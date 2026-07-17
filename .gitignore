@@ -1,0 +1,37 @@
+# API 인증정보
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# macOS
+.DS_Store
+**/.DS_Store
+
+# VS Code 개인설정
+.vscode/
+
+# 실제 수집 원본
+data/raw/**
+!data/raw/.gitkeep
+
+# 분석 결과
+data/processed/**
+!data/processed/.gitkeep
+
+# 품질검사 산출물
+data/quality/**
+!data/quality/.gitkeep
+
+# 실행 로그
+logs/**
+!logs/.gitkeep
+
+# 임시파일
+*.tmp
+*.temp
+*.bak
