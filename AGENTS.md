@@ -635,6 +635,16 @@ Codex는 코드, 테스트, 설정 또는 하네스 작업을 시작하기 전�
 `GIT_WORKFLOW.md`와 `SECURITY_RULES.md`는 필수 열람 문서로 적용한다.
 두 문서의 하네스 자동검사 대상 편입은 EG-3 후속 Issue에서 반영한다.
 
+데이터 수집·필드·분석 관련 작업을 시작하기 전에는 다음 문서를 반드시 읽는다.
+
+| 문서 | 역할 |
+|---|---|
+| `docs/rules/DATA_COLLECTION_RULES.md` | 데이터 수집, 원본 보존, 예측·날씨 분리와 결측 처리 규칙 |
+| `docs/data/FIELD_DICTIONARY.md` | 원본·정규화·메타데이터·파생필드의 정의와 검증 상태 |
+| `docs/analysis/ANALYSIS_PLAN.md` | 분석 질문, 기준선, 평가기간과 Gate A·B·C 판정 계획 |
+
+세 문서의 하네스 자동검사 대상 편입은 EG-3 후속 Issue에서 반영한다.
+
 Codex는 작업 시작 전에 다음을 확인한다.
 
 1. 현재 작업이 어느 품질 게이트에 해당하는가
@@ -656,7 +666,7 @@ Codex는 작업 시작 전에 다음을 확인한다.
 
 1. PM의 최신 명시적 지시
 2. `AGENTS.md`
-3. `docs/product/REQUIREMENTS.md`
+3. `requirements-definition-freshmanager-poc-v0.4.md`
 4. `docs/rules/CODING_RULES.md`
 5. `docs/testing/HARNESS_SPEC.md`
 6. `docs/testing/QUALITY_GATES.md`
