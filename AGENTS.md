@@ -615,6 +615,8 @@ Codex는 코드, 테스트, 설정 또는 하네스 작업을 시작하기 전�
 다음 문서를 반드시 읽어야 한다.
 
 - `docs/rules/CODING_RULES.md`
+- `docs/rules/GIT_WORKFLOW.md`
+- `docs/rules/SECURITY_RULES.md`
 - `docs/testing/HARNESS_SPEC.md`
 - `docs/testing/QUALITY_GATES.md`
 - `docs/testing/HARNESS_REPORT_TEMPLATE.md`
@@ -624,9 +626,14 @@ Codex는 코드, 테스트, 설정 또는 하네스 작업을 시작하기 전�
 | 문서 | 역할 |
 |---|---|
 | `CODING_RULES.md` | 코드 구조, 오류처리, 보안, 저장 및 테스트 작성 규칙 |
+| `GIT_WORKFLOW.md` | Issue, Branch, Worktree, Commit, Pull Request, Review, Merge 운영 규칙 |
+| `SECURITY_RULES.md` | API 키, 로그, 민감정보, GitHub 및 외부 공유 보안 규칙 |
 | `HARNESS_SPEC.md` | 자동검사 항목과 검사 ID, PASS·FAIL·WARN·SKIP 판정, 종료 코드의 유일한 기준 |
 | `QUALITY_GATES.md` | EG-0~EG-8의 순서, 단계별 통과조건과 다음 단계 진입조건 |
 | `HARNESS_REPORT_TEMPLATE.md` | `HARNESS_SPEC.md`에 정의된 검사 결과와 PM 확인사항의 기록 형식 |
+
+`GIT_WORKFLOW.md`와 `SECURITY_RULES.md`는 필수 열람 문서로 적용한다.
+두 문서의 하네스 자동검사 대상 편입은 EG-3 후속 Issue에서 반영한다.
 
 Codex는 작업 시작 전에 다음을 확인한다.
 

@@ -491,7 +491,7 @@ http://openapi.seoul.go.kr:8088/********/json/...
 공유용 파일은 `.env.example`만 사용하고 실제 키를 넣지 않는다.
 
 ```env
-SEOUL_API_KEY=your_api_key_here
+SEOUL_OPEN_API_KEY=your_api_key_here
 ```
 
 ---
@@ -565,6 +565,11 @@ EG-3 오프라인 하네스 통과 후 PM 승인을 받아 EG-4 여의도 1장�
 ## 19. 작업 원칙
 
 Codex는 작업 전 반드시 `AGENTS.md`를 읽는다.
+
+관련 운영 문서:
+
+- `docs/rules/GIT_WORKFLOW.md`: Git 작업 운영 규칙
+- `docs/rules/SECURITY_RULES.md`: 보안 운영 규칙
 
 ```text
 요구사항 확인
