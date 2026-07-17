@@ -683,3 +683,11 @@ Codex는 작업 시작 전에 다음을 확인한다.
 4. 선택 가능한 수정안
 5. 권장안
 6. PM 승인이 필요한 이유
+
+## 25. GitHub Issue·Pull Request 템플릿
+
+- `.github/ISSUE_TEMPLATE/task.md`: 모든 변경 작업의 Issue 작성에 사용한다.
+- `.github/pull_request_template.md`: 모든 Pull Request 작성과 검토에 사용한다.
+
+변경 작업은 Issue에서 PM의 구현계획 승인을 받은 뒤 시작하고,
+Pull Request는 해당 Issue를 연결하며 PM의 최종 Merge 승인을 받는다.
