@@ -573,6 +573,8 @@ Codex는 작업 전 반드시 `AGENTS.md`를 읽는다.
 - `docs/rules/DATA_COLLECTION_RULES.md`: 데이터 수집·원본 보존·결측 처리 규칙
 - `docs/data/FIELD_DICTIONARY.md`: 원본·정규화·메타데이터·파생필드 정의
 - `docs/analysis/ANALYSIS_PLAN.md`: 분석 질문·기준선·평가기간·Gate 판정 계획
+- `.github/ISSUE_TEMPLATE/task.md`: 범용 작업 Issue 템플릿
+- `.github/pull_request_template.md`: Pull Request 검토 템플릿
 
 ```text
 요구사항 확인
