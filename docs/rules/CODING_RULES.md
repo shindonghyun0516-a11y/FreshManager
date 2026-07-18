@@ -61,14 +61,16 @@ python3 파일경로
 data/reference/seoul_121_places.csv
 ```
 
-현재 공식 CSV는 배치됐지만 무결성 검증은 완료되지 않았고 EG-1도 통과하지 않았다.
+현재 공식 CSV는 정비와 `main` 반영 및 읽기 전용 재검증을 완료해 EG-1을 통과했다.
 XLSX 파일과 XLSX 보존 경로는 사용하지 않는다.
 
 - 수집기와 하네스는 같은 공식 CSV만 장소 순회·코드 조회·검증 입력으로 사용한다.
 - CSV는 `open(..., mode="r", encoding="utf-8-sig", newline="")`로 열고
   표준 라이브러리 `csv.DictReader`로 읽는다.
-- `utf-8-sig`로 UTF-8과 UTF-8 BOM을 모두 처리한다.
-- `CATEGORY`, `NO`, `AREA_CD`, `AREA_NM`, `ENG_NM`을 필수 컬럼으로 검사한다.
+- `utf-8-sig`로 UTF-8과 UTF-8 BOM을 모두 처리하며 BOM 존재 자체를
+  필수조건으로 요구하지 않는다.
+- 헤더는 `CATEGORY`, `NO`, `AREA_CD`, `AREA_NM`, `ENG_NM`의 정확한
+  5개 컬럼과 순서인지 검사한다.
 - 헤더를 제외한 121행, `AREA_CD` 결측·중복 없음, `AREA_NM` 결측 없음,
   여의도 `POI072`, 분류별 합계 121을 검사한다.
 - `POI001`부터 `POI121`까지 코드 생성, `NO`의 코드 전환과 자동 보정을 금지한다.
