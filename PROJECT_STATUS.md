@@ -9,16 +9,16 @@
 
 - 프로젝트: **프레시매니저 유동판매 추천 서비스 — 데이터 타당성 PoC**
 - 현재 목표: 공개 데이터만으로 여의도 오피스 상권의 유동판매 추천 가능성을 검증
-- 완료: EG-0, EG-1, EG-2, EG-3
-- 현재 작업: **Issue #16 — GitHub Actions에서 Python Harness 자동 실행**
-- 현재 Branch: `ci/issue-16-github-actions-harness`
-- 현재 단계: 구현 전 계획 검토 완료, PM 결정 및 구현 지시 대기
-- 다음 공식 단계: Issue #16 완료 후 **EG-4 서울시 API 최초 호출**
+- 완료: EG-0, EG-1, EG-2, EG-3, CI 보강
+- 현재 작업: 없음
+- 현재 Branch: `main`
+- 현재 단계: CI 완료, EG-4 시작 전
+- 다음 공식 단계: **EG-4 서울시 API 최초 호출**
 - 절대 주의:
   - API Key Commit 금지
   - 공식 CSV·JSON 임의 수정 금지
   - `git add .` 사용 금지
-  - 범위 밖 작업일지 파일을 CI 작업에 포함하지 않기
+  - 승인 범위 밖 작업일지 파일을 Stage하지 않기
 
 ---
 
@@ -169,7 +169,7 @@ Issue 생성
 | EG-1 | 완료 | 데이터·검증 계약 수립 |
 | EG-2 | 완료 | 공식 기준 CSV와 샘플 JSON 반영 |
 | EG-3 | 완료 | Python Harness와 단위 테스트 구현·병합 |
-| CI 보강 | 진행 중 | Issue #16 |
+| CI 보강 | 완료 | Issue #16, PR #20, PR 및 main Push 자동검사 검증 완료 |
 | EG-4 | 대기 | 서울시 API 최초 호출과 원본 응답 저장 |
 | EG-5 이후 | 미진행 | EG-4 완료 후 정의 |
 
@@ -234,25 +234,31 @@ OK
 
 ---
 
-## 7. 현재 작업 — Issue #16
+## 7. 최근 완료 작업 — Issue #16 CI 보강
 
 ### 7.1 기본 정보
 
-- Issue: #16
+- Issue: #16 종료
+- Pull Request: #20 Squash and merge 완료
 - 작업명: GitHub Actions에서 Python Harness 자동 실행
-- Branch: `ci/issue-16-github-actions-harness`
-- 현재 상태:
-  - Branch 생성 완료
-  - 읽기 전용 구현계획 수립 완료
-  - 판정: `CI PLAN READY WITH WARNINGS`
-  - Workflow 구현 전
-  - PM 결정과 구현 지시 대기
+- Workflow: `.github/workflows/harness.yml` 구현 완료
+- 검증 결과:
+  - `pull_request` Trigger 실행 성공
+  - `main` Push Trigger 실행 성공
+  - Harness 실행 성공
+  - 단위 테스트 실행 성공
+- 정리 결과:
+  - GitHub 원격 작업 Branch 삭제 완료
+  - 로컬 Issue #16 Branch 삭제 완료
+  - 로컬 `main` 최신화 완료
+- Branch 보호 규칙: 아직 미적용
+- 현재 진행 중인 Issue: 없음
 
 ### 7.2 이 작업을 쉬운 말로 설명하면
 
-현재는 사용자가 직접 명령어를 실행해야 검사가 시작된다.
+Issue #16 전에는 사용자가 직접 명령어를 실행해야 검사가 시작됐다.
 
-Issue #16은 다음 상황에서 GitHub가 검사를 자동 실행하도록 만드는 작업이다.
+이제 다음 상황에서 GitHub가 검사를 자동 실행한다.
 
 ```text
 Pull Request 생성 또는 갱신
@@ -268,28 +274,22 @@ python3 scripts/harness_check.py
 python3 -B -m unittest discover -s tests -p "test_*.py" -v
 ```
 
-### 7.4 제안 변경 파일
-
-필수:
+### 7.4 구현 파일
 
 - `.github/workflows/harness.yml`
-
-문서 상태 동기화를 위한 최소 수정:
-
 - `docs/testing/QUALITY_GATES.md`
 
-### 7.5 PM 결정이 필요한 사항
+### 7.5 적용 결과
 
-| 결정사항 | 권장안 | 이유 |
+| 항목 | 적용 내용 | 이유 |
 |---|---|---|
-| CI Python 버전 | `3.12` | 새 CI 기준을 지원 종료된 로컬 3.9에 맞추지 않기 위해 |
-| QUALITY_GATES 수정 | 포함 | “CI 미구현” 문장이 실제 상태와 충돌하지 않도록 |
-| GitHub Action 참조 | 우선 공식 주 버전 사용 | 첫 CI에서는 단순성과 관리 편의 우선 |
-| Commit SHA 고정 | 후속 보안 Issue | 비개발자 PM이 관리할 항목을 이번 작업에서 과도하게 늘리지 않기 위해 |
+| CI Python 버전 | `3.12` | 지원되는 Python 버전으로 자동검사 실행 |
+| GitHub Action 참조 | `actions/checkout@v6`, `actions/setup-python@v6` | 공식 주 버전 사용 |
+| 권한 | `contents: read` | 저장소 읽기 최소 권한만 허용 |
+| Secret·`.env` | 사용하지 않음 | 오프라인 하네스와 단위 테스트만 실행 |
+| Branch 보호 규칙 | 미적용 | 별도 승인과 설정이 필요한 후속 운영 범위 |
 
-> 위 권장안은 아직 구현 결과가 아니다. PM이 승인한 뒤 적용한다.
-
-### 7.6 Issue #16 범위 제외
+### 7.6 Issue #16에서 변경하지 않은 범위
 
 - Harness 검사 로직 추가·변경
 - 단위 테스트 변경
@@ -315,7 +315,7 @@ work log/project-journal-day03-2026-07-17.md
 
 처리 원칙:
 
-- Issue #16에 포함하지 않는다.
+- 현재 PROJECT_STATUS 갱신 작업에 포함하지 않는다.
 - 수정·삭제·Stage하지 않는다.
 - `git add .`을 사용하지 않는다.
 - 별도 문서 Issue에서 처리한다.
@@ -393,7 +393,7 @@ Python은 이 작업을 외부 패키지 없이 비교적 단순하게 수행할
 
 ---
 
-## 11. Issue #16 완료 후 다음 단계 — EG-4
+## 11. 다음 공식 단계 — EG-4
 
 ### 11.1 EG-4를 쉬운 말로 설명하면
 
@@ -430,7 +430,7 @@ API Key를 로컬에서 안전하게 읽기
 - 알림 기능
 - 사용자 위치 추적
 
-Issue #16과 EG-4는 하나의 PR에 섞지 않는다.
+완료된 CI 보강과 EG-4 구현은 별도 Issue와 PR로 관리한다.
 
 ---
 
@@ -527,46 +527,25 @@ Issue #16과 EG-4는 하나의 PR에 섞지 않는다.
 
 ### 지금 해야 할 일
 
-Issue #16의 PM 결정을 확정하고 Codex에 구현을 지시한다.
-
-권장 결정:
+다음 공식 작업인 EG-4를 시작한다.
 
 ```text
-CI Python: 3.12
-QUALITY_GATES.md 최소 수정: 포함
-GitHub Actions: 공식 주 버전 사용
-Commit SHA 고정: 후속 보안 Issue로 분리
-```
-
-### 구현 후 확인 순서
-
-```text
-1. 변경 파일이 승인 범위인지 확인
-2. Harness 실행
-3. 단위 테스트 실행
-4. git diff --check
-5. 승인된 파일만 Stage
-6. Commit
-7. Push
-8. PR 생성
-9. GitHub Actions 성공 확인
-10. Merge
-11. main Push 자동검사 성공 확인
-12. Issue #16 종료
-13. Branch·Worktree 정리
-14. PROJECT_STATUS.md 갱신
-15. EG-4 Issue 생성
+1. EG-4 Issue 생성
+2. EG-4 범위와 완료조건 확정
+3. EG-4 Branch 또는 Worktree 생성
+4. Codex 읽기 전용 구현계획 검토
+5. PM 승인 후 구현
 ```
 
 ---
 
 ## 15. 마지막 갱신 정보
 
-- 문서 버전: 1.1
-- 마지막 갱신일: 2026-07-18
-- 현재 Issue: #16
-- 현재 Branch: `ci/issue-16-github-actions-harness`
-- 현재 단계: CI 구현 전 PM 결정·구현 지시 대기
-- 완료된 최근 작업: EG-3 Python Harness main 병합
-- 다음 행동: Issue #16 구현 계약 확정
-- 그다음 단계: EG-4 서울시 API 최초 호출
+- 문서 버전: 1.2
+- 마지막 갱신일: 2026-07-19
+- 현재 Issue: 없음
+- 현재 Branch: `main`
+- 현재 단계: CI 완료, EG-4 시작 전
+- 완료된 최근 작업: Issue #16 및 PR #20 GitHub Actions CI
+- 다음 행동: EG-4 Issue 생성
+- 다음 공식 단계: 서울시 API 최초 호출
