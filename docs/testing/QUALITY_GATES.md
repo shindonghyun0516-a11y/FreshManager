@@ -62,8 +62,11 @@ EG-0 문서 기준선
 | EG-7 | 미구현 |
 | EG-8 | 미결정 |
 
-EG-3의 로컬 하네스와 단위 테스트 검증은 완료됐다. GitHub Actions는 아직
-구현되지 않았으며 후속 Issue 범위다. EG-4 이후 단계는 아직 진행하지 않았다.
+EG-3의 로컬 하네스와 단위 테스트 검증은 완료됐다. GitHub Actions Workflow가
+구현되어 `main` 대상 Pull Request와 `main` Push에서 하네스와 단위 테스트를
+자동 실행한다. 첫 Pull Request에서 `pull_request` Trigger를 검증하고, Merge 후
+`main` Push Trigger를 검증한다. Branch 보호 규칙은 아직 적용하지 않았으며,
+EG-4 이후 단계는 아직 진행하지 않았다.
 
 ---
 
