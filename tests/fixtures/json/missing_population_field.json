@@ -1,0 +1,12 @@
+{
+  "SeoulRtd.citydata_ppltn": [
+    {
+      "AREA_NM": "여의도",
+      "AREA_CD": "POI072"
+    }
+  ],
+  "RESULT": {
+    "RESULT.CODE": "INFO-000",
+    "RESULT.MESSAGE": "정상 처리되었습니다"
+  }
+}

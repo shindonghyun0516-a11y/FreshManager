@@ -20,8 +20,7 @@ EG-0부터 EG-2까지는 하네스 구현 전 단계다. 각 게이트에 적용
 python3 scripts/harness_check.py
 ```
 
-현재 `scripts/harness_check.py`는 구현되지 않았으므로 이 명령을 아직
-실행 가능한 기능으로 간주하지 않는다.
+`scripts/harness_check.py`는 EG-3의 현재 구현체이며 위 명령으로 실행한다.
 
 - 일반 하네스와 일반 테스트에서는 네트워크 연결과 실제 서울시 API 호출을 금지한다.
 - 저장된 샘플 JSON, 가짜 응답과 임시 파일만 사용한다.
@@ -77,8 +76,8 @@ python3 scripts/harness_check.py
 | 검사 ID | 검사명 | 검사 목적 | 입력 파일 | PASS 조건 | FAIL 조건 | WARN·SKIP 가능 여부 | 적용 엔지니어링 게이트 |
 |---|---|---|---|---|---|---|---|
 | `H-101` | 공식 CSV 파일 존재 | 단일 기준파일 배치 확인 | `data/reference/seoul_121_places.csv` | 지정 경로에 일반 파일이 존재 | 파일이 없거나 경로가 파일이 아님 | 불가 | EG-1 사전검증, EG-3 이후 |
-| `H-102` | CSV 인코딩 읽기 | UTF-8과 UTF-8 BOM 수용 | 공식 CSV | `encoding="utf-8-sig"`, `newline=""`로 오류 없이 읽힘 | 디코딩 또는 CSV 읽기 오류 | 불가 | EG-1, EG-3 이후 |
-| `H-103` | CSV 필수 컬럼 | 기준 스키마 확인 | 공식 CSV | `CATEGORY`, `NO`, `AREA_CD`, `AREA_NM`, `ENG_NM` 모두 존재 | 한 개 이상 누락 | 불가 | EG-1, EG-3 이후 |
+| `H-102` | CSV 인코딩 읽기 | UTF-8과 UTF-8 BOM 수용 | 공식 CSV | BOM 유무와 관계없이 `encoding="utf-8-sig"`, `newline=""`로 오류 없이 읽힘 | UTF-8 디코딩 또는 CSV 읽기 오류 | 불가 | EG-1, EG-3 이후 |
+| `H-103` | CSV 필수 컬럼 | 기준 스키마 확인 | 공식 CSV | `CATEGORY`, `NO`, `AREA_CD`, `AREA_NM`, `ENG_NM`의 정확한 5개 헤더가 이 순서로 존재 | 추가·이름 없는 컬럼, 순서 변경 또는 한 개 이상 누락 | 불가 | EG-1, EG-3 이후 |
 | `H-104` | CSV 121행 | 전체 장소 수 확인 | 공식 CSV | 헤더 제외 정확히 121행 | 121행이 아님 | 불가 | EG-1, EG-3 이후 |
 | `H-105` | AREA_CD 결측 | 호출 코드 결측 방지 | 공식 CSV | 모든 `AREA_CD`가 비어 있지 않음 | 한 개 이상 결측 | 불가 | EG-1, EG-3 이후 |
 | `H-106` | AREA_CD 중복 | 장소코드 고유성 확인 | 공식 CSV | 모든 `AREA_CD`가 서로 고유 | 한 개 이상 중복 | 불가 | EG-1, EG-3 이후 |
@@ -184,9 +183,9 @@ PM 승인된 실제 호출은 별도 수동 단계이며 하네스가 호출을 
 ## 5. 현재 적용 상태
 
 - EG-0: 통과, PM 승인 완료
-- EG-1: 읽기 전용 검사 완료, 전 필드 공백 레코드 868개로 미통과
+- EG-1: 공식 CSV 정비·`main` 반영 및 읽기 전용 재검증 완료로 통과
 - EG-2: 공식 샘플 배치 및 `H-301`~`H-304` PASS로 통과
-- EG-3: 하네스 미구현
+- EG-3: `scripts/harness_check.py` 구현 및 로컬 검증 완료
 - EG-4~EG-8: 미진행
 
-현재 단계에서는 Python 하네스를 실행하지 않는다.
+표준 실행 명령은 `python3 scripts/harness_check.py`다.

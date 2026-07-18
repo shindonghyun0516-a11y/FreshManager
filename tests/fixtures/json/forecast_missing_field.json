@@ -1,0 +1,14 @@
+{
+  "SeoulRtd.citydata_ppltn": [
+    {
+      "FCST_YN": "Y",
+      "FCST_PPLTN": [
+        {
+          "FCST_TIME": "2026-07-16 21:00",
+          "FCST_CONGEST_LVL": "보통",
+          "FCST_PPLTN_MIN": "1000"
+        }
+      ]
+    }
+  ]
+}
