@@ -9,11 +9,15 @@
 
 - 프로젝트: **프레시매니저 유동판매 추천 서비스 — 데이터 타당성 PoC**
 - 현재 목표: 공개 데이터만으로 여의도 오피스 상권의 유동판매 추천 가능성을 검증
-- 완료: EG-0, EG-1, EG-2, EG-3, CI 보강
-- 현재 작업: 없음
-- 현재 Branch: `main`
-- 현재 단계: CI 완료, EG-4 시작 전
-- 다음 공식 단계: **EG-4 서울시 API 최초 호출**
+- 완료: EG-0, EG-1, EG-2, EG-3, CI 보강, Harness 구조·용어 개편 P1·P2
+- 현재 작업: Issue #26 — Architecture 병합 결과의 PROJECT_STATUS 최신화
+- 공식 기준 Branch: `main`
+- 현재 작업 Branch: `docs/issue-26-update-project-status-after-architecture-merge`
+- 현재 Harness 상태: P1·P2 완료, P3~P7 영향 분석 시작 전
+- 다음 Harness 작업:
+  - Project Guard 명칭 전환을 위한 별도 Issue 생성
+  - 파일 변경 전 읽기 전용 영향 분석
+- 다음 공식 Engineering Gate: **EG-4 서울시 API 최초 호출**
 - 절대 주의:
   - API Key Commit 금지
   - 공식 CSV·JSON 임의 수정 금지
@@ -232,9 +236,24 @@ OK
 
 이 두 파일은 별도 Issue와 PM 승인 없이 수정하지 않는다.
 
+### 6.6 Codex Engineering Harness Architecture — Issue #24 / PR #25
+
+- Issue #24 완료 및 Close
+- PR #25 Merge 완료
+- Commit: `docs: define Codex engineering harness architecture (#25)`
+- 반영 문서: `docs/engineering/CODEX_HARNESS_ARCHITECTURE.md`
+- 주요 결과:
+  - Codex Engineering Harness와 Project Guard 계층 구분
+  - Project Guard, Unit Tests, CI, Review와 Quality Gates 책임 구분
+  - PM 범위 승인·외부 실행 승인·Merge 승인 구분
+  - 문서별 공식 책임과 중복 방지 원칙 정의
+  - Current State와 Target State 구분
+- Harness 구조·용어 개편: P1 완료, P2 완료
+- 검증: PR #25 CI, `main` Push CI, 로컬 Project Guard와 Unit Tests 성공
+
 ---
 
-## 7. 최근 완료 작업 — Issue #16 CI 보강
+## 7. 완료 이력 — Issue #16 CI 보강
 
 ### 7.1 기본 정보
 
@@ -252,7 +271,7 @@ OK
   - 로컬 Issue #16 Branch 삭제 완료
   - 로컬 `main` 최신화 완료
 - Branch 보호 규칙: 아직 미적용
-- 현재 진행 중인 Issue: 없음
+- Issue #16 완료 당시 후속 진행 Issue: 없음
 
 ### 7.2 이 작업을 쉬운 말로 설명하면
 
@@ -440,13 +459,14 @@ API Key를 로컬에서 안전하게 읽기
 
 1. `PROJECT_STATUS.md`
 2. `AGENTS.md`
-3. `README.md`
-4. `docs/testing/QUALITY_GATES.md`
-5. `docs/testing/HARNESS_SPEC.md`
-6. 현재 GitHub Issue
-7. 현재 Branch
-8. `git status --short`
-9. 최근 병합된 PR과 Commit
+3. `docs/engineering/CODEX_HARNESS_ARCHITECTURE.md`
+4. `README.md`
+5. `docs/testing/QUALITY_GATES.md`
+6. `docs/testing/HARNESS_SPEC.md`
+7. 현재 GitHub Issue
+8. 현재 Branch
+9. `git status --short`
+10. 최근 병합된 PR과 Commit
 
 ### 12.2 AI가 작업 전 보고할 내용
 
@@ -468,8 +488,9 @@ API Key를 로컬에서 안전하게 읽기
 ```text
 저장소의 PROJECT_STATUS.md부터 읽고 프로젝트 상태를 복원해줘.
 
-그다음 AGENTS.md, README.md, QUALITY_GATES.md, HARNESS_SPEC.md,
-현재 GitHub Issue, Branch, 최근 PR과 Git 상태를 확인해줘.
+그다음 AGENTS.md, docs/engineering/CODEX_HARNESS_ARCHITECTURE.md,
+README.md, QUALITY_GATES.md, HARNESS_SPEC.md, 현재 GitHub Issue,
+Branch, 최근 PR과 Git 상태를 확인해줘.
 
 나는 비개발자 PM이다. 반드시 다음 순서로 설명해줘.
 
@@ -525,27 +546,42 @@ API Key를 로컬에서 안전하게 읽기
 
 ## 14. 현재 다음 행동
 
-### 지금 해야 할 일
+### 14.1 현재 진행 중인 작업
 
-다음 공식 작업인 EG-4를 시작한다.
+- Issue #26
+- PR #25 Architecture 병합 결과를 `PROJECT_STATUS.md`에 반영
+- 문서 구조와 갱신 정책은 변경하지 않음
 
-```text
-1. EG-4 Issue 생성
-2. EG-4 범위와 완료조건 확정
-3. EG-4 Branch 또는 Worktree 생성
-4. Codex 읽기 전용 구현계획 검토
-5. PM 승인 후 구현
-```
+### 14.2 다음 Harness 작업
+
+1. P3~P7 명칭 전환을 위한 별도 Issue 생성
+2. 현재 Harness 관련 파일과 참조를 읽기 전용으로 분석
+3. Report Template과 Unit Test 파일명 변경 여부 검토
+4. PM 승인 후 원자적인 명칭 전환 수행
+
+이 단계에서는 파일명을 아직 변경하지 않는다.
+
+### 14.3 다음 제품 Engineering Gate
+
+- EG-4: 서울시 API 최초 1회 호출 및 원본 응답 저장
+- Harness P3~P7 명칭 전환과 별도 축으로 관리
+- 현재 상태: 대기
 
 ---
 
 ## 15. 마지막 갱신 정보
 
-- 문서 버전: 1.2
+- 문서 버전: 1.3
 - 마지막 갱신일: 2026-07-19
-- 현재 Issue: 없음
-- 현재 Branch: `main`
-- 현재 단계: CI 완료, EG-4 시작 전
-- 완료된 최근 작업: Issue #16 및 PR #20 GitHub Actions CI
-- 다음 행동: EG-4 Issue 생성
-- 다음 공식 단계: 서울시 API 최초 호출
+- 현재 Issue: #26
+- 공식 기준 Branch: `main`
+- 현재 작업 Branch: `docs/issue-26-update-project-status-after-architecture-merge`
+- 현재 단계: Architecture 병합 결과의 PROJECT_STATUS 최신화
+- 완료된 최근 작업:
+  - Issue #24 및 PR #25
+  - Codex Engineering Harness Architecture `main` 반영
+  - Harness 구조·용어 개편 P1·P2 완료
+- 다음 Harness 행동:
+  - P3~P7 명칭 전환 Issue 생성
+  - 파일 변경 전 읽기 전용 영향 분석
+- 다음 공식 Engineering Gate: EG-4 서울시 API 최초 호출
