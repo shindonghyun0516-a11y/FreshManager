@@ -9,13 +9,13 @@
 
 - 프로젝트: **프레시매니저 유동판매 추천 서비스 — 데이터 타당성 PoC**
 - 현재 목표: 공개 데이터만으로 여의도 오피스 상권의 유동판매 추천 가능성을 검증
-- 완료: EG-0, EG-1, EG-2, EG-3, CI 보강, Codex Engineering Harness 구조·용어 개편 P1~P7
+- 완료: EG-0, EG-1, EG-2, EG-3, CI 보강, Codex Engineering Harness 구조·용어 개편 P1~P7, EG-4 오프라인 수집기 구현
 - 공식 진행 Issue: 없음
 - 공식 기준 Branch: `main`
 - 공식 작업 Branch: 없음
-- 현재 Engineering Gate: EG-3 완료
+- 현재 Engineering Gate: EG-4 진행 — 오프라인 구현 완료, 실제 호출 대기
 - 현재 Codex Engineering Harness 개편 상태: P1~P7 완료
-- 다음 공식 단계: **EG-4 준비도 분석 및 범위 확정**
+- 다음 공식 단계: **별도 Issue에서 EG-4 POI072 1회 실제 호출 준비와 외부 실행 승인**
 - 실제 서울시 API 호출: 미승인
 - 절대 주의:
   - API Key Commit 금지
@@ -25,6 +25,10 @@
 
 실제 작업 중 Issue와 Branch는 GitHub의 현재 Issue와
 `git branch --show-current` 결과를 우선한다.
+
+이 작업 Branch의 EG-4 오프라인 완료 표기는 Issue #32 PR Merge 후 예상되는
+`main` 상태를 같은 PR에서 선반영한 초안이다. Merge 전 실제 Issue와 Branch,
+공식 반영 여부는 GitHub와 `git branch --show-current` 결과를 우선한다.
 
 ---
 
@@ -184,7 +188,7 @@ Issue 생성
 | EG-2 | 완료 | 공식 기준 CSV와 샘플 JSON 반영 |
 | EG-3 | 완료 | Project Guard와 Unit Tests 구현·병합 |
 | CI 보강 | 완료 | Issue #16, PR #20, PR 및 main Push 자동검사 검증 완료 |
-| EG-4 | 대기 | 서울시 API 최초 호출과 원본 응답 저장 |
+| EG-4 | 진행 | POI072 오프라인 수집기·Fake 검증 완료, 실제 API 호출 미승인·미실행 |
 | EG-5 이후 | 미진행 | EG-4 완료 후 정의 |
 
 > EG-0~EG-2의 상세 완료조건은 저장소 문서와 병합된 Issue·PR을 확인한다.
@@ -235,7 +239,7 @@ python3 -B -m unittest discover -s tests -p "test_*.py" -v
 - CI Workflow: `.github/workflows/ci.yml`
 - Unit Tests: `tests/test_project_guard_check.py`
 
-### 6.4 정상 기준
+### 6.4 EG-3 병합 당시 정상 기준
 
 ```text
 PASS=28
@@ -290,6 +294,16 @@ OK
   - `docs/testing/PROJECT_GUARD_SPEC.md`
   - `docs/testing/PROJECT_GUARD_REPORT_TEMPLATE.md`
   - `.github/workflows/ci.yml`
+
+### 6.8 POI072 오프라인 수집기 — Issue #32
+
+- 루트 `freshmanager/` 패키지에 교체 가능한 Client 계약과 Fake 기반 수집 흐름 구현
+- 공식 CSV의 `POI072` 한 장소만 읽기 전용으로 처리
+- 원본 bytes 비덮어쓰기와 요청별 8개 메타데이터 JSON 구현
+- 실제 HTTP Adapter, 실제 `.env` 사용과 실제 API 호출은 제외
+- Issue #32 작업 Branch 현재 기준 Project Guard: 45개 ID 유지, 활성 35개 PASS,
+  후속 10개 SKIP
+- Issue #32 작업 Branch 현재 기준 Unit Tests: 83개 통과
 
 ---
 
@@ -370,12 +384,13 @@ python3 -B -m unittest discover -s tests -p "test_*.py" -v
 
 ```text
 work log/project-journal-day03-2026-07-17.md
+work log/project-journal-day04-2026-07-20.md
 ```
 
 처리 원칙:
 
 - 현재 PROJECT_STATUS 갱신 작업에 포함하지 않는다.
-- 수정·삭제·Stage하지 않는다.
+- 두 파일을 읽기·수정·삭제·복사·Stage·Commit하지 않는다.
 - `git add .`을 사용하지 않는다.
 - 별도 문서 Issue에서 처리한다.
 
@@ -454,14 +469,13 @@ Python은 이 작업을 외부 패키지 없이 비교적 단순하게 수행할
 
 ## 11. 다음 공식 단계 — EG-4
 
-EG-4 실제 서울시 API 호출은 아직 승인되지 않았다. 먼저 요구사항과 현재
-저장소 상태를 읽기 전용으로 분석하고 오프라인 구현 범위를 확정한다.
+EG-4 오프라인 수집기와 Fake 기반 검증은 완료했다. 실제 서울시 API 호출은
+아직 승인되지 않았으며 Issue #32 병합 후 별도 Issue에서 준비한다.
 
 ### 11.1 EG-4를 쉬운 말로 설명하면
 
-지금까지는 저장된 샘플 데이터를 검사했다.
-
-EG-4부터는 실제 서울시 API에 처음 연결해 다음을 확인한다.
+현재는 저장된 샘플과 Dummy `.env`로 네트워크 없는 수집 흐름을 검증했다.
+다음 별도 Issue에서는 PM 외부 실행 승인 후 다음을 확인한다.
 
 ```text
 API Key를 로컬에서 안전하게 읽기
@@ -472,7 +486,7 @@ API Key를 로컬에서 안전하게 읽기
 → Project Guard와 Unit Tests 실행
 ```
 
-### 11.2 EG-4 예상 범위
+### 11.2 EG-4 다음 실제 실행 범위
 
 - 로컬 `.env`에서 API Key 읽기
 - 서울시 API 최초 1회 호출
@@ -492,7 +506,7 @@ API Key를 로컬에서 안전하게 읽기
 - 알림 기능
 - 사용자 위치 추적
 
-완료된 CI 보강과 EG-4 구현은 별도 Issue와 PR로 관리한다.
+실제 HTTP Adapter와 POI072 1회 호출은 Issue #32와 분리해 별도 Issue와 PR로 관리한다.
 
 ---
 
@@ -604,41 +618,42 @@ Branch, 최근 PR과 Git 상태를 확인해줘.
 
 - 공식 진행 Issue 없음
 - 공식 작업 Branch 없음
-- EG-3와 Codex Engineering Harness P1~P7 완료
+- EG-3, Codex Engineering Harness P1~P7과 EG-4 오프라인 구현 완료
 
-### 14.2 다음 행동 — EG-4 준비
+### 14.2 다음 행동 — EG-4 실제 1회 호출 준비
 
-1. EG-4 요구사항과 현재 저장소 상태 읽기 전용 분석
-2. 오프라인 구현 범위와 수정 파일 확정
-3. PM 범위 승인
-4. 네트워크 없는 EG-4 구현과 테스트
-5. Project Guard·Unit Tests·CI 검증
-6. 실제 API 호출 별도 PM 승인
-7. 여의도 `POI072` 1회 실제 호출
+1. POI072 1회 실제 호출을 위한 별도 Issue 생성
+2. 실제 HTTP Adapter와 저장 범위 읽기 전용 분석
+3. PM 범위 승인과 외부 실행 승인 구분
+4. 실제 HTTP Adapter 구현 후 오프라인 회귀검증
+5. PM 외부 실행 승인
+6. 여의도 `POI072` 1회 실제 호출
+7. 원본·메타데이터·키 비노출 검증
 
 ### 14.3 다음 제품 Engineering Gate
 
 - EG-4: 서울시 API 최초 1회 호출 및 원본 응답 저장
-- 현재 상태: 준비도 분석 및 범위 확정 전
+- 현재 상태: 오프라인 구현 완료, 실제 호출 별도 Issue 시작 전
 - 실제 서울시 API 호출: 미승인
 
 ---
 
 ## 15. 마지막 갱신 정보
 
-- 문서 버전: 1.5
+- 문서 버전: 1.6
 - 마지막 갱신일: 2026-07-20
 - 공식 진행 Issue: 없음
 - 공식 기준 Branch: `main`
 - 공식 작업 Branch: 없음
-- 현재 Engineering Gate: EG-3 완료
-- 현재 단계: Codex Engineering Harness P1~P7 완료, EG-4 준비 전
+- 현재 Engineering Gate: EG-4 진행 — 오프라인 구현 완료, 실제 호출 대기
+- 현재 단계: Codex Engineering Harness P1~P7과 EG-4 POI072 오프라인 구현 완료
 - 완료된 최근 작업:
   - Issue #28 완료 및 PR #29 Squash and merge 완료
   - Squash Commit `0201eee`
   - PR CI와 `main` Push CI 성공
   - Project Guard 공식 명칭·파일명·경로 전환 완료
   - Codex Engineering Harness P3~P7 완료
-- 다음 행동: EG-4 요구사항과 현재 저장소 상태 읽기 전용 분석
-- 다음 공식 단계: EG-4 준비도 분석 및 범위 확정
+  - Issue #32 EG-4 오프라인 수집기와 Project Guard 7개 runner 구현
+- 다음 행동: POI072 1회 실제 호출 별도 Issue 생성
+- 다음 공식 단계: EG-4 실제 호출 준비와 PM 외부 실행 승인
 - 실제 서울시 API 호출: 미승인

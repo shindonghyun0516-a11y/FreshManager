@@ -430,6 +430,53 @@ class SecurityAndOfflineTests(unittest.TestCase):
         self.assertEqual(result.status, project_guard.Status.PASS, result.evidence)
 
 
+class Eg4ProjectGuardTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.project = TemporaryProject()
+
+    def tearDown(self) -> None:
+        self.project.close()
+
+    def assert_passed(self, check_id: str) -> None:
+        result = getattr(project_guard, f"check_{check_id.lower().replace('-', '')}")(self.project.context())
+        self.assertEqual(result.status, project_guard.Status.PASS, result.evidence)
+
+    def test_h204_minimal_env_loader(self) -> None:
+        self.assert_passed("H-204")
+
+    def test_h205_secret_masking(self) -> None:
+        self.assert_passed("H-205")
+
+    def test_h501_raw_non_overwrite(self) -> None:
+        self.assert_passed("H-501")
+
+    def test_h502_raw_filename_contract(self) -> None:
+        self.assert_passed("H-502")
+
+    def test_h503_metadata_contract(self) -> None:
+        self.assert_passed("H-503")
+
+    def test_h506_error_recording(self) -> None:
+        self.assert_passed("H-506")
+
+    def test_h506_fails_when_error_metadata_is_not_persisted(self) -> None:
+        with mock.patch.object(
+            project_guard.FileStorage,
+            "save_metadata",
+            side_effect=project_guard.StorageError("storage_error"),
+        ):
+            result = project_guard.check_h506(self.project.context())
+        self.assertEqual(result.status, project_guard.Status.FAIL)
+
+    def test_h701_single_yeouido_collection(self) -> None:
+        self.assert_passed("H-701")
+
+    def test_h701_fails_for_empty_normalized_population(self) -> None:
+        with mock.patch("freshmanager.collector.parse_population_response", return_value={}):
+            result = project_guard.check_h701(self.project.context())
+        self.assertEqual(result.status, project_guard.Status.FAIL)
+
+
 class RegistryAndExitCodeTests(unittest.TestCase):
     def test_all_45_ids_are_unique_and_in_spec_order(self) -> None:
         registry = [item.check_id for item in project_guard.CHECK_DEFINITIONS]
@@ -438,13 +485,13 @@ class RegistryAndExitCodeTests(unittest.TestCase):
         self.assertEqual(len(set(registry)), 45)
         self.assertEqual(registry, spec)
 
-    def test_expected_eg3_counts(self) -> None:
+    def test_expected_current_counts(self) -> None:
         results = project_guard.run_project_guard(ROOT)
         counts = Counter(item.status for item in results)
-        self.assertEqual(counts[project_guard.Status.PASS], 28)
+        self.assertEqual(counts[project_guard.Status.PASS], 35)
         self.assertEqual(counts[project_guard.Status.FAIL], 0)
         self.assertEqual(counts[project_guard.Status.WARN], 0)
-        self.assertEqual(counts[project_guard.Status.SKIP], 17)
+        self.assertEqual(counts[project_guard.Status.SKIP], 10)
         self.assertEqual(len(results), 45)
 
     def test_exit_code_zero_for_success(self) -> None:
