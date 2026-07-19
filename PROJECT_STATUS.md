@@ -9,20 +9,22 @@
 
 - 프로젝트: **프레시매니저 유동판매 추천 서비스 — 데이터 타당성 PoC**
 - 현재 목표: 공개 데이터만으로 여의도 오피스 상권의 유동판매 추천 가능성을 검증
-- 완료: EG-0, EG-1, EG-2, EG-3, CI 보강, Codex Engineering Harness 구조·용어 개편 P1·P2
-- 현재 작업: Issue #28 — Project Guard 명칭·경로 전환
+- 완료: EG-0, EG-1, EG-2, EG-3, CI 보강, Codex Engineering Harness 구조·용어 개편 P1~P7
+- 공식 진행 Issue: 없음
 - 공식 기준 Branch: `main`
-- 현재 작업 Branch: `refactor/issue-28-project-guard-terminology`
-- 현재 Codex Engineering Harness 개편 상태: P1·P2 완료, P3~P7 명칭 전환 구현 및 로컬 검증 완료, PR·CI·Merge 검증 대기
-- 현재 Project Guard 작업:
-  - 공식 파일명·경로·내부 식별자와 문서 참조 전환
-  - 로컬 검증 완료, PR·CI·Merge 검증 대기
-- 다음 공식 Engineering Gate: **EG-4 서울시 API 최초 호출**
+- 공식 작업 Branch: 없음
+- 현재 Engineering Gate: EG-3 완료
+- 현재 Codex Engineering Harness 개편 상태: P1~P7 완료
+- 다음 공식 단계: **EG-4 준비도 분석 및 범위 확정**
+- 실제 서울시 API 호출: 미승인
 - 절대 주의:
   - API Key Commit 금지
   - 공식 CSV·JSON 임의 수정 금지
   - `git add .` 사용 금지
   - 승인 범위 밖 작업일지 파일을 Stage하지 않기
+
+실제 작업 중 Issue와 Branch는 GitHub의 현재 Issue와
+`git branch --show-current` 결과를 우선한다.
 
 ---
 
@@ -100,7 +102,7 @@ Issue 생성
 → Push
 → Pull Request
 → Merge
-→ Issue 종료
+→ Issue 종료 상태 확인
 → Branch·Worktree 정리
 ```
 
@@ -124,12 +126,17 @@ Issue 생성
 → Commit
 → Push
 → Pull Request
+→ Codex가 PROJECT_STATUS 영향 사전 분석
+→ PM이 갱신 필요 또는 불필요 최종 판정
+→ 영향이 Merge 전에 확정되면 같은 PR에 반영
 → GitHub Actions 확인
 → PM 최종 승인
 → main Merge
-→ Issue 종료
+→ main CI와 로컬 재검증
+→ Merge 후 새롭게 확정된 중요 사실 확인
+→ 필요한 경우에만 별도 상태 갱신 Issue 생성
+→ Issue 종료 상태 확인
 → Branch·Worktree 정리
-→ PROJECT_STATUS.md 갱신
 ```
 
 ### 3.1 Git 운영 원칙
@@ -138,7 +145,10 @@ Issue 생성
 - Commit, Push, PR, Merge는 서로 다른 단계로 본다.
 - `git add .`은 사용하지 않는다.
 - 승인된 파일만 경로를 지정해 Stage한다.
-- 범위 밖 미추적 파일은 그대로 두어도 된다.
+- 미추적 파일은 자동으로 Stage하지 않는다.
+- PM이 인지한 보호 대상 미추적 파일은 유지할 수 있다.
+- 예상하지 못한 미추적 파일은 작업을 중단하고 정체와 범위를 확인한다.
+- 보호 대상 여부가 확인되지 않은 파일을 임의로 삭제하거나 Stage하지 않는다.
 - PR의 `Files changed`에 승인되지 않은 파일이 있으면 Merge하지 않는다.
 
 ---
@@ -172,7 +182,7 @@ Issue 생성
 | EG-0 | 완료 | 프로젝트 초기 기준 수립 |
 | EG-1 | 완료 | 데이터·검증 계약 수립 |
 | EG-2 | 완료 | 공식 기준 CSV와 샘플 JSON 반영 |
-| EG-3 | 완료 | Python Harness와 단위 테스트 구현·병합 |
+| EG-3 | 완료 | Project Guard와 Unit Tests 구현·병합 |
 | CI 보강 | 완료 | Issue #16, PR #20, PR 및 main Push 자동검사 검증 완료 |
 | EG-4 | 대기 | 서울시 API 최초 호출과 원본 응답 저장 |
 | EG-5 이후 | 미진행 | EG-4 완료 후 정의 |
@@ -260,6 +270,26 @@ OK
   - Current State와 Target State 구분
 - Codex Engineering Harness 구조·용어 개편: P1 완료, P2 완료
 - 검증: PR #25 CI, `main` Push CI, 로컬 Project Guard와 Unit Tests 성공
+
+### 6.7 Project Guard 명칭·경로 전환 — Issue #28 / PR #29
+
+- Issue #28 완료
+- PR #29 Squash and merge 완료
+- Squash Commit: `0201eee`
+- PR CI 성공
+- `main` Push CI 성공
+- 로컬 `main`과 `origin/main` 동기화 완료
+- Issue #28 작업 Branch 삭제 완료
+- Project Guard 공식 명칭·파일명·경로 전환 완료
+- Codex Engineering Harness 구조·용어 개편: P3~P7 완료
+- 검사 ID 45개 유지
+- Unit Tests 45개 유지
+- 공식 경로:
+  - `scripts/project_guard_check.py`
+  - `tests/test_project_guard_check.py`
+  - `docs/testing/PROJECT_GUARD_SPEC.md`
+  - `docs/testing/PROJECT_GUARD_REPORT_TEMPLATE.md`
+  - `.github/workflows/ci.yml`
 
 ---
 
@@ -424,6 +454,9 @@ Python은 이 작업을 외부 패키지 없이 비교적 단순하게 수행할
 
 ## 11. 다음 공식 단계 — EG-4
 
+EG-4 실제 서울시 API 호출은 아직 승인되지 않았다. 먼저 요구사항과 현재
+저장소 상태를 읽기 전용으로 분석하고 오프라인 구현 범위를 확정한다.
+
 ### 11.1 EG-4를 쉬운 말로 설명하면
 
 지금까지는 저장된 샘플 데이터를 검사했다.
@@ -519,84 +552,93 @@ Branch, 최근 PR과 Git 상태를 확인해줘.
 
 ## 13. PROJECT_STATUS.md 갱신 규칙
 
-다음 시점마다 갱신한다.
+모든 Issue를 종료할 때 `PROJECT_STATUS.md` 영향 여부를 반드시 판정한다.
+실제 문서 수정은 공식 프로젝트 상태에 영향이 있을 때만 수행하며,
+갱신이 불필요하면 그 사유를 Issue 또는 Pull Request에 기록한다.
 
-- 새 Issue를 시작했을 때
-- Branch를 생성했을 때
-- PM 결정사항을 확정했을 때
-- 구현이 완료됐을 때
-- PR을 생성했을 때
-- main에 Merge했을 때
-- Issue를 종료했을 때
-- Gate 상태가 변경됐을 때
-- 다음 우선순위가 바뀌었을 때
-- 새로운 위험이나 제약이 확인됐을 때
+### 13.1 갱신 필요 조건
 
-### 13.1 반드시 갱신할 항목
+다음 중 하나 이상이 변경되면 갱신한다.
 
-- 마지막 갱신일
-- 현재 Issue
-- 현재 Branch
-- 현재 단계
-- 완료 작업
-- 남은 작업
-- 다음 행동
-- 범위 밖 파일
-- 확정된 PM 결정
-- 새로 확인된 위험
+- 공식 작업 단계 또는 주요 작업축
+- Engineering Gate 또는 Codex Engineering Harness 단계
+- 공식 파일 경로, 실행 명령 또는 Workflow
+- 완료된 주요 Issue, Pull Request 또는 Commit
+- 다음 공식 행동이나 우선순위
+- PM이 확정한 운영정책
+- 위험, 제약 또는 외부 실행 승인 상태
+- 새 AI 세션의 상태 복원에 필요한 핵심 사실
 
-### 13.2 갱신 책임
+단순한 Issue 시작·종료 또는 작업 Branch 변경만으로는 자동 갱신하지 않는다.
 
-- Codex 또는 AI가 수정안을 제안할 수 있다.
-- PM이 실제 Git 상태와 Issue 상태를 확인한다.
+### 13.2 갱신 불필요 조건
+
+다음 변경만 있고 공식 상태, 다음 행동과 위험이 그대로라면 갱신하지 않는다.
+
+- 내부 구현 세부사항 또는 결과에 영향 없는 리팩터링
+- 테스트 내부 정리
+- 문체, 오타 또는 서식 수정
+- 상태 변화 없는 CI 재실행
+- 공식 경로와 계약을 바꾸지 않는 유지보수
+
+### 13.3 갱신 책임
+
+- PM은 공식 상태 영향과 완료 여부를 최종 판단한다.
+- Codex는 영향 분석, PM이 승인한 내용의 반영과 문서 정합성 검증을 담당한다.
+- GitHub CI는 Project Guard와 Unit Tests의 성공·실패 증거만 제공하며,
+  프로젝트 완료 또는 공식 상태를 판단하지 않는다.
 - 확인되지 않은 작업을 완료로 표시하지 않는다.
-- Merge 후에는 반드시 main 기준으로 문서를 다시 확인한다.
+
+### 13.4 반영 시점
+
+- 상태 영향이 Merge 전에 확정되면 원칙적으로 같은 Pull Request에 반영한다.
+- Merge 후에만 확정되는 중요한 정보는 별도 상태 갱신 Issue에서 반영한다.
+- 모든 Issue마다 별도 상태 갱신 Issue를 자동 생성하지 않는다.
+- Merge 후에는 `main` 기준으로 상태 영향과 문서 내용을 다시 확인한다.
 
 ---
 
 ## 14. 현재 다음 행동
 
-### 14.1 현재 진행 중인 작업
+### 14.1 공식 진행 중인 작업
 
-- Issue #28
-- Project Guard 파일명·실행 경로·내부 식별자와 문서 참조 전환
-- 검사 로직·ID·순서·판정·종료코드는 변경하지 않음
-- Issue #26 및 PR #27의 PROJECT_STATUS 최신화 작업은 완료·병합됨
+- 공식 진행 Issue 없음
+- 공식 작업 Branch 없음
+- EG-3와 Codex Engineering Harness P1~P7 완료
 
-### 14.2 다음 Codex Engineering Harness 작업
+### 14.2 다음 행동 — EG-4 준비
 
-1. P3~P7 명칭 전환 로컬 검증 완료
-2. 승인된 파일만 Stage하고 Staged Diff 검토
-3. Commit과 Push를 별도 단계로 수행
-4. Pull Request에서 독립 CI 검증
-5. PM Merge 승인 후 `main` 재검증
-
-현재 상태는 P3~P7 명칭 전환 구현 및 로컬 검증 완료이며
-Pull Request·CI·Merge 검증은 아직 완료되지 않았다.
+1. EG-4 요구사항과 현재 저장소 상태 읽기 전용 분석
+2. 오프라인 구현 범위와 수정 파일 확정
+3. PM 범위 승인
+4. 네트워크 없는 EG-4 구현과 테스트
+5. Project Guard·Unit Tests·CI 검증
+6. 실제 API 호출 별도 PM 승인
+7. 여의도 `POI072` 1회 실제 호출
 
 ### 14.3 다음 제품 Engineering Gate
 
 - EG-4: 서울시 API 최초 1회 호출 및 원본 응답 저장
-- Codex Engineering Harness P3~P7 명칭 전환과 별도 축으로 관리
-- 현재 상태: 대기
+- 현재 상태: 준비도 분석 및 범위 확정 전
+- 실제 서울시 API 호출: 미승인
 
 ---
 
 ## 15. 마지막 갱신 정보
 
-- 문서 버전: 1.4
-- 마지막 갱신일: 2026-07-19
-- 현재 Issue: #28
+- 문서 버전: 1.5
+- 마지막 갱신일: 2026-07-20
+- 공식 진행 Issue: 없음
 - 공식 기준 Branch: `main`
-- 현재 작업 Branch: `refactor/issue-28-project-guard-terminology`
-- 현재 단계: P3~P7 명칭 전환 구현 및 로컬 검증 완료, PR·CI·Merge 검증 대기
+- 공식 작업 Branch: 없음
+- 현재 Engineering Gate: EG-3 완료
+- 현재 단계: Codex Engineering Harness P1~P7 완료, EG-4 준비 전
 - 완료된 최근 작업:
-  - Issue #24 및 PR #25
-  - Codex Engineering Harness Architecture `main` 반영
-  - Codex Engineering Harness 구조·용어 개편 P1·P2 완료
-  - Issue #26 및 PR #27 PROJECT_STATUS 최신화 완료
-- 다음 Codex Engineering Harness 행동:
-  - Issue #28 변경 범위 PM 검토
-  - 승인된 파일 Stage와 Staged Diff 검토
-  - PR에서 Project Guard와 Unit Tests 독립 검증
-- 다음 공식 Engineering Gate: EG-4 서울시 API 최초 호출
+  - Issue #28 완료 및 PR #29 Squash and merge 완료
+  - Squash Commit `0201eee`
+  - PR CI와 `main` Push CI 성공
+  - Project Guard 공식 명칭·파일명·경로 전환 완료
+  - Codex Engineering Harness P3~P7 완료
+- 다음 행동: EG-4 요구사항과 현재 저장소 상태 읽기 전용 분석
+- 다음 공식 단계: EG-4 준비도 분석 및 범위 확정
+- 실제 서울시 API 호출: 미승인
