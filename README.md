@@ -165,6 +165,7 @@ POI001부터 POI121까지 자동 생성
 - 공식 여의도 실응답 샘플 `data/samples/population_yeouido_sample.json` 배치
 - 공식 샘플 읽기 전용 사전검증과 `H-301`~`H-304` 통과
 - EG-3 Python 기반 Project Guard `scripts/project_guard_check.py` 구현 및 로컬 검증 완료
+- Issue #32 EG-4 POI072 오프라인 수집기와 Fake 기반 검증 완료
 - `AGENTS.md` 생성
 - Codex의 `AGENTS.md` 인식 확인
 
@@ -176,7 +177,7 @@ EG-4의 승인된 여의도 1장소 실제 호출은 아직 수행하지 않았�
 ### 진행 예정
 
 - API 필드 정의서 작성
-- 1개 장소 1회 수집기 작성
+- POI072 실제 1회 호출과 실응답 저장
 - 유형별 대표 3장소 시험수집
 - 시험용 10장소 수집
 - 121장소 1회 수집
@@ -185,9 +186,9 @@ EG-4의 승인된 여의도 1장소 실제 호출은 아직 수행하지 않았�
 
 ### 미진행
 
-- 실제 `.env` 생성과 인증키 저장
+- 로컬 `.env` 내용·실제 인증키 확인 또는 사용
 - EG-4 여의도 1장소 실제 API 호출
-- EG-4부터 EG-8까지의 구현·실행·승인
+- EG-4 실제 호출·외부 실행 승인 및 EG-5~EG-8 구현·실행·승인
 - 121장소 자동수집
 - 장기 데이터 누적
 - 장소별 예측 성능 비교
@@ -240,13 +241,16 @@ missing
 ### 최소 수집 메타데이터
 
 - `request_id`
+- `area_code`
 - `endpoint_name`
 - `requested_at`
+- `received_at`
 - `http_status`
-- `area_code`
 - `collection_status`
 - `raw_file_path`
-- `parser_version`
+
+Issue #32 PM 결정에 따라 이전 최소 계약의 `parser_version` 대신
+`received_at`을 사용한다.
 
 `endpoint_name`에는 실제 URL이 아니라 `citydata_ppltn`과 같은 논리적 이름을 저장한다.
 `raw_file_path`에는 원본 JSON 내용이 아니라 저장된 원본 파일 경로를 기록한다.
@@ -298,7 +302,7 @@ missing
 | EG-1 | 장소 기준데이터 사전검증 | 통과: 공식 CSV 정비·`main` 반영 및 읽기 전용 재검증 완료 |
 | EG-2 | 샘플 JSON 사전검증 | 통과: 공식 샘플 배치 및 `H-301`~`H-304` PASS |
 | EG-3 | Project Guard 구현 및 자동 재검증 | 구현·로컬 검증 완료: PASS 28, SKIP 17 |
-| EG-4 | 여의도 1장소 | 미구현 |
+| EG-4 | 여의도 1장소 | POI072 오프라인 수집기 구현·검증, 실제 호출 미승인·미실행 |
 | EG-5 | 유형별 대표 3장소 | 미구현 |
 | EG-6 | 시험용 10장소 | 미구현 |
 | EG-7 | 121장소 1회 수집 | 미구현 |
@@ -308,10 +312,10 @@ EG-1과 EG-2는 Project Guard 구현 전의 읽기 전용 사전검증이다.
 공식 여의도 실응답 샘플 경로는
 `data/samples/population_yeouido_sample.json`이다.
 EG-3에서 문서, 공식 CSV, 샘플 JSON을 네트워크 없이 자동 재검증한다.
-EG-3까지는 실제 `.env`를 만들거나 실제 인증키를 저장하지 않고,
+EG-3까지는 실제 `.env`와 실제 인증키를 사용하지 않고,
 네트워크와 실제 서울시 API를 호출하지 않는다.
-실제 `.env` 생성·인증키 저장과 최초 실제 호출은 EG-3 오프라인 Project Guard
-통과 후 PM 승인을 받아 EG-4 여의도 1장소 단계에서 진행한다.
+실제 `.env` 사용·인증키 확인과 최초 실제 호출은 별도 PM 외부 실행 승인을
+받은 뒤 진행한다.
 각 게이트 통과 후 다음 구현 단계로 전환하려면 PM 승인을 받는다.
 
 EG-0~EG-8은 구현 준비도와 엔지니어링 품질을 판정한다.
@@ -464,9 +468,9 @@ data/raw/population/2026/07/16/POI072_20260716_200000.json
 실제 키는 프로젝트 루트의 `.env` 파일에만 저장하고,
 `.env`는 `.gitignore`에 포함한다.
 
-현재 `.env`를 생성하거나 실제 키를 저장하지 않는다.
-EG-3 오프라인 Project Guard가 통과하고 PM이 EG-4 진입과 실제 호출을 승인한 뒤에만
-EG-4 여의도 1장소 단계에서 `.env`를 생성하고 실제 키를 저장한다.
+로컬 `.env`는 존재하지만 Git에서 제외돼 있고 이번 Issue에서는 내용을 읽거나
+실제 키 존재 여부를 확인하지 않는다. 별도 PM 외부 실행 승인 전에는 실제 `.env`와
+실제 키를 사용하지 않는다.
 
 실제 키를 다음 위치에 작성하지 않는다.
 
@@ -531,17 +535,17 @@ Freshmanager/
 ```
 
 폴더는 필요한 시점에 순차적으로 만든다.
-위 구조는 예상 구조이며, 실제 `.env`는 아직 생성하지 않았다.
-`.env` 생성과 실제 키 저장은 EG-4 승인 후에만 진행한다.
+위 구조는 예상 구조다. 로컬 `.env`는 Git에서 제외하며, 내용 확인과 실제 키 사용은
+별도 PM 외부 실행 승인 후에만 진행한다.
 
 ---
 
 ## 18. 현재 실행방법
 
-EG-3 Python 기반 Project Guard가 `scripts/project_guard_check.py`에 구현돼 있다.
-전체 검사 ID 45개 중 EG-3 활성 검사 28개를 실행하고 후속 검사 17개는
-적용 예정 게이트를 근거로 `SKIP`한다. 정상 실행 기준은 `PASS 28`,
-`FAIL 0`, `WARN 0`, `SKIP 17`, 종료 코드 `0`이다.
+Python 기반 Project Guard가 `scripts/project_guard_check.py`에 구현돼 있다.
+Issue #32에서 EG-4 오프라인 검사 7개를 활성화해 전체 검사 ID 45개 중
+35개를 실행하고 후속 검사 10개는 적용 예정 범위를 근거로 `SKIP`한다.
+정상 실행 기준은 `PASS 35`, `FAIL 0`, `WARN 0`, `SKIP 10`, 종료 코드 `0`이다.
 
 표준 Project Guard 실행 명령:
 
@@ -556,17 +560,23 @@ python3 -B -m unittest discover -s tests -p "test_*.py" -v
 ```
 
 일반 Project Guard와 일반 테스트는 저장된 샘플 또는 가짜 응답만 사용하며
-네트워크와 실제 서울시 API를 호출하지 않는다. 최초 실제 호출은
-EG-3 오프라인 Project Guard 통과 후 PM 승인을 받아 EG-4 여의도 1장소 단계에서 수행한다.
+네트워크와 실제 서울시 API를 호출하지 않는다. `freshmanager/`에는 POI072
+오프라인 수집기가 구현돼 있지만 실제 HTTP Adapter는 없다.
 
-자동수집 코드는 아직 구현되지 않았으며 실행 가능한 수집 명령도 없다.
-아직 존재하지 않는 수집 명령을 README에 사실처럼 작성하지 않는다.
+오프라인 실행은 프로젝트의 실제 `.env` 대신 임시 Dummy `.env`와 임시 출력
+경로를 명시한다. 아래 자리표시자를 실제 키로 바꾸지 않는다.
 
-향후 수집기가 구현되면 다음 내용을 추가한다.
+```bash
+eg4_temp_dir="$(mktemp -d)"
+printf '%s\n' 'SEOUL_OPEN_API_KEY=your_api_key_here' > "$eg4_temp_dir/dummy.env"
+python3 -m freshmanager.offline \
+  --env-file "$eg4_temp_dir/dummy.env" \
+  --raw-root "$eg4_temp_dir/raw" \
+  --metadata-root "$eg4_temp_dir/metadata"
+```
 
-- 장소 목록 파일 배치방법
-- API 키 입력방법
-- 1장소 수집 명령
+실제 POI072 1회 호출은 Issue #32 병합 후 별도 Issue에서 PM 외부 실행 승인을
+받은 뒤 수행한다.
 - 대표 장소 시험 명령
 - 121장소 1회 수집 명령
 - 성공 확인방법

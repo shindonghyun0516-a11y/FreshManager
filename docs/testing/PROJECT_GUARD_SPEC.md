@@ -106,9 +106,9 @@ SHA-256을 비교하고, EG-3부터 임시 복사본 실행과 코드 검사를 
 | `H-204` | 최소 `.env` 로더 | 표준 라이브러리 설정 계약 확인 | 설정 코드, 임시 `.env` fixture | 빈 줄·주석 무시, 최초 `=` 분리, 공백 제거, `SEOUL_OPEN_API_KEY` 반환, 누락·빈 값은 `config_error` | 규칙 위반, 누락을 정상 처리, 실제 키 출력 | EG-4 전 SKIP만 가능 | EG-4 이후 |
 | `H-205` | URL·오류 마스킹 | 런타임 키 유출 방지 | URL·로그·예외 코드, 가짜 키 fixture | 출력·로그·예외의 키가 `********`로 치환 | 가짜 키가 평문으로 노출 | EG-4 전 SKIP만 가능 | EG-4 이후 |
 
-EG-3까지는 실제 `.env`를 생성하거나 실제 인증키를 저장하지 않는다.
+EG-3까지는 실제 `.env`와 실제 인증키를 사용하지 않는다.
 EG-3 Project Guard는 임시 `.env` fixture와 가짜 키만 사용하고 네트워크를 호출하지 않는다.
-실제 `.env`와 인증키는 EG-3 오프라인 Project Guard 통과 및 PM 승인 후 EG-4에서만 사용한다.
+실제 `.env`와 인증키는 EG-3 오프라인 Project Guard 통과 및 별도 PM 외부 실행 승인 후에만 사용한다.
 
 ### 4.4 샘플 JSON과 오프라인 실행
 
@@ -148,14 +148,27 @@ data/samples/population_yeouido_sample.json
 | 검사 ID | 검사명 | 검사 목적 | 입력 파일 | PASS 조건 | FAIL 조건 | WARN·SKIP 가능 여부 | 적용 엔지니어링 게이트 |
 |---|---|---|---|---|---|---|---|
 | `H-501` | 원본 JSON 불변·비덮어쓰기 | 원본 보존 | 원본 저장 코드, 가짜 응답, 임시 출력 | 반복 저장해도 기존 파일이 유지되고 새 파일 생성 | 기존 파일 변경·삭제·덮어쓰기 | EG-4 전 SKIP만 가능 | EG-4 이후 |
-| `H-502` | 원본 파일명 계약 | 장소·요청시각 추적 | 원본 저장 코드와 임시 출력 | 파일명에 실제 `AREA_CD`와 요청시각 포함 | 둘 중 하나 누락 또는 임의 코드 사용 | EG-4 전 SKIP만 가능 | EG-4 이후 |
+| `H-502` | 원본 파일명 계약 | 장소·요청시각 추적 | 원본 저장 코드와 임시 출력 | 파일명에 실제 `AREA_CD`, 요청시각과 `request_id` 포함 | 셋 중 하나 누락 또는 임의 코드 사용 | EG-4 전 SKIP만 가능 | EG-4 이후 |
 | `H-503` | 최소 메타데이터 계약 | 수집 결과 추적 | 결과·로그 writer와 fixture | 승인된 8개 필드 존재, `raw_payload` 없음, `endpoint_name`은 논리명, `raw_file_path`는 원본 경로 | 필드 누락, 금지 필드·URL·잘못된 원본 경로 | EG-4 전 SKIP만 가능 | EG-4 이후 |
 | `H-504` | 예측 스냅샷 보존 | 같은 대상시각의 다중 예측 보존 | 예측 저장 코드, 복수 스냅샷 fixture | 요청·스냅샷·대상·관측시각을 구분하고 기존 예측 유지 | 최신값 덮어쓰기 또는 시각 혼합 | EG-4 전 SKIP만 가능 | EG-4 이후 |
 | `H-505` | 날씨 관측·예보 분리 | 시점 누수 방지 | 날씨 writer, 관측·예보 fixture | 서로 분리 저장하고 예보 발행·대상시각 보존, 상호 대체 없음 | 같은 CSV 혼합 또는 관측값으로 예보 대체 | EG-4 전 SKIP만 가능 | EG-4 이후 |
-| `H-506` | 이상값·오류 별도 기록 | 원본 삭제·은폐 방지 | 파서·품질 로그, 이상값 fixture | 원본은 유지하고 오류를 별도 로그에 기록 | 원본 값 삭제·수정 또는 오류 무기록 | EG-4 전 SKIP만 가능 | EG-4 이후 |
+| `H-506` | 이상값·오류 별도 기록 | 원본 삭제·은폐 방지 | Collector, Storage, 오프라인 CLI와 7개 오류 경로 | 메타데이터 저장소가 정상이면 6개 오류를 요청별 8개 필드 JSON으로 기록하고, writer 자체 실패는 비재귀 반환-only 예외로 안전하게 종료 | 원본 변경, 오류 무기록, writer 재귀 호출, 불완전 최종 파일 또는 비밀정보 노출 | EG-4 전 SKIP만 가능 | EG-4 이후 |
 
-`H-503`의 필수 필드는 `request_id`, `endpoint_name`, `requested_at`,
-`http_status`, `area_code`, `collection_status`, `raw_file_path`, `parser_version`이다.
+`H-503`의 Issue #32 필수 필드는 `request_id`, `area_code`, `endpoint_name`,
+`requested_at`, `received_at`, `http_status`, `collection_status`, `raw_file_path`다.
+이 계약은 이전 최소 계약의 `parser_version`을 `received_at`으로 대체한다.
+
+`H-506`은 `config_error`, `api_error`, `timeout`, `parse_error`,
+`validation_error`와 원본 저장 단계의 `storage_error`를 검사한다. 메타데이터
+저장소를 사용할 수 있으면 각 오류는 승인된 8개 필드만 가진 요청별 JSON으로
+기록한다. 요청 전 오류의 `http_status`와 원본 미저장 오류의 `raw_file_path`는
+`null`이며 숫자 `0`이나 임의 경로로 보정하지 않는다. 응답을 받은
+`parse_error`와 `validation_error`는 받은 원본 bytes를 별도 원본 파일로 유지한다.
+
+메타데이터 writer 자체가 실패하면 같은 writer를 재귀 호출하지 않는다. 이 예외는
+`collection_status=storage_error`, `metadata_path=None`으로 반환하고 CLI는 안전한
+`request_id`와 상태만 출력한 뒤 비정상 종료한다. 최종 메타데이터 파일과 불완전한
+정상 확장자 파일을 남기지 않으며 API Key·인증 URL을 출력하지 않는다.
 
 ### 4.7 상권현황과 결측
 
@@ -187,6 +200,11 @@ PM 승인된 실제 호출은 별도 수동 단계이며 Project Guard가 호출
 - EG-1: 공식 CSV 정비·`main` 반영 및 읽기 전용 재검증 완료로 통과
 - EG-2: 공식 샘플 배치 및 `H-301`~`H-304` PASS로 통과
 - EG-3: `scripts/project_guard_check.py` 구현 및 로컬 검증 완료
-- EG-4~EG-8: 미진행
+- EG-4: POI072 오프라인 수집기와 `H-204`, `H-205`, `H-501`~`H-503`,
+  `H-506`, `H-701` runner 구현. 실제 API 호출은 미승인·미실행
+- EG-5~EG-8: 미진행
+
+현재 활성 검사는 35개이고 후속 검사는 10개 `SKIP`이다. `H-504`, `H-505`,
+`H-601`, `H-602`는 Issue #32 결정에 따라 계속 `SKIP`한다.
 
 표준 실행 명령은 `python3 scripts/project_guard_check.py`다.

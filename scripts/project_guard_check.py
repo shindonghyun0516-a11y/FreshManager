@@ -8,8 +8,10 @@ This module uses only the Python standard library. It never reads the real
 from __future__ import annotations
 
 import ast
+import contextlib
 import csv
 import hashlib
+import io
 import json
 import os
 import re
@@ -17,14 +19,26 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import uuid
 from collections import Counter
 from dataclasses import dataclass, replace
+from datetime import datetime
 from enum import Enum
 from pathlib import Path
 from typing import Callable, Iterable, Sequence
+from zoneinfo import ZoneInfo
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from freshmanager.collector import METADATA_FIELDS as EG4_METADATA_FIELDS  # noqa: E402
+from freshmanager.collector import Collector, HttpResponse  # noqa: E402
+from freshmanager.config import ConfigError, load_api_key, mask_secret  # noqa: E402
+from freshmanager.offline import run as run_offline  # noqa: E402
+from freshmanager.storage import FileStorage, StorageError  # noqa: E402
+
 CSV_RELATIVE_PATH = Path("data/reference/seoul_121_places.csv")
 JSON_RELATIVE_PATH = Path("data/samples/population_yeouido_sample.json")
 SPEC_RELATIVE_PATH = Path("docs/testing/PROJECT_GUARD_SPEC.md")
@@ -76,6 +90,8 @@ METADATA_FIELDS = [
     "raw_file_path",
     "parser_version",
 ]
+EG4_FIXED_TIME = datetime(2026, 7, 20, 9, 10, 11, tzinfo=ZoneInfo("Asia/Seoul"))
+EG4_DUMMY_KEY = "dummy-key-for-project-guard"
 DOCUMENT_PATHS = [
     Path("AGENTS.md"),
     Path("README.md"),
@@ -737,6 +753,90 @@ def check_h203(context: ProjectGuardContext) -> CheckResult:
     return passed("H-203", "실제 키·인증키 포함 실행 URL 없음(.env 내용 미열람)", "저장소 문서·코드·테스트·샘플·로그")
 
 
+class GuardSampleClient:
+    def __init__(self, payload: bytes, status_code: int = 200) -> None:
+        self.payload = payload
+        self.status_code = status_code
+        self.calls: list[str] = []
+
+    def fetch_population(self, area_code: str, api_key: str, timeout_seconds: float) -> HttpResponse:
+        del api_key, timeout_seconds
+        self.calls.append(area_code)
+        return HttpResponse(self.status_code, self.payload)
+
+
+class GuardTimeoutClient:
+    def fetch_population(self, area_code: str, api_key: str, timeout_seconds: float) -> HttpResponse:
+        del area_code, api_key, timeout_seconds
+        raise TimeoutError
+
+
+class GuardRawFailStorage(FileStorage):
+    def save_raw(self, area_code: str, requested_at: datetime, request_id: str, payload: bytes) -> Path:
+        del area_code, requested_at, request_id, payload
+        raise StorageError("storage_error")
+
+
+class GuardMetadataFailStorage(FileStorage):
+    def __init__(self, raw_root: Path, metadata_root: Path) -> None:
+        super().__init__(raw_root, metadata_root)
+        self.metadata_calls = 0
+
+    def save_metadata(self, requested_at: datetime, request_id: str, metadata: dict[str, object]) -> Path:
+        self.metadata_calls += 1
+        del requested_at, request_id, metadata
+        raise StorageError("storage_error")
+
+
+def guard_collector(
+    context: ProjectGuardContext,
+    output_root: Path,
+    client: GuardSampleClient,
+    request_id_factory: Callable[[], uuid.UUID],
+) -> Collector:
+    return Collector(
+        context.csv_path,
+        client,
+        FileStorage(output_root / "raw", output_root / "metadata"),
+        clock=lambda: EG4_FIXED_TIME,
+        request_id_factory=request_id_factory,
+    )
+
+
+def check_h204(context: ProjectGuardContext) -> CheckResult:
+    del context
+    env_name = "SEOUL_OPEN" + "_API_KEY"
+    with tempfile.TemporaryDirectory(prefix="freshmanager-h204-") as temporary:
+        root = Path(temporary)
+        valid = root / "valid.env"
+        valid.write_text(f"# comment\n\n {env_name} = {EG4_DUMMY_KEY}=suffix \n", encoding="utf-8")
+        if load_api_key(valid) != f"{EG4_DUMMY_KEY}=suffix":
+            return failed("H-204", "최초 등호 분리·공백 제거 결과 불일치", "freshmanager/config.py", "임시 .env")
+        invalid_paths = [root / "missing.env", root / "empty.env"]
+        invalid_paths[1].write_text(f"{env_name}=   \n", encoding="utf-8")
+        for path in invalid_paths:
+            try:
+                load_api_key(path)
+            except ConfigError:
+                continue
+            return failed("H-204", "누락·빈 설정을 config_error로 처리하지 않음", "freshmanager/config.py", "임시 .env")
+    return passed("H-204", "임시 .env에서 주석·공백·최초 등호 처리 및 누락·빈 값 config_error 확인", "freshmanager/config.py", "임시 .env")
+
+
+def check_h205(context: ProjectGuardContext) -> CheckResult:
+    del context
+    source = f"request failed /{EG4_DUMMY_KEY}/"
+    masked = mask_secret(source, EG4_DUMMY_KEY)
+    if EG4_DUMMY_KEY in masked or "********" not in masked:
+        return failed("H-205", "Dummy Key 마스킹 실패", "freshmanager/config.py")
+    try:
+        raise ConfigError("config_error: 인증정보 누락")
+    except ConfigError as error:
+        if EG4_DUMMY_KEY in str(error):
+            return failed("H-205", "오류 메시지에 Dummy Key 노출", "freshmanager/config.py")
+    return passed("H-205", "Dummy Key가 출력·예외에서 비노출되고 마스킹됨", "freshmanager/config.py")
+
+
 def json_or_failure(context: ProjectGuardContext, check_id: str) -> JsonInspection | CheckResult:
     try:
         return inspect_json(context.json_path)
@@ -952,6 +1052,305 @@ def check_h404(context: ProjectGuardContext) -> CheckResult:
     return passed("H-404", "성공=0, 필수실패=1, 내부오류=2 계약 확인", "scripts/project_guard_check.py")
 
 
+def check_h501(context: ProjectGuardContext) -> CheckResult:
+    with tempfile.TemporaryDirectory(prefix="freshmanager-h501-") as temporary:
+        root = Path(temporary)
+        client = GuardSampleClient(context.json_path.read_bytes())
+        identifiers = iter(
+            [
+                uuid.UUID("11111111-1111-4111-8111-111111111111"),
+                uuid.UUID("22222222-2222-4222-8222-222222222222"),
+            ]
+        )
+        collector = guard_collector(context, root, client, lambda: next(identifiers))
+        first = collector.collect(EG4_DUMMY_KEY)
+        first_path = Path(str(first.metadata["raw_file_path"]))
+        first_hash = sha256_file(first_path)
+        second = collector.collect(EG4_DUMMY_KEY)
+        second_path = Path(str(second.metadata["raw_file_path"]))
+        if first.status != "success" or second.status != "success":
+            return failed("H-501", "반복 오프라인 저장 실패", "freshmanager/storage.py", "임시 출력")
+        if first_path == second_path or not second_path.is_file() or sha256_file(first_path) != first_hash:
+            return failed("H-501", "기존 원본 보존 또는 새 파일 생성 실패", "freshmanager/storage.py", "임시 출력")
+    return passed("H-501", "원본 bytes 유지, 반복 요청은 기존 파일을 보존하고 새 파일 생성", "freshmanager/storage.py", "임시 출력")
+
+
+def check_h502(context: ProjectGuardContext) -> CheckResult:
+    with tempfile.TemporaryDirectory(prefix="freshmanager-h502-") as temporary:
+        root = Path(temporary)
+        request_id = uuid.UUID("33333333-3333-4333-8333-333333333333")
+        collector = guard_collector(
+            context,
+            root,
+            GuardSampleClient(context.json_path.read_bytes()),
+            lambda: request_id,
+        )
+        result = collector.collect(EG4_DUMMY_KEY)
+        raw_path = Path(str(result.metadata["raw_file_path"]))
+        expected = ".".join(["_".join(["POI072", "20260720", "091011", str(request_id)]), "json"])
+        if result.status != "success" or raw_path.name != expected or raw_path.parts[-4:-1] != ("2026", "07", "20"):
+            return failed("H-502", f"원본 경로·파일명 계약 불일치: {raw_path.name}", "freshmanager/storage.py")
+    return passed("H-502", "AREA_CD·요청시각·request_id 파일명과 YYYY/MM/DD 경로 확인", "freshmanager/storage.py")
+
+
+def check_h503(context: ProjectGuardContext) -> CheckResult:
+    with tempfile.TemporaryDirectory(prefix="freshmanager-h503-") as temporary:
+        root = Path(temporary)
+        collector = guard_collector(
+            context,
+            root,
+            GuardSampleClient(context.json_path.read_bytes()),
+            lambda: uuid.UUID("44444444-4444-4444-8444-444444444444"),
+        )
+        result = collector.collect(EG4_DUMMY_KEY)
+        if tuple(result.metadata) != tuple(EG4_METADATA_FIELDS):
+            return failed("H-503", f"메타데이터 필드 불일치={list(result.metadata)}", "freshmanager/collector.py")
+        if "raw_payload" in result.metadata or result.metadata.get("endpoint_name") != "citydata_ppltn":
+            return failed("H-503", "금지 필드 또는 endpoint 논리명 위반", "freshmanager/collector.py")
+        raw_path = Path(str(result.metadata.get("raw_file_path")))
+        if result.metadata_path is None or not raw_path.is_file():
+            return failed("H-503", "메타데이터와 원본 파일 경로 연결 실패", "freshmanager/storage.py")
+        stored = json.loads(result.metadata_path.read_text(encoding="utf-8"))
+        if stored != result.metadata:
+            return failed("H-503", "저장된 메타데이터 내용 불일치", "freshmanager/storage.py")
+    return passed("H-503", "승인된 8개 필드와 논리 endpoint·원본 경로 연결 확인", "freshmanager/collector.py", "freshmanager/storage.py")
+
+
+def check_h506(context: ProjectGuardContext) -> CheckResult:
+    def metadata_issue(
+        result: object,
+        expected_status: str,
+        *,
+        raw_expected: bool,
+        expected_raw: bytes | None = None,
+    ) -> str | None:
+        metadata = result.metadata
+        if result.status != expected_status or metadata.get("collection_status") != expected_status:
+            return f"상태 불일치: expected={expected_status}, actual={result.status}"
+        if tuple(metadata) != tuple(EG4_METADATA_FIELDS):
+            return f"메타데이터 필드 불일치: {list(metadata)}"
+        if metadata.get("http_status") == 0:
+            return "http_status를 임의의 0으로 보정함"
+        rendered = json.dumps(metadata, ensure_ascii=False)
+        if EG4_DUMMY_KEY in rendered or "http://" in rendered or "https://" in rendered or "raw_payload" in metadata:
+            return "메타데이터에 Dummy Key·URL 또는 raw_payload 포함"
+        if result.metadata_path is None or not result.metadata_path.is_file():
+            return "오류 메타데이터 파일 누락"
+        stored = json.loads(result.metadata_path.read_text(encoding="utf-8"))
+        if stored != metadata:
+            return "저장된 오류 메타데이터 내용 불일치"
+        raw_value = metadata.get("raw_file_path")
+        if not raw_expected:
+            return None if raw_value is None else "원본 미저장 경로에 raw_file_path가 존재함"
+        raw_path = Path(str(raw_value))
+        if not raw_path.is_file():
+            return "받은 원본 파일 누락"
+        if expected_raw is not None and raw_path.read_bytes() != expected_raw:
+            return "받은 원본 bytes가 변경됨"
+        return None
+
+    invalid_payload = b'{"SeoulRtd.citydata_ppltn": ['
+    validation_document = json.loads(context.json_path.read_text(encoding="utf-8-sig"))
+    validation_document["SeoulRtd.citydata_ppltn"][0]["AREA_CD"] = "POI999"
+    validation_payload = json.dumps(validation_document, ensure_ascii=False).encode("utf-8")
+    with tempfile.TemporaryDirectory(prefix="freshmanager-h506-") as temporary:
+        root = Path(temporary)
+        config_root = root / "config"
+        invalid_env = config_root / "invalid.env"
+        invalid_env.parent.mkdir(parents=True, exist_ok=True)
+        private_setting = "private-dummy-config-content"
+        invalid_env.write_text(f"OTHER_SETTING={private_setting}\n", encoding="utf-8")
+        config_stdout = io.StringIO()
+        with contextlib.redirect_stdout(config_stdout):
+            config_exit = run_offline(
+                [
+                    "--env-file",
+                    str(invalid_env),
+                    "--csv",
+                    str(context.csv_path),
+                    "--sample",
+                    str(context.json_path),
+                    "--raw-root",
+                    str(config_root / "raw"),
+                    "--metadata-root",
+                    str(config_root / "metadata"),
+                ]
+            )
+        config_files = list((config_root / "metadata").rglob("*.metadata.json"))
+        if config_exit == 0 or len(config_files) != 1:
+            return failed("H-506", "CLI config_error 메타데이터 기록 또는 비정상 종료 실패", "freshmanager/offline.py")
+        config_metadata = json.loads(config_files[0].read_text(encoding="utf-8"))
+        config_rendered = config_stdout.getvalue() + json.dumps(config_metadata, ensure_ascii=False)
+        if (
+            tuple(config_metadata) != tuple(EG4_METADATA_FIELDS)
+            or config_metadata.get("collection_status") != "config_error"
+            or config_metadata.get("http_status") is not None
+            or config_metadata.get("raw_file_path") is not None
+            or str(invalid_env) in config_rendered
+            or private_setting in config_rendered
+            or EG4_DUMMY_KEY in config_rendered
+            or "http://" in config_rendered
+            or "https://" in config_rendered
+        ):
+            return failed("H-506", "CLI config_error 8개 필드·null·비노출 계약 위반", "freshmanager/offline.py")
+
+        identifiers = iter(
+            uuid.UUID(value)
+            for value in [
+                "50000000-0000-4000-8000-000000000002",
+                "50000000-0000-4000-8000-000000000003",
+                "50000000-0000-4000-8000-000000000004",
+                "50000000-0000-4000-8000-000000000005",
+            ]
+        )
+        cases = [
+            (
+                "api_error",
+                guard_collector(context, root / "api", GuardSampleClient(b'{"error":true}', 500), lambda: next(identifiers)),
+                EG4_DUMMY_KEY,
+                True,
+                b'{"error":true}',
+            ),
+            (
+                "timeout",
+                guard_collector(context, root / "timeout", GuardTimeoutClient(), lambda: next(identifiers)),
+                EG4_DUMMY_KEY,
+                False,
+                None,
+            ),
+            (
+                "parse_error",
+                guard_collector(context, root / "parse", GuardSampleClient(invalid_payload), lambda: next(identifiers)),
+                EG4_DUMMY_KEY,
+                True,
+                invalid_payload,
+            ),
+            (
+                "validation_error",
+                guard_collector(context, root / "validation", GuardSampleClient(validation_payload), lambda: next(identifiers)),
+                EG4_DUMMY_KEY,
+                True,
+                validation_payload,
+            ),
+        ]
+        for expected_status, collector, key, raw_expected, expected_raw in cases:
+            result = collector.collect(key)
+            issue = metadata_issue(
+                result,
+                expected_status,
+                raw_expected=raw_expected,
+                expected_raw=expected_raw,
+            )
+            if issue:
+                return failed("H-506", f"{expected_status}: {issue}", "freshmanager/collector.py", "freshmanager/storage.py")
+
+        raw_failure_storage = GuardRawFailStorage(root / "raw-failure/raw", root / "raw-failure/metadata")
+        raw_failure_collector = Collector(
+            context.csv_path,
+            GuardSampleClient(context.json_path.read_bytes()),
+            raw_failure_storage,
+            clock=lambda: EG4_FIXED_TIME,
+            request_id_factory=lambda: uuid.UUID("50000000-0000-4000-8000-000000000006"),
+        )
+        raw_failure = raw_failure_collector.collect(EG4_DUMMY_KEY)
+        issue = metadata_issue(raw_failure, "storage_error", raw_expected=False)
+        if issue:
+            return failed("H-506", f"원본 저장 실패: {issue}", "freshmanager/collector.py", "freshmanager/storage.py")
+
+        env_path = root / "metadata-failure/dummy.env"
+        env_path.parent.mkdir(parents=True, exist_ok=True)
+        env_path.write_text("SEOUL_OPEN_API_KEY=" + EG4_DUMMY_KEY + "\n", encoding="utf-8")
+        metadata_failure_storage = GuardMetadataFailStorage(
+            root / "metadata-failure/raw",
+            root / "metadata-failure/metadata",
+        )
+        stdout = io.StringIO()
+        with contextlib.redirect_stdout(stdout):
+            exit_code = run_offline(
+                [
+                    "--env-file",
+                    str(env_path),
+                    "--csv",
+                    str(context.csv_path),
+                    "--sample",
+                    str(context.json_path),
+                    "--raw-root",
+                    str(metadata_failure_storage.raw_root),
+                    "--metadata-root",
+                    str(metadata_failure_storage.metadata_root),
+                ],
+                storage_factory=lambda raw_root, metadata_root: metadata_failure_storage,
+            )
+        output = stdout.getvalue()
+        output_lines = [line for line in output.splitlines() if line]
+        if exit_code == 0 or metadata_failure_storage.metadata_calls != 1:
+            return failed("H-506", "메타데이터 writer 실패의 비정상 종료·단일 시도 계약 위반", "freshmanager/offline.py")
+        if len(output_lines) != 2 or not output_lines[0].startswith("request_id=") or output_lines[1] != "collection_status=storage_error":
+            return failed("H-506", "메타데이터 writer 실패 출력이 request_id·상태로 제한되지 않음", "freshmanager/offline.py")
+        if EG4_DUMMY_KEY in output or "http://" in output or "https://" in output:
+            return failed("H-506", "메타데이터 writer 실패 출력에 Dummy Key·URL 노출", "freshmanager/offline.py")
+        if list(metadata_failure_storage.metadata_root.rglob("*.json")) or list(
+            metadata_failure_storage.metadata_root.rglob("*.partial")
+        ):
+            return failed("H-506", "메타데이터 writer 실패 후 최종·partial 파일 잔존", "freshmanager/storage.py")
+    return passed(
+        "H-506",
+        "6개 오류 메타데이터 기록과 metadata writer 반환-only 예외·비노출·비재귀 확인",
+        "freshmanager/collector.py",
+        "freshmanager/storage.py",
+        "freshmanager/offline.py",
+    )
+
+
+def check_h701(context: ProjectGuardContext) -> CheckResult:
+    with tempfile.TemporaryDirectory(prefix="freshmanager-h701-") as temporary:
+        root = Path(temporary)
+        client = GuardSampleClient(context.json_path.read_bytes())
+        collector = guard_collector(
+            context,
+            root,
+            client,
+            lambda: uuid.UUID("77777777-7777-4777-8777-777777777777"),
+        )
+        result = collector.collect(EG4_DUMMY_KEY)
+        raw_path = Path(str(result.metadata["raw_file_path"]))
+        if client.calls != ["POI072"] or result.status != "success":
+            return failed("H-701", f"처리 호출={client.calls}, 상태={result.status}", "freshmanager/collector.py")
+        if not result.population or result.metadata_path is None or not raw_path.is_file():
+            return failed("H-701", "원본·파싱 결과·상태 메타데이터 누락", "freshmanager/collector.py", "freshmanager/storage.py")
+        required_population = {
+            "area_code",
+            "area_name",
+            "population_reference_time",
+            "congestion_level",
+            "population_min",
+            "population_max",
+            "forecast_available",
+            "forecasts",
+        }
+        if not required_population.issubset(result.population):
+            return failed("H-701", "정규화 현재 인구 필수 값 누락", "freshmanager/collector.py")
+        forecasts = result.population.get("forecasts")
+        if (
+            result.population.get("area_code") != "POI072"
+            or result.population.get("area_name") != "여의도"
+            or not result.population.get("population_reference_time")
+            or not isinstance(forecasts, list)
+            or not forecasts
+        ):
+            return failed("H-701", "정규화 장소·현재 인구·예측 구조 불일치", "freshmanager/collector.py")
+        stored_metadata = json.loads(result.metadata_path.read_text(encoding="utf-8"))
+        if (
+            stored_metadata != result.metadata
+            or stored_metadata.get("collection_status") != "success"
+            or stored_metadata.get("area_code") != result.population.get("area_code")
+            or Path(str(stored_metadata.get("raw_file_path"))) != raw_path
+            or raw_path.read_bytes() != context.json_path.read_bytes()
+        ):
+            return failed("H-701", "원본·정규화·상태 결과 연결 불일치", "freshmanager/collector.py", "freshmanager/storage.py")
+    return passed("H-701", "공식 CSV의 POI072 1건과 원본·정규화 현재/예측·상태 결과 연결 확인", "freshmanager/collector.py", "freshmanager/storage.py")
+
+
 RUNNERS: dict[str, Callable[[ProjectGuardContext], CheckResult]] = {
     f"check_{check_id.lower().replace('-', '')}": globals()[f"check_{check_id.lower().replace('-', '')}"]
     for check_id in [
@@ -959,8 +1358,10 @@ RUNNERS: dict[str, Callable[[ProjectGuardContext], CheckResult]] = {
         "H-101", "H-102", "H-103", "H-104", "H-105", "H-106",
         "H-107", "H-108", "H-109", "H-110", "H-111", "H-112",
         "H-201", "H-202", "H-203",
+        "H-204", "H-205",
         "H-301", "H-302", "H-303", "H-304", "H-305",
         "H-401", "H-402", "H-403", "H-404",
+        "H-501", "H-502", "H-503", "H-506", "H-701",
     ]
 }
 
@@ -990,8 +1391,8 @@ CHECK_DEFINITIONS = [
     definition("H-201", ".env Git 제외", "EG-3 이후"),
     definition("H-202", ".env.example 계약", "EG-3 이후"),
     definition("H-203", "비밀정보 노출 검사", "EG-3 이후"),
-    definition("H-204", "최소 .env 로더", "EG-4 이후", False, "EG-4 설정 로더 구현 후 적용"),
-    definition("H-205", "URL·오류 마스킹", "EG-4 이후", False, "EG-4 요청·로그 코드 구현 후 적용"),
+    definition("H-204", "최소 .env 로더", "EG-4 이후"),
+    definition("H-205", "URL·오류 마스킹", "EG-4 이후"),
     definition("H-301", "샘플 JSON 존재·문법", "EG-2, EG-3 이후"),
     definition("H-302", "샘플 장소·인구 구조", "EG-2, EG-3 이후"),
     definition("H-303", "샘플 미래예측 구조", "EG-2, EG-3 이후"),
@@ -1001,15 +1402,15 @@ CHECK_DEFINITIONS = [
     definition("H-402", "검사 ID 등록 정합성", "EG-3 이후"),
     definition("H-403", "상태·건수 정합성", "EG-3 이후"),
     definition("H-404", "종료 코드 계약", "EG-3 이후"),
-    definition("H-501", "원본 JSON 불변·비덮어쓰기", "EG-4 이후", False, "EG-4 원본 저장 코드 구현 후 적용"),
-    definition("H-502", "원본 파일명 계약", "EG-4 이후", False, "EG-4 원본 저장 코드 구현 후 적용"),
-    definition("H-503", "최소 메타데이터 계약", "EG-4 이후", False, "EG-4 결과·로그 writer 구현 후 적용"),
+    definition("H-501", "원본 JSON 불변·비덮어쓰기", "EG-4 이후"),
+    definition("H-502", "원본 파일명 계약", "EG-4 이후"),
+    definition("H-503", "최소 메타데이터 계약", "EG-4 이후"),
     definition("H-504", "예측 스냅샷 보존", "EG-4 이후", False, "EG-4 예측 저장 코드 구현 후 적용"),
     definition("H-505", "날씨 관측·예보 분리", "EG-4 이후", False, "EG-4 날씨 writer 구현 후 적용"),
-    definition("H-506", "이상값·오류 별도 기록", "EG-4 이후", False, "EG-4 파서·품질 로그 구현 후 적용"),
+    definition("H-506", "이상값·오류 별도 기록", "EG-4 이후"),
     definition("H-601", "상권현황 표현", "EG-4 이후", False, "EG-4 상권 파서·출력 구현 후 적용"),
     definition("H-602", "상태값 구분", "EG-4 이후", False, "EG-4 상권 상태 처리 구현 후 적용"),
-    definition("H-701", "여의도 1장소", "EG-4 이후", False, "EG-4 여의도 수집 단위 구현 후 적용"),
+    definition("H-701", "여의도 1장소", "EG-4 이후"),
     definition("H-702", "유형별 대표 3장소", "EG-5 이후", False, "EG-5 대표 3장소 구현 후 적용"),
     definition("H-703", "시험용 10장소", "EG-6 이후", False, "EG-6 시험용 10장소 구현 후 적용"),
     definition("H-704", "실패 격리·재시도 제한", "EG-6 이후", False, "EG-6 배치 실패 격리 구현 후 적용"),
