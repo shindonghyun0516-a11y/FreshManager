@@ -9,14 +9,14 @@
 
 - 프로젝트: **프레시매니저 유동판매 추천 서비스 — 데이터 타당성 PoC**
 - 현재 목표: 공개 데이터만으로 여의도 오피스 상권의 유동판매 추천 가능성을 검증
-- 완료: EG-0, EG-1, EG-2, EG-3, CI 보강, Harness 구조·용어 개편 P1·P2
-- 현재 작업: Issue #26 — Architecture 병합 결과의 PROJECT_STATUS 최신화
+- 완료: EG-0, EG-1, EG-2, EG-3, CI 보강, Codex Engineering Harness 구조·용어 개편 P1·P2
+- 현재 작업: Issue #28 — Project Guard 명칭·경로 전환
 - 공식 기준 Branch: `main`
-- 현재 작업 Branch: `docs/issue-26-update-project-status-after-architecture-merge`
-- 현재 Harness 상태: P1·P2 완료, P3~P7 영향 분석 시작 전
-- 다음 Harness 작업:
-  - Project Guard 명칭 전환을 위한 별도 Issue 생성
-  - 파일 변경 전 읽기 전용 영향 분석
+- 현재 작업 Branch: `refactor/issue-28-project-guard-terminology`
+- 현재 Codex Engineering Harness 개편 상태: P1·P2 완료, P3~P7 명칭 전환 구현 및 로컬 검증 완료, PR·CI·Merge 검증 대기
+- 현재 Project Guard 작업:
+  - 공식 파일명·경로·내부 식별자와 문서 참조 전환
+  - 로컬 검증 완료, PR·CI·Merge 검증 대기
 - 다음 공식 Engineering Gate: **EG-4 서울시 API 최초 호출**
 - 절대 주의:
   - API Key Commit 금지
@@ -118,7 +118,7 @@ Issue 생성
 → Codex 읽기 전용 계획
 → PM 범위 승인
 → 구현
-→ 로컬 Harness와 테스트
+→ 로컬 Project Guard와 Unit Tests
 → 변경 파일 검토
 → 승인된 파일만 Stage
 → Commit
@@ -154,7 +154,7 @@ Issue 생성
 4. PROJECT_STATUS.md
 5. AGENTS.md
 6. docs/testing/QUALITY_GATES.md
-7. docs/testing/HARNESS_SPEC.md
+7. docs/testing/PROJECT_GUARD_SPEC.md
 8. README.md
 9. 작업일지
 10. 과거 AI 대화
@@ -191,6 +191,9 @@ Issue 생성
   - 사람이 매번 확인하던 데이터와 문서 상태를 자동 검사
   - 오류가 있으면 다음 작업으로 넘어가지 않도록 방지
 
+`Python Harness`는 Issue #14 당시 작업명이다. 현재 자동검사 하위 시스템의
+공식 명칭은 Project Guard다.
+
 ### 6.2 검사 범위
 
 - 공식 CSV 구조와 내용
@@ -203,10 +206,10 @@ Issue 생성
 
 ### 6.3 공식 실행 명령
 
-Harness:
+Project Guard:
 
 ```bash
-python3 scripts/harness_check.py
+python3 scripts/project_guard_check.py
 ```
 
 단위 테스트:
@@ -214,6 +217,13 @@ python3 scripts/harness_check.py
 ```bash
 python3 -B -m unittest discover -s tests -p "test_*.py" -v
 ```
+
+현재 공식 구성:
+
+- 명세: `docs/testing/PROJECT_GUARD_SPEC.md`
+- 결과 보고 템플릿: `docs/testing/PROJECT_GUARD_REPORT_TEMPLATE.md`
+- CI Workflow: `.github/workflows/ci.yml`
+- Unit Tests: `tests/test_project_guard_check.py`
 
 ### 6.4 정상 기준
 
@@ -248,7 +258,7 @@ OK
   - PM 범위 승인·외부 실행 승인·Merge 승인 구분
   - 문서별 공식 책임과 중복 방지 원칙 정의
   - Current State와 Target State 구분
-- Harness 구조·용어 개편: P1 완료, P2 완료
+- Codex Engineering Harness 구조·용어 개편: P1 완료, P2 완료
 - 검증: PR #25 CI, `main` Push CI, 로컬 Project Guard와 Unit Tests 성공
 
 ---
@@ -260,7 +270,7 @@ OK
 - Issue: #16 종료
 - Pull Request: #20 Squash and merge 완료
 - 작업명: GitHub Actions에서 Python Harness 자동 실행
-- Workflow: `.github/workflows/harness.yml` 구현 완료
+- Workflow: `.github/workflows/harness.yml` 구현 완료(당시 경로, 현재 공식 경로는 `.github/workflows/ci.yml`)
 - 검증 결과:
   - `pull_request` Trigger 실행 성공
   - `main` Push Trigger 실행 성공
@@ -286,7 +296,7 @@ Pull Request 생성 또는 갱신
 → 성공한 경우에만 PM이 Merge 검토
 ```
 
-### 7.3 자동 실행할 명령
+### 7.3 Issue #16 당시 자동 실행 명령
 
 ```bash
 python3 scripts/harness_check.py
@@ -295,7 +305,7 @@ python3 -B -m unittest discover -s tests -p "test_*.py" -v
 
 ### 7.4 구현 파일
 
-- `.github/workflows/harness.yml`
+- `.github/workflows/harness.yml`(당시 경로)
 - `docs/testing/QUALITY_GATES.md`
 
 ### 7.5 적용 결과
@@ -305,7 +315,7 @@ python3 -B -m unittest discover -s tests -p "test_*.py" -v
 | CI Python 버전 | `3.12` | 지원되는 Python 버전으로 자동검사 실행 |
 | GitHub Action 참조 | `actions/checkout@v6`, `actions/setup-python@v6` | 공식 주 버전 사용 |
 | 권한 | `contents: read` | 저장소 읽기 최소 권한만 허용 |
-| Secret·`.env` | 사용하지 않음 | 오프라인 하네스와 단위 테스트만 실행 |
+| Secret·`.env` | 사용하지 않음 | 오프라인 Project Guard와 단위 테스트만 실행 |
 | Branch 보호 규칙 | 미적용 | 별도 승인과 설정이 필요한 후속 운영 범위 |
 
 ### 7.6 Issue #16에서 변경하지 않은 범위
@@ -426,7 +436,7 @@ API Key를 로컬에서 안전하게 읽기
 → 실제 응답 받기
 → 원본 JSON 그대로 저장
 → Key가 노출되지 않았는지 검사
-→ Harness와 테스트 실행
+→ Project Guard와 Unit Tests 실행
 ```
 
 ### 11.2 EG-4 예상 범위
@@ -437,7 +447,7 @@ API Key를 로컬에서 안전하게 읽기
 - 원본 JSON 저장
 - 수집 시각·장소 등 최소 메타데이터 저장
 - API Key 비노출 확인
-- 기존 Harness와 테스트 통과
+- 기존 Project Guard와 Unit Tests 통과
 
 ### 11.3 EG-4에서 아직 하지 않는 것
 
@@ -462,7 +472,7 @@ API Key를 로컬에서 안전하게 읽기
 3. `docs/engineering/CODEX_HARNESS_ARCHITECTURE.md`
 4. `README.md`
 5. `docs/testing/QUALITY_GATES.md`
-6. `docs/testing/HARNESS_SPEC.md`
+6. `docs/testing/PROJECT_GUARD_SPEC.md`
 7. 현재 GitHub Issue
 8. 현재 Branch
 9. `git status --short`
@@ -489,7 +499,7 @@ API Key를 로컬에서 안전하게 읽기
 저장소의 PROJECT_STATUS.md부터 읽고 프로젝트 상태를 복원해줘.
 
 그다음 AGENTS.md, docs/engineering/CODEX_HARNESS_ARCHITECTURE.md,
-README.md, QUALITY_GATES.md, HARNESS_SPEC.md, 현재 GitHub Issue,
+README.md, QUALITY_GATES.md, PROJECT_GUARD_SPEC.md, 현재 GitHub Issue,
 Branch, 최근 PR과 Git 상태를 확인해줘.
 
 나는 비개발자 PM이다. 반드시 다음 순서로 설명해줘.
@@ -548,40 +558,45 @@ Branch, 최근 PR과 Git 상태를 확인해줘.
 
 ### 14.1 현재 진행 중인 작업
 
-- Issue #26
-- PR #25 Architecture 병합 결과를 `PROJECT_STATUS.md`에 반영
-- 문서 구조와 갱신 정책은 변경하지 않음
+- Issue #28
+- Project Guard 파일명·실행 경로·내부 식별자와 문서 참조 전환
+- 검사 로직·ID·순서·판정·종료코드는 변경하지 않음
+- Issue #26 및 PR #27의 PROJECT_STATUS 최신화 작업은 완료·병합됨
 
-### 14.2 다음 Harness 작업
+### 14.2 다음 Codex Engineering Harness 작업
 
-1. P3~P7 명칭 전환을 위한 별도 Issue 생성
-2. 현재 Harness 관련 파일과 참조를 읽기 전용으로 분석
-3. Report Template과 Unit Test 파일명 변경 여부 검토
-4. PM 승인 후 원자적인 명칭 전환 수행
+1. P3~P7 명칭 전환 로컬 검증 완료
+2. 승인된 파일만 Stage하고 Staged Diff 검토
+3. Commit과 Push를 별도 단계로 수행
+4. Pull Request에서 독립 CI 검증
+5. PM Merge 승인 후 `main` 재검증
 
-이 단계에서는 파일명을 아직 변경하지 않는다.
+현재 상태는 P3~P7 명칭 전환 구현 및 로컬 검증 완료이며
+Pull Request·CI·Merge 검증은 아직 완료되지 않았다.
 
 ### 14.3 다음 제품 Engineering Gate
 
 - EG-4: 서울시 API 최초 1회 호출 및 원본 응답 저장
-- Harness P3~P7 명칭 전환과 별도 축으로 관리
+- Codex Engineering Harness P3~P7 명칭 전환과 별도 축으로 관리
 - 현재 상태: 대기
 
 ---
 
 ## 15. 마지막 갱신 정보
 
-- 문서 버전: 1.3
+- 문서 버전: 1.4
 - 마지막 갱신일: 2026-07-19
-- 현재 Issue: #26
+- 현재 Issue: #28
 - 공식 기준 Branch: `main`
-- 현재 작업 Branch: `docs/issue-26-update-project-status-after-architecture-merge`
-- 현재 단계: Architecture 병합 결과의 PROJECT_STATUS 최신화
+- 현재 작업 Branch: `refactor/issue-28-project-guard-terminology`
+- 현재 단계: P3~P7 명칭 전환 구현 및 로컬 검증 완료, PR·CI·Merge 검증 대기
 - 완료된 최근 작업:
   - Issue #24 및 PR #25
   - Codex Engineering Harness Architecture `main` 반영
-  - Harness 구조·용어 개편 P1·P2 완료
-- 다음 Harness 행동:
-  - P3~P7 명칭 전환 Issue 생성
-  - 파일 변경 전 읽기 전용 영향 분석
+  - Codex Engineering Harness 구조·용어 개편 P1·P2 완료
+  - Issue #26 및 PR #27 PROJECT_STATUS 최신화 완료
+- 다음 Codex Engineering Harness 행동:
+  - Issue #28 변경 범위 PM 검토
+  - 승인된 파일 Stage와 Staged Diff 검토
+  - PR에서 Project Guard와 Unit Tests 독립 검증
 - 다음 공식 Engineering Gate: EG-4 서울시 API 최초 호출

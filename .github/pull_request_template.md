@@ -34,7 +34,7 @@ Closes #
 |---|---|---|
 |  |  |  |
 
-- 하네스 결과 또는 미실행 사유:
+- Project Guard 결과 또는 미실행 사유:
 - GitHub Actions 결과 또는 미구현·미적용 사유:
 - Codex 리뷰 결과:
 

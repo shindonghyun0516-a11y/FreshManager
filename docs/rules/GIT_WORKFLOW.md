@@ -5,14 +5,14 @@
 - 작성자: 신동현
 - 최종 승인자: 신동현
 - 최초 작성일: 2026-07-17
-- 최종 수정일: 2026-07-17
+- 최종 수정일: 2026-07-19
 - 적용 프로젝트: Freshmanager Data PoC
 - 관련 문서:
   - `AGENTS.md`
   - `README.md`
   - `docs/rules/CODING_RULES.md`
   - `docs/rules/SECURITY_RULES.md`
-  - `docs/testing/HARNESS_SPEC.md`
+  - `docs/testing/PROJECT_GUARD_SPEC.md`
   - `docs/testing/QUALITY_GATES.md`
 - 변경 시 PM 승인: 필요
 
@@ -28,7 +28,7 @@
 2. 작업 목적과 범위를 Issue 단위로 명확히 한다.
 3. 모든 변경을 Branch 또는 Worktree에서 분리한다.
 4. 변경 결과와 검증 근거를 Pull Request에 기록한다.
-5. 적용 대상 하네스와, 구성된 경우 GitHub Actions를 통과한 변경만 병합한다.
+5. 적용 대상 Project Guard와 Unit Tests를 통과하고, 구성된 경우 GitHub Actions도 통과한 변경만 병합한다.
 6. PM이 최종 승인권을 유지한다.
 7. 문제가 발생했을 때 변경 이유와 이력을 추적할 수 있게 한다.
 
@@ -47,7 +47,7 @@
 - 공식 기준 CSV
 - 샘플 JSON
 - 데이터 구조
-- 하네스 검사 규칙
+- Project Guard 검사 규칙
 - 분석계획
 - Codex Skill
 - 운영 스크립트
@@ -71,8 +71,9 @@
 | Issue | 한 번의 작업 목적·범위·완료조건을 정의한 작업요청서 |
 | Pull Request | 작업 Branch를 `main`에 반영하기 위한 검토·승인 요청 |
 | Merge | 승인된 작업 Branch의 변경을 `main`에 반영하는 작업 |
-| Harness | 여러 검사를 하나의 명령으로 실행하는 검증 체계 |
-| GitHub Actions | GitHub 서버에서 하네스를 자동 실행하는 체계 |
+| Project Guard | 파일·데이터·문서·보안·정책 등 저장소 규칙을 자동검사하는 하위 시스템 |
+| Unit Tests | 코드 또는 Project Guard 검사 로직의 개별 동작을 검증하는 별도 검증 요소 |
+| GitHub Actions/CI | GitHub 서버에서 Project Guard와 Unit Tests를 자동 실행하는 체계 |
 | PM 승인 | 신동현이 작업 범위 또는 다음 단계 진행을 명시적으로 승인한 상태 |
 
 ---
@@ -86,7 +87,8 @@
 - 작업 목적이 명확함
 - Issue 범위를 준수함
 - 관련 문서가 업데이트됨
-- 적용 대상 하네스 검사 통과 또는 하네스 미구현 단계의 문서 수동검증 완료
+- 적용 대상 Project Guard 검사 통과 또는 Project Guard 미구현 단계의 문서 수동검증 완료
+- 적용 대상 Unit Tests 통과
 - GitHub Actions가 구성돼 현재 작업에 적용되는 경우 통과
 - 보안 위반 없음
 - PM 최종 승인 완료
@@ -138,7 +140,7 @@
 ```text
 [EG-1] 서울시 121장소 CSV 무결성 검증
 [EG-2] 여의도 샘플 JSON 경로 동기화
-[EG-3] 오프라인 하네스 1차 구현
+[EG-3] 오프라인 Project Guard 1차 구현
 [Docs] Git 운영 규칙 작성
 [Security] API 키 로그 마스킹
 ```
@@ -192,7 +194,7 @@ Branch 이름은 영문 소문자와 하이픈을 사용한다.
 ```text
 docs/issue-12-git-workflow
 data/issue-13-csv-validation
-feature/issue-18-eg3-harness
+feature/issue-18-eg3-project-guard
 fix/issue-21-forecast-parser
 security/issue-25-key-masking
 test/issue-27-parser-fixtures
@@ -207,7 +209,7 @@ chore/issue-30-config-template
 | `data/` | 기준데이터·데이터 구조 |
 | `feature/` | 새로운 기능 |
 | `fix/` | 오류 수정 |
-| `test/` | 테스트·하네스 |
+| `test/` | 테스트·Project Guard |
 | `security/` | 보안 관련 변경 |
 | `chore/` | 환경·설정·정리 |
 | `analysis/` | 분석계획·분석 코드 |
@@ -334,7 +336,8 @@ AGENTS.md 읽기
 → 구현 계획 보고
 → PM 승인 대기
 → 승인된 범위만 수정
-→ 하네스 실행
+→ Project Guard 실행
+→ Unit Tests 실행
 → 자체 리뷰
 → 결과 보고
 ```
@@ -366,7 +369,7 @@ Commit은 하나의 의미 있는 변경 단위를 기록한다.
 ```text
 docs: define Git workflow
 data: validate Seoul place reference
-feat: implement offline harness
+feat: implement offline project guard
 fix: preserve forecast snapshots
 security: mask API key in logs
 test: add invalid JSON fixture
@@ -447,18 +450,25 @@ Commit 또는 Push 전에 다음을 수행한다.
 1. `git status`
 2. 변경 파일 확인
 3. 범위 밖 변경 여부 확인
-4. 하네스 실행
-5. 민감정보 확인
-6. Codex 자체 리뷰
-7. 문서와 코드 정합성 확인
+4. Project Guard 실행
+5. Unit Tests 실행
+6. 민감정보 확인
+7. Codex 자체 리뷰
+8. 문서와 코드 정합성 확인
 
-하네스가 구현된 이후 공식 명령은 다음과 같다.
+Project Guard가 구현된 이후 공식 명령은 다음과 같다.
 
 ```bash
-python3 scripts/harness_check.py
+python3 scripts/project_guard_check.py
 ```
 
-하네스가 아직 구현되지 않은 단계에서는 관련 문서에 정의된 읽기 전용 수동검증을 수행한다.
+Unit Tests 공식 명령은 다음과 같다.
+
+```bash
+python3 -B -m unittest discover -s tests -p "test_*.py" -v
+```
+
+Project Guard가 아직 구현되지 않은 단계에서는 관련 문서에 정의된 읽기 전용 수동검증을 수행한다.
 
 검증 실패 상태에서 완료로 보고하지 않는다.
 
@@ -492,7 +502,8 @@ Push 전 확인:
 - 현재 Branch가 `main`이 아님
 - 실제 API 키 없음
 - 범위 밖 파일 없음
-- 하네스 결과 확인
+- Project Guard 결과 확인
+- Unit Tests 결과 확인
 
 ---
 
@@ -524,7 +535,7 @@ main에 반영하기 위한 검토 요청
 
 ```text
 [Docs] Git 운영 규칙 기준선 수립
-[EG-3] 오프라인 하네스 1차 구현
+[EG-3] 오프라인 Project Guard 1차 구현
 ```
 
 ### 13.3 PR 본문 필수항목
@@ -534,12 +545,13 @@ main에 반영하기 위한 검토 요청
 3. 변경 파일
 4. 파일별 변경사항
 5. 검증 명령
-6. 하네스 결과
-7. Codex 리뷰 결과
-8. 범위 외 변경
-9. PM 확인사항
-10. 남은 위험
-11. 다음 게이트 진입 가능 여부
+6. Project Guard 결과
+7. Unit Tests 결과
+8. Codex 리뷰 결과
+9. 범위 외 변경
+10. PM 확인사항
+11. 남은 위험
+12. 다음 게이트 진입 가능 여부
 
 ### 13.4 Issue 연결
 
@@ -558,18 +570,18 @@ PR 병합 시 연결된 Issue가 종료되도록 한다.
 표준 리뷰 순서는 다음과 같다.
 
 ```text
-로컬 하네스 또는 문서 수동검증
+로컬 Project Guard와 Unit Tests 또는 문서 전용 작업의 수동검증
 → Codex Review
 → Commit
 → Push
 → Pull Request
-→ 구성된 경우 GitHub Actions
+→ 구성된 경우 GitHub Actions/CI에서 Project Guard와 Unit Tests
 → 필요 시 Codex GitHub Review
 → PM Review
 → Merge
 ```
 
-### 14.1 하네스
+### 14.1 Project Guard
 
 정해진 규칙을 기계적으로 검사한다.
 
@@ -582,7 +594,19 @@ PR 병합 시 연결된 Issue가 종료되도록 한다.
 - API 키 노출
 - 종료 코드
 
-### 14.2 Codex Review
+### 14.2 Unit Tests
+
+코드 또는 Project Guard 검사 로직의 개별 동작이 예상대로 수행되는지 검증한다.
+
+예:
+
+- 정상·실패 입력별 판정
+- 검사 ID와 순서
+- 종료 코드
+- 네트워크 차단
+- 공식 데이터 불변성
+
+### 14.3 Codex Review
 
 의미와 위험을 검토한다.
 
@@ -595,7 +619,7 @@ PR 병합 시 연결된 Issue가 종료되도록 한다.
 - 문서와 코드 불일치
 - 테스트 누락
 
-### 14.3 PM Review
+### 14.4 PM Review
 
 다음을 최종 판단한다.
 
@@ -614,8 +638,9 @@ PR 병합 시 연결된 Issue가 종료되도록 한다.
 - 연결 Issue 존재
 - 완료조건 충족
 - 변경 파일 검토 완료
-- 적용 대상 하네스 `FAIL=0` 또는 하네스 미구현 단계의 문서 수동검증 완료
-- GitHub Actions가 구성돼 현재 작업에 적용되는 경우 통과
+- 적용 대상 Project Guard `FAIL=0` 또는 Project Guard 미구현 단계의 문서 수동검증 완료
+- 적용 대상 Unit Tests 통과
+- GitHub Actions/CI가 구성돼 현재 작업에 적용되는 경우 Project Guard와 Unit Tests 통과
 - 보안 위반 없음
 - 범위 밖 변경 없음
 - 남은 위험 보고
@@ -644,6 +669,16 @@ git switch main
 git pull origin main
 git status
 ```
+
+`main` 반영 후 다음 명령으로 재검증한다.
+
+```bash
+python3 scripts/project_guard_check.py
+python3 -B -m unittest discover -s tests -p "test_*.py" -v
+```
+
+`main` 재검증에 실패하면 완료 처리와 Branch 정리를 중단하고,
+실패한 단계와 결과를 PM에게 보고한다.
 
 로컬 작업 Branch 삭제:
 
@@ -731,7 +766,7 @@ git restore --staged 파일경로
 ### 18.5 GitHub Actions 실패
 
 - 실패한 Step 확인
-- 하네스 출력 확인
+- Project Guard와 Unit Tests 출력 확인
 - 로컬에서 동일 명령 재현
 - 원인 수정
 - 다시 Commit·Push
@@ -747,11 +782,13 @@ Git 작업은 다음 조건을 모두 만족해야 완료다.
 - 승인된 Branch에서 작업
 - 범위 밖 변경 없음
 - Commit 메시지 명확
-- 적용 대상 하네스 통과 또는 하네스 미구현 단계의 문서 수동검증 완료
+- 적용 대상 Project Guard 통과 또는 Project Guard 미구현 단계의 문서 수동검증 완료
+- 적용 대상 Unit Tests 통과
 - PR 생성
-- GitHub Actions가 구성돼 현재 작업에 적용되는 경우 통과
+- GitHub Actions/CI가 구성돼 현재 작업에 적용되는 경우 Project Guard와 Unit Tests 통과
 - PM 승인
 - `main` Merge
+- `main`에서 Project Guard와 Unit Tests 재검증 통과
 - 로컬 `main` 최신화
 - 작업 Branch 정리
 - Issue 종료
