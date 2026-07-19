@@ -13,7 +13,7 @@
   - `docs/rules/CODING_RULES.md`
   - `docs/rules/SECURITY_RULES.md`
   - `docs/data/FIELD_DICTIONARY.md`
-  - `docs/testing/HARNESS_SPEC.md`
+  - `docs/testing/PROJECT_GUARD_SPEC.md`
   - `docs/testing/QUALITY_GATES.md`
   - `docs/analysis/ANALYSIS_PLAN.md`
 - 변경 시 PM 승인: 필요
@@ -117,7 +117,7 @@ EG-4 여의도 1장소
 
 신규 실제 API 호출은 다음 조건을 모두 만족한 뒤에만 수행한다.
 
-- EG-3 오프라인 하네스 통과
+- EG-3 오프라인 Project Guard 통과
 - EG-4 진입 PM 승인
 - 실제 호출 PM 승인
 
@@ -129,7 +129,7 @@ EG-4 여의도 1장소
 - 121장소 1회 수집
 - 승인된 반복수집
 
-일반 하네스와 단위 테스트에서는 실제 API를 호출하지 않는다.
+일반 Project Guard와 단위 테스트에서는 실제 API를 호출하지 않는다.
 
 테스트에는 다음 자료를 사용한다.
 
@@ -717,7 +717,7 @@ retry_count = 0
 8. 총 소요시간
 9. 생성된 원본 파일 수
 10. 생성된 분석용 행 수
-11. 하네스 결과
+11. Project Guard 결과
 12. API 키 미노출 확인
 13. 범위 준수
 14. PM 확인사항
@@ -741,7 +741,7 @@ retry_count = 0
 - 결측·미지원·오류 구분
 - 배치 실패 격리
 - 성공·실패 결과 보고
-- 하네스 통과
+- Project Guard 통과
 - PM 승인
 
 ---

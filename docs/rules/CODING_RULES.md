@@ -10,9 +10,9 @@
 - `AGENTS.md`: 제품 범위, 최상위 원칙과 PM 승인 범위
 - `README.md`: 현재 상태와 비개발자용 안내
 - `CODING_RULES.md`: 구현 방법과 코드 작성 규칙
-- `HARNESS_SPEC.md`: 검사 ID, 판정 상태와 종료 코드의 유일한 기준
+- `PROJECT_GUARD_SPEC.md`: 검사 ID, 판정 상태와 종료 코드의 유일한 기준
 - `QUALITY_GATES.md`: 엔지니어링 게이트 순서와 진입·통과 조건
-- `HARNESS_REPORT_TEMPLATE.md`: 실제 검사 결과 기록 형식
+- `PROJECT_GUARD_REPORT_TEMPLATE.md`: 실제 검사 결과 기록 형식
 
 이 문서에서는 검사 ID를 정의하거나 품질 게이트를 새로 만들지 않는다.
 
@@ -55,7 +55,7 @@ python3 파일경로
 
 ## 4. 장소 기준데이터 규칙
 
-수집기와 하네스가 공통으로 사용하는 유일한 공식 장소 기준파일은 다음과 같다.
+수집기와 Project Guard가 공통으로 사용하는 유일한 공식 장소 기준파일은 다음과 같다.
 
 ```text
 data/reference/seoul_121_places.csv
@@ -64,7 +64,7 @@ data/reference/seoul_121_places.csv
 현재 공식 CSV는 정비와 `main` 반영 및 읽기 전용 재검증을 완료해 EG-1을 통과했다.
 XLSX 파일과 XLSX 보존 경로는 사용하지 않는다.
 
-- 수집기와 하네스는 같은 공식 CSV만 장소 순회·코드 조회·검증 입력으로 사용한다.
+- 수집기와 Project Guard는 같은 공식 CSV만 장소 순회·코드 조회·검증 입력으로 사용한다.
 - CSV는 `open(..., mode="r", encoding="utf-8-sig", newline="")`로 열고
   표준 라이브러리 `csv.DictReader`로 읽는다.
 - `utf-8-sig`로 UTF-8과 UTF-8 BOM을 모두 처리하며 BOM 존재 자체를
@@ -85,7 +85,7 @@ XLSX 파일과 XLSX 보존 경로는 사용하지 않는다.
 프로젝트 루트의 `.env`에서 `SEOUL_OPEN_API_KEY`를 읽는 최소 로더는
 다음 규칙을 따라야 한다. 이 로더는 아직 구현되지 않았다.
 
-실제 `.env` 생성과 실제 인증키 저장은 EG-3 오프라인 하네스 통과 후
+실제 `.env` 생성과 실제 인증키 저장은 EG-3 오프라인 Project Guard 통과 후
 PM이 EG-4 진입과 여의도 1장소 실제 호출을 승인한 뒤에만 진행한다.
 EG-3까지의 로더 검사는 임시 `.env` fixture와 가짜 키만 사용한다.
 
@@ -105,9 +105,9 @@ EG-3까지의 로더 검사는 임시 `.env` fixture와 가짜 키만 사용한�
 
 ## 6. API 요청과 보안
 
-- 실제 서울시 API 호출은 EG-3 오프라인 하네스 통과 후 PM이 EG-4 진입과
+- 실제 서울시 API 호출은 EG-3 오프라인 Project Guard 통과 후 PM이 EG-4 진입과
   여의도 1장소 호출을 승인한 별도 실행에서만 수행한다.
-- 일반 하네스와 일반 테스트는 네트워크와 실제 서울시 API를 호출하지 않는다.
+- 일반 Project Guard와 일반 테스트는 네트워크와 실제 서울시 API를 호출하지 않는다.
 - API 키는 함수 인자 또는 설정 객체로 전달하고 전역 문자열로 복제하지 않는다.
 - API 키가 포함된 전체 URL을 출력하거나 오류에 포함하지 않는다.
 - 로그에는 실제 URL 대신 `citydata_ppltn` 같은 논리적 `endpoint_name`을 기록한다.
@@ -193,7 +193,7 @@ EG-3까지의 로더 검사는 임시 `.env` fixture와 가짜 키만 사용한�
 
 ## 12. 변경과 검증 원칙
 
-구현 전 현재 EG와 `HARNESS_SPEC.md`의 적용 검사 ID를 확인한다.
+구현 전 현재 EG와 `PROJECT_GUARD_SPEC.md`의 적용 검사 ID를 확인한다.
 적용 대상 필수검사를 통과한 뒤 결과를 보고하고, 다음 구현 단계 전환은
 PM 승인 후 진행한다. 검사 실행 자체에는 PM 승인이 필요하지 않다.
 

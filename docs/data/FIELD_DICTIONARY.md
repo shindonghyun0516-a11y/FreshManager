@@ -482,7 +482,7 @@ forecast_target_time
 6. 결측 표현 확인
 7. 분석용 필드명 제안
 8. 검증 상태 지정
-9. 관련 파서·하네스 영향 확인
+9. 관련 파서·Project Guard 영향 확인
 10. PM 승인
 
 ---
@@ -494,7 +494,7 @@ forecast_target_time
 - 기존 원본 데이터 영향
 - 파서 영향
 - 분석 코드 영향
-- 하네스 영향
+- Project Guard 영향
 - README 영향
 - 요구사항 영향
 - 마이그레이션 필요 여부

@@ -13,7 +13,7 @@
   - `.env.example`
   - `docs/rules/GIT_WORKFLOW.md`
   - `docs/rules/CODING_RULES.md`
-  - `docs/testing/HARNESS_SPEC.md`
+  - `docs/testing/PROJECT_GUARD_SPEC.md`
 - 변경 시 PM 승인: 필요
 
 ---
@@ -57,7 +57,7 @@
 .env
 ```
 
-실제 `.env` 생성과 실제 인증키 저장은 EG-3 오프라인 하네스 통과 후
+실제 `.env` 생성과 실제 인증키 저장은 EG-3 오프라인 Project Guard 통과 후
 PM이 EG-4 진입과 실제 API 호출을 승인한 뒤에만 진행한다.
 
 환경변수 이름:
@@ -89,7 +89,7 @@ SEOUL_OPEN_API_KEY=your_api_key_here
 ```
 
 `.env.example`에는 실제 키와 유사한 값도 넣지 않는다.
-`.env.example`은 EG-3 하네스 구현 단계에서 생성·검증하며,
+`.env.example`은 EG-3 Project Guard 구현 단계에서 생성·검증하며,
 그 전에는 존재를 완료조건으로 요구하지 않는다.
 
 ---
@@ -373,7 +373,7 @@ SEOUL_OPEN_API_KEY=********
 
 ## 16. GitHub Actions 보안
 
-PR 하네스는 실제 서울시 API를 호출하지 않는다.
+PR Project Guard는 실제 서울시 API를 호출하지 않는다.
 
 일반 GitHub Actions에는 실제 API 키가 필요하지 않다.
 
@@ -432,12 +432,12 @@ Codex는 환경변수 존재 여부만 확인하고 실제 값을 출력하지 �
 
 ---
 
-## 19. 하네스 보안검사
+## 19. Project Guard 보안검사
 
-아래 검사는 `HARNESS_SPEC.md`에서 현재 게이트에 적용되는 시점부터 수행한다.
-하네스 미구현 단계의 문서 전용 작업은 읽기 전용 수동 보안검사로 대신한다.
+아래 검사는 `PROJECT_GUARD_SPEC.md`에서 현재 게이트에 적용되는 시점부터 수행한다.
+Project Guard 미구현 단계의 문서 전용 작업은 읽기 전용 수동 보안검사로 대신한다.
 
-하네스는 최소 다음을 검사한다.
+Project Guard는 최소 다음을 검사한다.
 
 - `.env` Git 제외
 - `.env.example` 존재
@@ -481,7 +481,7 @@ Codex는 환경변수 존재 여부만 확인하고 실제 값을 출력하지 �
 7. 민감정보 제거
 8. 필요 시 Git 이력 정리
 9. 원인 기록
-10. 하네스 또는 규칙 보완
+10. Project Guard 또는 규칙 보완
 11. PM 최종 확인
 ```
 
@@ -519,7 +519,7 @@ git diff --cached
 - [ ] Commit·PR 변경 대상에 `.env`가 없는가
 - [ ] 실제 키가 없는가
 - [ ] 로그에 인증정보가 없는가
-- [ ] 적용 대상 하네스 보안검사 또는 하네스 미구현 단계의 문서 수동검사 통과
+- [ ] 적용 대상 Project Guard 보안검사 또는 Project Guard 미구현 단계의 문서 수동검사 통과
 - [ ] GitHub Actions에서 Secret을 사용하지 않는가
 - [ ] 화면 캡처가 안전한가
 - [ ] 남은 보안위험을 보고했는가
@@ -535,7 +535,7 @@ git diff --cached
 - 코드·문서·로그에 실제 키 없음
 - 샘플 데이터 안전
 - 개인정보 미포함
-- 적용 대상 하네스 보안검사 또는 하네스 미구현 단계의 문서 수동검사 통과
+- 적용 대상 Project Guard 보안검사 또는 Project Guard 미구현 단계의 문서 수동검사 통과
 - 남은 위험 보고
 - PM 확인 완료
 

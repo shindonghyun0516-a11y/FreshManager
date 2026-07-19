@@ -260,68 +260,56 @@ flowchart TB
 
 ### 5.2 Current State
 
-현재 저장소는 자동검사 부분에 `Harness`라는 이름을 사용한다. 다음 표는 Project
-Guard 실행 구성, 이를 보증하는 Unit Tests·Fixtures와 Project Guard를 호출하는
-외부 CI 연결을 구분해 보여준다.
+현재 저장소는 자동검사 하위 시스템에 `Project Guard`라는 이름을 사용한다. 다음
+표는 Project Guard 실행 구성, 이를 보증하는 Unit Tests·Fixtures와 Project Guard를
+호출하는 외부 CI 연결을 구분해 보여준다.
 
 | 역할 | 현재 경로 또는 구성 | 현재 책임 |
 |---|---|---|
-| Project Guard 실행 기준 | [`docs/testing/HARNESS_SPEC.md`](../testing/HARNESS_SPEC.md) | 검사 ID, 판정 조건, 상태와 종료코드의 유일한 기준 |
-| Project Guard 실행 구현체 | [`scripts/harness_check.py`](../../scripts/harness_check.py) | 등록된 검사를 순서대로 실행하고 결과와 종료코드 생성 |
-| Project Guard 결과 보고 형식 | [`docs/testing/HARNESS_REPORT_TEMPLATE.md`](../testing/HARNESS_REPORT_TEMPLATE.md) | 검사 결과, 위험과 PM 확인사항 기록 형식 |
-| Project Guard 보증 Unit Tests | [`tests/test_harness_check.py`](../../tests/test_harness_check.py) | 검사 로직, 정합성, 실패 처리와 불변성 검증 |
+| Project Guard 실행 기준 | [`docs/testing/PROJECT_GUARD_SPEC.md`](../testing/PROJECT_GUARD_SPEC.md) | 검사 ID, 판정 조건, 상태와 종료코드의 유일한 기준 |
+| Project Guard 실행 구현체 | [`scripts/project_guard_check.py`](../../scripts/project_guard_check.py) | 등록된 검사를 순서대로 실행하고 결과와 종료코드 생성 |
+| Project Guard 결과 보고 형식 | [`docs/testing/PROJECT_GUARD_REPORT_TEMPLATE.md`](../testing/PROJECT_GUARD_REPORT_TEMPLATE.md) | 검사 결과, 위험과 PM 확인사항 기록 형식 |
+| Project Guard 보증 Unit Tests | [`tests/test_project_guard_check.py`](../../tests/test_project_guard_check.py) | 검사 로직, 정합성, 실패 처리와 불변성 검증 |
 | Project Guard 보증 Fixtures | [`tests/fixtures/`](../../tests/fixtures/) | 오류 경로를 재현하는 CSV·JSON fixture |
-| 외부 CI 연결 | [`.github/workflows/harness.yml`](../../.github/workflows/harness.yml) | Project Guard 외부에서 PR와 `main` 변경의 검사를 자동 실행 |
+| 외부 CI 연결 | [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml) | Project Guard 외부에서 PR와 `main` 변경의 검사를 자동 실행 |
 
 현재 저장소 전용 Skill은 없다. Git, 선택적 Worktree, Python과 GitHub Actions가
 현재 확인되는 주요 실행 수단이다.
 
 ### 5.3 Target State
 
-다음은 P3 이후 도달하려는 목표 명칭이다. 이 절은 계획 상태이며 구현 완료를
-의미하지 않는다.
+P3~P7에서 목표로 한 명칭과 경로는 현재 Working Tree에 반영됐다. 다음 상태는
+로컬 구현 기준이며 Pull Request, CI와 Merge 완료를 의미하지 않는다.
 
-| 목표 역할 | 목표 경로 또는 상태 | 계획 상태 |
+| 목표 역할 | 목표 경로 또는 상태 | 현재 상태 |
 |---|---|---|
-| Project Guard 실행 스크립트 | `scripts/project_guard_check.py` | 향후 이름 전환 대상 |
-| Project Guard 공식 명세 | `docs/testing/PROJECT_GUARD_SPEC.md` | P3~P7 영향 분석 후 단일 공식 기준을 유지하며 이름 전환 예정 |
-| 통합 CI Workflow | `.github/workflows/ci.yml` | 향후 이름 전환 대상 |
-| 결과 보고 템플릿 | 영향 분석 후 결정 | 변경 여부 미확정 후보 |
-| 검사 Unit Test | 영향 분석 후 결정 | 변경 여부 미확정 후보 |
+| Project Guard 실행 스크립트 | `scripts/project_guard_check.py` | 이름 전환 구현 |
+| Project Guard 공식 명세 | `docs/testing/PROJECT_GUARD_SPEC.md` | 단일 공식 기준으로 이름 전환 구현 |
+| 통합 CI Workflow | `.github/workflows/ci.yml` | 이름과 실행 명령 전환 구현 |
+| 결과 보고 템플릿 | `docs/testing/PROJECT_GUARD_REPORT_TEMPLATE.md` | 이름 전환 구현 |
+| 검사 Unit Test | `tests/test_project_guard_check.py` | 이름과 import 전환 구현 |
 
-목표 경로는 아직 존재하지 않으므로 Markdown 링크로 사용하지 않는다. 결과 보고
-템플릿과 Unit Test는 영향을 분석한 뒤 변경 여부를 결정하며 반드시 이름을
-바꿀 파일로 단정하지 않는다.
-
-Project Guard 명세의 목표 전환은 기존 명세의 이력 보존을 우선 고려하고 P3~P7
-영향 분석 후 구체적인 Git 작업 방식을 확정한다. 새 명세를 별도로 병존시키는
-것을 목표로 하지 않으며 전환 중에도 단일 공식 기준을 유지한다.
+최종 완료 판정은 Pull Request의 독립 CI 검증, PM Review와 Merge 후 `main`
+재검증까지 끝난 뒤 수행한다.
 
 ### 5.4 단일 공식 기준 원칙
 
 현재 공식 자동검사 명세는
-[`docs/testing/HARNESS_SPEC.md`](../testing/HARNESS_SPEC.md) 하나다.
-목표 경로인 `docs/testing/PROJECT_GUARD_SPEC.md`는 아직 존재하지 않는다.
+[`docs/testing/PROJECT_GUARD_SPEC.md`](../testing/PROJECT_GUARD_SPEC.md) 하나다.
+이전 `docs/testing/HARNESS_SPEC.md`와 신·구 명세를 병존시키지 않는다.
 
-전환이 완료되기 전까지 두 문서를 동시에 공식 기준으로 표현하지 않는다. 목표
-이름과 전환 계획은 다음 Migration 표에서만 관리한다.
+### 5.5 Migration 이력
 
-### 5.5 Migration 계획
+이 절은 P3~P7 명칭 전환의 추적 가능한 이력만 남긴 임시 Migration 기록이며
+문서별 공식 책임표가 아니다.
 
-이 표는 현재와 목표 사이의 전환 계획이며 문서별 공식 책임표가 아니다. 또한
-P3~P7 전환 기간에만 사용하는 임시 Migration 절이다. 이름 전환과 참조 정렬이
-완료되면 실제 상태에 맞게 축소하거나 제거하며 영구 책임 모델로 사용하지 않는다.
-
-| 역할 | 현재 경로 | 목표 경로 | 현재 상태 | 전환 예정 단계 | 주의사항 |
-|---|---|---|---|---|---|
-| 검사 실행 스크립트 | `scripts/harness_check.py` | `scripts/project_guard_check.py` | 현재 사용 중 | P3~P7의 해당 전환 작업 | 참조 경로와 실행 주체를 함께 정렬 |
-| 검사 명세 | `docs/testing/HARNESS_SPEC.md` | `docs/testing/PROJECT_GUARD_SPEC.md` | 현재 유일한 공식 기준 | P3~P7의 해당 전환 작업 | 신·구 명세를 동시에 공식 기준으로 두지 않음 |
-| CI Workflow | `.github/workflows/harness.yml` | `.github/workflows/ci.yml` | 현재 PR·main 검증에 사용 | P3~P7의 해당 전환 작업 | Trigger와 검증 의미를 유지하고 배포를 추가하지 않음 |
-| 결과 보고 템플릿 | `docs/testing/HARNESS_REPORT_TEMPLATE.md` | 영향 분석 후 결정 | 현재 저장소에 존재하며 Project Guard 결과 보고 형식을 정의함 | P3~P7 영향 분석 | 후보이며 이름 변경을 선결정하지 않음 |
-| 검사 Unit Test | `tests/test_harness_check.py` | 영향 분석 후 결정 | 현재 사용 중 | P3~P7 영향 분석 | 테스트 의미와 발견 규칙을 보존 |
-
-P3~P7에서 실제 이름 전환이 완료되면 이 Architecture의 Current State, 관련 링크와
-Migration 상태도 실제 저장소에 맞게 갱신한다.
+| 역할 | 당시 경로 | 현재 공식 경로 | 구현 상태 |
+|---|---|---|---|
+| 검사 실행 스크립트 | `scripts/harness_check.py` | `scripts/project_guard_check.py` | 로컬 전환 구현·검증, PR·CI·Merge 대기 |
+| 검사 명세 | `docs/testing/HARNESS_SPEC.md` | `docs/testing/PROJECT_GUARD_SPEC.md` | 단일 공식 기준 전환 구현·검증 |
+| CI Workflow | `.github/workflows/harness.yml` | `.github/workflows/ci.yml` | Trigger를 유지한 이름 전환 구현·검증 |
+| 결과 보고 템플릿 | `docs/testing/HARNESS_REPORT_TEMPLATE.md` | `docs/testing/PROJECT_GUARD_REPORT_TEMPLATE.md` | 이름 전환 구현·검증 |
+| 검사 Unit Test | `tests/test_harness_check.py` | `tests/test_project_guard_check.py` | 이름과 import 전환 구현·검증 |
 
 ---
 
@@ -355,7 +343,7 @@ PROJECT_STATUS는 상태 복원을 지원하지만 Git 기록이나 현재 Issue
 4. `PROJECT_STATUS.md`
 5. `AGENTS.md`
 6. `docs/testing/QUALITY_GATES.md`
-7. `docs/testing/HARNESS_SPEC.md`
+7. `docs/testing/PROJECT_GUARD_SPEC.md`
 8. `README.md`
 9. 작업일지
 10. 과거 AI 대화
@@ -610,7 +598,7 @@ EG-4 이후 제품 코드가 생기면 API 요청 준비, 응답 검증, 원본 
 
 ### 11.5 CI의 현재 역할
 
-현재 CI는 [`.github/workflows/harness.yml`](../../.github/workflows/harness.yml)을
+현재 CI는 [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml)을
 통해 `main` 대상 Pull Request와 `main` Push에서 Project Guard와 Unit Tests를
 실행한다. CI 환경은 로컬과 다른 독립 실행 증거를 제공한다.
 
@@ -812,17 +800,16 @@ P8~P10에서 문서를 정렬할 공식 목표 책임 모델이다.
 | Codex 시작 순서·행동 규칙·금지사항·PM 승인 지점 | [`AGENTS.md`](../../AGENTS.md) | Architecture에서 역할과 진입점만 설명 | 상세 시작 순서·금지사항 복사 | 행동 정책 또는 승인 지점 변경 시 | PM |
 | Harness 전체 구조·계층·관계·책임 모델·피드백 루프 | `docs/engineering/CODEX_HARNESS_ARCHITECTURE.md` | README·AGENTS의 한 문장과 링크 | 전체 계층·책임표·피드백 루프 재작성 | 구성요소·책임·전환 상태 변경 시 | Codex 유지, PM 승인 |
 | 분야별 Rules | [`docs/rules/`](../rules/) | Architecture에서 문서별 역할과 링크 | 구현·Git·보안·수집 규칙 전문 복사 | 해당 분야 계약 변경 시 | 구현자와 PM |
-| Project Guard 검사 항목과 판정 | [`docs/testing/HARNESS_SPEC.md`](../testing/HARNESS_SPEC.md) | 검사 범주와 공식 명세 링크 | 개별 검사 ID·조건 전체 복사 | 검사·상태·종료코드 변경 시 | 구현자, PM 승인 |
+| Project Guard 검사 항목과 판정 | [`docs/testing/PROJECT_GUARD_SPEC.md`](../testing/PROJECT_GUARD_SPEC.md) | 검사 범주와 공식 명세 링크 | 개별 검사 ID·조건 전체 복사 | 검사·상태·종료코드 변경 시 | 구현자, PM 승인 |
 | 단계 진입·통과·PR·Merge·Issue 종료 판단 | [`docs/testing/QUALITY_GATES.md`](../testing/QUALITY_GATES.md) | 현재 단계 이름과 공식 Gate 링크 | 단계별 조건 전체 복사 | 진입·통과·Merge·종료 기준 변경 시 | PM |
 | 단일 작업 범위와 완료조건 | GitHub Issue ([템플릿](../../.github/ISSUE_TEMPLATE/task.md)) | PR의 Issue 연결과 목적 요약 | 승인된 Issue 본문 전체 복사 | 작업 생성·범위 변경 승인 시 | PM |
 | 실제 변경과 검증 증거 | Pull Request ([템플릿](../../.github/pull_request_template.md)) | PROJECT_STATUS의 완료 한 줄과 PR 참조 | 영구 정책과 Architecture 원문 작성 | PR 생성·검증·리뷰 시 | 구현자, PM 최종 승인 |
 | Git 변경 이력 | Git Commit | PR과 상태 문서의 Commit 참조 | 현재 상태나 요구사항을 Commit만으로 대체 | 승인된 변경을 추적 가능한 이력으로 기록할 때 | Commit 작성자 |
 | 개인 작업일지 | 작업일지 | 공식 Issue로 승격된 결론만 인용 | 공식 상태·정책·승인 근거로 직접 사용 | 개인 필요 시 | 작성자 |
-| Project Guard 결과 보고 형식 | [`HARNESS_REPORT_TEMPLATE.md`](../testing/HARNESS_REPORT_TEMPLATE.md) | PR의 상태 집계와 보고서 참조 | 검사별 결과표 전문 복사 | 결과 기록 형식 변경 시 | 실행자, PM 확인 |
-| CI 자동 실행 정의 | [`.github/workflows/harness.yml`](../../.github/workflows/harness.yml) | README의 CI 존재 안내 | Workflow YAML과 일시 실행 로그 복사 | Trigger·환경·자동 실행 단계 변경 시 | 구현자, PM 승인 |
+| Project Guard 결과 보고 형식 | [`PROJECT_GUARD_REPORT_TEMPLATE.md`](../testing/PROJECT_GUARD_REPORT_TEMPLATE.md) | PR의 상태 집계와 보고서 참조 | 검사별 결과표 전문 복사 | 결과 기록 형식 변경 시 | 실행자, PM 확인 |
+| CI 자동 실행 정의 | [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml) | README의 CI 존재 안내 | Workflow YAML과 일시 실행 로그 복사 | Trigger·환경·자동 실행 단계 변경 시 | 구현자, PM 승인 |
 
-이 책임표에서 현재 Project Guard 공식 명세는 `HARNESS_SPEC.md` 하나다. 아직
-존재하지 않는 목표 명세는 공식 소유 문서로 추가하지 않는다.
+이 책임표에서 현재 Project Guard 공식 명세는 `PROJECT_GUARD_SPEC.md` 하나다.
 
 ### 15.3 문서 중복 방지 원칙
 
@@ -924,15 +911,13 @@ Codex Engineering Harness 안에서 진행되는 방식을 설명하는 시나�
 - [Git Workflow](../rules/GIT_WORKFLOW.md)
 - [Security Rules](../rules/SECURITY_RULES.md)
 - [Data Collection Rules](../rules/DATA_COLLECTION_RULES.md)
-- [Current Project Guard Spec](../testing/HARNESS_SPEC.md)
+- [Current Project Guard Spec](../testing/PROJECT_GUARD_SPEC.md)
 - [Quality Gates](../testing/QUALITY_GATES.md)
-- [Current Project Guard Report Template](../testing/HARNESS_REPORT_TEMPLATE.md)
+- [Current Project Guard Report Template](../testing/PROJECT_GUARD_REPORT_TEMPLATE.md)
 - [Issue Template](../../.github/ISSUE_TEMPLATE/task.md)
 - [Pull Request Template](../../.github/pull_request_template.md)
-- [Current CI Workflow](../../.github/workflows/harness.yml)
-- [Current Project Guard Implementation](../../scripts/harness_check.py)
-- [Current Project Guard Unit Tests](../../tests/test_harness_check.py)
+- [Current CI Workflow](../../.github/workflows/ci.yml)
+- [Current Project Guard Implementation](../../scripts/project_guard_check.py)
+- [Current Project Guard Unit Tests](../../tests/test_project_guard_check.py)
 
-아직 존재하지 않는 목표 경로인 `scripts/project_guard_check.py`,
-`docs/testing/PROJECT_GUARD_SPEC.md`와 `.github/workflows/ci.yml`은 링크로
-사용하지 않는다.
+위 Current 링크는 현재 Working Tree의 공식 Project Guard 경로를 가리킨다.

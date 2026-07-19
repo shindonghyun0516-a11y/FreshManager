@@ -78,7 +78,7 @@
 
 ## 4. 공식 장소 목록
 
-수집기와 하네스가 공통으로 사용하는 유일한 공식 장소 기준파일은 다음 CSV다.
+수집기와 Project Guard가 공통으로 사용하는 유일한 공식 장소 기준파일은 다음 CSV다.
 
 ```text
 data/reference/seoul_121_places.csv
@@ -95,7 +95,7 @@ data/reference/seoul_121_places.csv
 - `encoding="utf-8-sig"`를 사용해 UTF-8과 UTF-8 BOM을 모두 처리하며,
   BOM 존재 자체를 필수조건으로 요구하지 않는다.
 - 공식 CSV 처리를 위해 `openpyxl`을 사용하거나 설치하지 않는다.
-- 수집기와 하네스는 CSV를 자동 수정·보정·정렬·덮어쓰기·재인코딩하거나
+- 수집기와 Project Guard는 CSV를 자동 수정·보정·정렬·덮어쓰기·재인코딩하거나
   다른 형식으로 변환하지 않는다.
 
 공식 CSV는 `CATEGORY`, `NO`, `AREA_CD`, `AREA_NM`, `ENG_NM`의 정확한
@@ -164,7 +164,7 @@ POI001부터 POI121까지 자동 생성
 - EG-0 문서 기준선 PM 승인
 - 공식 여의도 실응답 샘플 `data/samples/population_yeouido_sample.json` 배치
 - 공식 샘플 읽기 전용 사전검증과 `H-301`~`H-304` 통과
-- EG-3 Python 하네스 `scripts/harness_check.py` 구현 및 로컬 검증 완료
+- EG-3 Python 기반 Project Guard `scripts/project_guard_check.py` 구현 및 로컬 검증 완료
 - `AGENTS.md` 생성
 - Codex의 `AGENTS.md` 인식 확인
 
@@ -297,20 +297,20 @@ missing
 | EG-0 | 문서 기준선 | 통과: PM 승인 완료 |
 | EG-1 | 장소 기준데이터 사전검증 | 통과: 공식 CSV 정비·`main` 반영 및 읽기 전용 재검증 완료 |
 | EG-2 | 샘플 JSON 사전검증 | 통과: 공식 샘플 배치 및 `H-301`~`H-304` PASS |
-| EG-3 | 하네스 구현 및 자동 재검증 | 구현·로컬 검증 완료: PASS 28, SKIP 17 |
+| EG-3 | Project Guard 구현 및 자동 재검증 | 구현·로컬 검증 완료: PASS 28, SKIP 17 |
 | EG-4 | 여의도 1장소 | 미구현 |
 | EG-5 | 유형별 대표 3장소 | 미구현 |
 | EG-6 | 시험용 10장소 | 미구현 |
 | EG-7 | 121장소 1회 수집 | 미구현 |
 | EG-8 | 반복수집 주기 승인 | 미결정 |
 
-EG-1과 EG-2는 하네스 구현 전의 읽기 전용 사전검증이다.
+EG-1과 EG-2는 Project Guard 구현 전의 읽기 전용 사전검증이다.
 공식 여의도 실응답 샘플 경로는
 `data/samples/population_yeouido_sample.json`이다.
 EG-3에서 문서, 공식 CSV, 샘플 JSON을 네트워크 없이 자동 재검증한다.
 EG-3까지는 실제 `.env`를 만들거나 실제 인증키를 저장하지 않고,
 네트워크와 실제 서울시 API를 호출하지 않는다.
-실제 `.env` 생성·인증키 저장과 최초 실제 호출은 EG-3 오프라인 하네스
+실제 `.env` 생성·인증키 저장과 최초 실제 호출은 EG-3 오프라인 Project Guard
 통과 후 PM 승인을 받아 EG-4 여의도 1장소 단계에서 진행한다.
 각 게이트 통과 후 다음 구현 단계로 전환하려면 PM 승인을 받는다.
 
@@ -465,7 +465,7 @@ data/raw/population/2026/07/16/POI072_20260716_200000.json
 `.env`는 `.gitignore`에 포함한다.
 
 현재 `.env`를 생성하거나 실제 키를 저장하지 않는다.
-EG-3 오프라인 하네스가 통과하고 PM이 EG-4 진입과 실제 호출을 승인한 뒤에만
+EG-3 오프라인 Project Guard가 통과하고 PM이 EG-4 진입과 실제 호출을 승인한 뒤에만
 EG-4 여의도 1장소 단계에서 `.env`를 생성하고 실제 키를 저장한다.
 
 실제 키를 다음 위치에 작성하지 않는다.
@@ -538,15 +538,15 @@ Freshmanager/
 
 ## 18. 현재 실행방법
 
-EG-3 Python 하네스가 `scripts/harness_check.py`에 구현돼 있다.
+EG-3 Python 기반 Project Guard가 `scripts/project_guard_check.py`에 구현돼 있다.
 전체 검사 ID 45개 중 EG-3 활성 검사 28개를 실행하고 후속 검사 17개는
 적용 예정 게이트를 근거로 `SKIP`한다. 정상 실행 기준은 `PASS 28`,
 `FAIL 0`, `WARN 0`, `SKIP 17`, 종료 코드 `0`이다.
 
-표준 하네스 실행 명령:
+표준 Project Guard 실행 명령:
 
 ```bash
-python3 scripts/harness_check.py
+python3 scripts/project_guard_check.py
 ```
 
 단위 테스트 실행 명령:
@@ -555,9 +555,9 @@ python3 scripts/harness_check.py
 python3 -B -m unittest discover -s tests -p "test_*.py" -v
 ```
 
-일반 하네스와 일반 테스트는 저장된 샘플 또는 가짜 응답만 사용하며
+일반 Project Guard와 일반 테스트는 저장된 샘플 또는 가짜 응답만 사용하며
 네트워크와 실제 서울시 API를 호출하지 않는다. 최초 실제 호출은
-EG-3 오프라인 하네스 통과 후 PM 승인을 받아 EG-4 여의도 1장소 단계에서 수행한다.
+EG-3 오프라인 Project Guard 통과 후 PM 승인을 받아 EG-4 여의도 1장소 단계에서 수행한다.
 
 자동수집 코드는 아직 구현되지 않았으며 실행 가능한 수집 명령도 없다.
 아직 존재하지 않는 수집 명령을 README에 사실처럼 작성하지 않는다.
@@ -592,7 +592,7 @@ Codex는 작업 전 반드시 `AGENTS.md`를 읽는다.
 ```text
 요구사항 확인
 → 현재 EG와 선행 게이트 확인
-→ 읽기 전용 사전검증 또는 적용 하네스 검사
+→ 읽기 전용 사전검증 또는 적용 Project Guard 검사
 → 게이트 판정
 → PM의 다음 구현 단계 전환 승인
 → 승인된 최소 단위 구현
@@ -600,7 +600,7 @@ Codex는 작업 전 반드시 `AGENTS.md`를 읽는다.
 ```
 
 위 흐름은 구현 작업에 적용한다.
-문서 전용 작업은 Python 하네스를 만들거나 실행하지 않고
+문서 전용 작업은 Python 기반 Project Guard를 만들거나 실행하지 않고
 코드 블록 정상 종료, Markdown 제목 구조와 여섯 문서의 규칙·상태 일관성을 확인한다.
 
 검사 실행과 읽기 전용 판정 자체에는 PM 승인이 필요하지 않다.
@@ -615,8 +615,8 @@ Codex는 작업 전 반드시 `AGENTS.md`를 읽는다.
 - 자동실행 구성 또는 변경
 - GitHub main 브랜치 병합
 
-EG-1과 EG-2는 하네스 없이 읽기 전용으로 판정하고,
-EG-3부터 적용 대상 하네스 검사를 사용한다.
+EG-1과 EG-2는 Project Guard 없이 읽기 전용으로 판정하고,
+EG-3부터 적용 대상 Project Guard 검사를 사용한다.
 121장소 전체 수집은 여의도, 대표 3장소, 시험용 10장소 단계를
 순서대로 통과한 뒤 진행한다.
 
@@ -637,7 +637,7 @@ EG-3부터 적용 대상 하네스 검사를 사용한다.
 - 예측 스냅샷을 덮어쓰지 않음
 - 상권 미지원과 결측을 구분함
 - API 키가 노출되지 않음
-- 하네스 검사를 실행하고 통과함
+- Project Guard 검사를 실행하고 통과함
 - 현재 품질 게이트 통과와 다음 단계 전환 승인을 구분함
 - 실행방법을 한국어로 설명함
 - PM 확인사항과 남은 위험을 보고함

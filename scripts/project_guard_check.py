@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""FreshManager EG-3 offline validation harness.
+"""FreshManager EG-3 offline Project Guard.
 
 This module uses only the Python standard library. It never reads the real
 ``.env`` file, performs network requests, or writes to the official CSV/JSON.
@@ -27,7 +27,7 @@ from typing import Callable, Iterable, Sequence
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 CSV_RELATIVE_PATH = Path("data/reference/seoul_121_places.csv")
 JSON_RELATIVE_PATH = Path("data/samples/population_yeouido_sample.json")
-SPEC_RELATIVE_PATH = Path("docs/testing/HARNESS_SPEC.md")
+SPEC_RELATIVE_PATH = Path("docs/testing/PROJECT_GUARD_SPEC.md")
 
 EXPECTED_HEADERS = ["CATEGORY", "NO", "AREA_CD", "AREA_NM", "ENG_NM"]
 EXPECTED_CATEGORIES = {
@@ -80,12 +80,12 @@ DOCUMENT_PATHS = [
     Path("AGENTS.md"),
     Path("README.md"),
     Path("docs/rules/CODING_RULES.md"),
-    Path("docs/testing/HARNESS_SPEC.md"),
+    Path("docs/testing/PROJECT_GUARD_SPEC.md"),
     Path("docs/testing/QUALITY_GATES.md"),
-    Path("docs/testing/HARNESS_REPORT_TEMPLATE.md"),
+    Path("docs/testing/PROJECT_GUARD_REPORT_TEMPLATE.md"),
 ]
-STANDARD_HARNESS_COMMAND = "python3 scripts/harness_check.py"
-EG3_STATUS_ROW = "| EG-3 | 하네스 구현 및 자동 재검증 | 구현·로컬 검증 완료: PASS 28, SKIP 17 |"
+STANDARD_PROJECT_GUARD_COMMAND = "python3 scripts/project_guard_check.py"
+EG3_STATUS_ROW = "| EG-3 | Project Guard 구현 및 자동 재검증 | 구현·로컬 검증 완료: PASS 28, SKIP 17 |"
 
 
 class Status(str, Enum):
@@ -126,7 +126,7 @@ class JsonInspection:
 
 
 @dataclass(frozen=True)
-class HarnessContext:
+class ProjectGuardContext:
     root: Path
     csv_hash_before: str | None
     json_hash_before: str | None
@@ -245,7 +245,7 @@ def markdown_section(text: str, heading: str) -> str:
     return text[match.start():end]
 
 
-def check_h001(context: HarnessContext) -> CheckResult:
+def check_h001(context: ProjectGuardContext) -> CheckResult:
     missing = []
     empty = []
     for relative_path in DOCUMENT_PATHS:
@@ -259,7 +259,7 @@ def check_h001(context: HarnessContext) -> CheckResult:
     return passed("H-001", "필수 문서 6개가 존재하고 비어 있지 않음", *map(str, DOCUMENT_PATHS))
 
 
-def check_h002(context: HarnessContext) -> CheckResult:
+def check_h002(context: ProjectGuardContext) -> CheckResult:
     errors = []
     for relative_path in DOCUMENT_PATHS:
         path = context.root / relative_path
@@ -273,7 +273,7 @@ def check_h002(context: HarnessContext) -> CheckResult:
     return passed("H-002", "필수 문서의 코드 블록과 제목 계층 정상", *map(str, DOCUMENT_PATHS))
 
 
-def check_h003(context: HarnessContext) -> CheckResult:
+def check_h003(context: ProjectGuardContext) -> CheckResult:
     required_text = {
         Path("AGENTS.md"): [
             "data/reference/seoul_121_places.csv",
@@ -289,7 +289,7 @@ def check_h003(context: HarnessContext) -> CheckResult:
             "EG-1을 통과했다",
             "SEOUL_OPEN_API_KEY",
         ],
-        Path("docs/testing/HARNESS_SPEC.md"): [
+        Path("docs/testing/PROJECT_GUARD_SPEC.md"): [
             "data/reference/seoul_121_places.csv",
             "data/samples/population_yeouido_sample.json",
             "EG-1: 공식 CSV 정비",
@@ -299,7 +299,7 @@ def check_h003(context: HarnessContext) -> CheckResult:
             "data/samples/population_yeouido_sample.json",
             "EG-1 | 통과:",
         ],
-        Path("docs/testing/HARNESS_REPORT_TEMPLATE.md"): ["HARNESS_SPEC.md"],
+        Path("docs/testing/PROJECT_GUARD_REPORT_TEMPLATE.md"): ["PROJECT_GUARD_SPEC.md"],
     }
     forbidden = [
         "헤더 제외 CSV 레코드 989개",
@@ -347,9 +347,9 @@ def check_h003(context: HarnessContext) -> CheckResult:
     return passed("H-003", "승인된 경로·EG 상태·메타데이터·게이트 순서 일치", *map(str, DOCUMENT_PATHS))
 
 
-def check_h004(context: HarnessContext) -> CheckResult:
+def check_h004(context: ProjectGuardContext) -> CheckResult:
     readme_path = context.root / "README.md"
-    harness_path = context.root / "scripts/harness_check.py"
+    project_guard_path = context.root / "scripts/project_guard_check.py"
     if not readme_path.is_file():
         return failed("H-004", "README.md가 없음", "README.md")
     readme = read_text(readme_path)
@@ -371,17 +371,17 @@ def check_h004(context: HarnessContext) -> CheckResult:
     )
     forbidden_patterns = {
         "EG-3 미구현": r"\|\s*EG-3\s*\|[^\n]*\|\s*미구현\s*\|",
-        "하네스 코드 없음": r"하네스[^\n]*코드[^\n]*(?:없음|구현되지)",
-        "하네스 파일 없음": r"하네스 파일 없음",
-        "하네스 실행 불가": r"하네스 실행 불가",
+        "Project Guard 코드 없음": r"Project Guard[^\n]*코드[^\n]*(?:없음|구현되지)",
+        "Project Guard 파일 없음": r"Project Guard 파일 없음",
+        "Project Guard 실행 불가": r"Project Guard 실행 불가",
     }
     stale = [label for label, pattern in forbidden_patterns.items() if re.search(pattern, current_state)]
-    if not harness_path.is_file():
-        missing.append("scripts/harness_check.py 일반 파일")
+    if not project_guard_path.is_file():
+        missing.append("scripts/project_guard_check.py 일반 파일")
     if EG3_STATUS_ROW not in status_section:
         missing.append("README EG-3 구현·로컬 검증 완료 상태")
-    if STANDARD_HARNESS_COMMAND not in execution_section:
-        missing.append("README 표준 하네스 실행 명령")
+    if STANDARD_PROJECT_GUARD_COMMAND not in execution_section:
+        missing.append("README 표준 Project Guard 실행 명령")
     actual_missing = [
         path.as_posix()
         for path in [CSV_RELATIVE_PATH, JSON_RELATIVE_PATH]
@@ -392,23 +392,23 @@ def check_h004(context: HarnessContext) -> CheckResult:
             "H-004",
             f"README·구현 누락={missing}, 실제 파일 누락={actual_missing}, 과거 상태={stale}",
             "README.md",
-            "scripts/harness_check.py",
+            "scripts/project_guard_check.py",
         )
     return passed(
         "H-004",
         "실행 파일·표준 명령·EG-3 구현 상태와 공식 데이터 경로 일치",
         "README.md",
-        "scripts/harness_check.py",
+        "scripts/project_guard_check.py",
     )
 
 
-def check_h101(context: HarnessContext) -> CheckResult:
+def check_h101(context: ProjectGuardContext) -> CheckResult:
     if not context.csv_path.is_file():
         return failed("H-101", "공식 CSV가 없거나 일반 파일이 아님", str(CSV_RELATIVE_PATH))
     return passed("H-101", "공식 CSV 일반 파일 존재", str(CSV_RELATIVE_PATH))
 
 
-def check_h102(context: HarnessContext) -> CheckResult:
+def check_h102(context: ProjectGuardContext) -> CheckResult:
     try:
         inspection = inspect_csv(context.csv_path)
     except (OSError, UnicodeDecodeError, csv.Error) as error:
@@ -421,14 +421,14 @@ def check_h102(context: HarnessContext) -> CheckResult:
     )
 
 
-def csv_or_failure(context: HarnessContext, check_id: str) -> CsvInspection | CheckResult:
+def csv_or_failure(context: ProjectGuardContext, check_id: str) -> CsvInspection | CheckResult:
     try:
         return inspect_csv(context.csv_path)
     except (OSError, UnicodeDecodeError, csv.Error) as error:
         return failed(check_id, f"선행 CSV 읽기 실패({type(error).__name__})", str(CSV_RELATIVE_PATH))
 
 
-def check_h103(context: HarnessContext) -> CheckResult:
+def check_h103(context: ProjectGuardContext) -> CheckResult:
     inspected = csv_or_failure(context, "H-103")
     if isinstance(inspected, CheckResult):
         return inspected
@@ -438,7 +438,7 @@ def check_h103(context: HarnessContext) -> CheckResult:
     return passed("H-103", f"정확한 5개 헤더와 순서 확인: {actual}", str(CSV_RELATIVE_PATH))
 
 
-def check_h104(context: HarnessContext) -> CheckResult:
+def check_h104(context: ProjectGuardContext) -> CheckResult:
     inspected = csv_or_failure(context, "H-104")
     if isinstance(inspected, CheckResult):
         return inspected
@@ -453,7 +453,7 @@ def normalized_cell(row: dict[str | None, str | list[str] | None], key: str) -> 
     return value.strip() if isinstance(value, str) else ""
 
 
-def check_h105(context: HarnessContext) -> CheckResult:
+def check_h105(context: ProjectGuardContext) -> CheckResult:
     inspected = csv_or_failure(context, "H-105")
     if isinstance(inspected, CheckResult):
         return inspected
@@ -463,7 +463,7 @@ def check_h105(context: HarnessContext) -> CheckResult:
     return passed("H-105", "AREA_CD 결측 0건", str(CSV_RELATIVE_PATH))
 
 
-def check_h106(context: HarnessContext) -> CheckResult:
+def check_h106(context: ProjectGuardContext) -> CheckResult:
     inspected = csv_or_failure(context, "H-106")
     if isinstance(inspected, CheckResult):
         return inspected
@@ -474,7 +474,7 @@ def check_h106(context: HarnessContext) -> CheckResult:
     return passed("H-106", "AREA_CD 중복 0건", str(CSV_RELATIVE_PATH))
 
 
-def check_h107(context: HarnessContext) -> CheckResult:
+def check_h107(context: ProjectGuardContext) -> CheckResult:
     inspected = csv_or_failure(context, "H-107")
     if isinstance(inspected, CheckResult):
         return inspected
@@ -484,7 +484,7 @@ def check_h107(context: HarnessContext) -> CheckResult:
     return passed("H-107", "AREA_NM 결측 0건", str(CSV_RELATIVE_PATH))
 
 
-def check_h108(context: HarnessContext) -> CheckResult:
+def check_h108(context: ProjectGuardContext) -> CheckResult:
     inspected = csv_or_failure(context, "H-108")
     if isinstance(inspected, CheckResult):
         return inspected
@@ -524,11 +524,11 @@ def find_area_code_generation(source: str) -> list[int]:
     return sorted(set(lines))
 
 
-def check_h109(context: HarnessContext) -> CheckResult:
+def check_h109(context: ProjectGuardContext) -> CheckResult:
     inspected = csv_or_failure(context, "H-109")
     if isinstance(inspected, CheckResult):
         return inspected
-    source_path = context.root / "scripts/harness_check.py"
+    source_path = context.root / "scripts/project_guard_check.py"
     source = read_text(source_path)
     generated_lines = find_area_code_generation(source)
     expected = [normalized_cell(row, "AREA_CD") for row in inspected.rows]
@@ -538,13 +538,13 @@ def check_h109(context: HarnessContext) -> CheckResult:
             "H-109",
             f"코드 생성 의심 행={generated_lines}, CSV 코드 보존={actual == expected}",
             str(CSV_RELATIVE_PATH),
-            "scripts/harness_check.py",
+            "scripts/project_guard_check.py",
         )
-    return passed("H-109", "대상 코드는 CSV AREA_CD에서 순서대로 읽으며 자동생성 없음", str(CSV_RELATIVE_PATH), "scripts/harness_check.py")
+    return passed("H-109", "대상 코드는 CSV AREA_CD에서 순서대로 읽으며 자동생성 없음", str(CSV_RELATIVE_PATH), "scripts/project_guard_check.py")
 
 
-def check_h110(context: HarnessContext) -> CheckResult:
-    source_path = context.root / "scripts/harness_check.py"
+def check_h110(context: ProjectGuardContext) -> CheckResult:
+    source_path = context.root / "scripts/project_guard_check.py"
     source = read_text(source_path)
     tree = ast.parse(source)
     imports = set()
@@ -580,12 +580,12 @@ def check_h110(context: HarnessContext) -> CheckResult:
         return failed(
             "H-110",
             f"csv import={('csv' in imports)}, DictReader={has_dict_reader}, utf-8-sig/newline={has_read_contract}, 금지 import={forbidden}, 의존성={dependency_hits}",
-            "scripts/harness_check.py",
+            "scripts/project_guard_check.py",
         )
-    return passed("H-110", "표준 csv.DictReader와 utf-8-sig/newline='' 사용, openpyxl·pandas 없음", "scripts/harness_check.py")
+    return passed("H-110", "표준 csv.DictReader와 utf-8-sig/newline='' 사용, openpyxl·pandas 없음", "scripts/project_guard_check.py")
 
 
-def check_h111(context: HarnessContext) -> CheckResult:
+def check_h111(context: ProjectGuardContext) -> CheckResult:
     if not context.csv_path.is_file():
         return failed("H-111", "공식 CSV가 없어 불변성 검사 불가", str(CSV_RELATIVE_PATH))
     official_before = sha256_file(context.csv_path)
@@ -605,7 +605,7 @@ def check_h111(context: HarnessContext) -> CheckResult:
     return passed("H-111", f"공식 CSV·임시 복사본 SHA-256 불변({official_after})", str(CSV_RELATIVE_PATH))
 
 
-def check_h112(context: HarnessContext) -> CheckResult:
+def check_h112(context: ProjectGuardContext) -> CheckResult:
     inspected = csv_or_failure(context, "H-112")
     if isinstance(inspected, CheckResult):
         return inspected
@@ -633,7 +633,7 @@ def run_git(root: Path, arguments: Sequence[str]) -> subprocess.CompletedProcess
     )
 
 
-def check_h201(context: HarnessContext) -> CheckResult:
+def check_h201(context: ProjectGuardContext) -> CheckResult:
     gitignore = context.root / ".gitignore"
     if not gitignore.is_file():
         return failed("H-201", ".gitignore 없음", ".gitignore")
@@ -651,7 +651,7 @@ def check_h201(context: HarnessContext) -> CheckResult:
 SAFE_ENV_VALUES = {"your_api_key_here", "********"}
 
 
-def check_h202(context: HarnessContext) -> CheckResult:
+def check_h202(context: ProjectGuardContext) -> CheckResult:
     path = context.root / ".env.example"
     if not path.is_file():
         return failed("H-202", ".env.example 없음", ".env.example")
@@ -727,7 +727,7 @@ def sensitive_findings(path: Path, root: Path) -> list[tuple[int, str]]:
     return findings
 
 
-def check_h203(context: HarnessContext) -> CheckResult:
+def check_h203(context: ProjectGuardContext) -> CheckResult:
     findings = []
     for path in iter_security_files(context.root):
         for line_number, finding_type in sensitive_findings(path, context.root):
@@ -737,14 +737,14 @@ def check_h203(context: HarnessContext) -> CheckResult:
     return passed("H-203", "실제 키·인증키 포함 실행 URL 없음(.env 내용 미열람)", "저장소 문서·코드·테스트·샘플·로그")
 
 
-def json_or_failure(context: HarnessContext, check_id: str) -> JsonInspection | CheckResult:
+def json_or_failure(context: ProjectGuardContext, check_id: str) -> JsonInspection | CheckResult:
     try:
         return inspect_json(context.json_path)
     except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
         return failed(check_id, f"샘플 JSON 읽기 실패({type(error).__name__})", str(JSON_RELATIVE_PATH))
 
 
-def check_h301(context: HarnessContext) -> CheckResult:
+def check_h301(context: ProjectGuardContext) -> CheckResult:
     if not context.json_path.is_file():
         return failed("H-301", "공식 샘플 JSON 없음", str(JSON_RELATIVE_PATH))
     inspected = json_or_failure(context, "H-301")
@@ -760,7 +760,7 @@ def population_items(document: object) -> list[object] | None:
     return value if isinstance(value, list) else None
 
 
-def check_h302(context: HarnessContext) -> CheckResult:
+def check_h302(context: ProjectGuardContext) -> CheckResult:
     inspected = json_or_failure(context, "H-302")
     if isinstance(inspected, CheckResult):
         return inspected
@@ -802,7 +802,7 @@ def parse_integer(value: object) -> int:
     return int(str(value).strip())
 
 
-def check_h303(context: HarnessContext) -> CheckResult:
+def check_h303(context: ProjectGuardContext) -> CheckResult:
     inspected = json_or_failure(context, "H-303")
     if isinstance(inspected, CheckResult):
         return inspected
@@ -837,7 +837,7 @@ def check_h303(context: HarnessContext) -> CheckResult:
     return passed("H-303", f"예측 객체 {len(forecasts)}개, 필수필드·정수 범위 정상(개수는 정보성)", str(JSON_RELATIVE_PATH))
 
 
-def check_h304(context: HarnessContext) -> CheckResult:
+def check_h304(context: ProjectGuardContext) -> CheckResult:
     path = context.json_path
     findings = sensitive_findings(path, context.root)
     try:
@@ -894,17 +894,17 @@ def project_python_files(root: Path) -> list[Path]:
     return sorted(files)
 
 
-def check_h305(context: HarnessContext) -> CheckResult:
+def check_h305(context: ProjectGuardContext) -> CheckResult:
     findings = []
     for path in project_python_files(context.root):
         for finding in network_code_findings(path):
             findings.append(f"{relative(path, context.root)}:{finding}")
     if findings:
         return failed("H-305", "; ".join(findings), "scripts/", "tests/")
-    return passed("H-305", "하네스·테스트에 네트워크 import·실행 호출 없음", "scripts/", "tests/")
+    return passed("H-305", "Project Guard·테스트에 네트워크 import·실행 호출 없음", "scripts/", "tests/")
 
 
-def check_h401(context: HarnessContext) -> CheckResult:
+def check_h401(context: ProjectGuardContext) -> CheckResult:
     errors = []
     files = project_python_files(context.root)
     for path in files:
@@ -923,7 +923,7 @@ def ids_from_spec(path: Path) -> list[str]:
     return re.findall(r"^\| `(H-\d{3})` \|", text, flags=re.MULTILINE)
 
 
-def check_h402(context: HarnessContext) -> CheckResult:
+def check_h402(context: ProjectGuardContext) -> CheckResult:
     spec_ids = ids_from_spec(context.root / SPEC_RELATIVE_PATH)
     registry_ids = [definition.check_id for definition in CHECK_DEFINITIONS]
     if len(spec_ids) != len(set(spec_ids)) or spec_ids != registry_ids:
@@ -931,28 +931,28 @@ def check_h402(context: HarnessContext) -> CheckResult:
             "H-402",
             f"spec={len(spec_ids)}개/고유={len(set(spec_ids))}개, registry={len(registry_ids)}개, 순서일치={spec_ids == registry_ids}",
             str(SPEC_RELATIVE_PATH),
-            "scripts/harness_check.py",
+            "scripts/project_guard_check.py",
         )
-    return passed("H-402", "HARNESS_SPEC와 registry의 45개 ID·순서가 정확히 일치", str(SPEC_RELATIVE_PATH), "scripts/harness_check.py")
+    return passed("H-402", "PROJECT_GUARD_SPEC와 registry의 45개 ID·순서가 정확히 일치", str(SPEC_RELATIVE_PATH), "scripts/project_guard_check.py")
 
 
-def check_h403(context: HarnessContext) -> CheckResult:
-    return passed("H-403", "최종 결과 생성 후 상태·건수 정합성 재검증 예정", "하네스 실행 결과")
+def check_h403(context: ProjectGuardContext) -> CheckResult:
+    return passed("H-403", "최종 결과 생성 후 상태·건수 정합성 재검증 예정", "Project Guard 실행 결과")
 
 
 def exit_code_for(results: Sequence[CheckResult]) -> int:
     return 1 if any(result.status is Status.FAIL for result in results) else 0
 
 
-def check_h404(context: HarnessContext) -> CheckResult:
+def check_h404(context: ProjectGuardContext) -> CheckResult:
     synthetic_pass = [make_result("H-404", Status.PASS, "synthetic")]
     synthetic_fail = [make_result("H-404", Status.FAIL, "synthetic")]
     if exit_code_for(synthetic_pass) != 0 or exit_code_for(synthetic_fail) != 1:
-        return failed("H-404", "성공·실패 종료 코드 매핑 오류", "scripts/harness_check.py")
-    return passed("H-404", "성공=0, 필수실패=1, 내부오류=2 계약 확인", "scripts/harness_check.py")
+        return failed("H-404", "성공·실패 종료 코드 매핑 오류", "scripts/project_guard_check.py")
+    return passed("H-404", "성공=0, 필수실패=1, 내부오류=2 계약 확인", "scripts/project_guard_check.py")
 
 
-RUNNERS: dict[str, Callable[[HarnessContext], CheckResult]] = {
+RUNNERS: dict[str, Callable[[ProjectGuardContext], CheckResult]] = {
     f"check_{check_id.lower().replace('-', '')}": globals()[f"check_{check_id.lower().replace('-', '')}"]
     for check_id in [
         "H-001", "H-002", "H-003", "H-004",
@@ -996,7 +996,7 @@ CHECK_DEFINITIONS = [
     definition("H-302", "샘플 장소·인구 구조", "EG-2, EG-3 이후"),
     definition("H-303", "샘플 미래예측 구조", "EG-2, EG-3 이후"),
     definition("H-304", "샘플 비밀정보 제거", "EG-2, EG-3 이후"),
-    definition("H-305", "하네스·테스트 오프라인", "EG-3 이후"),
+    definition("H-305", "Project Guard·테스트 오프라인", "EG-3 이후"),
     definition("H-401", "Python 문법", "EG-3 이후"),
     definition("H-402", "검사 ID 등록 정합성", "EG-3 이후"),
     definition("H-403", "상태·건수 정합성", "EG-3 이후"),
@@ -1054,28 +1054,28 @@ def validate_final_results(results: list[CheckResult]) -> CheckResult:
     if sum(counts.values()) != len(results):
         issues.append("상태별 합계 불일치")
     if issues:
-        return failed("H-403", "; ".join(issues), "하네스 실행 결과")
+        return failed("H-403", "; ".join(issues), "Project Guard 실행 결과")
     return passed(
         "H-403",
         f"상태별 합계={len(results)}, ID·순서·상태값 정상",
-        "하네스 실행 결과",
+        "Project Guard 실행 결과",
     )
 
 
-def enforce_official_file_immutability(context: HarnessContext, results: list[CheckResult]) -> None:
+def enforce_official_file_immutability(context: ProjectGuardContext, results: list[CheckResult]) -> None:
     csv_after = sha256_if_file(context.csv_path)
     json_after = sha256_if_file(context.json_path)
     if context.csv_hash_before is not None and csv_after != context.csv_hash_before:
-        replace_result(results, failed("H-111", "하네스 전체 실행 전후 공식 CSV SHA-256 불일치", str(CSV_RELATIVE_PATH)))
+        replace_result(results, failed("H-111", "Project Guard 전체 실행 전후 공식 CSV SHA-256 불일치", str(CSV_RELATIVE_PATH)))
     if context.json_hash_before is not None and json_after != context.json_hash_before:
-        replace_result(results, failed("H-301", "하네스 전체 실행 전후 공식 JSON SHA-256 불일치", str(JSON_RELATIVE_PATH)))
+        replace_result(results, failed("H-301", "Project Guard 전체 실행 전후 공식 JSON SHA-256 불일치", str(JSON_RELATIVE_PATH)))
 
 
-def run_harness(root: Path = PROJECT_ROOT) -> list[CheckResult]:
+def run_project_guard(root: Path = PROJECT_ROOT) -> list[CheckResult]:
     root = root.resolve()
     csv_path = root / CSV_RELATIVE_PATH
     json_path = root / JSON_RELATIVE_PATH
-    context = HarnessContext(
+    context = ProjectGuardContext(
         root=root,
         csv_hash_before=sha256_if_file(csv_path),
         json_hash_before=sha256_if_file(json_path),
@@ -1120,15 +1120,15 @@ def format_report(results: Sequence[CheckResult]) -> str:
 
 def main(
     root: Path = PROJECT_ROOT,
-    runner: Callable[[Path], list[CheckResult]] = run_harness,
+    runner: Callable[[Path], list[CheckResult]] = run_project_guard,
 ) -> int:
     try:
         results = runner(root)
         print(format_report(results))
         return exit_code_for(results)
-    except Exception as error:  # Harness failures must map to the documented code 2.
+    except Exception as error:  # Project Guard failures must map to the documented code 2.
         print(
-            f"[HARNESS_ERROR] 내부 오류({type(error).__name__}); 민감값은 출력하지 않음",
+            f"[PROJECT_GUARD_ERROR] 내부 오류({type(error).__name__}); 민감값은 출력하지 않음",
             file=sys.stderr,
         )
         print("EXIT_CODE=2", file=sys.stderr)

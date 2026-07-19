@@ -79,12 +79,12 @@ data/reference/seoul_121_places.csv
 ```
 
 - XLSX 파일과 XLSX 보존 경로는 사용하지 않는다.
-- 수집기와 하네스는 같은 공식 CSV만 장소 순회·코드 조회·검증 기준으로 사용한다.
+- 수집기와 Project Guard는 같은 공식 CSV만 장소 순회·코드 조회·검증 기준으로 사용한다.
 - CSV는 Python 표준 라이브러리 `csv` 모듈로만 읽는다.
 - `encoding="utf-8-sig"`를 사용해 UTF-8과 UTF-8 BOM을 모두 처리하며,
   BOM 존재 자체를 필수조건으로 요구하지 않는다.
 - 공식 CSV 처리를 위해 `openpyxl`을 사용하거나 설치하지 않는다.
-- 코드, 수집기, 하네스와 검증 절차는 공식 CSV를 수정·보정·정렬·덮어쓰기·
+- 코드, 수집기, Project Guard와 검증 절차는 공식 CSV를 수정·보정·정렬·덮어쓰기·
   재인코딩하거나 다른 형식으로 변환하지 않는다.
 
 현재 파일 상태는 다음과 같다.
@@ -215,7 +215,7 @@ Codex는 다음 순서를 건너뛰지 않는다.
 EG-0 문서 기준선
 → EG-1 장소 기준데이터 사전검증
 → EG-2 샘플 JSON 사전검증
-→ EG-3 하네스 구현 및 자동 재검증
+→ EG-3 Project Guard 구현 및 자동 재검증
 → EG-4 여의도 1장소
 → EG-5 유형별 대표 3장소
 → EG-6 시험용 10장소
@@ -225,19 +225,19 @@ EG-0 문서 기준선
 
 - EG-0은 여섯 기준 문서의 구조·역할·규칙·현재 상태를 문서 검사로 확인한다.
 - 현재 EG-0은 PM 승인으로 통과했다.
-- EG-1은 하네스 구현 전에 공식 CSV 단일파일을 읽기 전용으로 사전검증한다.
-- EG-2는 하네스 구현 전에 `data/samples/population_yeouido_sample.json`을
+- EG-1은 Project Guard 구현 전에 공식 CSV 단일파일을 읽기 전용으로 사전검증한다.
+- EG-2는 Project Guard 구현 전에 `data/samples/population_yeouido_sample.json`을
   네트워크 없이 읽기 전용으로 사전검증한다.
 - 현재 공식 샘플은 `H-301`부터 `H-304`까지 PASS해 EG-2를 통과했다.
 - 위 파일만 공식 여의도 실응답 샘플로 사용한다.
 - `tests/fixtures/`는 결측 필드, 잘못된 JSON, 빈 예측 배열 등 오류 테스트
   입력에만 사용하며 공식 실응답 샘플을 이동·복사하지 않는다.
-- EG-1과 EG-2에는 아직 존재하지 않는 하네스의 PASS를 요구하지 않는다.
-- EG-3에서 문서, 공식 CSV와 샘플 JSON을 오프라인 하네스로 자동 재검증한다.
+- EG-1과 EG-2에는 아직 존재하지 않는 Project Guard의 PASS를 요구하지 않는다.
+- EG-3에서 문서, 공식 CSV와 샘플 JSON을 오프라인 Project Guard로 자동 재검증한다.
 - EG-3까지는 실제 `.env` 생성, 실제 인증키 저장, 네트워크 연결과
   실제 서울시 API 호출을 금지하고 임시 설정과 가짜 키만 사용한다.
 - 실제 `.env` 생성·인증키 저장과 최초 실제 API 호출은 EG-3 오프라인
-  하네스 통과 후 PM 승인을 받아 EG-4 여의도 1장소 단계에서 진행한다.
+  Project Guard 통과 후 PM 승인을 받아 EG-4 여의도 1장소 단계에서 진행한다.
 - EG-4부터 EG-7까지도 일반 테스트와 승인된 실제 API 실행을 분리한다.
 - 각 게이트 통과 후 다음 구현 단계로 전환하려면 PM 승인을 받는다.
 - EG-8 통과는 반복주기 승인까지를 뜻하며 자동실행 구성 완료를 뜻하지 않는다.
@@ -292,7 +292,7 @@ Gate A·Gate B·Gate C는 데이터 PoC 판정 게이트다.
 - 테스트에서 실제 API 키를 고정값으로 사용하지 않는다.
 
 EG-3까지는 실제 `.env` 파일을 만들거나 실제 인증키를 저장하지 않는다.
-EG-3 오프라인 하네스가 통과하고 PM이 EG-4 진입과 실제 호출을 승인한 뒤에만
+EG-3 오프라인 Project Guard가 통과하고 PM이 EG-4 진입과 실제 호출을 승인한 뒤에만
 EG-4 여의도 1장소 단계에서 `.env`를 생성하고 실제 인증키를 저장한다.
 
 API 요청 주소를 로그에 기록할 때 인증키를 마스킹한다.
@@ -483,16 +483,16 @@ POI072_20260716_200000.json
 
 ---
 
-## 20. 하네스 검사 원칙
+## 20. Project Guard 검사 원칙
 
-`docs/testing/HARNESS_SPEC.md`는 검사 ID, 상태값, 판정과 종료 코드의
+`docs/testing/PROJECT_GUARD_SPEC.md`는 검사 ID, 상태값, 판정과 종료 코드의
 유일한 기준이다. 다른 문서에서 검사 ID를 새로 정의하지 않는다.
 
-EG-3에서 하네스가 구현된 이후에는 모든 구현 작업 후 현재 게이트에
+EG-3에서 Project Guard가 구현된 이후에는 모든 구현 작업 후 현재 게이트에
 적용되는 필수검사를 실행한다.
 
-문서만 수정하는 작업은 구현 하네스 대상이 아니다.
-문서 전용 작업에서는 Python 하네스를 새로 만들거나 실행하지 않고
+문서만 수정하는 작업은 구현된 Project Guard 실행 대상이 아니다.
+문서 전용 작업에서는 Python 기반 Project Guard를 새로 만들거나 실행하지 않고
 다음을 확인한다.
 
 - 코드 블록 정상 종료와 Markdown 제목 구조
@@ -507,14 +507,14 @@ EG-3에서 하네스가 구현된 이후에는 모든 구현 작업 후 현재 �
 - 원본·예측·날씨 보존 규칙의 일치
 - 완료·미완료 상태와 여섯 문서 사이의 충돌 여부
 
-구체적인 자동검사 항목은 `docs/testing/HARNESS_SPEC.md`만 따른다.
-실행 결과는 `docs/testing/HARNESS_REPORT_TEMPLATE.md`에 기록한다.
+구체적인 자동검사 항목은 `docs/testing/PROJECT_GUARD_SPEC.md`만 따른다.
+실행 결과는 `docs/testing/PROJECT_GUARD_REPORT_TEMPLATE.md`에 기록한다.
 
-`scripts/harness_check.py`가 만들어진 이후에는
+`scripts/project_guard_check.py`가 만들어진 이후에는
 모든 구현 작업 종료 전에 다음 명령을 실행한다.
 
 ```bash
-python3 scripts/harness_check.py
+python3 scripts/project_guard_check.py
 ```
 
 검사에 실패한 상태로 완료 보고하지 않는다.
@@ -523,9 +523,9 @@ python3 scripts/harness_check.py
 
 ## 21. 실데이터 호출 원칙
 
-일반 하네스와 일반 테스트에서는 네트워크 연결과 실제 서울시 API 호출을 금지한다.
+일반 Project Guard와 일반 테스트에서는 네트워크 연결과 실제 서울시 API 호출을 금지한다.
 
-EG-3 오프라인 하네스가 통과하기 전에는 실제 인증키를 저장하거나
+EG-3 오프라인 Project Guard가 통과하기 전에는 실제 인증키를 저장하거나
 실제 서울시 API를 호출하지 않는다. 실제 호출은 EG-3 통과 후 PM이
 EG-4 진입과 여의도 1장소 호출을 승인한 경우에만 일반 테스트와 분리된
 수동 점검 또는 스모크 실행으로 수행한다.
@@ -547,7 +547,7 @@ EG-4 진입과 여의도 1장소 호출을 승인한 경우에만 일반 테스�
 
 운영자가 복사해서 실행할 명령을 제공한다.
 
-### 하네스 결과
+### Project Guard 결과
 
 실행한 검사와 성공·실패 결과를 제공한다.
 
@@ -583,8 +583,8 @@ PM이 직접 확인하거나 승인해야 할 내용을 구분한다.
 - 검증된 공식 CSV를 기준으로 사용함
 - 임의의 장소코드를 생성하지 않음
 - 관련 문서를 업데이트함
-- 하네스 검사를 실행함
-- 하네스 검사에 통과함
+- Project Guard 검사를 실행함
+- Project Guard 검사에 통과함
 - API 키가 노출되지 않음
 - 원본 데이터가 보존됨
 - 한 장소 실패가 전체 실패로 이어지지 않음
@@ -599,24 +599,24 @@ PM이 직접 확인하거나 승인해야 할 내용을 구분한다.
 - Markdown 제목 구조를 확인함
 - `AGENTS.md`와 `README.md`의 핵심 규칙이 일치함
 - 실제 파일 상태와 문서의 완료·미완료 표현이 일치함
-- 구현 하네스 대신 문서 일관성 검사를 수행함
+- 구현된 Project Guard 실행 대신 문서 일관성 검사를 수행함
 - 코드 블록, 제목, 검사 ID, 품질 게이트 순환을 확인함
 - PM 확인사항과 남은 위험을 보고함
 
 PM의 최종 승인 전에는 main 브랜치 병합 또는
 최종 완료 상태로 확정하지 않는다.
 
-## 24. 코드 및 하네스 규칙 문서
+## 24. 코드 및 Project Guard 규칙 문서
 
-Codex는 코드, 테스트, 설정 또는 하네스 작업을 시작하기 전에
+Codex는 코드, 테스트, 설정 또는 Project Guard 작업을 시작하기 전에
 다음 문서를 반드시 읽어야 한다.
 
 - `docs/rules/CODING_RULES.md`
 - `docs/rules/GIT_WORKFLOW.md`
 - `docs/rules/SECURITY_RULES.md`
-- `docs/testing/HARNESS_SPEC.md`
+- `docs/testing/PROJECT_GUARD_SPEC.md`
 - `docs/testing/QUALITY_GATES.md`
-- `docs/testing/HARNESS_REPORT_TEMPLATE.md`
+- `docs/testing/PROJECT_GUARD_REPORT_TEMPLATE.md`
 
 각 문서의 역할은 다음과 같다.
 
@@ -625,12 +625,12 @@ Codex는 코드, 테스트, 설정 또는 하네스 작업을 시작하기 전�
 | `CODING_RULES.md` | 코드 구조, 오류처리, 보안, 저장 및 테스트 작성 규칙 |
 | `GIT_WORKFLOW.md` | Issue, Branch, Worktree, Commit, Pull Request, Review, Merge 운영 규칙 |
 | `SECURITY_RULES.md` | API 키, 로그, 민감정보, GitHub 및 외부 공유 보안 규칙 |
-| `HARNESS_SPEC.md` | 자동검사 항목과 검사 ID, PASS·FAIL·WARN·SKIP 판정, 종료 코드의 유일한 기준 |
+| `PROJECT_GUARD_SPEC.md` | 자동검사 항목과 검사 ID, PASS·FAIL·WARN·SKIP 판정, 종료 코드의 유일한 기준 |
 | `QUALITY_GATES.md` | EG-0~EG-8의 순서, 단계별 통과조건과 다음 단계 진입조건 |
-| `HARNESS_REPORT_TEMPLATE.md` | `HARNESS_SPEC.md`에 정의된 검사 결과와 PM 확인사항의 기록 형식 |
+| `PROJECT_GUARD_REPORT_TEMPLATE.md` | `PROJECT_GUARD_SPEC.md`에 정의된 검사 결과와 PM 확인사항의 기록 형식 |
 
 `GIT_WORKFLOW.md`와 `SECURITY_RULES.md`는 필수 열람 문서로 적용한다.
-두 문서의 하네스 자동검사 대상 편입은 EG-3 후속 Issue에서 반영한다.
+두 문서의 Project Guard 자동검사 대상 편입은 EG-3 후속 Issue에서 반영한다.
 
 데이터 수집·필드·분석 관련 작업을 시작하기 전에는 다음 문서를 반드시 읽는다.
 
@@ -640,13 +640,13 @@ Codex는 코드, 테스트, 설정 또는 하네스 작업을 시작하기 전�
 | `docs/data/FIELD_DICTIONARY.md` | 원본·정규화·메타데이터·파생필드의 정의와 검증 상태 |
 | `docs/analysis/ANALYSIS_PLAN.md` | 분석 질문, 기준선, 평가기간과 Gate A·B·C 판정 계획 |
 
-세 문서의 하네스 자동검사 대상 편입은 EG-3 후속 Issue에서 반영한다.
+세 문서의 Project Guard 자동검사 대상 편입은 EG-3 후속 Issue에서 반영한다.
 
 Codex는 작업 시작 전에 다음을 확인한다.
 
 1. 현재 작업이 어느 품질 게이트에 해당하는가
 2. 이전 게이트가 통과됐는가
-3. 이번 작업에 적용되는 하네스 검사 ID는 무엇인가
+3. 이번 작업에 적용되는 Project Guard 검사 ID는 무엇인가
 4. 이번 작업에서 생성하거나 수정할 파일은 무엇인가
 5. PM 승인 없이 변경할 수 없는 사항이 있는가
 6. 실제 API 호출이 필요한 작업인가
@@ -655,7 +655,7 @@ Codex는 작업 시작 전에 다음을 확인한다.
 현재 품질 게이트를 통과하지 않은 상태에서
 다음 단계의 코드를 임의로 구현하지 않는다.
 
-아직 구현되지 않은 기능에 대한 하네스 검사는 `SKIP`으로 표시할 수 있다.
+아직 구현되지 않은 기능에 대한 Project Guard 검사는 `SKIP`으로 표시할 수 있다.
 
 단, 구현 완료로 보고한 기능에 필요한 검사를 `SKIP`으로 처리하면 안 된다.
 
@@ -665,7 +665,7 @@ Codex는 작업 시작 전에 다음을 확인한다.
 2. `AGENTS.md`
 3. `requirements-definition-freshmanager-poc-v0.4.md`
 4. `docs/rules/CODING_RULES.md`
-5. `docs/testing/HARNESS_SPEC.md`
+5. `docs/testing/PROJECT_GUARD_SPEC.md`
 6. `docs/testing/QUALITY_GATES.md`
 7. `README.md`
 8. 그 밖의 운영 및 참고 문서
