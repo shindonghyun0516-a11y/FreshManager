@@ -1,11 +1,11 @@
 # Git Workflow
 
 - 문서 상태: Draft
-- 버전: v0.1.0
+- 버전: v0.1.1
 - 작성자: 신동현
 - 최종 승인자: 신동현
 - 최초 작성일: 2026-07-17
-- 최종 수정일: 2026-07-19
+- 최종 수정일: 2026-07-20
 - 적용 프로젝트: Freshmanager Data PoC
 - 관련 문서:
   - `AGENTS.md`
@@ -262,29 +262,44 @@ donghyun
 
 작업 시작 전 다음 순서로 확인한다.
 
-1. `git status`
+1. `git status --short --untracked-files=all`
 2. `git branch --show-current`
-3. 작업 트리가 clean인지 확인
+3. Stage·추적 파일 변경·미추적 파일 상태 확인
 4. `git switch main`
 5. `git pull --ff-only origin main`
-6. `git status`
+6. `git status --short --untracked-files=all`
 
-첫 `git status`가 clean이 아니면 Branch 전환과 Pull을 중단하고
-변경사항을 먼저 확인한다.
+작업 시작 전 다음 조건을 모두 확인한다.
+
+- Stage된 변경이 없어야 한다.
+- 추적 파일의 수정·삭제·추가가 없어야 한다.
+- 예상하지 못한 미추적 파일이 없어야 한다.
+- PM이 인지한 보호 대상 미추적 파일은 유지할 수 있다.
+- 보호 대상 미추적 파일은 자동 Stage하지 않는다.
+
+다음 중 하나라도 해당하면 Branch 전환과 Pull을 중단한다.
+
+- Stage된 변경이 있음
+- 추적 파일 변경이 있음
+- 예상하지 못한 미추적 파일이 있음
+- 미추적 파일의 보호 대상 여부가 확인되지 않음
+
+PM이 인지한 보호 대상 미추적 파일만 존재하는 경우에는
+Branch 전환과 `main` 최신화를 차단하지 않는다.
 
 ```bash
-git status
+git status --short --untracked-files=all
 git branch --show-current
 git switch main
 git pull --ff-only origin main
-git status
+git status --short --untracked-files=all
 ```
 
 의미:
 
 | 명령 | 의미 |
 |---|---|
-| `git status` | 작업 트리의 변경상태 확인 |
+| `git status --short --untracked-files=all` | Stage·추적 파일 변경과 전체 미추적 파일 확인 |
 | `git branch --show-current` | 현재 Branch 확인 |
 | `git switch main` | 기준 브랜치로 이동 |
 | `git pull --ff-only origin main` | 새 Merge Commit 없이 GitHub의 최신 `main`을 로컬에 반영 |
@@ -431,11 +446,11 @@ Commit:
 git commit -m "docs: define Git workflow"
 ```
 
-### 10.4 `git add .` 사용
+### 10.4 `git add .` 사용 금지
 
-`git add .`는 모든 변경을 한 번에 선택하므로 주의한다.
+`git add .`는 사용하지 않는다.
 
-가능한 경우 수정한 파일을 직접 지정한다.
+승인된 파일 경로를 직접 지정해서 Stage한다.
 
 ```bash
 git add docs/rules/GIT_WORKFLOW.md
@@ -666,8 +681,8 @@ GitHub에서 Merge 후 다음 절차를 수행한다.
 
 ```bash
 git switch main
-git pull origin main
-git status
+git pull --ff-only origin main
+git status --short --untracked-files=all
 ```
 
 `main` 반영 후 다음 명령으로 재검증한다.
@@ -679,6 +694,37 @@ python3 -B -m unittest discover -s tests -p "test_*.py" -v
 
 `main` 재검증에 실패하면 완료 처리와 Branch 정리를 중단하고,
 실패한 단계와 결과를 PM에게 보고한다.
+
+PROJECT_STATUS 영향 판정은 Merge 전과 Merge 후 두 단계로 구분한다.
+
+Merge 전:
+
+```text
+Pull Request에서 Codex가 PROJECT_STATUS 영향 분석
+→ PM이 갱신 필요 또는 불필요 최종 판단
+→ 필요하면 같은 Pull Request에 상태 문서 반영
+```
+
+Merge 후:
+
+```text
+Merge
+→ main 최신화
+→ main CI 확인
+→ Project Guard와 Unit Tests 재검증
+→ Merge 후 새롭게 확정된 중요 사실 확인
+→ 필요한 경우에만 별도 상태 갱신 Issue 생성
+→ 갱신 불필요하면 Issue 또는 Pull Request에 근거 기록
+→ Issue 종료 상태 확인과 Branch 정리
+```
+
+- PM은 공식 프로젝트 상태와 Issue 완료 여부를 최종 판단한다.
+- Codex는 상태 영향 분석, 승인된 내용 반영과 문서 정합성 검증을 담당한다.
+- GitHub CI는 Project Guard와 Unit Tests의 성공·실패 증거만 제공하며,
+  프로젝트 완료 또는 공식 상태를 판단하지 않는다.
+- 상태 영향이 Merge 전에 확정되면 원칙적으로 같은 Pull Request에 반영한다.
+- Merge 후에만 확정되는 중요한 정보가 있을 때만 별도 상태 갱신 Issue를 만든다.
+- 모든 Issue에 별도 상태 갱신 Issue를 자동 생성하지 않는다.
 
 로컬 작업 Branch 삭제:
 
@@ -696,7 +742,7 @@ git fetch --prune
 
 ```bash
 git branch --show-current
-git status
+git status --short --untracked-files=all
 git log --oneline -5
 ```
 
@@ -705,7 +751,9 @@ git log --oneline -5
 ```text
 현재 Branch: main
 로컬 main과 origin/main 동기화
-작업 트리 clean
+추적 파일 변경 없음
+승인되지 않은 Stage 없음
+PM이 인지한 보호 대상 미추적 파일은 존재할 수 있음
 ```
 
 ---
@@ -789,9 +837,13 @@ Git 작업은 다음 조건을 모두 만족해야 완료다.
 - PM 승인
 - `main` Merge
 - `main`에서 Project Guard와 Unit Tests 재검증 통과
+- PROJECT_STATUS 영향 판정 완료
+- 갱신 필요 시 같은 Pull Request 반영 또는 Merge 후 새롭게 확정된 중요 사실에 대한 후속 상태 갱신 Issue 생성
+- 갱신 불필요 시 Issue 또는 Pull Request에 사유 기록
+- PM의 최종 상태 영향과 완료 판단 완료
 - 로컬 `main` 최신화
 - 작업 Branch 정리
-- Issue 종료
+- Issue 종료 상태 확인
 - 남은 위험 기록
 
 ---
@@ -800,4 +852,5 @@ Git 작업은 다음 조건을 모두 만족해야 완료다.
 
 | 버전 | 날짜 | 변경내용 | 작성자 | 승인상태 |
 |---|---|---|---|---|
+| v0.1.1 | 2026-07-20 | PROJECT_STATUS 영향 판정의 Merge 전·후 절차와 책임·완료조건 보완 | 신동현 | Draft |
 | v0.1.0 | 2026-07-17 | 최초 초안 작성 | 신동현 | Draft |
