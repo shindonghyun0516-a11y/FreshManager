@@ -1,11 +1,11 @@
 # Field Dictionary
 
 - 문서 상태: Draft
-- 버전: v0.1.0
+- 버전: v0.1.1
 - 작성자: 신동현
 - 최종 승인자: 신동현
 - 최초 작성일: 2026-07-17
-- 최종 수정일: 2026-07-17
+- 최종 수정일: 2026-07-20
 - 적용 프로젝트: Freshmanager Data PoC
 - 관련 문서:
   - `AGENTS.md`
@@ -252,7 +252,7 @@ $["SeoulRtd.citydata_ppltn"][0]["FCST_PPLTN"]
 | `request_id` | 요청 고유번호 | 예측을 확보한 API 요청 ID | string | 수집 메타데이터 |
 | `area_code` | 장소코드 | 예측 대상 장소 | string | 키 |
 | `raw_file_path` | 원본 파일 경로 | 예측 원본 JSON 위치 | string | 추적성 |
-| `parser_version` | 파서 버전 | 예측 파싱에 사용한 코드 버전 | string | 추적성 |
+| `parser_version` | 파서 버전 | 향후 정규화·분석 데이터 저장 구현 시 검토할 파서 추적 필드 | string | 향후 제안 |
 
 ---
 
@@ -261,22 +261,24 @@ $["SeoulRtd.citydata_ppltn"][0]["FCST_PPLTN"]
 | 필드 | 한글명 | 정의 | 형식 | 결측 허용 | 검증 상태 |
 |---|---|---|---|---|---|
 | `request_id` | 요청 고유번호 | API 호출별 고유 식별값 | string | 아니오 | Documented |
+| `area_code` | 장소코드 | 공식 CSV에서 확인한 요청 대상 장소코드 | string | 아니오 | Documented |
 | `endpoint_name` | Endpoint 이름 | 인증 URL이 아닌 논리적 API 이름 | string | 아니오 | Documented |
 | `requested_at` | 요청시각 | API 호출 시작시각 | datetime | 아니오 | Documented |
+| `received_at` | 응답 수신시각 | 응답 수신 또는 요청 실패를 확인한 시각 | datetime | 아니오 | Documented |
 | `http_status` | HTTP 상태 | HTTP 응답 상태코드 | integer | 예 | Documented |
-| `area_code` | 장소코드 | 요청 대상 장소코드 | string | 예 | Documented |
 | `collection_status` | 수집 상태 | 수집 결과 상태값 | categorical | 아니오 | Documented |
 | `raw_file_path` | 원본 파일 경로 | 저장된 원본 JSON 경로 | string | 실패 시 예 | Documented |
-| `parser_version` | 파서 버전 | 사용한 파서 버전 | string | 예 | Documented |
 
 `raw_payload`는 수집 메타데이터가 아니라 원본 응답이며,
 `raw_file_path`로 저장 위치를 추적한다.
+
+`parser_version`은 현재 `collection_logs` 최소 계약에 포함하지 않는다. 향후
+정규화·분석 데이터 저장 구현 시 파서 추적 필드로 별도 검토한다.
 
 다음 필드는 v0.1 필수 메타데이터가 아닌 선택 제안이다.
 
 | 필드 | 제안 목적 | 검증 상태 |
 |---|---|---|
-| `received_at` | API 응답 수신 완료시각 기록 | Unverified |
 | `error_type` | 실패 원인의 구조화된 분류 | Unverified |
 | `error_message` | 민감정보를 제거한 오류 설명 | Unverified |
 
@@ -524,4 +526,5 @@ Field Dictionary v0.1은 다음 조건을 만족해야 한다.
 
 | 버전 | 날짜 | 변경내용 | 작성자 | 승인상태 |
 |---|---|---|---|---|
+| v0.1.1 | 2026-07-20 | collection_logs를 공식 8개 메타데이터 계약으로 정렬하고 parser_version을 향후 정규화·분석 추적 필드로 분리 | 신동현 | PM 검토 전 |
 | v0.1.0 | 2026-07-17 | 장소·인구·예측·로그 필드 초안 | 신동현 | Draft |

@@ -56,7 +56,7 @@ EG-0 문서 기준선
 | EG-1 | 통과: 공식 CSV 정비·`main` 반영 및 읽기 전용 재검증 완료 |
 | EG-2 | 통과: 공식 샘플 배치 및 `H-301`~`H-304` PASS |
 | EG-3 | 구현·로컬 검증 완료: 활성 28개 PASS, 후속 17개 SKIP, 종료 코드 0 |
-| EG-4 | 오프라인 구현·검증 진행: 실제 API 호출 미승인·미실행 |
+| EG-4 | 오프라인 수집기·HTTP Adapter Fake 검증 완료: 실제 API 호출 미승인·미실행 |
 | EG-5 | 미구현 |
 | EG-6 | 미구현 |
 | EG-7 | 미구현 |
@@ -66,7 +66,7 @@ EG-3의 로컬 Project Guard와 단위 테스트 검증은 완료됐다. GitHub 
 구현되어 `main` 대상 Pull Request와 `main` Push에서 Project Guard와 단위 테스트를
 자동 실행한다. 첫 Pull Request에서 `pull_request` Trigger를 검증하고, Merge 후
 `main` Push Trigger를 검증한다. Branch 보호 규칙은 아직 적용하지 않았으며,
-EG-4 이후 단계는 아직 진행하지 않았다.
+EG-4 전체 통과와 EG-5 이후 단계는 아직 진행하지 않았다.
 
 ---
 
@@ -258,6 +258,10 @@ Issue #32에서는 `freshmanager/`의 POI072 오프라인 수집기와 Fake Clie
 Issue #32가 `main`에 병합된 뒤 별도 Issue와 PM 외부 실행 승인으로 진행한다.
 따라서 Issue #32 완료는 EG-4 오프라인 구현 완료를 뜻하며 EG-4 전체 통과나
 EG-5 진입 승인을 뜻하지 않는다.
+
+Issue #34에서는 HTTP Adapter, 명시적 Transport 주입, Redirect 거부와 5 MiB 응답
+상한을 구현하고 Fake Transport로만 검증한다. 실제 실행 CLI, 실제 `.env`·API Key
+사용과 실제 호출은 포함하지 않으며, Issue #34 완료도 EG-4 전체 통과를 뜻하지 않는다.
 
 ### 다음 단계
 

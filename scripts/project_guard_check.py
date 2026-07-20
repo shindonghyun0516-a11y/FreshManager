@@ -36,6 +36,7 @@ if str(PROJECT_ROOT) not in sys.path:
 from freshmanager.collector import METADATA_FIELDS as EG4_METADATA_FIELDS  # noqa: E402
 from freshmanager.collector import Collector, HttpResponse  # noqa: E402
 from freshmanager.config import ConfigError, load_api_key, mask_secret  # noqa: E402
+from freshmanager.http_adapter import BASE_URL, SeoulPopulationHttpClient  # noqa: E402
 from freshmanager.offline import run as run_offline  # noqa: E402
 from freshmanager.storage import FileStorage, StorageError  # noqa: E402
 
@@ -80,16 +81,7 @@ FORECAST_FIELDS = [
     "FCST_PPLTN_MIN",
     "FCST_PPLTN_MAX",
 ]
-METADATA_FIELDS = [
-    "request_id",
-    "endpoint_name",
-    "requested_at",
-    "http_status",
-    "area_code",
-    "collection_status",
-    "raw_file_path",
-    "parser_version",
-]
+METADATA_FIELDS = list(EG4_METADATA_FIELDS)
 EG4_FIXED_TIME = datetime(2026, 7, 20, 9, 10, 11, tzinfo=ZoneInfo("Asia/Seoul"))
 EG4_DUMMY_KEY = "dummy-key-for-project-guard"
 DOCUMENT_PATHS = [
@@ -771,6 +763,12 @@ class GuardTimeoutClient:
         raise TimeoutError
 
 
+class GuardConnectionFailureTransport:
+    def open(self, request: object, timeout_seconds: float) -> object:
+        del request, timeout_seconds
+        raise OSError("unsafe transport detail")
+
+
 class GuardRawFailStorage(FileStorage):
     def save_raw(self, area_code: str, requested_at: datetime, request_id: str, payload: bytes) -> Path:
         del area_code, requested_at, request_id, payload
@@ -834,7 +832,26 @@ def check_h205(context: ProjectGuardContext) -> CheckResult:
     except ConfigError as error:
         if EG4_DUMMY_KEY in str(error):
             return failed("H-205", "오류 메시지에 Dummy Key 노출", "freshmanager/config.py")
-    return passed("H-205", "Dummy Key가 출력·예외에서 비노출되고 마스킹됨", "freshmanager/config.py")
+    output = io.StringIO()
+    try:
+        with contextlib.redirect_stdout(output), contextlib.redirect_stderr(output):
+            SeoulPopulationHttpClient(GuardConnectionFailureTransport()).fetch_population(
+                "POI072",
+                EG4_DUMMY_KEY,
+                10.0,
+            )
+    except OSError as error:
+        rendered = output.getvalue() + str(error)
+        if EG4_DUMMY_KEY in rendered or BASE_URL in rendered:
+            return failed("H-205", "Adapter 오류에 Dummy Key 또는 인증 URL 노출", "freshmanager/http_adapter.py")
+    else:
+        return failed("H-205", "Adapter 연결 오류가 안전한 OSError로 변환되지 않음", "freshmanager/http_adapter.py")
+    return passed(
+        "H-205",
+        "Dummy Key와 인증 URL이 출력·예외에서 비노출되고 마스킹됨",
+        "freshmanager/config.py",
+        "freshmanager/http_adapter.py",
+    )
 
 
 def json_or_failure(context: ProjectGuardContext, check_id: str) -> JsonInspection | CheckResult:
@@ -953,6 +970,7 @@ def check_h304(context: ProjectGuardContext) -> CheckResult:
     return passed("H-304", "샘플 JSON에 실제 키·URL 없음", str(JSON_RELATIVE_PATH))
 
 
+APPROVED_NETWORK_ADAPTER_PATH = Path("freshmanager/http_adapter.py")
 FORBIDDEN_NETWORK_MODULES = {"requests", "urllib.request", "http.client"}
 FORBIDDEN_NETWORK_CALLS = {
     "requests.get",
@@ -965,24 +983,56 @@ FORBIDDEN_NETWORK_CALLS = {
 }
 
 
-def network_code_findings(path: Path) -> list[str]:
+class NetworkCodeVisitor(ast.NodeVisitor):
+    def __init__(self, *, approved_adapter: bool) -> None:
+        self.approved_adapter = approved_adapter
+        self.findings: list[str] = []
+        self.scope: list[tuple[str, str]] = []
+
+    def visit_ClassDef(self, node: ast.ClassDef) -> None:
+        self.scope.append(("class", node.name))
+        self.generic_visit(node)
+        self.scope.pop()
+
+    def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
+        self.scope.append(("function", node.name))
+        self.generic_visit(node)
+        self.scope.pop()
+
+    def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:
+        self.visit_FunctionDef(node)
+
+    def visit_Import(self, node: ast.Import) -> None:
+        for alias in node.names:
+            if alias.name in FORBIDDEN_NETWORK_MODULES and not self.approved_adapter:
+                self.findings.append(f"{node.lineno}행:network import {alias.name}")
+
+    def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
+        if node.module in FORBIDDEN_NETWORK_MODULES and not self.approved_adapter:
+            self.findings.append(f"{node.lineno}행:network import {node.module}")
+
+    def visit_Call(self, node: ast.Call) -> None:
+        name = qualified_name(node.func)
+        if self.approved_adapter and not self.scope:
+            self.findings.append(f"{node.lineno}행:adapter module-level call {name or '<unknown>'}")
+        elif name in FORBIDDEN_NETWORK_CALLS:
+            allowed_scope = self.approved_adapter and self.scope[-2:] == [
+                ("class", "UrllibTransport"),
+                ("function", "open"),
+            ]
+            if not allowed_scope:
+                self.findings.append(f"{node.lineno}행:network call {name}")
+        self.generic_visit(node)
+
+
+def network_code_findings(path: Path, root: Path) -> list[str]:
     try:
         tree = ast.parse(read_text(path), filename=str(path))
     except (OSError, UnicodeDecodeError, SyntaxError):
         return []
-    findings = []
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Import):
-            for alias in node.names:
-                if alias.name in FORBIDDEN_NETWORK_MODULES:
-                    findings.append(f"{node.lineno}행:network import {alias.name}")
-        elif isinstance(node, ast.ImportFrom) and node.module in FORBIDDEN_NETWORK_MODULES:
-            findings.append(f"{node.lineno}행:network import {node.module}")
-        elif isinstance(node, ast.Call):
-            name = qualified_name(node.func)
-            if name in FORBIDDEN_NETWORK_CALLS:
-                findings.append(f"{node.lineno}행:network call {name}")
-    return findings
+    visitor = NetworkCodeVisitor(approved_adapter=path.relative_to(root) == APPROVED_NETWORK_ADAPTER_PATH)
+    visitor.visit(tree)
+    return visitor.findings
 
 
 def project_python_files(root: Path) -> list[Path]:
@@ -997,11 +1047,17 @@ def project_python_files(root: Path) -> list[Path]:
 def check_h305(context: ProjectGuardContext) -> CheckResult:
     findings = []
     for path in project_python_files(context.root):
-        for finding in network_code_findings(path):
+        for finding in network_code_findings(path, context.root):
             findings.append(f"{relative(path, context.root)}:{finding}")
     if findings:
-        return failed("H-305", "; ".join(findings), "scripts/", "tests/")
-    return passed("H-305", "Project Guard·테스트에 네트워크 import·실행 호출 없음", "scripts/", "tests/")
+        return failed("H-305", "; ".join(findings), "freshmanager/http_adapter.py", "scripts/", "tests/")
+    return passed(
+        "H-305",
+        "승인 Adapter 외 네트워크 코드와 Adapter module-level 실행 없음",
+        "freshmanager/http_adapter.py",
+        "scripts/",
+        "tests/",
+    )
 
 
 def check_h401(context: ProjectGuardContext) -> CheckResult:

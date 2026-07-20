@@ -104,7 +104,7 @@ SHA-256을 비교하고, EG-3부터 임시 복사본 실행과 코드 검사를 
 | `H-202` | `.env.example` 계약 | 안전한 설정 안내 | `.env.example` | `SEOUL_OPEN_API_KEY` 자리표시자가 있고 실제 키가 없음 | 키 항목 누락 또는 실제 키 포함 | EG-3 전 SKIP만 가능 | EG-3 이후 |
 | `H-203` | 비밀정보 노출 검사 | 코드·문서·테스트·로그의 키 유출 방지 | `.env`를 제외한 문서, 코드, 테스트, 샘플, 로그 | 실제 키와 인증키가 포함된 전체 URL이 없음 | 실제 키 또는 비마스킹 URL 발견 | EG-3 전 SKIP만 가능 | EG-3 이후 |
 | `H-204` | 최소 `.env` 로더 | 표준 라이브러리 설정 계약 확인 | 설정 코드, 임시 `.env` fixture | 빈 줄·주석 무시, 최초 `=` 분리, 공백 제거, `SEOUL_OPEN_API_KEY` 반환, 누락·빈 값은 `config_error` | 규칙 위반, 누락을 정상 처리, 실제 키 출력 | EG-4 전 SKIP만 가능 | EG-4 이후 |
-| `H-205` | URL·오류 마스킹 | 런타임 키 유출 방지 | URL·로그·예외 코드, 가짜 키 fixture | 출력·로그·예외의 키가 `********`로 치환 | 가짜 키가 평문으로 노출 | EG-4 전 SKIP만 가능 | EG-4 이후 |
+| `H-205` | URL·오류 마스킹 | 런타임 키 유출 방지 | 설정·HTTP Adapter·URL·로그·예외 코드, 가짜 키 fixture | 출력·로그·예외에 가짜 키와 완성 인증 URL이 없고 필요한 표시는 `********`로 치환 | 가짜 키 또는 완성 인증 URL이 평문으로 노출 | EG-4 전 SKIP만 가능 | EG-4 이후 |
 
 EG-3까지는 실제 `.env`와 실제 인증키를 사용하지 않는다.
 EG-3 Project Guard는 임시 `.env` fixture와 가짜 키만 사용하고 네트워크를 호출하지 않는다.
@@ -128,7 +128,12 @@ data/samples/population_yeouido_sample.json
 | `H-302` | 샘플 장소·인구 구조 | 실제 응답 기반 파서 기준 확보 | 여의도 샘플 JSON | `AREA_NM`, `AREA_CD=POI072`와 확인된 인구 필드 존재 | 핵심 장소·인구 구조 누락 | 불가 | EG-2, EG-3 이후 |
 | `H-303` | 샘플 미래예측 구조 | 예측 저장 기준 확보 | 여의도 샘플 JSON | `FCST_YN=Y`이면 예측 배열과 확인된 필수 예측 필드 존재 | 표시와 구조 불일치 | 불가 | EG-2, EG-3 이후 |
 | `H-304` | 샘플 비밀정보 제거 | fixture를 통한 키 유출 방지 | 여의도 샘플 JSON | 실제 키와 인증키 포함 URL이 없음 | 비밀정보 발견 | 불가 | EG-2, EG-3 이후 |
-| `H-305` | Project Guard·테스트 오프라인 | 일반 검사에서 실 API 호출 방지 | Project Guard, 테스트, 테스트 설정 | 네트워크 접근이 없고 샘플·가짜 응답만 사용 | 소켓·HTTP·실제 서울시 API 접근 시도 | EG-3 전 SKIP만 가능 | EG-3 이후 |
+| `H-305` | Project Guard·테스트 오프라인 | 일반 검사에서 실 API 호출 방지 | 승인 HTTP Adapter, Project Guard, 테스트, 테스트 설정 | 네트워크 가능 코드는 승인 Transport에만 있고 Project Guard·테스트는 샘플·가짜 응답으로 DNS·소켓·HTTP 접근 0회 | 승인 경계 밖 네트워크 코드, import·module-level 실행 또는 자동검사 중 네트워크 접근 | EG-3 전 SKIP만 가능 | EG-3 이후 |
+
+네트워크 가능 표준 모듈은 `freshmanager/http_adapter.py`의 승인된 Transport
+구현에서만 허용한다. `scripts/`, `tests/`, 다른 제품 모듈과 Adapter의 module-level
+실행은 FAIL이다. H-305는 AST 경계 검사와 Unit Tests의 DNS·소켓·HTTP 동적 차단을
+함께 사용하며 Project Guard 자체는 실제 Adapter를 실행하지 않는다.
 
 경로 변경 전 `H-301`은 문서의 공식 경로와 실제 파일 경로가 달라 FAIL이었다.
 공식 경로를 위 파일로 통일한 뒤 같은 파일을 읽기 전용으로 재검증한 결과
@@ -200,8 +205,9 @@ PM 승인된 실제 호출은 별도 수동 단계이며 Project Guard가 호출
 - EG-1: 공식 CSV 정비·`main` 반영 및 읽기 전용 재검증 완료로 통과
 - EG-2: 공식 샘플 배치 및 `H-301`~`H-304` PASS로 통과
 - EG-3: `scripts/project_guard_check.py` 구현 및 로컬 검증 완료
-- EG-4: POI072 오프라인 수집기와 `H-204`, `H-205`, `H-501`~`H-503`,
-  `H-506`, `H-701` runner 구현. 실제 API 호출은 미승인·미실행
+- EG-4: POI072 오프라인 수집기, 명시적 Transport 기반 HTTP Adapter와
+  `H-204`, `H-205`, `H-501`~`H-503`, `H-506`, `H-701` runner 구현.
+  Adapter는 가짜 Transport로만 검증했으며 실제 API 호출은 미승인·미실행
 - EG-5~EG-8: 미진행
 
 현재 활성 검사는 35개이고 후속 검사는 10개 `SKIP`이다. `H-504`, `H-505`,

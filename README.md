@@ -166,6 +166,7 @@ POI001부터 POI121까지 자동 생성
 - 공식 샘플 읽기 전용 사전검증과 `H-301`~`H-304` 통과
 - EG-3 Python 기반 Project Guard `scripts/project_guard_check.py` 구현 및 로컬 검증 완료
 - Issue #32 EG-4 POI072 오프라인 수집기와 Fake 기반 검증 완료
+- Issue #34 EG-4 HTTP Adapter와 명시적 Transport 주입의 Fake 기반 검증 완료
 - `AGENTS.md` 생성
 - Codex의 `AGENTS.md` 인식 확인
 
@@ -302,7 +303,7 @@ Issue #32 PM 결정에 따라 이전 최소 계약의 `parser_version` 대신
 | EG-1 | 장소 기준데이터 사전검증 | 통과: 공식 CSV 정비·`main` 반영 및 읽기 전용 재검증 완료 |
 | EG-2 | 샘플 JSON 사전검증 | 통과: 공식 샘플 배치 및 `H-301`~`H-304` PASS |
 | EG-3 | Project Guard 구현 및 자동 재검증 | 구현·로컬 검증 완료: PASS 28, SKIP 17 |
-| EG-4 | 여의도 1장소 | POI072 오프라인 수집기 구현·검증, 실제 호출 미승인·미실행 |
+| EG-4 | 여의도 1장소 | POI072 오프라인 수집기·HTTP Adapter의 Fake 검증 완료, 실제 호출 미승인·미실행 |
 | EG-5 | 유형별 대표 3장소 | 미구현 |
 | EG-6 | 시험용 10장소 | 미구현 |
 | EG-7 | 121장소 1회 수집 | 미구현 |
@@ -560,8 +561,9 @@ python3 -B -m unittest discover -s tests -p "test_*.py" -v
 ```
 
 일반 Project Guard와 일반 테스트는 저장된 샘플 또는 가짜 응답만 사용하며
-네트워크와 실제 서울시 API를 호출하지 않는다. `freshmanager/`에는 POI072
-오프라인 수집기가 구현돼 있지만 실제 HTTP Adapter는 없다.
+네트워크와 실제 서울시 API를 호출하지 않는다. `freshmanager/http_adapter.py`에
+실제 통신 기능을 분리한 HTTP Adapter가 구현돼 있지만 Transport를 반드시
+명시적으로 주입해야 하며 실제 실행 CLI는 없다.
 
 오프라인 실행은 프로젝트의 실제 `.env` 대신 임시 Dummy `.env`와 임시 출력
 경로를 명시한다. 아래 자리표시자를 실제 키로 바꾸지 않는다.
@@ -575,8 +577,9 @@ python3 -m freshmanager.offline \
   --metadata-root "$eg4_temp_dir/metadata"
 ```
 
-실제 POI072 1회 호출은 Issue #32 병합 후 별도 Issue에서 PM 외부 실행 승인을
-받은 뒤 수행한다.
+실제 POI072 1회 호출은 Issue #34 병합 후 별도 Issue에서 PM 외부 실행 승인을
+받은 뒤 수행한다. 현재 실제 `.env`와 API Key를 사용하지 않았고 실제 응답도
+수집하지 않았으므로 EG-4 전체 통과나 EG-5 진입을 뜻하지 않는다.
 - 대표 장소 시험 명령
 - 121장소 1회 수집 명령
 - 성공 확인방법
