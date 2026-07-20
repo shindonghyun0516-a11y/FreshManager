@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Callable, Protocol
+from xml.etree import ElementTree
 from zoneinfo import ZoneInfo
 
 from .storage import FileStorage, StorageError
@@ -117,10 +118,23 @@ def load_place(csv_path: Path, area_code: str = "POI072") -> Place:
     return place
 
 
+def _is_xml_service_error_envelope(payload: bytes) -> bool:
+    try:
+        root = ElementTree.fromstring(payload)
+    except (ElementTree.ParseError, LookupError):
+        return False
+    if root.tag != "RESULT":
+        return False
+    direct_child_tags = {child.tag for child in root}
+    return "CODE" in direct_child_tags and "MESSAGE" in direct_child_tags
+
+
 def parse_population_response(payload: bytes, place: Place) -> dict[str, object]:
     try:
         document = json.loads(payload.decode("utf-8-sig"))
     except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        if _is_xml_service_error_envelope(payload):
+            raise ValueError("api_error: XML 서비스 오류") from None
         raise ValueError("parse_error") from error
     if not isinstance(document, dict):
         raise ValueError("validation_error: 응답 최상위 객체 없음")
