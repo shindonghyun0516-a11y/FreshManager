@@ -167,7 +167,7 @@ POI001부터 POI121까지 자동 생성
 - EG-3 Python 기반 Project Guard `scripts/project_guard_check.py` 구현 및 로컬 검증 완료
 - Issue #32 EG-4 POI072 오프라인 수집기와 Fake 기반 검증 완료
 - Issue #34 EG-4 HTTP Adapter와 명시적 Transport 주입의 Fake 기반 검증 완료
-- Issue #39 작업 Branch에서 POI072 단일 실행 CLI 조립과 Fake Transport 기반 오프라인 검증·PM Diff Review 완료(`main` 미병합)
+- Issue #39 Closed 및 PR #40 Squash Merge 완료: POI072 단일 실행 CLI와 Fake Transport 기반 오프라인 검증 `main` 반영 완료
 - `AGENTS.md` 생성
 - Codex의 `AGENTS.md` 인식 확인
 
@@ -304,7 +304,7 @@ Issue #32 PM 결정에 따라 이전 최소 계약의 `parser_version` 대신
 | EG-1 | 장소 기준데이터 사전검증 | 통과: 공식 CSV 정비·`main` 반영 및 읽기 전용 재검증 완료 |
 | EG-2 | 샘플 JSON 사전검증 | 통과: 공식 샘플 배치 및 `H-301`~`H-304` PASS |
 | EG-3 | Project Guard 구현 및 자동 재검증 | 구현·로컬 검증 완료: PASS 28, SKIP 17 |
-| EG-4 | 여의도 1장소 | `main`: POI072 오프라인 수집기·HTTP Adapter Fake 검증 완료; Issue #39 작업 Branch: 단일 실행 CLI Fake 검증·PM Diff Review 완료, `main` 미병합; 실제 외부 실행 미승인·미실행; EG-4 전체 미통과·EG-5 진입 전 |
+| EG-4 | 여의도 1장소 | `main`: POI072 오프라인 수집기·HTTP Adapter·단일 실행 CLI와 Fake 기반 검증 완료; 실제 외부 실행 미승인·미실행; EG-4 전체 미통과·EG-5 진입 전 |
 | EG-5 | 유형별 대표 3장소 | 미구현 |
 | EG-6 | 시험용 10장소 | 미구현 |
 | EG-7 | 121장소 1회 수집 | 미구현 |
@@ -470,9 +470,8 @@ data/raw/population/2026/07/16/POI072_20260716_200000.json
 실제 키는 프로젝트 루트의 `.env` 파일에만 저장하고,
 `.env`는 `.gitignore`에 포함한다.
 
-로컬 `.env`는 존재하지만 Git에서 제외돼 있고 이번 Issue에서는 내용을 읽거나
-실제 키 존재 여부를 확인하지 않는다. 별도 PM 외부 실행 승인 전에는 실제 `.env`와
-실제 키를 사용하지 않는다.
+로컬 `.env`는 존재하지만 Git에서 제외돼 있다. 별도 PM 외부 실행 승인 전에는
+내용을 읽거나 실제 키 존재 여부를 확인하지 않으며 실제 키를 사용하지 않는다.
 
 실제 키를 다음 위치에 작성하지 않는다.
 
@@ -564,9 +563,9 @@ python3 -B -m unittest discover -s tests -p "test_*.py" -v
 일반 Project Guard와 일반 테스트는 저장된 샘플 또는 가짜 응답만 사용하며
 네트워크와 실제 서울시 API를 호출하지 않는다. `freshmanager/http_adapter.py`에
 실제 통신 기능을 분리한 HTTP Adapter가 구현돼 있지만 Transport를 반드시
-명시적으로 주입해야 한다. Issue #39 작업 Branch의 `freshmanager/live.py`는
-기존 구성요소를 조립해 `POI072` 한 장소를 최대 한 번 요청하는 실행 CLI이며
-자동 재시도와 반복 실행은 없다. PM Diff Review를 완료했으며 `main`에는 미병합 상태다.
+명시적으로 주입해야 한다. 현재 `main`의 공식 단일 실행 CLI인
+`freshmanager/live.py`는 기존 구성요소를 조립해 `POI072` 한 장소를 최대 한 번
+요청하며 자동 재시도와 반복 실행은 없다.
 
 오프라인 실행은 프로젝트의 실제 `.env` 대신 임시 Dummy `.env`와 임시 출력
 경로를 명시한다. 아래 자리표시자를 실제 키로 바꾸지 않는다.
@@ -592,11 +591,10 @@ python3 -m freshmanager.live \
   --execute-live
 ```
 
-Issue #39 작업 Branch에서는 Fake Transport와 임시 Dummy `.env`로 CLI 조립만
-검증하고 PM Diff Review를 완료했다. 현재 `main`에는 아직 병합하지 않았고,
-실제 `.env`와 API Key를 사용하지 않았으며 서울시 API 호출과 실제 응답도
-수집하지 않았다. 실제 외부 실행은 미승인·미실행 상태이므로 EG-4 전체 통과나
-EG-5 진입을 뜻하지 않는다.
+Issue #39와 PR #40을 통해 Fake Transport와 임시 Dummy `.env` 기반 CLI 조립 검증을
+완료하고 `main`에 반영했다. 실제 프로젝트 `.env`를 열람·사용하지 않았고 API Key도
+사용하지 않았으며 서울시 API 호출과 실제 응답도 수집하지 않았다. 실제 외부 실행은 미승인·미실행
+상태이므로 EG-4 전체 통과나 EG-5 진입을 뜻하지 않는다.
 - 대표 장소 시험 명령
 - 121장소 1회 수집 명령
 - 성공 확인방법
