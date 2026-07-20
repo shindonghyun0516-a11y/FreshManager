@@ -26,9 +26,8 @@
 실제 작업 중 Issue와 Branch는 GitHub의 현재 Issue와
 `git branch --show-current` 결과를 우선한다.
 
-이 작업 Branch의 HTTP Adapter 구현 표기는 Issue #34 PR Merge 후 예상되는
-`main` 상태를 같은 PR에서 선반영한 초안이다. Merge 전 실제 Issue와 Branch,
-공식 반영 여부는 GitHub와 `git branch --show-current` 결과를 우선한다.
+Issue #34와 PR #36의 HTTP Adapter 구현 결과는 `main`에 반영됐다. 실제 API
+호출과 응답 저장은 아직 수행하지 않았으며 별도 Issue와 PM 승인이 필요하다.
 
 ---
 
@@ -301,21 +300,26 @@ OK
 - 공식 CSV의 `POI072` 한 장소만 읽기 전용으로 처리
 - 원본 bytes 비덮어쓰기와 요청별 8개 메타데이터 JSON 구현
 - 실제 HTTP Adapter, 실제 `.env` 사용과 실제 API 호출은 제외
-- Issue #32 작업 Branch 현재 기준 Project Guard: 45개 ID 유지, 활성 35개 PASS,
+- Issue #32 완료 당시 Project Guard: 45개 ID 유지, 활성 35개 PASS,
   후속 10개 SKIP
-- Issue #32 작업 Branch 현재 기준 Unit Tests: 83개 통과
+- Issue #32 완료 당시 Unit Tests: 83개 통과
 
-### 6.9 HTTP Adapter 오프라인 구현 — Issue #34
+### 6.9 HTTP Adapter 오프라인 구현 — Issue #34 / PR #36
 
+- Issue #34 Closed
+- PR #36 Squash and merge 완료
+- Squash Commit: `b99c9c9`
+- PR #36 CI 성공
+- Merge 후 `main` Push CI 성공
+- HTTP Adapter `main` 반영 완료
 - 명시적으로 주입한 Transport를 통해서만 HTTP 처리를 수행하는 Adapter 구현
 - Fake Transport로 정상·오류·Timeout·Redirect 거부와 5 MiB 응답 상한 검증 완료
 - 실제 실행 CLI는 구현하지 않음
 - 실제 `.env`와 실제 API Key를 사용하지 않음
 - 실제 DNS·socket·HTTP 요청 0회
 - 실제 `POI072` 응답은 수집하지 않음
-- Issue #34 작업 Branch 현재 기준 Project Guard: 45개 ID 유지, 활성 35개 PASS,
-  후속 10개 SKIP
-- Issue #34 작업 Branch 현재 기준 Unit Tests: 107개 통과
+- Project Guard: PASS 35, FAIL 0, WARN 0, SKIP 10, TOTAL 45, EXIT_CODE 0
+- Unit Tests: Ran 107 tests, OK
 - EG-4 전체 통과가 아니며 EG-5 진입 전 상태 유지
 
 ---
@@ -482,9 +486,9 @@ Python은 이 작업을 외부 패키지 없이 비교적 단순하게 수행할
 
 ## 11. 다음 공식 단계 — EG-4
 
-EG-4 오프라인 수집기와 HTTP Adapter의 Fake 기반 검증은 완료했다. 실제 실행
-CLI는 없고 서울시 API 호출도 승인되지 않았으며 Issue #34 병합 후 별도
-Issue에서 준비한다.
+EG-4 오프라인 수집기와 HTTP Adapter의 Fake 기반 검증은 `main`에 반영됐다.
+실제 실행 CLI는 없고 서울시 API 호출도 승인되지 않았으며 별도 Issue에서
+준비한다.
 
 ### 11.1 EG-4를 쉬운 말로 설명하면
 
@@ -521,7 +525,8 @@ API Key를 로컬에서 안전하게 읽기
 - 알림 기능
 - 사용자 위치 추적
 
-실제 실행 CLI와 POI072 1회 호출은 Issue #34와 분리해 별도 Issue와 PR로 관리한다.
+실제 실행 CLI와 POI072 1회 호출은 PR #36의 병합 범위에 포함하지 않았으며
+별도 Issue와 PR로 관리한다.
 
 ---
 
@@ -655,7 +660,7 @@ Branch, 최근 PR과 Git 상태를 확인해줘.
 
 ## 15. 마지막 갱신 정보
 
-- 문서 버전: 1.7
+- 문서 버전: 1.8
 - 마지막 갱신일: 2026-07-20
 - 공식 진행 Issue: 없음
 - 공식 기준 Branch: `main`
@@ -669,7 +674,9 @@ Branch, 최근 PR과 Git 상태를 확인해줘.
   - Project Guard 공식 명칭·파일명·경로 전환 완료
   - Codex Engineering Harness P3~P7 완료
   - Issue #32 EG-4 오프라인 수집기와 Project Guard 7개 runner 구현
-  - Issue #34 HTTP Adapter와 Fake Transport 오프라인 검증
+  - Issue #34 Closed 및 PR #36 Squash and merge 완료(`b99c9c9`)
+  - PR #36 CI와 Merge 후 `main` Push CI 성공
+  - HTTP Adapter `main` 반영 및 Project Guard 35개 PASS·Unit Tests 107개 OK
 - 다음 행동: POI072 1회 실제 호출 별도 Issue 생성
 - 다음 공식 단계: EG-4 실제 호출 준비와 PM 외부 실행 승인
 - 실제 서울시 API 호출: 미승인
