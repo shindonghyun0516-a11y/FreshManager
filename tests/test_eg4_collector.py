@@ -239,6 +239,55 @@ class Eg4CollectorTests(unittest.TestCase):
         self.assertEqual(result.status, "api_error")
         self.assertTrue(Path(str(result.metadata["raw_file_path"])).is_file())
 
+    def test_xml_service_error_is_api_error_and_secret_stays_in_raw(self) -> None:
+        secret_marker = "synthetic-xml-message-must-stay-in-raw"
+        body = (
+            b"<RESULT><CODE>synthetic-code</CODE><MESSAGE>"
+            + secret_marker.encode("utf-8")
+            + b"</MESSAGE></RESULT>"
+        )
+        client = FakeClient(body)
+        stdout = io.StringIO()
+        with contextlib.redirect_stdout(stdout):
+            result = self.collector(client).collect(DUMMY_KEY)
+
+        self.assert_recorded_error(result, "api_error", raw_expected=True)
+        self.assertEqual(result.metadata["http_status"], 200)
+        self.assertEqual(tuple(result.metadata), METADATA_FIELDS)
+        self.assertEqual(len(client.calls), 1)
+
+        raw_path = Path(str(result.metadata["raw_file_path"]))
+        self.assertEqual(raw_path.read_bytes(), body)
+        self.assertIn(secret_marker.encode("utf-8"), raw_path.read_bytes())
+
+        metadata_bytes = result.metadata_path.read_bytes()  # type: ignore[union-attr]
+        rendered = stdout.getvalue() + repr(result)
+        self.assertNotIn(secret_marker, rendered)
+        self.assertNotIn(secret_marker.encode("utf-8"), metadata_bytes)
+
+    def test_unrecognized_non_json_payloads_remain_parse_error(self) -> None:
+        cases = {
+            "wrong-root": b"<OTHER><CODE>x</CODE><MESSAGE>y</MESSAGE></OTHER>",
+            "missing-code": b"<RESULT><MESSAGE>y</MESSAGE></RESULT>",
+            "missing-message": b"<RESULT><CODE>x</CODE></RESULT>",
+            "namespace": b'<RESULT xmlns="urn:test"><CODE>x</CODE><MESSAGE>y</MESSAGE></RESULT>',
+            "html": b"<html><CODE>x</CODE><MESSAGE>y</MESSAGE></html>",
+            "plain-text": b"service error",
+            "unsupported-xml-encoding": (
+                b'<?xml version="1.0" encoding="unknown-encoding"?>'
+                b"<RESULT><CODE>x</CODE><MESSAGE>y</MESSAGE></RESULT>"
+            ),
+        }
+        for label, body in cases.items():
+            with self.subTest(label=label):
+                client = FakeClient(body)
+                storage = FileStorage(self.raw_root / label, self.metadata_root / label)
+                result = self.collector(client, storage).collect(DUMMY_KEY)
+                self.assert_recorded_error(result, "parse_error", raw_expected=True)
+                self.assertEqual(result.metadata["http_status"], 200)
+                self.assertEqual(Path(str(result.metadata["raw_file_path"])).read_bytes(), body)
+                self.assertEqual(len(client.calls), 1)
+
     def test_timeout_is_recorded_without_raw_file(self) -> None:
         result = self.collector(TimeoutClient()).collect(DUMMY_KEY)
         self.assert_recorded_error(result, "timeout", raw_expected=False)
