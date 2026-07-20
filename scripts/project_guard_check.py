@@ -36,6 +36,7 @@ if str(PROJECT_ROOT) not in sys.path:
 from freshmanager.collector import METADATA_FIELDS as EG4_METADATA_FIELDS  # noqa: E402
 from freshmanager.collector import Collector, HttpResponse  # noqa: E402
 from freshmanager.config import ConfigError, load_api_key, mask_secret  # noqa: E402
+from freshmanager import eg5 as eg5_cli  # noqa: E402
 from freshmanager.http_adapter import BASE_URL, SeoulPopulationHttpClient  # noqa: E402
 from freshmanager.offline import run as run_offline  # noqa: E402
 from freshmanager.storage import FileStorage, StorageError  # noqa: E402
@@ -84,6 +85,13 @@ FORECAST_FIELDS = [
 METADATA_FIELDS = list(EG4_METADATA_FIELDS)
 EG4_FIXED_TIME = datetime(2026, 7, 20, 9, 10, 11, tzinfo=ZoneInfo("Asia/Seoul"))
 EG4_DUMMY_KEY = "dummy-key-for-project-guard"
+EG5_DUMMY_KEY = "dummy-key-for-eg5-project-guard"
+EG5_APPROVED_AREA_CODES = ("POI019", "POI013", "POI014")
+EG5_APPROVED_AREA_NAMES = {
+    "POI019": "구로디지털단지역",
+    "POI013": "가산디지털단지역",
+    "POI014": "강남역",
+}
 DOCUMENT_PATHS = [
     Path("AGENTS.md"),
     Path("README.md"),
@@ -253,6 +261,56 @@ def markdown_section(text: str, heading: str) -> str:
     return text[match.start():end]
 
 
+def current_gate_status_conflicts(text: str) -> list[str]:
+    section = markdown_section(text, "3. 전체 순서와 현재 상태")
+    if not section:
+        return ["현재 게이트 상태 절 누락"]
+
+    table_status: dict[str, str] = {}
+    for gate in ("EG-4", "EG-5"):
+        match = re.search(
+            rf"^\|\s*{re.escape(gate)}\s*\|\s*([^|\n]+)\|",
+            section,
+            flags=re.MULTILINE,
+        )
+        if match:
+            table_status[gate] = match.group(1).strip()
+
+    prose = "\n".join(
+        line for line in section.splitlines() if not line.lstrip().startswith("|")
+    )
+    issues: list[str] = []
+    eg4_status = table_status.get("EG-4", "")
+    if "통과" in eg4_status and "미통과" not in eg4_status:
+        eg4_stale = re.search(
+            r"EG-4[^\n]*(?:미통과|통과\s*전|통과하지\s*않|아직[^\n]*진행하지)",
+            prose,
+        )
+        if eg4_stale:
+            issues.append("EG-4 통과 상태와 본문 미통과 표현 충돌")
+
+    eg5_status = table_status.get("EG-5", "")
+    if "진행" in eg5_status and not any(value in eg5_status for value in ("미진행", "미구현")):
+        eg5_stale = re.search(
+            r"EG-5[^\n]*(?:미구현|미진행|진입\s*전|시작(?:하지|되지)\s*않|아직[^\n]*진행하지)",
+            prose,
+        )
+        if eg5_stale:
+            issues.append("EG-5 진행 상태와 본문 미시작 표현 충돌")
+
+    actual_not_run = "미실행" in eg5_status or re.search(
+        r"EG-5[^\n]*(?:실제|실응답)[^\n]*미실행",
+        prose,
+    )
+    actual_completed = re.search(
+        r"(?:EG-5|대표\s*3장소)[^\n]*(?:실제|실응답)[^\n]*(?:수집|호출|응답|검증)[^\n]*(?:완료|성공|확인)",
+        prose,
+    )
+    if actual_not_run and actual_completed:
+        issues.append("EG-5 실제 호출 미실행 상태와 실제 수집 완료 표현 충돌")
+    return issues
+
+
 def check_h001(context: ProjectGuardContext) -> CheckResult:
     missing = []
     empty = []
@@ -349,6 +407,10 @@ def check_h003(context: ProjectGuardContext) -> CheckResult:
                 cursor = position + len(item)
         if any(position < 0 for position in positions):
             issues.append(f"{path}: EG-0~EG-8 순서 확인 실패")
+
+    quality_path = Path("docs/testing/QUALITY_GATES.md")
+    for issue in current_gate_status_conflicts(texts.get(quality_path, "")):
+        issues.append(f"{quality_path}: {issue}")
 
     if issues:
         return failed("H-003", "; ".join(issues), *map(str, DOCUMENT_PATHS))
@@ -680,6 +742,7 @@ def check_h202(context: ProjectGuardContext) -> CheckResult:
 
 SECURITY_SUFFIXES = {".md", ".py", ".json", ".csv", ".txt", ".log", ".example"}
 SKIP_DIRECTORY_NAMES = {".git", "__pycache__", ".pytest_cache", ".mypy_cache"}
+PROTECTED_WORK_LOG_DIRECTORY = "work log"
 ENV_ASSIGNMENT = re.compile(r"SEOUL_OPEN_API_KEY\s*=\s*([^\s`'\"<>]+)")
 JSON_SECRET_FIELD = re.compile(
     r"[\"'](?:SEOUL_OPEN_API_KEY|API_KEY|api_key|token|authorization)[\"']\s*:\s*[\"']([^\"']+)[\"']",
@@ -698,10 +761,21 @@ def is_safe_url_segment(value: str) -> bool:
     return any("가" <= character <= "힣" for character in value)
 
 
+def prune_traversal_directories(root: Path, current: Path, directory_names: list[str]) -> None:
+    """Prevent traversal into caches and the exact protected top-level work log."""
+
+    directory_names[:] = [
+        name
+        for name in directory_names
+        if name not in SKIP_DIRECTORY_NAMES
+        and not (current == root and name == PROTECTED_WORK_LOG_DIRECTORY)
+    ]
+
+
 def iter_security_files(root: Path) -> Iterable[Path]:
     for current_root, directory_names, file_names in os.walk(root):
-        directory_names[:] = [name for name in directory_names if name not in SKIP_DIRECTORY_NAMES]
         current = Path(current_root)
+        prune_traversal_directories(root, current, directory_names)
         relative_parts = current.relative_to(root).parts if current != root else ()
         if relative_parts[:2] in {("data", "raw"), ("data", "processed"), ("data", "quality")}:
             directory_names[:] = []
@@ -761,6 +835,134 @@ class GuardTimeoutClient:
     def fetch_population(self, area_code: str, api_key: str, timeout_seconds: float) -> HttpResponse:
         del area_code, api_key, timeout_seconds
         raise TimeoutError
+
+
+class GuardEg5Response:
+    def __init__(self, payload: bytes) -> None:
+        self.status = 200
+        self.payload = payload
+        self.offset = 0
+
+    def read(self, size: int = -1) -> bytes:
+        if size < 0:
+            size = len(self.payload) - self.offset
+        chunk = self.payload[self.offset : self.offset + size]
+        self.offset += len(chunk)
+        return chunk
+
+    def close(self) -> None:
+        return None
+
+
+class GuardEg5Transport:
+    def __init__(self, failures: set[str] | None = None) -> None:
+        self.failures = failures or set()
+        self.calls: list[str] = []
+
+    def open(self, request: object, timeout_seconds: float) -> GuardEg5Response:
+        del timeout_seconds
+        selector = str(getattr(request, "selector", ""))
+        area_code = selector.rsplit("/", 1)[-1]
+        self.calls.append(area_code)
+        if area_code in self.failures:
+            raise TimeoutError("synthetic timeout detail")
+        return GuardEg5Response(synthetic_eg5_payload(area_code))
+
+
+@dataclass(frozen=True)
+class Eg5GuardExecution:
+    exit_code: int
+    output: str
+    calls: tuple[str, ...]
+    raw_area_codes: tuple[str, ...]
+    metadata: tuple[dict[str, object], ...]
+    stage_only: bool
+
+
+def synthetic_eg5_payload(area_code: str) -> bytes:
+    area_name = EG5_APPROVED_AREA_NAMES[area_code]
+    current = {field: "1" for field in CURRENT_POPULATION_FIELDS}
+    current.update(
+        {
+            "AREA_NM": area_name,
+            "AREA_CD": area_code,
+            "AREA_CONGEST_LVL": "보통",
+            "AREA_CONGEST_MSG": "Project Guard 합성 응답",
+            "AREA_PPLTN_MIN": "1000",
+            "AREA_PPLTN_MAX": "1200",
+            "PPLTN_TIME": "2026-07-21 10:00",
+            "FCST_YN": "Y",
+            "FCST_PPLTN": [
+                {
+                    "FCST_TIME": "2026-07-21 11:00",
+                    "FCST_CONGEST_LVL": "보통",
+                    "FCST_PPLTN_MIN": "1100",
+                    "FCST_PPLTN_MAX": "1300",
+                }
+            ],
+        }
+    )
+    document = {
+        "SeoulRtd.citydata_ppltn": [current],
+        "RESULT": {
+            "RESULT.CODE": "INFO-000",
+            "RESULT.MESSAGE": "정상 처리되었습니다",
+        },
+    }
+    return json.dumps(document, ensure_ascii=False).encode("utf-8")
+
+
+def run_eg5_guard(context: ProjectGuardContext, failures: set[str] | None = None) -> Eg5GuardExecution:
+    with tempfile.TemporaryDirectory(prefix="freshmanager-eg5-guard-") as temporary:
+        root = Path(temporary)
+        env_path = root / "dummy.env"
+        env_name = "SEOUL_OPEN" + "_API_KEY"
+        env_path.write_text(f"{env_name}={EG5_DUMMY_KEY}\n", encoding="utf-8")
+        output_root = root / "output"
+        transport = GuardEg5Transport(failures)
+        stdout = io.StringIO()
+        with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stdout):
+            exit_code = eg5_cli.run(
+                [
+                    "--env-file",
+                    str(env_path),
+                    "--output-root",
+                    str(output_root),
+                    "--execute-live",
+                ],
+                transport_factory=lambda: transport,
+                official_csv_path=context.csv_path,
+            )
+        raw_files = sorted((output_root / eg5_cli.RAW_OUTPUT_PATH).rglob("*.json"))
+        metadata_files = sorted(
+            (output_root / eg5_cli.METADATA_OUTPUT_PATH).rglob("*.metadata.json")
+        )
+        created_files = [path for path in output_root.rglob("*") if path.is_file()]
+        stage_only = all(
+            path.relative_to(output_root).parts[:2] == eg5_cli.STAGE_PATH.parts
+            for path in created_files
+        )
+        metadata = tuple(
+            json.loads(path.read_text(encoding="utf-8")) for path in metadata_files
+        )
+        raw_area_codes = tuple(path.name.split("_", 1)[0] for path in raw_files)
+        return Eg5GuardExecution(
+            exit_code=exit_code,
+            output=stdout.getvalue(),
+            calls=tuple(transport.calls),
+            raw_area_codes=raw_area_codes,
+            metadata=metadata,
+            stage_only=stage_only,
+        )
+
+
+def eg5_summary(output: str) -> dict[str, str]:
+    lines = output.splitlines()
+    try:
+        start = lines.index("EG5_COLLECTION_SUMMARY") + 1
+    except ValueError:
+        return {}
+    return dict(line.split("=", 1) for line in lines[start:] if "=" in line)
 
 
 class GuardConnectionFailureTransport:
@@ -1037,10 +1239,10 @@ def network_code_findings(path: Path, root: Path) -> list[str]:
 
 def project_python_files(root: Path) -> list[Path]:
     files = []
-    for path in root.rglob("*.py"):
-        if any(part in SKIP_DIRECTORY_NAMES for part in path.relative_to(root).parts):
-            continue
-        files.append(path)
+    for current_root, directory_names, file_names in os.walk(root):
+        current = Path(current_root)
+        prune_traversal_directories(root, current, directory_names)
+        files.extend(current / name for name in file_names if Path(name).suffix == ".py")
     return sorted(files)
 
 
@@ -1407,6 +1609,136 @@ def check_h701(context: ProjectGuardContext) -> CheckResult:
     return passed("H-701", "공식 CSV의 POI072 1건과 원본·정규화 현재/예측·상태 결과 연결 확인", "freshmanager/collector.py", "freshmanager/storage.py")
 
 
+def check_h702(context: ProjectGuardContext) -> CheckResult:
+    inspected = csv_or_failure(context, "H-702")
+    if isinstance(inspected, CheckResult):
+        return inspected
+    names_by_code = {
+        normalized_cell(row, "AREA_CD"): normalized_cell(row, "AREA_NM")
+        for row in inspected.rows
+    }
+    if (
+        tuple(eg5_cli.EG5_AREA_CODES) != EG5_APPROVED_AREA_CODES
+        or len(set(eg5_cli.EG5_AREA_CODES)) != 3
+        or any(names_by_code.get(code) != EG5_APPROVED_AREA_NAMES[code] for code in EG5_APPROVED_AREA_CODES)
+    ):
+        return failed(
+            "H-702",
+            "승인 Allowlist 또는 공식 CSV 장소명 불일치",
+            str(CSV_RELATIVE_PATH),
+            "freshmanager/eg5.py",
+        )
+
+    execution = run_eg5_guard(context)
+    metadata_codes = tuple(str(item.get("area_code")) for item in execution.metadata)
+    metadata_is_valid = all(
+        tuple(item) == tuple(EG4_METADATA_FIELDS)
+        and item.get("collection_status") == "success"
+        for item in execution.metadata
+    )
+    if (
+        execution.exit_code != 0
+        or execution.calls != EG5_APPROVED_AREA_CODES
+        or len(execution.raw_area_codes) != 3
+        or set(execution.raw_area_codes) != set(EG5_APPROVED_AREA_CODES)
+        or len(metadata_codes) != 3
+        or set(metadata_codes) != set(EG5_APPROVED_AREA_CODES)
+        or not metadata_is_valid
+        or not execution.stage_only
+    ):
+        return failed(
+            "H-702",
+            "승인 3장소 처리 또는 전용 단계 원본·메타데이터 계약 불일치",
+            str(CSV_RELATIVE_PATH),
+            "freshmanager/eg5.py",
+            "임시 출력",
+        )
+    rendered_metadata = json.dumps(execution.metadata, ensure_ascii=False)
+    if EG5_DUMMY_KEY in execution.output or EG5_DUMMY_KEY in rendered_metadata or BASE_URL in execution.output:
+        return failed(
+            "H-702",
+            "EG-5 출력·메타데이터에 Dummy Key 또는 인증 URL 노출",
+            "freshmanager/eg5.py",
+            "임시 출력",
+        )
+    return passed(
+        "H-702",
+        "POI019·POI013·POI014를 고정 순서로 각각 1회 처리하고 전용 단계에 분리 저장",
+        str(CSV_RELATIVE_PATH),
+        "freshmanager/eg5.py",
+        "임시 출력",
+    )
+
+
+def check_h704(context: ProjectGuardContext) -> CheckResult:
+    execution = run_eg5_guard(context, {"POI013"})
+    summary = eg5_summary(execution.output)
+    status_by_code = {
+        str(item.get("area_code")): str(item.get("collection_status"))
+        for item in execution.metadata
+    }
+    if (
+        execution.exit_code != 1
+        or execution.calls != EG5_APPROVED_AREA_CODES
+        or any(execution.calls.count(code) != 1 for code in EG5_APPROVED_AREA_CODES)
+        or status_by_code
+        != {"POI019": "success", "POI013": "timeout", "POI014": "success"}
+        or summary.get("retry_count") != "0"
+    ):
+        return failed(
+            "H-704",
+            "가운데 장소 실패 후 계속 처리 또는 재시도 0회 계약 불일치",
+            "freshmanager/eg5.py",
+            "가짜 Transport",
+            "임시 출력",
+        )
+    return passed(
+        "H-704",
+        "POI013 실패 후 POI014 계속 처리, 세 장소 각 1회, 재시도 0회 확인",
+        "freshmanager/eg5.py",
+        "가짜 Transport",
+        "임시 출력",
+    )
+
+
+def check_h705(context: ProjectGuardContext) -> CheckResult:
+    success_execution = run_eg5_guard(context)
+    failure_execution = run_eg5_guard(context, {"POI013"})
+    success_summary = eg5_summary(success_execution.output)
+    failure_summary = eg5_summary(failure_execution.output)
+    expected_success = {
+        "target_count": "3",
+        "success_count": "3",
+        "failure_count": "0",
+        "failed_area_codes": "",
+        "retry_count": "0",
+        "stage": "eg5_representative_3",
+        "exit_code": "0",
+    }
+    expected_failure = {
+        "target_count": "3",
+        "success_count": "2",
+        "failure_count": "1",
+        "failed_area_codes": "POI013",
+        "retry_count": "0",
+        "stage": "eg5_representative_3",
+        "exit_code": "1",
+    }
+    if success_summary != expected_success or failure_summary != expected_failure:
+        return failed(
+            "H-705",
+            "정상·부분실패 회차 요약의 대상·성공·실패·목록 정합성 불일치",
+            "freshmanager/eg5.py",
+            "임시 출력",
+        )
+    return passed(
+        "H-705",
+        "정상·부분실패 회차에서 대상=성공+실패와 실패 목록·종료코드 정합성 확인",
+        "freshmanager/eg5.py",
+        "임시 출력",
+    )
+
+
 RUNNERS: dict[str, Callable[[ProjectGuardContext], CheckResult]] = {
     f"check_{check_id.lower().replace('-', '')}": globals()[f"check_{check_id.lower().replace('-', '')}"]
     for check_id in [
@@ -1417,7 +1749,7 @@ RUNNERS: dict[str, Callable[[ProjectGuardContext], CheckResult]] = {
         "H-204", "H-205",
         "H-301", "H-302", "H-303", "H-304", "H-305",
         "H-401", "H-402", "H-403", "H-404",
-        "H-501", "H-502", "H-503", "H-506", "H-701",
+        "H-501", "H-502", "H-503", "H-506", "H-701", "H-702", "H-704", "H-705",
     ]
 }
 
@@ -1467,12 +1799,18 @@ CHECK_DEFINITIONS = [
     definition("H-601", "상권현황 표현", "EG-4 이후", False, "EG-4 상권 파서·출력 구현 후 적용"),
     definition("H-602", "상태값 구분", "EG-4 이후", False, "EG-4 상권 상태 처리 구현 후 적용"),
     definition("H-701", "여의도 1장소", "EG-4 이후"),
-    definition("H-702", "유형별 대표 3장소", "EG-5 이후", False, "EG-5 대표 3장소 구현 후 적용"),
+    definition("H-702", "EG-5 대표 3장소", "EG-5 이후"),
     definition("H-703", "시험용 10장소", "EG-6 이후", False, "EG-6 시험용 10장소 구현 후 적용"),
-    definition("H-704", "실패 격리·재시도 제한", "EG-6 이후", False, "EG-6 배치 실패 격리 구현 후 적용"),
-    definition("H-705", "회차 결과 요약", "EG-6 이후", False, "EG-6 회차 집계 구현 후 적용"),
+    definition("H-704", "실패 격리·재시도 제한", "EG-5 이후"),
+    definition("H-705", "회차 결과 요약", "EG-5 이후"),
     definition("H-706", "121장소 1회 완전성", "EG-7 이후", False, "EG-7 121장소 1회 수집 후 적용"),
-    definition("H-707", "반복주기 승인 준수", "EG-8", False, "EG-8 반복주기 승인 후 적용"),
+    definition(
+        "H-707",
+        "반복주기 승인 준수",
+        "EG-8",
+        False,
+        "반복수집 전 PM 주기 승인과 외장 저장장치 또는 승인된 클라우드 폴더 백업 Gate 필요",
+    ),
 ]
 DEFINITION_BY_ID = {item.check_id: item for item in CHECK_DEFINITIONS}
 

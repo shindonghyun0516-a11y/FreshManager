@@ -9,16 +9,17 @@
 
 - 프로젝트: **프레시매니저 유동판매 추천 서비스 — 데이터 타당성 PoC**
 - 현재 목표: 공개 데이터만으로 여의도 오피스 상권의 유동판매 추천 가능성을 검증
-- `main` 반영 완료: EG-0, EG-1, EG-2, EG-3, CI 보강, Codex Engineering Harness 구조·용어 개편 P1~P7, EG-4 오프라인 수집기·HTTP Adapter·단일 실행 CLI와 Fake Transport 검증
-- 공식 진행 Issue: 없음
+- `main` 반영 완료: EG-0~EG-3, CI 보강, Codex Engineering Harness P1~P7, EG-4 수집기·HTTP Adapter·단일 실행 CLI와 XML 서비스 오류 분류 보완
+- 공식 진행 Issue: #46
 - 공식 기준 Branch: `main`
-- 공식 작업 Branch: 없음
-- 현재 작업: Issue #39 Closed 및 PR #40 Squash Merge·`main` 반영 완료, 실제 외부 실행 준비 전
-- 현재 Engineering Gate: EG-4 진행 — 오프라인 실행 준비 완료, 실제 외부 실행 미승인·미실행
+- 공식 작업 Branch: `feat/issue-46-eg5-representative-3`
+- 기준 Commit: `b596d85bbe4b4b1898b4846378b978c5ea31e120`
+- 현재 작업: Issue #46 EG-5 대표 3장소 오프라인 구현·검증
+- 현재 Engineering Gate: EG-5 진행 — EG-4 PASS, 대표 3장소 실제 호출은 미승인·미실행
 - 현재 Codex Engineering Harness 개편 상태: P1~P7 완료
-- 다음 공식 단계: **POI072 실제 1회 호출을 위한 별도 실행 Issue 생성, 실행 범위 검토와 PM 외부 실행 승인**
-- 실제 서울시 API 호출: 미승인·미실행
-- Issue #39 및 PR #40: 완료, 단일 실행 CLI `main` 반영 완료
+- 다음 공식 단계: **Issue #46 Diff와 오프라인 검증 결과에 대한 PM 승인**
+- 실제 서울시 API 호출: Issue #43에서 POI072 정상 JSON 수집 완료; EG-5 세 장소 호출은 미승인·미실행
+- Issue #43: 완료, PM이 EG-4 PASS 확정
 - 절대 주의:
   - API Key Commit 금지
   - 공식 CSV·JSON 임의 수정 금지
@@ -28,8 +29,8 @@
 실제 작업 중 Issue와 Branch는 GitHub의 현재 Issue와
 `git branch --show-current` 결과를 우선한다.
 
-Issue #34와 PR #36의 HTTP Adapter 구현 결과는 `main`에 반영됐다. 실제 API
-호출과 응답 저장은 아직 수행하지 않았으며 별도 Issue와 PM 승인이 필요하다.
+Issue #43의 PM 승인 범위에서 POI072 실제 정상 JSON과 원본·메타데이터 저장을
+확인했다. EG-5 세 장소의 실제 API 호출은 별도 PM 승인 전에는 수행하지 않는다.
 
 ---
 
@@ -189,8 +190,9 @@ Issue 생성
 | EG-2 | 완료 | 공식 기준 CSV와 샘플 JSON 반영 |
 | EG-3 | 완료 | Project Guard와 Unit Tests 구현·병합 |
 | CI 보강 | 완료 | Issue #16, PR #20, PR 및 main Push 자동검사 검증 완료 |
-| EG-4 | 진행 | `main`: POI072 오프라인 수집기·HTTP Adapter·단일 실행 CLI와 Fake 검증 반영 완료; 실제 외부 실행: 미승인·미실행; EG-4 전체 미통과·EG-5 진입 전 |
-| EG-5 이후 | 미진행 | EG-4 완료 후 정의 |
+| EG-4 | 완료 | Issue #43에서 POI072 실제 정상 JSON과 원본·메타데이터 저장 확인, PM PASS |
+| EG-5 | 진행 | Issue #46 작업 Branch에서 POI019·POI013·POI014 오프라인 구현·검증; 실제 호출 미승인·미실행 |
+| EG-6 이후 | 미진행 | EG-5 통과와 별도 PM 승인 후 진행 |
 
 > EG-0~EG-2의 상세 완료조건은 저장소 문서와 병합된 Issue·PR을 확인한다.
 
@@ -322,7 +324,7 @@ OK
 - 실제 `POI072` 응답은 수집하지 않음
 - Project Guard: PASS 35, FAIL 0, WARN 0, SKIP 10, TOTAL 45, EXIT_CODE 0
 - Unit Tests: Ran 107 tests, OK
-- EG-4 전체 통과가 아니며 EG-5 진입 전 상태 유지
+- Issue #34 완료 당시에는 EG-4 전체 통과 전 상태였음
 
 ### 6.10 POI072 단일 실행 CLI 오프라인 구현 — Issue #39 / PR #40
 
@@ -344,7 +346,16 @@ OK
 - 실제 프로젝트 `.env`를 열람·사용하지 않았고 실제 API Key 사용과 DNS·socket·HTTP 요청 0회
 - 실제 `POI072` 응답은 수집하지 않음
 - 공식 CSV·JSON 해시 변경 없음
-- 실제 호출 준비는 완료했지만 EG-4 전체 통과가 아니며 EG-5 진입 전 상태 유지
+- Issue #39 완료 당시에는 실제 호출 전이어서 EG-4 전체 통과 전 상태였음
+
+### 6.11 POI072 실제 수집과 EG-4 PASS — Issue #43 / Issue #44 / PR #45
+
+- Issue #43의 PM 승인 범위에서 로컬 Python으로 POI072 실제 단일 수집 수행
+- 최초 인증 오류 응답을 원본으로 보존하고 민감정보 없이 실패 기록
+- Issue #44와 PR #45에서 XML 서비스 오류를 `api_error`로 분류하도록 보완
+- Squash Commit: `b596d85bbe4b4b1898b4846378b978c5ea31e120`
+- 보완 후 POI072 정상 JSON과 원본·메타데이터 저장 확인
+- PM이 EG-4 PASS 확정, Issue #43 완료
 
 ---
 
@@ -508,40 +519,36 @@ Python은 이 작업을 외부 패키지 없이 비교적 단순하게 수행할
 
 ---
 
-## 11. 다음 공식 단계 — EG-4
+## 11. 현재 공식 단계 — EG-5
 
-EG-4 오프라인 수집기, HTTP Adapter와 POI072 단일 실행 CLI의 Fake 기반 검증은
-`main`에 반영됐다. 서울시 API 호출은 승인되지 않았으며 별도 실제 실행 Issue와
-PM 외부 실행 승인 후에만 수행한다.
-
-### 11.1 EG-4를 쉬운 말로 설명하면
-
-현재는 저장된 샘플, Dummy `.env`와 Fake Transport로 네트워크 없는 수집 흐름,
-HTTP Adapter의 Redirect 거부·5 MiB 응답 상한과 실행 CLI 조립을 검증했다.
-Issue #39와 PR #40의 병합 검증은 완료됐으며 별도 실제 실행 Issue에서 다음 순서로
-PM 외부 실행 승인을 받아 확인한다.
+Issue #43에서 POI072 실제 정상 JSON과 원본·메타데이터 저장을 확인했고 PM이
+EG-4 PASS를 확정했다. Issue #46은 오피스·상업 역세권 집중 검증을 위해 다음 세
+장소의 단일 회차 오프라인 구현과 검증만 수행한다.
 
 ```text
-별도 실제 실행 Issue 생성
-→ 실행 대상 POI072와 최대 1회 호출 범위 확정
-→ 출력 경로와 실제 .env 사용 범위 검토
-→ PM 외부 실행 승인
-→ 승인 후 실제 API 1회 호출
-→ 원본 JSON·메타데이터·키 비노출 검증
-→ Project Guard와 Unit Tests 재검증
+POI019 구로디지털단지역
+→ POI013 가산디지털단지역
+→ POI014 강남역
 ```
 
-### 11.2 EG-4 다음 실제 실행 범위
+### 11.1 EG-5를 쉬운 말로 설명하면
 
-- 로컬 `.env`에서 API Key 읽기
-- 서울시 API 최초 1회 호출
-- 여의도 대상 실제 응답 확보
-- 원본 JSON 저장
-- 수집 시각·장소 등 최소 메타데이터 저장
-- API Key 비노출 확인
-- 기존 Project Guard와 Unit Tests 통과
+한 번 실행할 때 승인된 세 장소를 정해진 순서로 각각 최대 한 번 처리한다. 한 장소의
+API·timeout·응답 검증 실패는 다음 장소를 막지 않으며 자동 재시도는 0회다. 공통
+사전검사·설정·저장환경·안전 문제만 회차를 시작하지 않거나 중단한다.
 
-### 11.3 EG-4에서 아직 하지 않는 것
+### 11.2 EG-5 저장과 실행 계약
+
+- 공통 output root 아래 `stages/eg5_representative_3` 자동 적용
+- 원본: `data/raw/population/`
+- 메타데이터: `data/processed/collection_logs/`
+- 단계명·raw 경로·metadata 경로 직접 입력 옵션 없음
+- 기존 EG-4 실제 원본·메타데이터 열람·이동·복사·수정·삭제 없음
+- 최종 원본·메타데이터 자동 삭제 없음
+- 종료코드: 전체 성공 `0`, 장소별 실패 포함 회차 완료 `1`, 공통 문제 `2`
+- 실제 EG-5 세 장소 호출은 별도 PM 승인 전 실행 금지
+
+### 11.3 EG-5에서 하지 않는 것
 
 - 반복 스케줄 수집
 - 데이터베이스 구축
@@ -550,9 +557,13 @@ PM 외부 실행 승인을 받아 확인한다.
 - 매출 예측
 - 알림 기능
 - 사용자 위치 추적
+- 10장소·121장소 수집 구현
+- 반복수집·Scheduler
+- 백업 기능 구현
+- Google 기반 수집
 
-실제 실행 CLI는 Issue #39와 PR #40을 통해 `main`에 반영됐다. POI072 실제 1회 호출은
-포함하지 않았으며 별도 실제 실행 Issue와 PM 외부 실행 승인으로 관리한다.
+반복수집 전에는 외장 저장장치 주기적 복사 또는 PM 승인 클라우드 폴더 주기적
+백업 중 하나가 별도 Gate로 필요하다. 수집은 로컬 Python에 유지하고 백업만 분리한다.
 
 ---
 
@@ -662,40 +673,40 @@ Branch, 최근 PR과 Git 상태를 확인해줘.
 
 ### 14.1 공식 진행 중인 작업
 
-- 공식 진행 Issue: 없음
-- 공식 작업 Branch: 없음
-- `main`: EG-3, Codex Engineering Harness P1~P7과 EG-4 수집기·HTTP Adapter·단일 실행 CLI Fake 검증 완료
-- 실제 서울시 API 호출: 미승인·미실행
+- 공식 진행 Issue: #46
+- 공식 작업 Branch: `feat/issue-46-eg5-representative-3`
+- 기준 `main`: `b596d85bbe4b4b1898b4846378b978c5ea31e120`
+- 현재 작업: EG-5 대표 3장소 오프라인 구현·검증
+- 실제 서울시 API 호출: Issue #43의 POI072 정상 수집 완료; EG-5 세 장소 호출 미승인·미실행
 
-### 14.2 다음 행동 — EG-4 실제 1회 호출 준비
+### 14.2 다음 행동 — Issue #46 검토
 
-1. 별도 실제 실행 Issue 생성
-2. 실행 대상 `POI072`와 최대 1회 호출 범위 확정
-3. 출력 경로와 실제 `.env` 사용 범위 검토
-4. PM 외부 실행 승인
-5. 승인 후 실제 API 1회 호출
-6. 원본 JSON·메타데이터·키 비노출 검증
-7. Project Guard와 Unit Tests 재검증
+1. EG-5 대상 테스트와 전체 Unit Tests 확인
+2. Project Guard `TOTAL=45`, `FAIL=0`, `WARN=0`, `EXIT_CODE=0` 확인
+3. `H-702`, `H-704`, `H-705` PASS와 `H-707` SKIP 확인
+4. 승인된 8개 파일의 Diff와 수정 금지 파일 불변 확인
+5. PM의 Diff 및 검증 결과 승인 대기
+6. Commit·Push·PR은 별도 승인 후 진행
 
 ### 14.3 다음 제품 Engineering Gate
 
-- EG-4: 서울시 API 최초 1회 호출 및 원본 응답 저장
-- `main` 반영 완료: 수집기·HTTP Adapter·단일 실행 CLI Fake 검증
-- 실제 외부 실행: 미승인·미실행
-- EG-4 전체 미통과, EG-5 진입 전
+- EG-5: 대표 3장소 단일 회차 수집 검증
+- 오프라인 구현·검증 후에도 실제 API 호출은 자동 승인되지 않음
+- 실제 세 장소 호출은 별도 PM 승인 시 장소별 최대 1회, 총 최대 3회
+- EG-6 진입은 EG-5 통과와 별도 PM 단계 전환 승인 후 가능
 
 ---
 
 ## 15. 마지막 갱신 정보
 
-- 문서 버전: 1.10
-- 마지막 갱신일: 2026-07-20
-- 공식 진행 Issue: 없음
+- 문서 버전: 1.11
+- 마지막 갱신일: 2026-07-21
+- 공식 진행 Issue: #46
 - 공식 기준 Branch: `main`
-- 기준 Commit: `3040242e5bf23b2eee5ef15b118ce4fd46e41597`
-- 공식 작업 Branch: 없음
-- 현재 Engineering Gate: EG-4 진행 — 오프라인 실행 준비 `main` 반영 완료, 실제 외부 실행 미승인·미실행
-- 현재 단계: EG-4 오프라인 실행 준비 `main` 반영 완료, 실제 외부 실행 미승인·미실행
+- 기준 Commit: `b596d85bbe4b4b1898b4846378b978c5ea31e120`
+- 공식 작업 Branch: `feat/issue-46-eg5-representative-3`
+- 현재 Engineering Gate: EG-5 진행 — EG-4 PASS, 대표 3장소 오프라인 구현·검증
+- 현재 단계: Issue #46 승인 범위의 Branch 구현과 로컬 검증
 - 완료된 최근 작업:
   - Issue #28 완료 및 PR #29 Squash and merge 완료
   - Squash Commit `0201eee`
@@ -711,6 +722,8 @@ Branch, 최근 PR과 Git 상태를 확인해줘.
   - POI072 단일 실행 CLI와 Fake Transport 기반 오프라인 검증 `main` 반영 완료
   - Project Guard 35개 PASS·Unit Tests 120개 OK
   - Issue #39 로컬·원격 작업 Branch 삭제 완료
-- 다음 행동: POI072 실제 1회 호출을 위한 별도 실행 Issue 생성
-- 다음 공식 단계: 실행 범위 검토와 PM 외부 실행 승인 후 POI072 실제 1회 호출
-- 실제 서울시 API 호출: 미승인·미실행
+  - Issue #43 PM 승인 실제 POI072 정상 JSON 수집 및 EG-4 PASS
+  - Issue #44·PR #45 XML 서비스 오류를 `api_error`로 안전하게 분류, Commit `b596d85`
+- 다음 행동: Issue #46 Diff와 오프라인 검증 결과 PM 승인
+- 다음 공식 단계: 승인 후 Commit·Push·PR 진행 여부 결정
+- 실제 서울시 API 호출: EG-5 세 장소는 미승인·미실행

@@ -31,7 +31,16 @@ def valid_rows() -> list[dict[str, str]]:
         for _ in range(count):
             code = f"TST-{number:03d}"
             name = f"테스트 장소 {number}"
-            if number == 72:
+            if number == 13:
+                code = "POI013"
+                name = "가산디지털단지역"
+            elif number == 14:
+                code = "POI014"
+                name = "강남역"
+            elif number == 19:
+                code = "POI019"
+                name = "구로디지털단지역"
+            elif number == 72:
                 code = "POI072"
                 name = "여의도"
             rows.append(
@@ -137,6 +146,52 @@ data/samples/population_yeouido_sample.json
 
 현재 상태만 검사한다.
 """
+
+
+def quality_gate_status_fixture(extra_current_text: str = "") -> str:
+    return f"""# Quality Gates
+
+## 3. 전체 순서와 현재 상태
+
+| 게이트 | 현재 상태 |
+|---|---|
+| EG-4 | 통과: Issue #43 완료 |
+| EG-5 | 진행: 오프라인 구현 중; 실제 세 장소 호출 미실행 |
+| EG-6 | 미구현 |
+
+EG-4는 통과했고 EG-5는 오프라인 구현을 진행한다.
+{extra_current_text}
+
+## 4. 다음 절
+
+후속 내용
+"""
+
+
+class H003CurrentGateStatusTests(unittest.TestCase):
+    def test_current_gate_status_fixture_without_conflict_passes(self) -> None:
+        self.assertEqual(
+            project_guard.current_gate_status_conflicts(quality_gate_status_fixture()),
+            [],
+        )
+
+    def test_current_gate_status_conflicts_are_detected(self) -> None:
+        conflicts = {
+            "eg4_not_passed": "EG-4 전체 통과 전 상태다.",
+            "eg5_not_started": "EG-5는 아직 시작되지 않았다.",
+            "actual_collection_complete": "EG-5 대표 3장소 정상 실응답 검증 완료.",
+        }
+        for case_name, text in conflicts.items():
+            with self.subTest(case_name=case_name):
+                self.assertTrue(
+                    project_guard.current_gate_status_conflicts(
+                        quality_gate_status_fixture(text)
+                    )
+                )
+
+    def test_repository_quality_gate_current_state_has_no_conflict(self) -> None:
+        text = (ROOT / "docs/testing/QUALITY_GATES.md").read_text(encoding="utf-8")
+        self.assertEqual(project_guard.current_gate_status_conflicts(text), [])
 
 
 class H004ReadmeStatusTests(unittest.TestCase):
@@ -423,6 +478,109 @@ class SecurityAndOfflineTests(unittest.TestCase):
         selected = list(project_guard.iter_security_files(self.project.root))
         self.assertNotIn(env_path, selected)
 
+    def test_h203_never_opens_top_level_protected_work_log(self) -> None:
+        protected_root = self.project.root / project_guard.PROTECTED_WORK_LOG_DIRECTORY
+        protected_root.mkdir()
+        protected_file = protected_root / "sentinel.md"
+        protected_value = "PROTECTED_" + "VALUE_123456"
+        env_name = "SEOUL_OPEN" + "_API_KEY"
+        protected_file.write_text(
+            f"{env_name}={protected_value}\n",
+            encoding="utf-8",
+        )
+        visible_root = self.project.root / "other log"
+        visible_root.mkdir()
+        visible_file = visible_root / "visible-security-note.md"
+        visible_value = "VISIBLE_" + "VALUE_123456"
+        visible_file.write_text(
+            f"{env_name}={visible_value}\n",
+            encoding="utf-8",
+        )
+        original_open = Path.open
+
+        def guarded_open(path: Path, *args: object, **kwargs: object) -> object:
+            if path == protected_file:
+                raise AssertionError("protected file must not be opened")
+            return original_open(path, *args, **kwargs)  # type: ignore[arg-type]
+
+        with mock.patch.object(Path, "open", new=guarded_open):
+            result = project_guard.check_h203(self.project.context())
+
+        self.assertEqual(result.status, project_guard.Status.FAIL)
+        self.assertIn("other log/visible-security-note.md", result.evidence)
+        self.assertNotIn("sentinel", result.evidence)
+        self.assertNotIn(protected_value, result.evidence)
+        self.assertNotIn(visible_value, result.evidence)
+
+    def test_all_guard_walkers_prune_top_level_protected_python_before_open(self) -> None:
+        protected_root = self.project.root / project_guard.PROTECTED_WORK_LOG_DIRECTORY
+        protected_root.mkdir()
+        protected_file = protected_root / "protected-python-sentinel.py"
+        protected_value = "PROTECTED_" + "PYTHON_VALUE_123456"
+        env_name = "SEOUL_OPEN" + "_API_KEY"
+        protected_file.write_text(
+            f"{env_name}={protected_value}\nimport requests\n",
+            encoding="utf-8",
+        )
+
+        normal_file = self.project.root / "normal.py"
+        normal_file.write_text("NORMAL_VALUE = 1\n", encoding="utf-8")
+        visible_root = self.project.root / "other log"
+        visible_root.mkdir()
+        visible_file = visible_root / "visible-security.py"
+        visible_value = "VISIBLE_" + "PYTHON_VALUE_123456"
+        visible_file.write_text(
+            f"{env_name}={visible_value}\nimport requests\n",
+            encoding="utf-8",
+        )
+        nested_same_name = self.project.root / "nested" / project_guard.PROTECTED_WORK_LOG_DIRECTORY
+        nested_same_name.mkdir(parents=True)
+        nested_file = nested_same_name / "nested-visible.py"
+        nested_file.write_text("NESTED_VALUE = 1\n", encoding="utf-8")
+
+        context = self.project.context()
+        original_open = Path.open
+        original_scandir = project_guard.os.scandir
+
+        def guarded_open(path: Path, *args: object, **kwargs: object) -> object:
+            if path == protected_file:
+                raise AssertionError("protected Python file must not be opened")
+            return original_open(path, *args, **kwargs)  # type: ignore[arg-type]
+
+        def guarded_scandir(path: object) -> object:
+            if Path(path) == protected_root:  # type: ignore[arg-type]
+                raise AssertionError("protected directory must not be entered")
+            return original_scandir(path)  # type: ignore[arg-type]
+
+        with (
+            mock.patch.object(Path, "open", new=guarded_open),
+            mock.patch.object(project_guard.os, "scandir", new=guarded_scandir),
+        ):
+            security_files = list(project_guard.iter_security_files(self.project.root))
+            python_files = project_guard.project_python_files(self.project.root)
+            h203 = project_guard.check_h203(context)
+            h305 = project_guard.check_h305(context)
+            h401 = project_guard.check_h401(context)
+
+        self.assertNotIn(protected_file, security_files)
+        self.assertIn(normal_file, security_files)
+        self.assertIn(visible_file, security_files)
+        self.assertIn(nested_file, security_files)
+        self.assertNotIn(protected_file, python_files)
+        self.assertIn(normal_file, python_files)
+        self.assertIn(visible_file, python_files)
+        self.assertIn(nested_file, python_files)
+        self.assertEqual(h203.status, project_guard.Status.FAIL)
+        self.assertIn("other log/visible-security.py", h203.evidence)
+        self.assertEqual(h305.status, project_guard.Status.FAIL)
+        self.assertIn("other log/visible-security.py", h305.evidence)
+        self.assertEqual(h401.status, project_guard.Status.PASS, h401.evidence)
+        combined_evidence = "\n".join((h203.evidence, h305.evidence, h401.evidence))
+        self.assertNotIn(project_guard.PROTECTED_WORK_LOG_DIRECTORY, combined_evidence)
+        self.assertNotIn(protected_file.name, combined_evidence)
+        self.assertNotIn(protected_value, combined_evidence)
+        self.assertNotIn(visible_value, combined_evidence)
+
     def test_full_project_guard_does_not_connect_to_network(self) -> None:
         with (
             mock.patch("socket.create_connection", side_effect=AssertionError("network forbidden")) as connection,
@@ -542,6 +700,38 @@ class Eg4ProjectGuardTests(unittest.TestCase):
         self.assertEqual(result.status, project_guard.Status.FAIL)
 
 
+class Eg5ProjectGuardTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.project = TemporaryProject()
+
+    def tearDown(self) -> None:
+        self.project.close()
+
+    def assert_passed(self, check_id: str) -> None:
+        result = getattr(project_guard, f"check_{check_id.lower().replace('-', '')}")(
+            self.project.context()
+        )
+        self.assertEqual(result.status, project_guard.Status.PASS, result.evidence)
+
+    def test_h702_approved_three_places_and_stage_path(self) -> None:
+        self.assert_passed("H-702")
+
+    def test_h704_failure_isolation_and_zero_retries(self) -> None:
+        self.assert_passed("H-704")
+
+    def test_h705_round_summary_consistency(self) -> None:
+        self.assert_passed("H-705")
+
+    def test_h702_fails_for_changed_allowlist(self) -> None:
+        with mock.patch.object(
+            project_guard.eg5_cli,
+            "EG5_AREA_CODES",
+            ("POI019", "POI013", "POI072"),
+        ):
+            result = project_guard.check_h702(self.project.context())
+        self.assertEqual(result.status, project_guard.Status.FAIL)
+
+
 class RegistryAndExitCodeTests(unittest.TestCase):
     def test_all_45_ids_are_unique_and_in_spec_order(self) -> None:
         registry = [item.check_id for item in project_guard.CHECK_DEFINITIONS]
@@ -553,11 +743,14 @@ class RegistryAndExitCodeTests(unittest.TestCase):
     def test_expected_current_counts(self) -> None:
         results = project_guard.run_project_guard(ROOT)
         counts = Counter(item.status for item in results)
-        self.assertEqual(counts[project_guard.Status.PASS], 35)
         self.assertEqual(counts[project_guard.Status.FAIL], 0)
         self.assertEqual(counts[project_guard.Status.WARN], 0)
-        self.assertEqual(counts[project_guard.Status.SKIP], 10)
         self.assertEqual(len(results), 45)
+        self.assertEqual(sum(counts.values()), 45)
+        status_by_id = {item.check_id: item.status for item in results}
+        for check_id in ("H-702", "H-704", "H-705"):
+            self.assertEqual(status_by_id[check_id], project_guard.Status.PASS)
+        self.assertEqual(status_by_id["H-707"], project_guard.Status.SKIP)
 
     def test_exit_code_zero_for_success(self) -> None:
         result = project_guard.make_result("H-404", project_guard.Status.PASS, "success")
