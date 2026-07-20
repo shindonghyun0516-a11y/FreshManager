@@ -1,11 +1,11 @@
 # Security Rules
 
 - 문서 상태: Draft
-- 버전: v0.1.0
+- 버전: v0.1.1
 - 작성자: 신동현
 - 최종 승인자: 신동현
 - 최초 작성일: 2026-07-17
-- 최종 수정일: 2026-07-17
+- 최종 수정일: 2026-07-20
 - 적용 프로젝트: Freshmanager Data PoC
 - 관련 문서:
   - `AGENTS.md`
@@ -197,6 +197,10 @@ git status --short --ignored
 
 코드는 URL 출력 전에 인증키를 마스킹해야 한다.
 
+HTTP Adapter는 자동 Redirect를 거부하고 인증키가 Redirect 대상에 전달되지 않게
+한다. Request 객체, 원래 인증 URL과 Redirect 대상 URL을 출력하거나 예외에 포함하지
+않으며, 실제 Transport는 명시적으로 주입된 경우에만 사용할 수 있다.
+
 ---
 
 ## 8. 로그 보안
@@ -211,7 +215,6 @@ git status --short --ignored
 - 수집 상태
 - 오류 유형
 - 원본 파일 경로
-- 파서 버전
 - 마스킹된 URL
 
 ### 기록 금지 정보
@@ -230,6 +233,8 @@ git status --short --ignored
 ## 9. 오류 메시지 보안
 
 예외 메시지에 API 키가 포함되지 않도록 한다.
+`HTTPError`와 `URLError`의 원문 문자열이나 traceback을 그대로 외부에 노출하지 않고,
+인증정보가 없는 고정 오류 메시지로 변환한다.
 
 피해야 할 예:
 
@@ -545,4 +550,5 @@ git diff --cached
 
 | 버전 | 날짜 | 변경내용 | 작성자 | 승인상태 |
 |---|---|---|---|---|
+| v0.1.1 | 2026-07-20 | HTTP Adapter의 Transport 주입, Redirect 거부, 인증 URL·네트워크 예외 비노출 규칙 반영 | 신동현 | PM 검토 전 |
 | v0.1.0 | 2026-07-17 | 최초 초안 작성 | 신동현 | Draft |

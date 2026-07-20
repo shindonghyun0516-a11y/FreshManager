@@ -436,16 +436,18 @@ POI072_20260716_200000.json
 1인 PoC에서는 다음 최소 메타데이터를 사용한다.
 
 - request_id
+- area_code
 - endpoint_name
 - requested_at
+- received_at
 - http_status
-- area_code
 - collection_status
 - raw_file_path
-- parser_version
 
 `endpoint_name`에는 실제 URL이 아니라 `citydata_ppltn`과 같은 논리적 이름을 저장한다.
 `raw_file_path`에는 원본 JSON 내용이 아니라 저장된 원본 파일 경로를 기록한다.
+`parser_version`은 최소 수집 메타데이터에 포함하지 않으며,
+정규화·분석 데이터 저장 구현 시 별도 검토한다.
 
 필요성이 확인되지 않은 메타데이터를 임의로 추가하지 않는다.
 

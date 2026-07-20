@@ -5,6 +5,7 @@ import csv
 import hashlib
 import io
 import json
+import socket
 import shutil
 import tempfile
 import unittest
@@ -423,11 +424,75 @@ class SecurityAndOfflineTests(unittest.TestCase):
         self.assertNotIn(env_path, selected)
 
     def test_full_project_guard_does_not_connect_to_network(self) -> None:
-        with mock.patch("socket.create_connection", side_effect=AssertionError("network forbidden")) as connection:
+        with (
+            mock.patch("socket.create_connection", side_effect=AssertionError("network forbidden")) as connection,
+            mock.patch.object(socket.socket, "connect", side_effect=AssertionError("network forbidden")) as socket_connect,
+            mock.patch("socket.getaddrinfo", side_effect=AssertionError("network forbidden")) as getaddrinfo,
+            mock.patch(
+                "freshmanager.http_adapter.UrllibTransport.open",
+                side_effect=AssertionError("HTTP forbidden"),
+            ) as transport_open,
+        ):
             results = project_guard.run_project_guard(ROOT)
         connection.assert_not_called()
+        socket_connect.assert_not_called()
+        getaddrinfo.assert_not_called()
+        transport_open.assert_not_called()
         result = next(item for item in results if item.check_id == "H-305")
         self.assertEqual(result.status, project_guard.Status.PASS, result.evidence)
+
+    def test_h305_allows_network_code_only_in_approved_transport(self) -> None:
+        path = self.project.root / project_guard.APPROVED_NETWORK_ADAPTER_PATH
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            "import urllib.request\n"
+            "class UrllibTransport:\n"
+            "    def open(self, request):\n"
+            "        return urllib.request.urlopen(request)\n",
+            encoding="utf-8",
+        )
+        result = project_guard.check_h305(self.project.context())
+        self.assertEqual(result.status, project_guard.Status.PASS, result.evidence)
+
+    def test_h305_rejects_network_code_in_other_product_module(self) -> None:
+        path = self.project.root / "freshmanager/other.py"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("import urllib.request\n", encoding="utf-8")
+        result = project_guard.check_h305(self.project.context())
+        self.assertEqual(result.status, project_guard.Status.FAIL)
+
+    def test_h305_rejects_network_code_in_scripts_and_tests(self) -> None:
+        for relative_path in ["scripts/network_task.py", "tests/test_network.py"]:
+            with self.subTest(relative_path=relative_path):
+                project = TemporaryProject()
+                try:
+                    path = project.root / relative_path
+                    path.parent.mkdir(parents=True, exist_ok=True)
+                    path.write_text("import urllib.request\n", encoding="utf-8")
+                    result = project_guard.check_h305(project.context())
+                    self.assertEqual(result.status, project_guard.Status.FAIL)
+                finally:
+                    project.close()
+
+    def test_h305_rejects_adapter_module_level_network_execution(self) -> None:
+        path = self.project.root / project_guard.APPROVED_NETWORK_ADAPTER_PATH
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            "import urllib.request\n"
+            "urllib.request.urlopen('redacted')\n",
+            encoding="utf-8",
+        )
+        result = project_guard.check_h305(self.project.context())
+        self.assertEqual(result.status, project_guard.Status.FAIL)
+
+    def test_h205_adapter_error_hides_key_and_url(self) -> None:
+        result = project_guard.check_h205(self.project.context())
+        self.assertEqual(result.status, project_guard.Status.PASS, result.evidence)
+
+    def test_h003_uses_received_at_metadata_contract(self) -> None:
+        self.assertEqual(project_guard.METADATA_FIELDS, list(project_guard.EG4_METADATA_FIELDS))
+        self.assertIn("received_at", project_guard.METADATA_FIELDS)
+        self.assertNotIn("parser_version", project_guard.METADATA_FIELDS)
 
 
 class Eg4ProjectGuardTests(unittest.TestCase):

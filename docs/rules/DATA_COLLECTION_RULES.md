@@ -1,11 +1,11 @@
 # Data Collection Rules
 
 - 문서 상태: Draft
-- 버전: v0.1.0
+- 버전: v0.1.1
 - 작성자: 신동현
 - 최종 승인자: 신동현
 - 최초 작성일: 2026-07-17
-- 최종 수정일: 2026-07-17
+- 최종 수정일: 2026-07-20
 - 적용 프로젝트: Freshmanager Data PoC
 - 관련 문서:
   - `AGENTS.md`
@@ -235,7 +235,7 @@ Asia/Seoul
 | 시간필드 | 의미 |
 |---|---|
 | `requested_at` | 수집기가 API 요청을 시작한 시각 |
-| `received_at` | API 응답 수신을 완료한 시각. v0.1 필수 메타데이터가 아닌 선택 제안 |
+| `received_at` | API 응답 수신 또는 요청 실패를 확인한 필수 수집 메타데이터 시각 |
 | `population_reference_time` | 현재 인구값이 기준으로 하는 시각 |
 | `forecast_snapshot_time` | 예측 묶음을 수집해 보존한 시각 |
 | `forecast_target_time` | 예측값이 가리키는 미래 대상시각 |
@@ -361,9 +361,13 @@ collection_logs
 현재 인구 데이터에는 다음 메타데이터를 연결한다.
 
 - `request_id`
+- `area_code`
+- `endpoint_name`
 - `requested_at`
+- `received_at`
+- `http_status`
+- `collection_status`
 - `raw_file_path`
-- `parser_version`
 
 권장 식별 조합:
 
@@ -490,19 +494,22 @@ parse_error → 0
 | 필드 | 의미 |
 |---|---|
 | `request_id` | 요청 고유번호 |
+| `area_code` | 공식 CSV의 장소코드 |
 | `endpoint_name` | 논리적 API 이름 |
 | `requested_at` | 요청시각 |
+| `received_at` | 응답 수신 또는 요청 실패 확인시각 |
 | `http_status` | HTTP 상태 |
-| `area_code` | 장소코드 |
 | `collection_status` | 수집 결과 상태 |
 | `raw_file_path` | 원본 JSON 경로 |
-| `parser_version` | 파서 버전 |
 
 `raw_payload`는 수집 메타데이터가 아니라 원본 응답이며,
 메타데이터의 `raw_file_path`로 저장 위치를 추적한다.
 
-`received_at`, `error_type`, `error_message`는 v0.1 필수 메타데이터에
-포함하지 않는다. 필요성이 확인되면 선택 필드로 별도 제안하고 PM 승인을 받는다.
+`parser_version`은 최소 수집 메타데이터에 포함하지 않는다. 정규화·분석 데이터
+파일 저장이 구현되는 시점에 파서 추적 필드로 별도 검토한다.
+
+`error_type`, `error_message`는 필수 메타데이터에 포함하지 않는다. 필요성이
+확인되면 선택 필드로 별도 제안하고 PM 승인을 받는다.
 
 필요성이 확인되지 않은 메타데이터를 임의로 추가하지 않는다.
 
@@ -750,4 +757,5 @@ retry_count = 0
 
 | 버전 | 날짜 | 변경내용 | 작성자 | 승인상태 |
 |---|---|---|---|---|
+| v0.1.1 | 2026-07-20 | received_at 포함 공식 8개 수집 메타데이터 계약 및 HTTP Adapter 오프라인 실행 경계 반영 | 신동현 | PM 검토 전 |
 | v0.1.0 | 2026-07-17 | 최초 초안 작성 | 신동현 | Draft |
