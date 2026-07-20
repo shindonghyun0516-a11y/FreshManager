@@ -5,8 +5,10 @@ import csv
 import hashlib
 import io
 import json
+import os
 import socket
 import shutil
+import subprocess
 import tempfile
 import unittest
 from collections import Counter
@@ -115,6 +117,62 @@ class TemporaryProject:
             csv_hash_before=file_hash(self.csv_path),
             json_hash_before=file_hash(self.json_path),
         )
+
+    def close(self) -> None:
+        self._temporary.cleanup()
+
+
+class TemporaryGitProject:
+    """Synthetic Git repository for H-206; it never uses real protected entries."""
+
+    def __init__(self) -> None:
+        self._temporary = tempfile.TemporaryDirectory(prefix="freshmanager-h206-")
+        self.root = Path(self._temporary.name)
+        self.run("init", "-q")
+        self.run("config", "user.name", "FreshManager Test")
+        self.run("config", "user.email", "freshmanager-test@example.invalid")
+        (self.root / ".gitignore").write_text(
+            f"/{project_guard.PROTECTED_WORK_LOG_DIRECTORY}/\n",
+            encoding="utf-8",
+        )
+        self.run("add", ".gitignore")
+        self.run("commit", "-q", "-m", "synthetic baseline")
+
+    def run(self, *arguments: str, check: bool = True) -> subprocess.CompletedProcess[bytes]:
+        result = subprocess.run(
+            ["git", *arguments],
+            cwd=self.root,
+            check=False,
+            capture_output=True,
+        )
+        if check and result.returncode != 0:
+            raise AssertionError("synthetic Git command failed; output intentionally hidden")
+        return result
+
+    def context(self) -> project_guard.ProjectGuardContext:
+        return project_guard.ProjectGuardContext(
+            root=self.root,
+            csv_hash_before=None,
+            json_hash_before=None,
+        )
+
+    def head(self) -> str:
+        return self.run("rev-parse", "HEAD").stdout.decode("ascii").strip()
+
+    def create_protected_file(self) -> Path:
+        protected_root = self.root / project_guard.PROTECTED_WORK_LOG_DIRECTORY
+        protected_root.mkdir(exist_ok=True)
+        synthetic_file = protected_root / "synthetic-entry.txt"
+        synthetic_file.write_text("synthetic only\n", encoding="utf-8")
+        return synthetic_file
+
+    def commit_protected_file(self) -> None:
+        self.create_protected_file()
+        self.run("add", "-f", "--", project_guard.PROTECTED_WORK_LOG_DIRECTORY)
+        self.run("commit", "-q", "-m", "synthetic protected entry")
+
+    def remove_protected_directory(self) -> None:
+        shutil.rmtree(self.root / project_guard.PROTECTED_WORK_LOG_DIRECTORY)
 
     def close(self) -> None:
         self._temporary.cleanup()
@@ -653,6 +711,242 @@ class SecurityAndOfflineTests(unittest.TestCase):
         self.assertNotIn("parser_version", project_guard.METADATA_FIELDS)
 
 
+class H206ProtectedWorkLogTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.repository = TemporaryGitProject()
+
+    def tearDown(self) -> None:
+        self.repository.close()
+
+    def check_h206(self) -> project_guard.CheckResult:
+        with mock.patch.dict(
+            os.environ,
+            {
+                project_guard.PROTECTED_GIT_BASE_ENV: "",
+                project_guard.PROTECTED_GIT_HEAD_ENV: "",
+            },
+        ):
+            return project_guard.check_h206(self.repository.context())
+
+    def write_ignore_rules(self, *rules: str) -> None:
+        (self.repository.root / ".gitignore").write_text(
+            "\n".join(rules) + "\n",
+            encoding="utf-8",
+        )
+
+    def test_absent_protected_directory_passes(self) -> None:
+        result = self.check_h206()
+        self.assertEqual(result.status, project_guard.Status.PASS, result.evidence)
+
+    def test_recreated_protected_directory_fails(self) -> None:
+        (self.repository.root / project_guard.PROTECTED_WORK_LOG_DIRECTORY).mkdir()
+        result = self.check_h206()
+        self.assertEqual(result.status, project_guard.Status.FAIL)
+
+    def test_untracked_protected_entry_fails(self) -> None:
+        self.repository.create_protected_file()
+        result = self.check_h206()
+        self.assertEqual(result.status, project_guard.Status.FAIL)
+
+    def test_tracked_protected_entry_fails(self) -> None:
+        self.repository.commit_protected_file()
+        result = self.check_h206()
+        self.assertEqual(result.status, project_guard.Status.FAIL)
+
+    def test_staged_protected_entry_fails_even_when_directory_is_absent(self) -> None:
+        synthetic_file = self.repository.create_protected_file()
+        self.repository.run("add", "-f", "--", project_guard.PROTECTED_WORK_LOG_DIRECTORY)
+        synthetic_file.unlink()
+        synthetic_file.parent.rmdir()
+        result = self.check_h206()
+        self.assertEqual(result.status, project_guard.Status.FAIL)
+        self.assertIn("Stage", result.evidence)
+
+    def test_approved_unstaged_removal_transition_passes(self) -> None:
+        self.repository.commit_protected_file()
+        self.repository.remove_protected_directory()
+        result = self.check_h206()
+        self.assertEqual(result.status, project_guard.Status.PASS, result.evidence)
+        self.assertIn("approved_removal_transition", result.evidence)
+
+    def test_base_to_head_deletion_only_transition_passes(self) -> None:
+        self.repository.commit_protected_file()
+        base_sha = self.repository.head()
+        self.repository.remove_protected_directory()
+        self.repository.run("add", "-u", "--", project_guard.PROTECTED_WORK_LOG_DIRECTORY)
+        self.repository.run("commit", "-q", "-m", "synthetic protected removal")
+        head_sha = self.repository.head()
+        with mock.patch.dict(
+            os.environ,
+            {
+                project_guard.PROTECTED_GIT_BASE_ENV: base_sha,
+                project_guard.PROTECTED_GIT_HEAD_ENV: head_sha,
+            },
+        ):
+            result = project_guard.check_h206(self.repository.context())
+        self.assertEqual(result.status, project_guard.Status.PASS, result.evidence)
+        self.assertIn("approved_deletion_only", result.evidence)
+
+    def test_base_to_head_protected_addition_fails(self) -> None:
+        base_sha = self.repository.head()
+        self.repository.commit_protected_file()
+        head_sha = self.repository.head()
+        self.repository.remove_protected_directory()
+        with mock.patch.dict(
+            os.environ,
+            {
+                project_guard.PROTECTED_GIT_BASE_ENV: base_sha,
+                project_guard.PROTECTED_GIT_HEAD_ENV: head_sha,
+            },
+        ):
+            result = project_guard.check_h206(self.repository.context())
+        self.assertEqual(result.status, project_guard.Status.FAIL)
+
+    def test_virtual_probe_is_ignored_without_broad_log_ignore(self) -> None:
+        protected_probe = self.repository.run(
+            "check-ignore",
+            "-q",
+            "--no-index",
+            "--",
+            project_guard.PROTECTED_VIRTUAL_PROBE,
+            check=False,
+        )
+        self.assertEqual(protected_probe.returncode, 0)
+        for probe in project_guard.UNRELATED_IGNORE_PROBES:
+            with self.subTest(probe_kind="unrelated"):
+                unrelated_probe = self.repository.run(
+                    "check-ignore",
+                    "-q",
+                    "--no-index",
+                    "--",
+                    probe,
+                    check=False,
+                )
+                self.assertEqual(unrelated_probe.returncode, 1)
+
+    def test_equivalent_but_non_exact_ignore_rule_fails(self) -> None:
+        (self.repository.root / ".gitignore").write_text(
+            f"/{project_guard.PROTECTED_WORK_LOG_DIRECTORY}/**\n",
+            encoding="utf-8",
+        )
+        result = self.check_h206()
+        self.assertEqual(result.status, project_guard.Status.FAIL)
+
+    def test_broad_ignore_rule_fails(self) -> None:
+        (self.repository.root / ".gitignore").write_text("/work*/\n", encoding="utf-8")
+        result = self.check_h206()
+        self.assertEqual(result.status, project_guard.Status.FAIL)
+
+    def test_exact_rule_plus_broad_rule_fails(self) -> None:
+        self.write_ignore_rules(
+            f"/{project_guard.PROTECTED_WORK_LOG_DIRECTORY}/",
+            "/work*/",
+        )
+        result = self.check_h206()
+        self.assertEqual(result.status, project_guard.Status.FAIL)
+
+    def test_exact_rule_plus_general_log_rule_fails(self) -> None:
+        self.write_ignore_rules(
+            f"/{project_guard.PROTECTED_WORK_LOG_DIRECTORY}/",
+            "/*log*/",
+        )
+        result = self.check_h206()
+        self.assertEqual(result.status, project_guard.Status.FAIL)
+
+    def test_exact_rule_plus_parent_scope_rule_fails(self) -> None:
+        self.write_ignore_rules(
+            f"/{project_guard.PROTECTED_WORK_LOG_DIRECTORY}/",
+            "/*",
+        )
+        result = self.check_h206()
+        self.assertEqual(result.status, project_guard.Status.FAIL)
+
+    def test_missing_protected_rule_fails(self) -> None:
+        self.write_ignore_rules("/project notes/")
+        result = self.check_h206()
+        self.assertEqual(result.status, project_guard.Status.FAIL)
+
+    def test_similar_path_rule_without_exact_rule_fails(self) -> None:
+        self.write_ignore_rules(f"/{project_guard.PROTECTED_WORK_LOG_DIRECTORY}s/")
+        result = self.check_h206()
+        self.assertEqual(result.status, project_guard.Status.FAIL)
+
+    def test_exact_rule_plus_nested_same_name_rule_fails(self) -> None:
+        self.write_ignore_rules(
+            f"/{project_guard.PROTECTED_WORK_LOG_DIRECTORY}/",
+            f"**/{project_guard.PROTECTED_WORK_LOG_DIRECTORY}/",
+        )
+        result = self.check_h206()
+        self.assertEqual(result.status, project_guard.Status.FAIL)
+
+    def test_probe_details_are_not_exposed_on_ignore_failure(self) -> None:
+        self.write_ignore_rules(
+            f"/{project_guard.PROTECTED_WORK_LOG_DIRECTORY}/",
+            "/*",
+        )
+        result = self.check_h206()
+        report = project_guard.format_report([result])
+        self.assertEqual(result.status, project_guard.Status.FAIL)
+        self.assertNotIn(project_guard.PROTECTED_VIRTUAL_PROBE, report)
+        for probe in project_guard.UNRELATED_IGNORE_PROBES:
+            self.assertNotIn(probe, report)
+
+    def test_git_stdout_and_stderr_are_never_exposed(self) -> None:
+        hidden_name = b"synthetic-hidden-name"
+        hidden_error = b"synthetic-hidden-error"
+        unsafe = subprocess.CompletedProcess(
+            args=["git"],
+            returncode=128,
+            stdout=hidden_name,
+            stderr=hidden_error,
+        )
+        with mock.patch.object(project_guard, "run_git_bytes", return_value=unsafe):
+            result = project_guard.check_h206(self.repository.context())
+        report = project_guard.format_report([result])
+        self.assertEqual(result.status, project_guard.Status.FAIL)
+        self.assertNotIn(hidden_name.decode("ascii"), report)
+        self.assertNotIn(hidden_error.decode("ascii"), report)
+
+    def test_h206_does_not_open_read_or_scan_protected_directory(self) -> None:
+        protected_root = self.repository.root / project_guard.PROTECTED_WORK_LOG_DIRECTORY
+        original_open = Path.open
+        original_read_text = Path.read_text
+        original_scandir = project_guard.os.scandir
+
+        def guarded_open(path: Path, *args: object, **kwargs: object) -> object:
+            if path == protected_root or protected_root in path.parents:
+                raise AssertionError("protected open forbidden")
+            return original_open(path, *args, **kwargs)  # type: ignore[arg-type]
+
+        def guarded_read_text(path: Path, *args: object, **kwargs: object) -> str:
+            if path == protected_root or protected_root in path.parents:
+                raise AssertionError("protected read forbidden")
+            return original_read_text(path, *args, **kwargs)  # type: ignore[arg-type]
+
+        def guarded_scandir(path: object) -> object:
+            if Path(path) == protected_root:  # type: ignore[arg-type]
+                raise AssertionError("protected scan forbidden")
+            return original_scandir(path)  # type: ignore[arg-type]
+
+        with (
+            mock.patch.object(Path, "open", new=guarded_open),
+            mock.patch.object(Path, "read_text", new=guarded_read_text),
+            mock.patch.object(project_guard.os, "scandir", new=guarded_scandir),
+        ):
+            result = self.check_h206()
+        self.assertEqual(result.status, project_guard.Status.PASS, result.evidence)
+
+    def test_h206_is_unique_mandatory_and_ci_has_comparison_history(self) -> None:
+        definitions = [item for item in project_guard.CHECK_DEFINITIONS if item.check_id == "H-206"]
+        self.assertEqual(len(definitions), 1)
+        self.assertIsNotNone(definitions[0].runner_name)
+        self.assertIsNone(definitions[0].skip_reason)
+        workflow = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+        self.assertIn("fetch-depth: 0", workflow)
+        self.assertIn(project_guard.PROTECTED_GIT_BASE_ENV, workflow)
+        self.assertIn(project_guard.PROTECTED_GIT_HEAD_ENV, workflow)
+
+
 class Eg4ProjectGuardTests(unittest.TestCase):
     def setUp(self) -> None:
         self.project = TemporaryProject()
@@ -733,11 +1027,11 @@ class Eg5ProjectGuardTests(unittest.TestCase):
 
 
 class RegistryAndExitCodeTests(unittest.TestCase):
-    def test_all_45_ids_are_unique_and_in_spec_order(self) -> None:
+    def test_all_46_ids_are_unique_and_in_spec_order(self) -> None:
         registry = [item.check_id for item in project_guard.CHECK_DEFINITIONS]
         spec = project_guard.ids_from_spec(ROOT / project_guard.SPEC_RELATIVE_PATH)
-        self.assertEqual(len(registry), 45)
-        self.assertEqual(len(set(registry)), 45)
+        self.assertEqual(len(registry), 46)
+        self.assertEqual(len(set(registry)), 46)
         self.assertEqual(registry, spec)
 
     def test_expected_current_counts(self) -> None:
@@ -745,10 +1039,10 @@ class RegistryAndExitCodeTests(unittest.TestCase):
         counts = Counter(item.status for item in results)
         self.assertEqual(counts[project_guard.Status.FAIL], 0)
         self.assertEqual(counts[project_guard.Status.WARN], 0)
-        self.assertEqual(len(results), 45)
-        self.assertEqual(sum(counts.values()), 45)
+        self.assertEqual(len(results), 46)
+        self.assertEqual(sum(counts.values()), 46)
         status_by_id = {item.check_id: item.status for item in results}
-        for check_id in ("H-702", "H-704", "H-705"):
+        for check_id in ("H-206", "H-702", "H-704", "H-705"):
             self.assertEqual(status_by_id[check_id], project_guard.Status.PASS)
         self.assertEqual(status_by_id["H-707"], project_guard.Status.SKIP)
 

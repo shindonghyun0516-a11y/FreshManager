@@ -20,6 +20,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
         with:
+          fetch-depth: 0
           persist-credentials: false
 
       - name: Set up Python
@@ -28,6 +29,9 @@ jobs:
           python-version: "3.12"
 
       - name: Run Project Guard
+        env:
+          PROJECT_GUARD_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          PROJECT_GUARD_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: python3 scripts/project_guard_check.py
 
       - name: Run unit tests

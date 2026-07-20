@@ -1,11 +1,11 @@
 # Git Workflow
 
 - 문서 상태: Draft
-- 버전: v0.1.1
+- 버전: v0.1.3
 - 작성자: 신동현
 - 최종 승인자: 신동현
 - 최초 작성일: 2026-07-17
-- 최종 수정일: 2026-07-20
+- 최종 수정일: 2026-07-21
 - 적용 프로젝트: Freshmanager Data PoC
 - 관련 문서:
   - `AGENTS.md`
@@ -262,47 +262,65 @@ donghyun
 
 작업 시작 전 다음 순서로 확인한다.
 
-1. `git status --short --untracked-files=all`
-2. `git branch --show-current`
-3. Stage·추적 파일 변경·미추적 파일 상태 확인
-4. `git switch main`
-5. `git pull --ff-only origin main`
-6. `git status --short --untracked-files=all`
+1. 안전 wrapper가 Git 상태 원문을 캡처하고 승인 파일·범위 밖 변경·보호 상태를
+   Boolean과 개수로 집계한다.
+2. `git branch --show-current`로 Branch를 확인한다.
+3. Stage·추적 파일 변경·미추적 파일 상태의 집계값을 확인한다.
+4. `git switch main`으로 이동한다.
+5. `git pull --ff-only origin main`으로 최신화한다.
+6. 같은 안전 wrapper로 변경 개수와 보호 상태를 다시 확인한다.
 
 작업 시작 전 다음 조건을 모두 확인한다.
 
 - Stage된 변경이 없어야 한다.
 - 추적 파일의 수정·삭제·추가가 없어야 한다.
 - 예상하지 못한 미추적 파일이 없어야 한다.
-- PM이 인지한 보호 대상 미추적 파일은 유지할 수 있다.
-- 보호 대상 미추적 파일은 자동 Stage하지 않는다.
+- 저장소 최상위 `work log/`는 존재하지 않아야 하며 H-206을 통과해야 한다.
 
 다음 중 하나라도 해당하면 Branch 전환과 Pull을 중단한다.
 
 - Stage된 변경이 있음
 - 추적 파일 변경이 있음
 - 예상하지 못한 미추적 파일이 있음
-- 미추적 파일의 보호 대상 여부가 확인되지 않음
-
-PM이 인지한 보호 대상 미추적 파일만 존재하는 경우에는
-Branch 전환과 `main` 최신화를 차단하지 않는다.
+- 폐기한 보호 경로가 재생성됐거나 H-206이 실패함
 
 ```bash
-git status --short --untracked-files=all
 git branch --show-current
 git switch main
 git pull --ff-only origin main
-git status --short --untracked-files=all
 ```
+
+이 코드 블록은 Branch 이동 명령만 제공한다. 이동 전·후 상태 확인은 원시 status를
+직접 출력하지 않고 위 안전 wrapper 절차로 수행한다.
 
 의미:
 
 | 명령 | 의미 |
 |---|---|
-| `git status --short --untracked-files=all` | Stage·추적 파일 변경과 전체 미추적 파일 확인 |
 | `git branch --show-current` | 현재 Branch 확인 |
 | `git switch main` | 기준 브랜치로 이동 |
 | `git pull --ff-only origin main` | 새 Merge Commit 없이 GitHub의 최신 `main`을 로컬에 반영 |
+
+### 8.1.1 폐기한 작업일지 경로 확인
+
+저장소 최상위 `work log/`는 Issue #47 이후 존재·추적을 허용하지 않는다.
+
+- 신규 개인 작업일지는 저장소 밖에서 관리한다.
+- `.gitignore`에는 정확한 `/work log/` 하나만 유지하고 유사·중첩·일반 로그 또는
+  다른 정상 프로젝트 경로를 포함하는 광범위 ignore 규칙을 추가하지 않는다.
+- 내부 파일명·내용·상대경로·크기·해시를 열거하거나 출력하지 않는다.
+- 보호 경로를 대상으로 `ls`, `find`, `rg`, 상세 status 또는 원본 Git 출력을
+  사용하지 않고 H-206의 Boolean·개수 판정을 사용한다.
+- 보호 상태 확인에 사용한 Git stdout·stderr는 메모리에서 캡처한 뒤 폐기하며,
+  원문을 터미널·보고서·대화에 출력하지 않는다.
+- Issue #47의 승인된 제거 작업에서는 모든 기존 항목의 삭제-only Diff만 허용한다.
+- 병합 후 정상 상태에서는 보호 경로의 추적·미추적·Stage·Working Tree 항목이
+  모두 0이어야 한다.
+- 기존 추적 항목 유지 예외와 Legacy 허용 개수는 폐지한다.
+- H-206은 EG-3 이후 `SKIP`할 수 없는 활성 검사이며 Project Guard는 `TOTAL=46`이다.
+- 과거 Commit의 Git 이력은 재작성하지 않는다.
+- PR #48은 Issue #47 해결·전체 검증·PM 승인 전까지 Merge하지 않는다.
+- Issue #47 구현·검증에서는 실제 API 호출과 EG-5 대표 3장소 수집을 수행하지 않는다.
 
 ### 8.2 작업 Branch 생성
 
@@ -416,12 +434,16 @@ work
 
 ### 10.3 Commit 전 확인
 
-```bash
-git status
-git diff
-```
+Commit 전 검토는 일반 승인 파일과 보호 경로를 분리한다.
 
-변경 파일을 선택한다.
+1. Issue에서 승인된 일반 파일 목록을 먼저 고정한다.
+2. 일반 파일은 승인된 경로 하나씩 정확한 개별 pathspec으로만 Diff를 검토한다.
+3. 보호 경로는 개별 Diff 대신 H-206 안전 wrapper로 존재 여부, 변경 개수와
+   deletion-only 여부만 확인한다.
+4. wrapper는 Git stdout·stderr를 캡처하고 Boolean·숫자 결과만 반환해야 한다.
+5. 보호 내부 이름이나 내용이 출력되면 즉시 검토·Stage·Commit을 중단한다.
+
+변경 파일을 선택할 때도 승인된 일반 파일 경로를 개별 지정한다.
 
 ```bash
 git add 파일경로
@@ -430,15 +452,13 @@ git add 파일경로
 여러 파일 예:
 
 ```bash
-git add docs/rules/GIT_WORKFLOW.md AGENTS.md README.md
+git add docs/rules/GIT_WORKFLOW.md
 ```
 
-Commit 대상 확인:
-
-```bash
-git diff --cached --name-only
-git diff --cached
-```
+Stage 후에도 같은 분리 절차를 반복한다. 승인된 일반 파일은 정확한 개별
+pathspec으로만 확인하고, 보호 삭제 전환은 이름 비노출 Boolean·개수와
+deletion-only 여부로만 확인한다. 전체 Stage 목록이나 광범위한 Staged Diff 원문을
+출력하지 않는다.
 
 Commit:
 
@@ -462,7 +482,7 @@ git add docs/rules/GIT_WORKFLOW.md
 
 Commit 또는 Push 전에 다음을 수행한다.
 
-1. `git status`
+1. 안전 wrapper가 캡처한 Stage·추적·미추적·보호 상태의 Boolean·개수 확인
 2. 변경 파일 확인
 3. 범위 밖 변경 여부 확인
 4. Project Guard 실행
@@ -682,8 +702,10 @@ GitHub에서 Merge 후 다음 절차를 수행한다.
 ```bash
 git switch main
 git pull --ff-only origin main
-git status --short --untracked-files=all
 ```
+
+최신화 후 상태는 원시 status를 출력하지 않고 안전 wrapper의 Boolean·개수 집계로
+확인한다.
 
 `main` 반영 후 다음 명령으로 재검증한다.
 
@@ -742,9 +764,10 @@ git fetch --prune
 
 ```bash
 git branch --show-current
-git status --short --untracked-files=all
 git log --oneline -5
 ```
+
+최종 변경 상태와 보호 경로 상태는 안전 wrapper의 Boolean·개수 집계로 별도 확인한다.
 
 정상 상태:
 
@@ -753,7 +776,7 @@ git log --oneline -5
 로컬 main과 origin/main 동기화
 추적 파일 변경 없음
 승인되지 않은 Stage 없음
-PM이 인지한 보호 대상 미추적 파일은 존재할 수 있음
+폐기한 보호 작업일지 경로와 관련 Git 항목 0
 ```
 
 ---
@@ -852,5 +875,7 @@ Git 작업은 다음 조건을 모두 만족해야 완료다.
 
 | 버전 | 날짜 | 변경내용 | 작성자 | 승인상태 |
 |---|---|---|---|---|
+| v0.1.3 | 2026-07-21 | Commit 전 Git 출력을 승인 파일 pathspec과 보호 경로 Boolean·개수 검증으로 분리 | 신동현 | PM 승인 구현 중 |
+| v0.1.2 | 2026-07-21 | 저장소 작업일지 경로 폐기, Legacy 예외 제거와 H-206 안전 검증 정책 반영 | 신동현 | PM 승인 구현 중 |
 | v0.1.1 | 2026-07-20 | PROJECT_STATUS 영향 판정의 Merge 전·후 절차와 책임·완료조건 보완 | 신동현 | Draft |
 | v0.1.0 | 2026-07-17 | 최초 초안 작성 | 신동현 | Draft |

@@ -743,6 +743,17 @@ def check_h202(context: ProjectGuardContext) -> CheckResult:
 SECURITY_SUFFIXES = {".md", ".py", ".json", ".csv", ".txt", ".log", ".example"}
 SKIP_DIRECTORY_NAMES = {".git", "__pycache__", ".pytest_cache", ".mypy_cache"}
 PROTECTED_WORK_LOG_DIRECTORY = "work log"
+PROTECTED_GIT_BASE_ENV = "PROJECT_GUARD_BASE_SHA"
+PROTECTED_GIT_HEAD_ENV = "PROJECT_GUARD_HEAD_SHA"
+PROTECTED_VIRTUAL_PROBE = f"{PROTECTED_WORK_LOG_DIRECTORY}/.project-guard-probe"
+UNRELATED_IGNORE_PROBES = (
+    "project notes/.project-guard-probe",
+    f"{PROTECTED_WORK_LOG_DIRECTORY}s/.project-guard-probe",
+    f"nested/{PROTECTED_WORK_LOG_DIRECTORY}/.project-guard-probe",
+    "audit log/.project-guard-probe",
+    "src/.project-guard-probe",
+)
+FULL_COMMIT_SHA = re.compile(r"[0-9a-fA-F]{40}")
 ENV_ASSIGNMENT = re.compile(r"SEOUL_OPEN_API_KEY\s*=\s*([^\s`'\"<>]+)")
 JSON_SECRET_FIELD = re.compile(
     r"[\"'](?:SEOUL_OPEN_API_KEY|API_KEY|api_key|token|authorization)[\"']\s*:\s*[\"']([^\"']+)[\"']",
@@ -817,6 +828,209 @@ def check_h203(context: ProjectGuardContext) -> CheckResult:
     if findings:
         return failed("H-203", "; ".join(findings), "저장소 문서·코드·테스트·샘플·로그")
     return passed("H-203", "실제 키·인증키 포함 실행 URL 없음(.env 내용 미열람)", "저장소 문서·코드·테스트·샘플·로그")
+
+
+def run_git_bytes(root: Path, arguments: Sequence[str]) -> subprocess.CompletedProcess[bytes] | None:
+    """Run Git without decoding or exposing path-bearing output."""
+
+    try:
+        return subprocess.run(
+            ["git", *arguments],
+            cwd=root,
+            check=False,
+            capture_output=True,
+        )
+    except OSError:
+        return None
+
+
+def git_nul_count(result: subprocess.CompletedProcess[bytes] | None) -> int | None:
+    if result is None or result.returncode != 0:
+        return None
+    return sum(bool(record) for record in result.stdout.split(b"\0"))
+
+
+def protected_ref_count(root: Path, commit_sha: str) -> int | None:
+    return git_nul_count(
+        run_git_bytes(
+            root,
+            ["ls-tree", "-r", "--name-only", "-z", commit_sha, "--", PROTECTED_WORK_LOG_DIRECTORY],
+        )
+    )
+
+
+def protected_diff_count(
+    root: Path,
+    base_sha: str,
+    head_sha: str,
+    diff_filter: str | None = None,
+) -> int | None:
+    arguments = ["diff", "--name-only", "-z"]
+    if diff_filter is not None:
+        arguments.append(f"--diff-filter={diff_filter}")
+    arguments.extend([base_sha, head_sha, "--", PROTECTED_WORK_LOG_DIRECTORY])
+    return git_nul_count(run_git_bytes(root, arguments))
+
+
+def has_exact_protected_ignore_rule(root: Path) -> bool:
+    try:
+        lines = (root / ".gitignore").read_text(encoding="utf-8").splitlines()
+    except (OSError, UnicodeDecodeError):
+        return False
+    active_rules = [
+        line.strip()
+        for line in lines
+        if line.strip() and not line.lstrip().startswith("#")
+    ]
+    return active_rules.count(f"/{PROTECTED_WORK_LOG_DIRECTORY}/") == 1
+
+
+def ignore_probe_matches(root: Path, probe: str) -> bool | None:
+    result = run_git_bytes(
+        root,
+        ["check-ignore", "-q", "--no-index", "--", probe],
+    )
+    if result is None or result.returncode not in (0, 1):
+        return None
+    return result.returncode == 0
+
+
+def check_h206(context: ProjectGuardContext) -> CheckResult:
+    """Validate the retired top-level work-log path without traversing it."""
+
+    protected_root = context.root / PROTECTED_WORK_LOG_DIRECTORY
+    if os.path.lexists(protected_root):
+        return failed(
+            "H-206",
+            "보호 경로가 재생성됨(내부 정보 미열람)",
+            ".gitignore",
+            "Git 메타데이터",
+        )
+    if not has_exact_protected_ignore_rule(context.root):
+        return failed("H-206", "보호 경로의 정확한 ignore 규칙 불일치", ".gitignore", "Git 메타데이터")
+
+    repository = run_git_bytes(context.root, ["rev-parse", "--is-inside-work-tree"])
+    if repository is None or repository.returncode != 0 or repository.stdout.strip() != b"true":
+        return failed("H-206", "안전한 Git 비교 불가", ".gitignore", "Git 메타데이터")
+
+    protected_probe_ignored = ignore_probe_matches(context.root, PROTECTED_VIRTUAL_PROBE)
+    unrelated_probe_results = tuple(
+        ignore_probe_matches(context.root, probe)
+        for probe in UNRELATED_IGNORE_PROBES
+    )
+    if protected_probe_ignored is not True or any(
+        result is not False for result in unrelated_probe_results
+    ):
+        return failed("H-206", "보호 경로 전용 ignore 규칙 불일치", ".gitignore", "Git 메타데이터")
+
+    tracked_count = git_nul_count(
+        run_git_bytes(context.root, ["ls-files", "-z", "--", PROTECTED_WORK_LOG_DIRECTORY])
+    )
+    untracked_count = git_nul_count(
+        run_git_bytes(
+            context.root,
+            ["ls-files", "--others", "-z", "--", PROTECTED_WORK_LOG_DIRECTORY],
+        )
+    )
+    staged_count = git_nul_count(
+        run_git_bytes(
+            context.root,
+            ["diff", "--cached", "--name-only", "-z", "--", PROTECTED_WORK_LOG_DIRECTORY],
+        )
+    )
+    worktree_count = git_nul_count(
+        run_git_bytes(context.root, ["diff", "--name-only", "-z", "--", PROTECTED_WORK_LOG_DIRECTORY])
+    )
+    deleted_count = git_nul_count(
+        run_git_bytes(
+            context.root,
+            ["diff", "--diff-filter=D", "--name-only", "-z", "--", PROTECTED_WORK_LOG_DIRECTORY],
+        )
+    )
+    missing_count = git_nul_count(
+        run_git_bytes(
+            context.root,
+            ["ls-files", "--deleted", "-z", "--", PROTECTED_WORK_LOG_DIRECTORY],
+        )
+    )
+    counts = (
+        tracked_count,
+        untracked_count,
+        staged_count,
+        worktree_count,
+        deleted_count,
+        missing_count,
+    )
+    if any(value is None for value in counts):
+        return failed("H-206", "안전한 Git 비교 불가", ".gitignore", "Git 메타데이터")
+
+    assert tracked_count is not None
+    assert untracked_count is not None
+    assert staged_count is not None
+    assert worktree_count is not None
+    assert deleted_count is not None
+    assert missing_count is not None
+
+    if untracked_count != 0:
+        return failed("H-206", "보호 경로에 미추적 항목이 존재함(개수만 확인)", ".gitignore", "Git 메타데이터")
+    if staged_count != 0:
+        return failed("H-206", "보호 경로가 Stage에 포함됨(개수만 확인)", ".gitignore", "Git 메타데이터")
+
+    if tracked_count == 0 and worktree_count == 0:
+        local_state = "normal"
+    elif (
+        tracked_count > 0
+        and missing_count == tracked_count
+        and worktree_count == tracked_count
+        and deleted_count == tracked_count
+    ):
+        local_state = "approved_removal_transition"
+    else:
+        return failed("H-206", "보호 경로 Git 상태가 허용 계약과 불일치", ".gitignore", "Git 메타데이터")
+
+    base_sha = os.environ.get(PROTECTED_GIT_BASE_ENV, "").strip()
+    head_sha = os.environ.get(PROTECTED_GIT_HEAD_ENV, "").strip()
+    comparison_state = "local_only"
+    if base_sha or head_sha:
+        if not FULL_COMMIT_SHA.fullmatch(base_sha) or not FULL_COMMIT_SHA.fullmatch(head_sha):
+            return failed("H-206", "안전한 Base·Head 비교 불가", ".gitignore", "Git 메타데이터")
+        base_object = run_git_bytes(context.root, ["cat-file", "-e", f"{base_sha}^{{commit}}"])
+        head_object = run_git_bytes(context.root, ["cat-file", "-e", f"{head_sha}^{{commit}}"])
+        if (
+            base_object is None
+            or base_object.returncode != 0
+            or head_object is None
+            or head_object.returncode != 0
+        ):
+            return failed("H-206", "안전한 Base·Head 비교 불가", ".gitignore", "Git 메타데이터")
+        base_count = protected_ref_count(context.root, base_sha)
+        head_count = protected_ref_count(context.root, head_sha)
+        comparison_count = protected_diff_count(context.root, base_sha, head_sha)
+        comparison_deleted_count = protected_diff_count(context.root, base_sha, head_sha, "D")
+        if None in (base_count, head_count, comparison_count, comparison_deleted_count):
+            return failed("H-206", "안전한 Base·Head 비교 불가", ".gitignore", "Git 메타데이터")
+        if comparison_count == 0 and head_count == 0:
+            comparison_state = "clean"
+        elif (
+            base_count is not None
+            and head_count is not None
+            and comparison_count is not None
+            and comparison_deleted_count is not None
+            and base_count > 0
+            and head_count == 0
+            and comparison_count == base_count
+            and comparison_deleted_count == comparison_count
+        ):
+            comparison_state = "approved_deletion_only"
+        else:
+            return failed("H-206", "대상 Commit·PR에 금지된 보호 경로 변경이 포함됨", ".gitignore", "Git 메타데이터")
+
+    return passed(
+        "H-206",
+        f"보호 경로 안전성 확인(state={local_state}, comparison={comparison_state}, exposed_names=0)",
+        ".gitignore",
+        "Git 메타데이터",
+    )
 
 
 class GuardSampleClient:
@@ -1291,7 +1505,7 @@ def check_h402(context: ProjectGuardContext) -> CheckResult:
             str(SPEC_RELATIVE_PATH),
             "scripts/project_guard_check.py",
         )
-    return passed("H-402", "PROJECT_GUARD_SPEC와 registry의 45개 ID·순서가 정확히 일치", str(SPEC_RELATIVE_PATH), "scripts/project_guard_check.py")
+    return passed("H-402", "PROJECT_GUARD_SPEC와 registry의 46개 ID·순서가 정확히 일치", str(SPEC_RELATIVE_PATH), "scripts/project_guard_check.py")
 
 
 def check_h403(context: ProjectGuardContext) -> CheckResult:
@@ -1746,7 +1960,7 @@ RUNNERS: dict[str, Callable[[ProjectGuardContext], CheckResult]] = {
         "H-101", "H-102", "H-103", "H-104", "H-105", "H-106",
         "H-107", "H-108", "H-109", "H-110", "H-111", "H-112",
         "H-201", "H-202", "H-203",
-        "H-204", "H-205",
+        "H-204", "H-205", "H-206",
         "H-301", "H-302", "H-303", "H-304", "H-305",
         "H-401", "H-402", "H-403", "H-404",
         "H-501", "H-502", "H-503", "H-506", "H-701", "H-702", "H-704", "H-705",
@@ -1781,6 +1995,7 @@ CHECK_DEFINITIONS = [
     definition("H-203", "비밀정보 노출 검사", "EG-3 이후"),
     definition("H-204", "최소 .env 로더", "EG-4 이후"),
     definition("H-205", "URL·오류 마스킹", "EG-4 이후"),
+    definition("H-206", "보호 작업일지 경로 안전성", "EG-3 이후"),
     definition("H-301", "샘플 JSON 존재·문법", "EG-2, EG-3 이후"),
     definition("H-302", "샘플 장소·인구 구조", "EG-2, EG-3 이후"),
     definition("H-303", "샘플 미래예측 구조", "EG-2, EG-3 이후"),
@@ -1841,7 +2056,7 @@ def validate_final_results(results: list[CheckResult]) -> CheckResult:
     issues = []
     if ids != expected_ids:
         issues.append("결과 ID 또는 순서 불일치")
-    if len(ids) != 45 or len(set(ids)) != 45:
+    if len(ids) != 46 or len(set(ids)) != 46:
         issues.append(f"결과 수={len(ids)}, 고유={len(set(ids))}")
     if any(result.status not in valid_statuses for result in results):
         issues.append("허용되지 않은 상태값")

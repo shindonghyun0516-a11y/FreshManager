@@ -10,21 +10,21 @@
 - 프로젝트: **프레시매니저 유동판매 추천 서비스 — 데이터 타당성 PoC**
 - 현재 목표: 공개 데이터만으로 여의도 오피스 상권의 유동판매 추천 가능성을 검증
 - `main` 반영 완료: EG-0~EG-3, CI 보강, Codex Engineering Harness P1~P7, EG-4 수집기·HTTP Adapter·단일 실행 CLI와 XML 서비스 오류 분류 보완
-- 공식 진행 Issue: #46
+- 공식 진행 Issue: #47 (Related #46, PR #48)
 - 공식 기준 Branch: `main`
-- 공식 작업 Branch: `feat/issue-46-eg5-representative-3`
+- 공식 작업 Branch: `hardening/issue-47-remove-work-log`
 - 기준 Commit: `b596d85bbe4b4b1898b4846378b978c5ea31e120`
-- 현재 작업: Issue #46 EG-5 대표 3장소 오프라인 구현·검증
+- 현재 작업: Issue #47 저장소 작업일지 경로 폐기와 H-206 hardening
 - 현재 Engineering Gate: EG-5 진행 — EG-4 PASS, 대표 3장소 실제 호출은 미승인·미실행
 - 현재 Codex Engineering Harness 개편 상태: P1~P7 완료
-- 다음 공식 단계: **Issue #46 Diff와 오프라인 검증 결과에 대한 PM 승인**
+- 다음 공식 단계: **Issue #47 보완 결과 안전 읽기 전용 재감사**
 - 실제 서울시 API 호출: Issue #43에서 POI072 정상 JSON 수집 완료; EG-5 세 장소 호출은 미승인·미실행
 - Issue #43: 완료, PM이 EG-4 PASS 확정
 - 절대 주의:
   - API Key Commit 금지
   - 공식 CSV·JSON 임의 수정 금지
   - `git add .` 사용 금지
-  - 승인 범위 밖 작업일지 파일을 Stage하지 않기
+  - 저장소 최상위 `work log/` 재생성·열거·Stage 금지
 
 실제 작업 중 Issue와 Branch는 GitHub의 현재 Issue와
 `git branch --show-current` 결과를 우선한다.
@@ -152,9 +152,8 @@ Issue 생성
 - `git add .`은 사용하지 않는다.
 - 승인된 파일만 경로를 지정해 Stage한다.
 - 미추적 파일은 자동으로 Stage하지 않는다.
-- PM이 인지한 보호 대상 미추적 파일은 유지할 수 있다.
 - 예상하지 못한 미추적 파일은 작업을 중단하고 정체와 범위를 확인한다.
-- 보호 대상 여부가 확인되지 않은 파일을 임의로 삭제하거나 Stage하지 않는다.
+- 폐기한 저장소 작업일지 경로는 H-206으로 존재 여부와 개수만 확인한다.
 - PR의 `Files changed`에 승인되지 않은 파일이 있으면 Merge하지 않는다.
 
 ---
@@ -192,6 +191,7 @@ Issue 생성
 | CI 보강 | 완료 | Issue #16, PR #20, PR 및 main Push 자동검사 검증 완료 |
 | EG-4 | 완료 | Issue #43에서 POI072 실제 정상 JSON과 원본·메타데이터 저장 확인, PM PASS |
 | EG-5 | 진행 | Issue #46 작업 Branch에서 POI019·POI013·POI014 오프라인 구현·검증; 실제 호출 미승인·미실행 |
+| Issue #47 Hardening | 진행 | PR #48 부모 Commit 위 stacked Branch에서 저장소 작업일지 경로 제거·H-206·CI 비교 구현; Merge 미승인 |
 | EG-6 이후 | 미진행 | EG-5 통과와 별도 PM 승인 후 진행 |
 
 > EG-0~EG-2의 상세 완료조건은 저장소 문서와 병합된 Issue·PR을 확인한다.
@@ -430,21 +430,27 @@ python3 -B -m unittest discover -s tests -p "test_*.py" -v
 
 ---
 
-## 8. 현재 Git 상태 주의사항
+## 8. 저장소 작업일지 폐기 상태
 
-로컬에 다음 미추적 파일이 남아 있다.
-
-```text
-work log/project-journal-day03-2026-07-17.md
-work log/project-journal-day04-2026-07-20.md
-```
+저장소 최상위 `work log/`는 Issue #47의 PM 승인에 따라 작업 Branch에서
+전체 제거했다. 내부 파일명과 내용은 문서나 검사 결과에 기록하지 않는다.
 
 처리 원칙:
 
-- 보호 작업일지 처리 범위가 별도로 승인될 때까지 다른 작업에 포함하지 않는다.
-- 두 파일을 읽기·수정·삭제·복사·Stage·Commit하지 않는다.
-- `git add .`을 사용하지 않는다.
-- 보호 작업일지 처리가 명시적으로 승인된 별도 문서 Issue에서만 처리한다.
+- 신규 개인 작업일지는 저장소 밖에서 관리한다.
+- `.gitignore`의 정확한 `/work log/` 규칙 하나로 경로 재생성을 방지하며,
+  유사·중첩·일반 로그 또는 다른 정상 프로젝트 경로를 포함하는 광범위 규칙은 금지한다.
+- 기존 추적 항목을 허용하는 Legacy 예외는 없다.
+- 현재 삭제 전환에서는 부모 Commit의 기존 추적 항목 전부가 이름 비노출 삭제
+  Diff로 남으며, 승인된 후속 Stage와 Commit 뒤 정상 추적 항목 수는 0이 된다.
+- 병합 후에는 디렉터리·추적·미추적·Stage·Working Tree 항목이 모두 0이어야 한다.
+- 보호 내부 파일명·상대경로·내용·크기·해시를 열거하거나 출력하지 않는다.
+- Git stdout·stderr는 캡처 후 원문을 출력하지 않고, 보호 상태는 Boolean과 숫자로만
+  보고한다.
+- H-206은 EG-3 이후 활성 상태로 유지하며 현재 Project Guard는 `TOTAL=46`이다.
+- Git 이력 재작성은 하지 않는다.
+- PR #48은 Issue #47 해결과 전체 회귀검증 전까지 Merge 보류다.
+- Issue #47 구현·검증에서는 실제 API 호출과 EG-5 대표 3장소 수집을 수행하지 않는다.
 
 ---
 
@@ -673,20 +679,23 @@ Branch, 최근 PR과 Git 상태를 확인해줘.
 
 ### 14.1 공식 진행 중인 작업
 
-- 공식 진행 Issue: #46
-- 공식 작업 Branch: `feat/issue-46-eg5-representative-3`
+- 공식 진행 Issue: #47
+- 관련 Issue·PR: Issue #46, Draft PR #48
+- 공식 작업 Branch: `hardening/issue-47-remove-work-log`
+- 부모 Branch: `feat/issue-46-eg5-representative-3`
+- 부모 Commit: `631f206bae8c6bbdbbc4ee8982b32504676bb05f`
 - 기준 `main`: `b596d85bbe4b4b1898b4846378b978c5ea31e120`
-- 현재 작업: EG-5 대표 3장소 오프라인 구현·검증
+- 현재 작업: 저장소 작업일지 경로 폐기, H-206과 CI Base·Head 비교 hardening
 - 실제 서울시 API 호출: Issue #43의 POI072 정상 수집 완료; EG-5 세 장소 호출 미승인·미실행
 
-### 14.2 다음 행동 — Issue #46 검토
+### 14.2 다음 행동 — Issue #47 검토
 
-1. EG-5 대상 테스트와 전체 Unit Tests 확인
-2. Project Guard `TOTAL=45`, `FAIL=0`, `WARN=0`, `EXIT_CODE=0` 확인
-3. `H-702`, `H-704`, `H-705` PASS와 `H-707` SKIP 확인
-4. 승인된 8개 파일의 Diff와 수정 금지 파일 불변 확인
-5. PM의 Diff 및 검증 결과 승인 대기
-6. Commit·Push·PR은 별도 승인 후 진행
+1. H-206 대상 테스트와 전체 Unit Tests 확인
+2. Project Guard `TOTAL=46`, `FAIL=0`, `WARN=0`, `EXIT_CODE=0` 확인
+3. H-206 삭제 전환, Base·Head 삭제-only와 내부 정보 비노출 확인
+4. Issue #47 승인 범위 밖 변경과 삭제가 0인지 확인
+5. PM의 읽기 전용 최종 Diff 감사 승인 대기
+6. Stage·Commit·Push·PR 수정은 별도 승인 후 진행
 
 ### 14.3 다음 제품 Engineering Gate
 
@@ -699,14 +708,14 @@ Branch, 최근 PR과 Git 상태를 확인해줘.
 
 ## 15. 마지막 갱신 정보
 
-- 문서 버전: 1.11
+- 문서 버전: 1.13
 - 마지막 갱신일: 2026-07-21
-- 공식 진행 Issue: #46
+- 공식 진행 Issue: #47 (Related #46, PR #48)
 - 공식 기준 Branch: `main`
 - 기준 Commit: `b596d85bbe4b4b1898b4846378b978c5ea31e120`
-- 공식 작업 Branch: `feat/issue-46-eg5-representative-3`
+- 공식 작업 Branch: `hardening/issue-47-remove-work-log`
 - 현재 Engineering Gate: EG-5 진행 — EG-4 PASS, 대표 3장소 오프라인 구현·검증
-- 현재 단계: Issue #46 승인 범위의 Branch 구현과 로컬 검증
+- 현재 단계: Issue #47 승인 범위의 보호 경로 폐기 구현과 로컬 오프라인 검증
 - 완료된 최근 작업:
   - Issue #28 완료 및 PR #29 Squash and merge 완료
   - Squash Commit `0201eee`
