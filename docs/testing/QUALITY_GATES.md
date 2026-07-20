@@ -56,7 +56,7 @@ EG-0 문서 기준선
 | EG-1 | 통과: 공식 CSV 정비·`main` 반영 및 읽기 전용 재검증 완료 |
 | EG-2 | 통과: 공식 샘플 배치 및 `H-301`~`H-304` PASS |
 | EG-3 | 구현·로컬 검증 완료: 활성 28개 PASS, 후속 17개 SKIP, 종료 코드 0 |
-| EG-4 | 오프라인 수집기·HTTP Adapter Fake 검증 완료: 실제 API 호출 미승인·미실행 |
+| EG-4 | `main`: 오프라인 수집기·HTTP Adapter Fake 검증 완료; Issue #39 작업 Branch: 단일 실행 CLI Fake 검증·PM Diff Review 완료, `main` 미병합; 실제 외부 실행 미승인·미실행; EG-4 전체 미통과·EG-5 진입 전 |
 | EG-5 | 미구현 |
 | EG-6 | 미구현 |
 | EG-7 | 미구현 |
@@ -262,6 +262,14 @@ EG-5 진입 승인을 뜻하지 않는다.
 Issue #34에서는 HTTP Adapter, 명시적 Transport 주입, Redirect 거부와 5 MiB 응답
 상한을 구현하고 Fake Transport로만 검증한다. 실제 실행 CLI, 실제 `.env`·API Key
 사용과 실제 호출은 포함하지 않으며, Issue #34 완료도 EG-4 전체 통과를 뜻하지 않는다.
+
+Issue #39 작업 Branch에서는 `python3 -m freshmanager.live` 실행 CLI가 기존
+수집기·저장소와 명시적으로 주입한 HTTP Adapter를 조립한다. 장소는 `POI072`로 고정하고
+`--execute-live`가 없으면 설정·Transport·Request·출력을 사용하지 않는다.
+Fake Transport와 임시 Dummy `.env`로만 오프라인 검증하며, `--execute-live`는
+PM 외부 실행 승인을 대체하지 않는다. 실제 `.env`·API Key 사용과 실제 호출은
+별도 Issue와 PM 승인 범위다. PM Diff Review를 완료했지만 `main`에는 미병합 상태이고
+실제 외부 실행도 미승인·미실행이므로 Issue #39 구현은 EG-4 전체 통과나 EG-5 진입을 뜻하지 않는다.
 
 ### 다음 단계
 

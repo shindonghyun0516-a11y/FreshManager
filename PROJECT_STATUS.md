@@ -9,14 +9,16 @@
 
 - 프로젝트: **프레시매니저 유동판매 추천 서비스 — 데이터 타당성 PoC**
 - 현재 목표: 공개 데이터만으로 여의도 오피스 상권의 유동판매 추천 가능성을 검증
-- 완료: EG-0, EG-1, EG-2, EG-3, CI 보강, Codex Engineering Harness 구조·용어 개편 P1~P7, EG-4 오프라인 수집기·HTTP Adapter 구현
-- 공식 진행 Issue: 없음
+- `main` 반영 완료: EG-0, EG-1, EG-2, EG-3, CI 보강, Codex Engineering Harness 구조·용어 개편 P1~P7, EG-4 오프라인 수집기·HTTP Adapter Fake 검증
+- 공식 진행 Issue: #39
 - 공식 기준 Branch: `main`
-- 공식 작업 Branch: 없음
-- 현재 Engineering Gate: EG-4 진행 — 수집기·HTTP Adapter 오프라인 검증 완료, 실제 호출 대기
+- 공식 작업 Branch: `feature/issue-39-poi072-execution-cli`
+- 현재 작업: Issue #39 작업 Branch에서 단일 실행 CLI 구현과 Fake 기반 검증·PM Diff Review 완료, `main` 미병합
+- 현재 Engineering Gate: EG-4 진행 — `main` 수집기·HTTP Adapter Fake 검증 완료, Issue #39 작업 Branch CLI Fake 검증 완료, 실제 호출 대기
 - 현재 Codex Engineering Harness 개편 상태: P1~P7 완료
 - 다음 공식 단계: **별도 Issue에서 EG-4 POI072 1회 실제 호출 준비와 외부 실행 승인**
-- 실제 서울시 API 호출: 미승인
+- 실제 서울시 API 호출: 미승인·미실행
+- Issue #39 CLI: PM Diff Review 완료, `main` 미병합
 - 절대 주의:
   - API Key Commit 금지
   - 공식 CSV·JSON 임의 수정 금지
@@ -187,7 +189,7 @@ Issue 생성
 | EG-2 | 완료 | 공식 기준 CSV와 샘플 JSON 반영 |
 | EG-3 | 완료 | Project Guard와 Unit Tests 구현·병합 |
 | CI 보강 | 완료 | Issue #16, PR #20, PR 및 main Push 자동검사 검증 완료 |
-| EG-4 | 진행 | POI072 오프라인 수집기·HTTP Adapter의 Fake 검증 완료, 실제 API 호출 미승인·미실행 |
+| EG-4 | 진행 | `main`: POI072 오프라인 수집기·HTTP Adapter Fake 검증 완료; Issue #39 작업 Branch: 단일 실행 CLI 구현·Fake 검증과 PM Diff Review 완료, `main` 미병합; 실제 API 호출: 미승인·미실행 |
 | EG-5 이후 | 미진행 | EG-4 완료 후 정의 |
 
 > EG-0~EG-2의 상세 완료조건은 저장소 문서와 병합된 Issue·PR을 확인한다.
@@ -321,6 +323,21 @@ OK
 - Project Guard: PASS 35, FAIL 0, WARN 0, SKIP 10, TOTAL 45, EXIT_CODE 0
 - Unit Tests: Ran 107 tests, OK
 - EG-4 전체 통과가 아니며 EG-5 진입 전 상태 유지
+
+### 6.10 POI072 단일 실행 CLI 오프라인 구현 — Issue #39
+
+- `freshmanager/live.py`에 `python3 -m freshmanager.live` 실행 경로 구현
+- 장소코드는 `POI072`로 고정하고 요청은 최대 한 번만 수행
+- 필수 옵션은 `--env-file`, `--output-root`, `--execute-live`이며 Timeout 기본값은 10초
+- `--execute-live` 누락 시 설정·Transport·Request·출력과 네트워크 접근 0회
+- 설정 오류는 `config_error`, `raw_file_path=null`인 공식 8개 메타데이터로 기록
+- Fake Transport와 임시 Dummy `.env`를 사용한 오프라인 검증 완료
+- Project Guard: PASS 35, FAIL 0, WARN 0, SKIP 10, TOTAL 45, EXIT_CODE 0
+- Unit Tests: Ran 120 tests, OK
+- 실제 `.env`와 실제 API Key를 사용하지 않았고 실제 DNS·socket·HTTP 요청 0회
+- 실제 `POI072` 응답은 수집하지 않았으며 PM Diff Review 완료 상태
+- Issue #39 CLI는 작업 Branch에만 있고 `main`에는 아직 병합되지 않음
+- 실제 호출 준비는 완료했지만 EG-4 전체 통과가 아니며 EG-5 진입 전 상태 유지
 
 ---
 
@@ -487,14 +504,15 @@ Python은 이 작업을 외부 패키지 없이 비교적 단순하게 수행할
 ## 11. 다음 공식 단계 — EG-4
 
 EG-4 오프라인 수집기와 HTTP Adapter의 Fake 기반 검증은 `main`에 반영됐다.
-실제 실행 CLI는 없고 서울시 API 호출도 승인되지 않았으며 별도 Issue에서
-준비한다.
+Issue #39 작업 Branch에서 POI072 단일 실행 CLI 조립과 Fake 기반 검증을 완료했지만
+서울시 API 호출은 승인되지 않았으며 별도 외부 실행 승인 후에만 수행한다.
 
 ### 11.1 EG-4를 쉬운 말로 설명하면
 
-현재는 저장된 샘플, Dummy `.env`와 Fake Transport로 네트워크 없는 수집 흐름과
-HTTP Adapter의 Redirect 거부·5 MiB 응답 상한을 검증했다.
-다음 별도 Issue에서는 PM 외부 실행 승인 후 다음을 확인한다.
+현재는 저장된 샘플, Dummy `.env`와 Fake Transport로 네트워크 없는 수집 흐름,
+HTTP Adapter의 Redirect 거부·5 MiB 응답 상한과 실행 CLI 조립을 검증했다.
+Issue #39의 PM Diff Review는 완료됐으며 병합 검증 이후 별도 실제 실행 Issue에서
+PM 외부 실행 승인을 받아 다음을 확인한다.
 
 ```text
 API Key를 로컬에서 안전하게 읽기
@@ -525,8 +543,9 @@ API Key를 로컬에서 안전하게 읽기
 - 알림 기능
 - 사용자 위치 추적
 
-실제 실행 CLI와 POI072 1회 호출은 PR #36의 병합 범위에 포함하지 않았으며
-별도 Issue와 PR로 관리한다.
+실제 실행 CLI와 POI072 1회 호출은 PR #36의 병합 범위에 포함하지 않았다.
+CLI는 Issue #39 작업 Branch에서 오프라인으로 구현·검증하며 실제 호출은 별도 Issue와
+PM 외부 실행 승인으로 관리한다.
 
 ---
 
@@ -636,37 +655,44 @@ Branch, 최근 PR과 Git 상태를 확인해줘.
 
 ### 14.1 공식 진행 중인 작업
 
-- 공식 진행 Issue 없음
-- 공식 작업 Branch 없음
-- EG-3, Codex Engineering Harness P1~P7과 EG-4 수집기·HTTP Adapter 오프라인 검증 완료
+- 공식 진행 Issue: #39
+- 공식 작업 Branch: `feature/issue-39-poi072-execution-cli`
+- `main`: EG-3, Codex Engineering Harness P1~P7과 EG-4 수집기·HTTP Adapter Fake 검증 완료
+- Issue #39 작업 Branch: 단일 실행 CLI 구현·Fake 검증과 PM Diff Review 완료, `main` 미병합
+- 실제 서울시 API 호출: 미승인·미실행
 
-### 14.2 다음 행동 — EG-4 실제 1회 호출 준비
+### 14.2 다음 행동 — Issue #39 Git 절차와 EG-4 실제 1회 호출 준비
 
-1. POI072 1회 실제 호출을 위한 별도 Issue 생성
-2. 실제 실행 CLI와 저장 범위 읽기 전용 분석
-3. PM 범위 승인과 외부 실행 승인 구분
-4. 네트워크 없는 실제 실행 경로 구현과 오프라인 회귀검증
-5. PM 외부 실행 승인
-6. 여의도 `POI072` 1회 실제 호출
-7. 원본·메타데이터·키 비노출 검증
+1. 승인된 파일 Stage
+2. Commit
+3. Push
+4. Pull Request 생성
+5. CI 검증
+6. PM Merge 승인
+7. Merge 후 `main` 재검증
+8. POI072 1회 실제 호출을 위한 별도 Issue 생성
+9. PM 외부 실행 승인
+10. 여의도 `POI072` 1회 실제 호출과 원본·메타데이터·키 비노출 검증
 
 ### 14.3 다음 제품 Engineering Gate
 
 - EG-4: 서울시 API 최초 1회 호출 및 원본 응답 저장
-- 현재 상태: 수집기·HTTP Adapter 오프라인 검증 완료, 실제 호출 별도 Issue 시작 전
-- 실제 서울시 API 호출: 미승인
+- `main` 반영 완료: 수집기·HTTP Adapter Fake 검증
+- Issue #39 작업 Branch: 단일 실행 CLI 구현·Fake 검증과 PM Diff Review 완료, `main` 미병합
+- 실제 외부 실행: 미승인·미실행
+- EG-4 전체 미통과, EG-5 진입 전
 
 ---
 
 ## 15. 마지막 갱신 정보
 
-- 문서 버전: 1.8
+- 문서 버전: 1.9
 - 마지막 갱신일: 2026-07-20
-- 공식 진행 Issue: 없음
+- 공식 진행 Issue: #39
 - 공식 기준 Branch: `main`
-- 공식 작업 Branch: 없음
-- 현재 Engineering Gate: EG-4 진행 — 수집기·HTTP Adapter 오프라인 검증 완료, 실제 호출 대기
-- 현재 단계: Codex Engineering Harness P1~P7과 EG-4 POI072 수집기·HTTP Adapter 오프라인 검증 완료
+- 공식 작업 Branch: `feature/issue-39-poi072-execution-cli`
+- 현재 Engineering Gate: EG-4 진행 — `main` 수집기·HTTP Adapter Fake 검증 완료, Issue #39 작업 Branch CLI Fake 검증 완료, 실제 호출 대기
+- 현재 단계: Issue #39 단일 실행 CLI 구현·Fake 검증과 PM Diff Review 완료, `main` 미병합
 - 완료된 최근 작업:
   - Issue #28 완료 및 PR #29 Squash and merge 완료
   - Squash Commit `0201eee`
@@ -677,6 +703,8 @@ Branch, 최근 PR과 Git 상태를 확인해줘.
   - Issue #34 Closed 및 PR #36 Squash and merge 완료(`b99c9c9`)
   - PR #36 CI와 Merge 후 `main` Push CI 성공
   - HTTP Adapter `main` 반영 및 Project Guard 35개 PASS·Unit Tests 107개 OK
-- 다음 행동: POI072 1회 실제 호출 별도 Issue 생성
-- 다음 공식 단계: EG-4 실제 호출 준비와 PM 외부 실행 승인
-- 실제 서울시 API 호출: 미승인
+  - Issue #39 POI072 단일 실행 CLI 구현과 Fake Transport 기반 오프라인 검증·PM Diff Review 완료(`main` 미병합)
+  - Issue #39 작업 Branch 기준 Project Guard 35개 PASS·Unit Tests 120개 OK
+- 다음 행동: 승인된 파일 Stage → Commit → Push → Pull Request → CI 검증 → PM Merge 승인
+- 다음 공식 단계: Issue #39 병합 검증 후 EG-4 실제 호출 별도 Issue와 PM 외부 실행 승인
+- 실제 서울시 API 호출: 미승인·미실행
