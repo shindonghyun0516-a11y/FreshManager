@@ -7,15 +7,17 @@
 
 현재 목표는 모바일 앱이나 추천 화면을 만드는 것이 아니다.
 
-현재 목표는 서울시 주요 121장소의 데이터를 안정적으로 수집하고,
-장소별·시간대별 인구 변화, 미래 인구예측, 카드소비 기반 소비활동,
-날씨정보를 비교할 수 있는 데이터 기반을 만드는 것이다.
+장기 목표는 서울시 주요 121장소를 공식 후보군으로 유지하면서 장소별·시간대별
+인구 변화, 미래 인구예측, 카드소비 기반 소비활동과 날씨정보를 비교할 수 있는
+데이터 기반을 만드는 것이다. 현재 MVP는 EG-6A에서 확정한 13개 Area 패널이며,
+EG-6B 수집 파이프라인은 구현·오프라인 검증·`main` 병합을 완료했고 실제 단일
+회차 수집과 PM PASS 판정은 아직 남아 있다.
 
 ---
 
 ## 2. 현재 검증 목표
 
-1. 서울시 주요 121장소의 실시간 인구 데이터를 안정적으로 수집할 수 있는가
+1. 현재 13개 Area 패널을 안정적으로 수집하고 후속 필요 시 121개로 확장할 수 있는가
 2. 장소별 현재 인구값과 미래 인구예측값을 모두 저장할 수 있는가
 3. 같은 미래시점에 대한 예측값을 수집시점별로 보존할 수 있는가
 4. 서울시 예측값과 후속 관측값을 비교할 수 있는가
@@ -67,7 +69,7 @@ Codex는 다음 원칙을 지켜야 한다.
 
 ```text
 장기 공식 수집 후보군: 서울시 주요 121장소
-현재 구현 범위: 여의도 1개 Area → 대표 3개 Area → 13개 Area·Spot·S-DoT 패널
+현재 구현 범위: 여의도 1개 Area → 대표 3개 Area → 13개 Area·Spot·S-DoT 패널과 단일 회차 파이프라인
 현재 분석 범위: 유동인구·혼잡·Forecast·S-DoT Feature와 스팟 이동 기회
 후속 검토: 13개 Area 단일·반복 수집과 분석 후 필요 시 121개 Area 확대
 ```
@@ -179,7 +181,8 @@ POI072
 - 유형별 대표 3장소 시험수집
 - 13개 Area·Spot·S-DoT 패널 확정
 - PM 승인 후 13개 Area 단일 수집과 Batch 구조 검증
-- PM 확인용 CSV와 로컬 스프레드시트 자동백업 준비
+- PM 승인 후 13개 Area 단일 회차 실제 수집과 결과 검증
+- 반복수집 전 외장 저장장치 또는 PM 승인 클라우드 폴더 백업 준비
 - PM 승인 후 동일 13개 Area 반복수집 파일럿
 - 시간·장소·Forecast·S-DoT Feature 분석
 - 필요성이 확인된 경우 121개 Area 확대 검토
@@ -231,7 +234,7 @@ EG-0 문서 기준선
 → EG-4 여의도 1장소
 → EG-5 유형별 대표 3장소
 → EG-6A 13개 Area·Spot·S-DoT 패널 확정
-→ EG-6B 13개 Area 단일 수집·Batch·PM 확인용 CSV·로컬 스프레드시트 자동백업
+→ EG-6B 13개 Area 단일 수집·Batch Log·Manifest·SHA-256 검증
 → EG-7 동일 13개 Area 반복수집 파일럿
 → EG-8 시간·장소·Forecast·S-DoT Feature 분석
 → 후속 검토에서 필요 시 121개 Area 확대
@@ -255,8 +258,9 @@ EG-0 문서 기준선
 - EG-4, EG-5, EG-6B와 EG-7에서도 일반 테스트와 승인된 실제 API 실행을 분리한다.
 - 각 게이트 통과 후 다음 구현 단계로 전환하려면 PM 승인을 받는다.
 - EG-6A는 실제 수집 없이 13개 Area·Spot·S-DoT 참조 패널을 확정한다.
-- EG-6B는 같은 13개 Area의 단일 수집과 Batch·PM 확인용 CSV·로컬
-  스프레드시트 자동백업을 검증한다.
+- EG-6B는 같은 13개 Area의 단일 수집과 Batch Log·Manifest·SHA-256 무결성을
+  검증한다. 구현·오프라인 검증·`main` 병합은 완료됐지만 실제 단일 회차 결과와
+  PM PASS 판정 전에는 EG-6B를 통과로 표시하지 않는다.
 - EG-7은 같은 13개 Area의 반복수집 파일럿으로 제한한다.
 - EG-8은 시간·장소·Forecast·S-DoT Feature를 분석하며 실제 판매효과를 분석하지 않는다.
 - 121개 Area 확대는 EG-8 이후 필요성이 확인된 경우 별도 PM 승인을 받아 검토한다.
@@ -513,9 +517,11 @@ POI072_20260716_200000.json
 EG-3에서 Project Guard가 구현된 이후에는 모든 구현 작업 후 현재 게이트에
 적용되는 필수검사를 실행한다.
 
-문서만 수정하는 작업은 구현된 Project Guard 실행 대상이 아니다.
-문서 전용 작업에서는 Python 기반 Project Guard를 새로 만들거나 실행하지 않고
-다음을 확인한다.
+문서 전용 작업에서는 Python 기반 Project Guard를 새로 구현하거나 검사 ID를
+임의로 추가하지 않는다. `AGENTS.md`, `README.md`, `PROJECT_GUARD_SPEC.md`,
+`QUALITY_GATES.md`처럼 기존 H-001~H-004 입력을 바꾸거나 PM이 검증을 요구한 경우에는
+구현된 Project Guard와 승인된 테스트를 실행한다. 그 밖의 순수 문서 작업은 다음
+문서 일관성 검사를 적용한다.
 
 - 코드 블록 정상 종료와 Markdown 제목 구조
 - 프로젝트 목표, 수집 범위, 분석 범위의 일치
@@ -621,7 +627,7 @@ PM이 직접 확인하거나 승인해야 할 내용을 구분한다.
 - Markdown 제목 구조를 확인함
 - `AGENTS.md`와 `README.md`의 핵심 규칙이 일치함
 - 실제 파일 상태와 문서의 완료·미완료 표현이 일치함
-- 구현된 Project Guard 실행 대신 문서 일관성 검사를 수행함
+- 기존 Guard 입력을 바꾼 경우 Project Guard를 실행하고, 모든 문서에서 문서 일관성 검사를 수행함
 - 코드 블록, 제목, 검사 ID, 품질 게이트 순환을 확인함
 - PM 확인사항과 남은 위험을 보고함
 
@@ -629,6 +635,36 @@ PM의 최종 승인 전에는 main 브랜치 병합 또는
 최종 완료 상태로 확정하지 않는다.
 
 ## 24. 코드 및 Project Guard 규칙 문서
+
+### 24.1 새 세션 상태 복원 순서
+
+새 대화나 새 Codex 세션은 다음 순서로 현재 상태를 복원한다.
+
+1. `PROJECT_STATUS.md`
+2. `docs/product/FreshManager_PRD_v1.0.md`
+3. `docs/engineering/FreshManager_TRD_v1.0.md`
+4. `AGENTS.md`
+5. `docs/engineering/CODEX_HARNESS_ARCHITECTURE.md`
+6. `docs/rules/DATA_COLLECTION_RULES.md`
+7. `docs/testing/QUALITY_GATES.md`
+8. `docs/testing/PROJECT_GUARD_SPEC.md`
+9. 현재 GitHub Issue, Branch, `main` HEAD, `git status`와 최근 병합 Pull Request
+
+`PROJECT_STATUS.md`는 빠른 복원 요약이다. 현재 구현 사실은 마지막 단계에서 실제
+`main` 코드·검증 결과·Issue·병합 기록과 대조한다.
+
+기준문서의 역할은 다음과 같다.
+
+| 문서 | 역할 |
+|---|---|
+| `FreshManager_PRD_v1.0.md` | 무엇을 왜 만들며 어떤 결과를 성공으로 볼지 정의하는 공식 제품 기준 |
+| `FreshManager_TRD_v1.0.md` | PRD를 현재 구현·데이터·보안·검증 계약으로 변환하는 공식 기술 기준 |
+| `requirements-definition-freshmanager-poc-v0.4.md` | PRD v1.0 이전의 역사적 요구사항 기준선; 현행 실행 기준으로 사용하지 않음 |
+| `DATA_COLLECTION_RULES.md` | 데이터 수집·보존·결측·반복주기 분야 규칙 |
+| `QUALITY_GATES.md` | EG 단계의 진입·통과와 다음 단계 전환 조건 |
+| `PROJECT_GUARD_SPEC.md` | 검사 ID·상태·종료코드의 유일한 기준 |
+
+### 24.2 코드·검증 작업의 필수 문서
 
 Codex는 코드, 테스트, 설정 또는 Project Guard 작업을 시작하기 전에
 다음 문서를 반드시 읽어야 한다.
@@ -653,6 +689,8 @@ Codex는 코드, 테스트, 설정 또는 Project Guard 작업을 시작하기 �
 
 `GIT_WORKFLOW.md`와 `SECURITY_RULES.md`는 필수 열람 문서로 적용한다.
 두 문서의 Project Guard 자동검사 대상 편입은 EG-3 후속 Issue에서 반영한다.
+
+### 24.3 데이터 작업의 필수 문서
 
 데이터 수집·필드·분석 관련 작업을 시작하기 전에는 다음 문서를 반드시 읽는다.
 
@@ -681,16 +719,22 @@ Codex는 작업 시작 전에 다음을 확인한다.
 
 단, 구현 완료로 보고한 기능에 필요한 검사를 `SKIP`으로 처리하면 안 된다.
 
-문서 간 규칙이 충돌할 경우 다음 우선순위를 적용한다.
+문서 간 규칙이 충돌할 경우 정보의 역할을 구분하고 다음 우선순위를 적용한다.
 
-1. PM의 최신 명시적 지시
-2. `AGENTS.md`
-3. `requirements-definition-freshmanager-poc-v0.4.md`
-4. `docs/rules/CODING_RULES.md`
-5. `docs/testing/PROJECT_GUARD_SPEC.md`
-6. `docs/testing/QUALITY_GATES.md`
-7. `README.md`
-8. 그 밖의 운영 및 참고 문서
+1. PM의 최신 명시적 지시와 승인·금지사항
+2. 현재 `main` 코드와 실제 검증 결과 — 구현 사실
+3. 현재 Issue의 PM 승인 범위와 병합된 Pull Request — 작업 사실
+4. `docs/product/FreshManager_PRD_v1.0.md` — 제품 목적·범위·수용 기준
+5. `docs/engineering/FreshManager_TRD_v1.0.md` — 기술 구조·계약·목표 상태
+6. `docs/rules/DATA_COLLECTION_RULES.md` — 데이터 수집·보관 규칙
+7. `docs/testing/QUALITY_GATES.md` — 단계 진입·통과 기준
+8. `AGENTS.md` — Codex 작업 절차와 금지사항
+9. `PROJECT_STATUS.md` — 빠른 상태 복원 요약
+
+검사 ID·PASS·FAIL·WARN·SKIP·종료코드는 위 일반 순서와 별개로
+`docs/testing/PROJECT_GUARD_SPEC.md`를 유일한 기준으로 사용한다. Git 작업과 보안의
+세부 규칙은 각각 `GIT_WORKFLOW.md`, `SECURITY_RULES.md`를 따른다. README와 역사
+문서는 공식 기준을 요약하거나 근거로 보존할 뿐 상위 기준을 바꾸지 않는다.
 
 충돌을 발견하면 Codex가 임의로 선택하거나 수정하지 않는다.
 

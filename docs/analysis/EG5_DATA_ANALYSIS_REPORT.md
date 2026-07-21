@@ -1,5 +1,11 @@
 # EG-5 대표 3장소 실제 수집 데이터 분석 보고서
 
+> **문서 역할**  이 보고서는 EG-5 실제 대표 3장소 수집 결과의 역사적 분석 증거다.
+> 현재 제품 단계와 다음 실행 승인은
+> [`FreshManager_PRD_v1.0.md`](../product/FreshManager_PRD_v1.0.md),
+> [`FreshManager_TRD_v1.0.md`](../engineering/FreshManager_TRD_v1.0.md)와
+> [`PROJECT_STATUS.md`](../../PROJECT_STATUS.md)를 따른다.
+
 ## 1. 보고서 상태
 
 - 분석 단계: EG-5 Live Collection 결과 분석

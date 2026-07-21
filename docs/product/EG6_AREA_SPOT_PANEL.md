@@ -3,14 +3,20 @@
 ## 1. 문서 상태
 
 - Issue: #51
+- Merge: PR #52 · `289bd18a5b870bc6dfde1ca18febbc48a948b8dc`
 - 패널 버전: `eg6a-v1`
-- 현재 판정: `EG6A_IMPLEMENTED_READY_FOR_DIFF_REVIEW`
+- 현재 판정: `EG6A_COMPLETE_EG6B_IMPLEMENTATION_MERGED`
+- 과거 Diff 승인 이력: `EG6A_IMPLEMENTED_READY_FOR_DIFF_REVIEW` (PR #52 병합 전)
 - 제안 지역: 13개
 - 안전 매핑 승인: 13개
 - PM 결정 대기: 0개
-- 실제 API 호출과 실제 수집: 없음
+- EG-6A 실제 API 호출과 실제 수집: 없음
+- EG-6B 실제 13개 Area 단일 회차: 미실행
 
-이 문서는 EG-6B 구현 전에 Area·Spot·S-DoT 보조 연결의 기준을 고정한다. 13개 제안행은 서로 다른 공식 장소코드와 연결됐으며 서비스 표시명, 실제 수집 Area명과 관계 근거를 분리해 기록한다.
+이 문서는 EG-6B가 사용하는 Area·Spot·S-DoT 보조 연결의 공식 기준이다. 13개
+제안행은 서로 다른 공식 장소코드와 연결됐으며 서비스 표시명, 실제 수집 Area명과
+관계 근거를 분리해 기록한다. EG-6B 파이프라인은 PR #54로 `main`에 병합됐지만
+실제 단일 회차와 PM PASS 판정은 아직 남아 있다.
 
 ## 2. 개념과 해석 한계
 
@@ -83,7 +89,9 @@ PM 원칙에 따라 대표 Spot을 광화문광장 방향으로 정의하고 `PO
 
 13개 서비스 지역마다 위치 후보 1개를 기록한다. 공식 출입구 좌표를 확보하지 않았으므로 전부 `STATION_CENTER_PROXY`이며 `FIELD_VALIDATION_REQUIRED`, `field_verified=false`다. Area 매핑이 승인된 13개 Spot은 `active=true`다.
 
-Spot의 업무적 이유는 후속 출구·보행동선 조사의 출발점을 설명할 뿐 현장 판매 적합성을 확정하지 않는다. EG-6B 전에 공식 출입구 좌표를 확보하거나 현장 적합성을 승인하는 작업은 별도 PM 결정이다.
+Spot의 업무적 이유는 후속 출구·보행동선 조사의 출발점을 설명할 뿐 현장 판매
+적합성을 확정하지 않는다. 공식 출입구 좌표 확보와 현장 적합성 승인은 EG-6B
+파이프라인 구현과 별개인 후속 PM 결정이다.
 
 ## 6. S-DoT 연결 근거 {#sdot-reference}
 
@@ -103,7 +111,8 @@ S-DoT 연결은 `SDOT_COVERAGE_CLASSIFICATION.md`, 설치 위치 파일과 최�
 
 ## 7. EG-6B Batch 참조 계약
 
-이번 Issue에서는 Batch 실행 코드나 반복수집을 구현하지 않는다. 다음 단계가 별도 승인될 경우 사용할 최소 필드는 다음과 같다.
+Issue #53·PR #54의 EG-6B Batch 실행 코드는 이 참조 패널을 입력으로 사용하며
+다음 최소 필드를 구현했다. 반복수집은 구현하지 않았다.
 
 | 필드 | 의미 |
 |---|---|
@@ -118,10 +127,14 @@ S-DoT 연결은 `SDOT_COVERAGE_CLASSIFICATION.md`, 설치 위치 파일과 최�
 | `failure_count` | 실패 Area 수 |
 | `exit_code` | 승인된 Batch 종료코드 |
 
-참조 데이터는 `panel_version`, `panel_order`, `approved`, `active`를 보존한다. 13개 Area는 모두 안전 매핑을 완료했지만, 이 문서와 Diff 검토가 EG-6B 구현·실제 호출 승인을 자동으로 뜻하지 않는다.
+참조 데이터는 `panel_version`, `panel_order`, `approved`, `active`를 보존한다.
+13개 Area는 모두 안전 매핑을 완료했고 EG-6B 구현은 병합됐지만, 그 사실이 실제
+최대 13회 호출이나 EG-6B PASS를 자동으로 뜻하지 않는다.
 
 ## 8. 참조 파일
 
+- `docs/product/FreshManager_PRD_v1.0.md`: 현재 13개 MVP 범위와 제품 수용 기준
+- `docs/engineering/FreshManager_TRD_v1.0.md`: EG-6B 구현·검증·실행 계약
 - `data/reference/eg6_area_panel.csv`: 13개 제안행과 공식 Area 매핑 상태
 - `data/reference/eg6_spot_master.csv`: 서비스 지역별 대표 Spot 후보
 - `data/reference/eg6_sdot_links.csv`: Spot별 최근 활성 S-DoT 보조 연결
@@ -130,6 +143,10 @@ S-DoT 연결은 `SDOT_COVERAGE_CLASSIFICATION.md`, 설치 위치 파일과 최�
 
 ## 9. 범위와 다음 승인
 
-이번 변경은 참조 데이터와 오프라인 검증만 포함한다. 실제 13개 수집, 반복수집, Scheduler, 자동 재시도, S-DoT 실시간 연동, 추천 점수, 머신러닝, 판매량 예측과 UI는 포함하지 않는다.
+EG-6A는 참조 데이터와 오프라인 검증만 포함했다. 이후 EG-6B 구현은 단일 회차
+수집 파이프라인만 추가했으며 실제 13개 수집, 반복수집, Scheduler, 자동 재시도,
+S-DoT 실시간 연동, 추천 점수, 머신러닝, 판매량 예측과 UI는 여전히 포함하지 않는다.
 
-다음 PM 결정은 Issue #51 전체 Diff 검토와 Stage·Commit 승인 여부다. EG-6B 13개 Area 단일 수집 구현과 실제 API 호출은 각각 별도 승인이 필요하다.
+다음 PM 결정은 EG-6B 실제 최대 13회 단일 회차 승인이다. 실행 결과의 Raw·Metadata·
+Collection Log·Manifest·SHA-256과 실패 목록을 검토한 뒤 PM이 EG-6B PASS 또는
+보완을 판정해야 EG-7 진입 여부를 논의할 수 있다.
