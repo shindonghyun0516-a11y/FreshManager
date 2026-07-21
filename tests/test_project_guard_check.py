@@ -1874,6 +1874,68 @@ class Eg6ReferenceProjectGuardTests(unittest.TestCase):
         self.assertEqual(self.check().status, project_guard.Status.FAIL)
 
 
+class Eg6bProjectGuardTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.project = TemporaryProject()
+        for relative_path in (
+            project_guard.CSV_RELATIVE_PATH,
+            project_guard.EG6_AREA_PANEL_RELATIVE_PATH,
+            project_guard.EG6_SPOT_MASTER_RELATIVE_PATH,
+            project_guard.EG6_SDOT_LINKS_RELATIVE_PATH,
+        ):
+            target = self.project.root / relative_path
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(ROOT / relative_path, target)
+
+    def tearDown(self) -> None:
+        self.project.close()
+
+    def check(self) -> project_guard.CheckResult:
+        return project_guard.check_h706(self.project.context())
+
+    def test_h706_thirteen_area_single_collection_contract_passes(self) -> None:
+        result = self.check()
+        self.assertEqual(result.status, project_guard.Status.PASS, result.evidence)
+
+    def test_h706_changed_runtime_order_fails(self) -> None:
+        changed = tuple(reversed(project_guard.eg6b_cli.EG6B_AREA_CODES))
+        with mock.patch.object(project_guard.eg6b_cli, "EG6B_AREA_CODES", changed):
+            result = self.check()
+        self.assertEqual(result.status, project_guard.Status.FAIL)
+
+    def test_h706_missing_elapsed_time_fails(self) -> None:
+        original = project_guard.eg6b_cli._collection_log
+
+        def without_elapsed(**kwargs: object) -> dict[str, object]:
+            document = original(**kwargs)  # type: ignore[arg-type]
+            document.pop("elapsed_seconds")
+            return document
+
+        with mock.patch.object(
+            project_guard.eg6b_cli,
+            "_collection_log",
+            side_effect=without_elapsed,
+        ):
+            result = self.check()
+        self.assertEqual(result.status, project_guard.Status.FAIL)
+
+    def test_h706_nonzero_retry_count_fails(self) -> None:
+        original = project_guard.eg6b_cli._collection_log
+
+        def with_retry(**kwargs: object) -> dict[str, object]:
+            document = original(**kwargs)  # type: ignore[arg-type]
+            document["retry_count"] = 1
+            return document
+
+        with mock.patch.object(
+            project_guard.eg6b_cli,
+            "_collection_log",
+            side_effect=with_retry,
+        ):
+            result = self.check()
+        self.assertEqual(result.status, project_guard.Status.FAIL)
+
+
 class RegistryAndExitCodeTests(unittest.TestCase):
     def test_all_46_ids_are_unique_and_in_spec_order(self) -> None:
         registry = [item.check_id for item in project_guard.CHECK_DEFINITIONS]
@@ -1887,12 +1949,12 @@ class RegistryAndExitCodeTests(unittest.TestCase):
         counts = Counter(item.status for item in results)
         self.assertEqual(counts[project_guard.Status.FAIL], 0)
         self.assertEqual(counts[project_guard.Status.WARN], 0)
-        self.assertEqual(counts[project_guard.Status.PASS], 40)
-        self.assertEqual(counts[project_guard.Status.SKIP], 6)
+        self.assertEqual(counts[project_guard.Status.PASS], 41)
+        self.assertEqual(counts[project_guard.Status.SKIP], 5)
         self.assertEqual(len(results), 46)
         self.assertEqual(sum(counts.values()), 46)
         status_by_id = {item.check_id: item.status for item in results}
-        for check_id in ("H-206", "H-702", "H-703", "H-704", "H-705"):
+        for check_id in ("H-206", "H-702", "H-703", "H-704", "H-705", "H-706"):
             self.assertEqual(status_by_id[check_id], project_guard.Status.PASS)
         self.assertEqual(status_by_id["H-707"], project_guard.Status.SKIP)
 

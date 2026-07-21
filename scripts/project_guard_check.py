@@ -25,7 +25,7 @@ from dataclasses import dataclass, replace
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Callable, Iterable, Sequence
+from typing import Callable, Iterable, Mapping, Sequence
 from zoneinfo import ZoneInfo
 
 
@@ -37,6 +37,7 @@ from freshmanager.collector import METADATA_FIELDS as EG4_METADATA_FIELDS  # noq
 from freshmanager.collector import Collector, HttpResponse  # noqa: E402
 from freshmanager.config import ConfigError, load_api_key, mask_secret  # noqa: E402
 from freshmanager import eg5 as eg5_cli  # noqa: E402
+from freshmanager import eg6b as eg6b_cli  # noqa: E402
 from freshmanager.http_adapter import BASE_URL, SeoulPopulationHttpClient  # noqa: E402
 from freshmanager.offline import run as run_offline  # noqa: E402
 from freshmanager.storage import FileStorage, StorageError  # noqa: E402
@@ -89,6 +90,7 @@ METADATA_FIELDS = list(EG4_METADATA_FIELDS)
 EG4_FIXED_TIME = datetime(2026, 7, 20, 9, 10, 11, tzinfo=ZoneInfo("Asia/Seoul"))
 EG4_DUMMY_KEY = "dummy-key-for-project-guard"
 EG5_DUMMY_KEY = "dummy-key-for-eg5-project-guard"
+EG6B_DUMMY_KEY = "dummy-key-for-eg6b-project-guard"
 EG5_APPROVED_AREA_CODES = ("POI019", "POI013", "POI014")
 EG5_APPROVED_AREA_NAMES = {
     "POI019": "구로디지털단지역",
@@ -1139,6 +1141,19 @@ class Eg5GuardExecution:
     stage_only: bool
 
 
+@dataclass(frozen=True)
+class Eg6bGuardExecution:
+    exit_code: int
+    output: str
+    calls: tuple[str, ...]
+    raw_area_codes: tuple[str, ...]
+    metadata: tuple[dict[str, object], ...]
+    collection_log: dict[str, object]
+    manifest: dict[str, object]
+    manifest_hashes_valid: bool
+    stage_only: bool
+
+
 def synthetic_eg5_payload(area_code: str) -> bytes:
     area_name = EG5_APPROVED_AREA_NAMES[area_code]
     current = {field: "1" for field in CURRENT_POPULATION_FIELDS}
@@ -1223,6 +1238,146 @@ def eg5_summary(output: str) -> dict[str, str]:
     except ValueError:
         return {}
     return dict(line.split("=", 1) for line in lines[start:] if "=" in line)
+
+
+class GuardEg6bTransport:
+    def __init__(self, area_names: Mapping[str, str], failures: set[str] | None = None) -> None:
+        self.area_names = area_names
+        self.failures = failures or set()
+        self.calls: list[str] = []
+
+    def open(self, request: object, timeout_seconds: float) -> GuardEg5Response:
+        del timeout_seconds
+        selector = str(getattr(request, "selector", ""))
+        area_code = selector.rsplit("/", 1)[-1]
+        self.calls.append(area_code)
+        if area_code in self.failures:
+            raise TimeoutError("synthetic timeout detail")
+        return GuardEg5Response(synthetic_population_payload(area_code, self.area_names[area_code]))
+
+
+def synthetic_population_payload(area_code: str, area_name: str) -> bytes:
+    current = {field: "1" for field in CURRENT_POPULATION_FIELDS}
+    current.update(
+        {
+            "AREA_NM": area_name,
+            "AREA_CD": area_code,
+            "AREA_CONGEST_LVL": "보통",
+            "AREA_CONGEST_MSG": "Project Guard 합성 응답",
+            "AREA_PPLTN_MIN": "1000",
+            "AREA_PPLTN_MAX": "1200",
+            "PPLTN_TIME": "2026-07-21 10:00",
+            "FCST_YN": "Y",
+            "FCST_PPLTN": [
+                {
+                    "FCST_TIME": "2026-07-21 11:00",
+                    "FCST_CONGEST_LVL": "보통",
+                    "FCST_PPLTN_MIN": "1100",
+                    "FCST_PPLTN_MAX": "1300",
+                }
+            ],
+        }
+    )
+    return json.dumps(
+        {
+            "SeoulRtd.citydata_ppltn": [current],
+            "RESULT": {
+                "RESULT.CODE": "INFO-000",
+                "RESULT.MESSAGE": "정상 처리되었습니다",
+            },
+        },
+        ensure_ascii=False,
+    ).encode("utf-8")
+
+
+def run_eg6b_guard(
+    context: ProjectGuardContext,
+    failures: set[str] | None = None,
+) -> Eg6bGuardExecution:
+    inspected = inspect_csv(context.csv_path)
+    area_names = {
+        normalized_cell(row, "AREA_CD"): normalized_cell(row, "AREA_NM")
+        for row in inspected.rows
+    }
+    reference_paths = eg6b_cli.ReferencePaths(
+        root=context.root,
+        official_csv=context.csv_path,
+        area_panel=context.root / EG6_AREA_PANEL_RELATIVE_PATH,
+        spot_master=context.root / EG6_SPOT_MASTER_RELATIVE_PATH,
+        sdot_links=context.root / EG6_SDOT_LINKS_RELATIVE_PATH,
+    )
+    with tempfile.TemporaryDirectory(prefix="freshmanager-eg6b-guard-") as temporary:
+        root = Path(temporary)
+        env_path = root / "dummy.env"
+        env_name = "SEOUL_OPEN" + "_API_KEY"
+        env_path.write_text(f"{env_name}={EG6B_DUMMY_KEY}\n", encoding="utf-8")
+        output_root = root / "output"
+        transport = GuardEg6bTransport(area_names, failures)
+        stdout = io.StringIO()
+        with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stdout):
+            exit_code = eg6b_cli.run(
+                [
+                    "--env-file",
+                    str(env_path),
+                    "--output-root",
+                    str(output_root),
+                    "--execute-live",
+                ],
+                transport_factory=lambda: transport,
+                reference_paths=reference_paths,
+            )
+        raw_files = sorted((output_root / eg6b_cli.RAW_OUTPUT_PATH).rglob("*.json"))
+        metadata_files = sorted(
+            (output_root / eg6b_cli.METADATA_OUTPUT_PATH).rglob("*.metadata.json")
+        )
+        log_files = list((output_root / eg6b_cli.BATCH_OUTPUT_PATH).rglob("collection_log.json"))
+        manifest_files = list((output_root / eg6b_cli.BATCH_OUTPUT_PATH).rglob("manifest.json"))
+        created_files = [path for path in output_root.rglob("*") if path.is_file()]
+        stage_only = all(
+            path.relative_to(output_root).parts[:2] == eg6b_cli.STAGE_PATH.parts
+            for path in created_files
+        )
+        collection_log = (
+            json.loads(log_files[0].read_text(encoding="utf-8")) if len(log_files) == 1 else {}
+        )
+        manifest = (
+            json.loads(manifest_files[0].read_text(encoding="utf-8"))
+            if len(manifest_files) == 1
+            else {}
+        )
+        manifest_hashes_valid = False
+        try:
+            references = manifest["reference_files"]
+            artifacts = manifest["artifacts"]
+            reference_valid = all(
+                (context.root / str(item["path"])).is_file()
+                and (context.root / str(item["path"])).stat().st_size == int(item["byte_size"])
+                and sha256_file(context.root / str(item["path"])) == item["sha256"]
+                for item in references
+            )
+            stage_root = output_root / eg6b_cli.STAGE_PATH
+            artifact_valid = all(
+                (stage_root / str(item["relative_path"])).is_file()
+                and (stage_root / str(item["relative_path"])).stat().st_size == int(item["byte_size"])
+                and sha256_file(stage_root / str(item["relative_path"])) == item["sha256"]
+                for item in artifacts
+            )
+            manifest_hashes_valid = bool(references and artifacts and reference_valid and artifact_valid)
+        except (KeyError, TypeError, ValueError, OSError):
+            manifest_hashes_valid = False
+        return Eg6bGuardExecution(
+            exit_code=exit_code,
+            output=stdout.getvalue(),
+            calls=tuple(transport.calls),
+            raw_area_codes=tuple(path.name.split("_", 1)[0] for path in raw_files),
+            metadata=tuple(
+                json.loads(path.read_text(encoding="utf-8")) for path in metadata_files
+            ),
+            collection_log=collection_log,
+            manifest=manifest,
+            manifest_hashes_valid=manifest_hashes_valid,
+            stage_only=stage_only,
+        )
 
 
 class GuardConnectionFailureTransport:
@@ -2201,6 +2356,122 @@ def check_h705(context: ProjectGuardContext) -> CheckResult:
     )
 
 
+def check_h706(context: ProjectGuardContext) -> CheckResult:
+    expected_codes = tuple(eg6b_cli.EG6B_AREA_CODES)
+    try:
+        panel_codes = tuple(
+            normalized_cell(row, "area_code")
+            for row in inspect_csv(context.root / EG6_AREA_PANEL_RELATIVE_PATH).rows
+        )
+    except (OSError, UnicodeDecodeError, csv.Error):
+        return failed(
+            "H-706",
+            "EG-6B 승인 Area 패널 읽기 실패",
+            str(EG6_AREA_PANEL_RELATIVE_PATH),
+        )
+    if expected_codes != panel_codes:
+        return failed(
+            "H-706",
+            "EG-6B 실행 순서와 승인 Area 패널 불일치",
+            "freshmanager/eg6b.py",
+            str(EG6_AREA_PANEL_RELATIVE_PATH),
+        )
+
+    success = run_eg6b_guard(context)
+    failed_code = expected_codes[5]
+    partial = run_eg6b_guard(context, {failed_code})
+
+    def execution_issue(
+        execution: Eg6bGuardExecution,
+        *,
+        expected_exit: int,
+        success_count: int,
+        failure_count: int,
+        failed_codes: list[str],
+    ) -> str | None:
+        log = execution.collection_log
+        if execution.exit_code != expected_exit:
+            return "종료코드 불일치"
+        if execution.calls != expected_codes or any(execution.calls.count(code) != 1 for code in expected_codes):
+            return "대상 순서·중복·누락 또는 호출 수 불일치"
+        if int(log.get("expected_area_count", -1)) != len(expected_codes):
+            return "대상 수 기록 불일치"
+        if int(log.get("attempted_count", -1)) != len(expected_codes):
+            return "시도 수 기록 불일치"
+        if int(log.get("success_count", -1)) != success_count:
+            return "성공 수 기록 불일치"
+        if int(log.get("failure_count", -1)) != failure_count:
+            return "실패 수 기록 불일치"
+        if log.get("failed_area_codes") != failed_codes:
+            return "실패 목록 기록 불일치"
+        if success_count + failure_count != len(expected_codes):
+            return "대상=성공+실패 계약 불일치"
+        if int(log.get("retry_count", -1)) != 0:
+            return "재시도 0회 계약 불일치"
+        elapsed = log.get("elapsed_seconds")
+        if not isinstance(elapsed, (int, float)) or elapsed < 0:
+            return "소요시간 기록 누락 또는 오류"
+        if log.get("collector_version") != eg6b_cli.COLLECTOR_VERSION:
+            return "collector_version 불일치"
+        if log.get("data_version") != eg6b_cli.DATA_VERSION:
+            return "data_version 불일치"
+        metadata_codes = tuple(str(item.get("area_code")) for item in execution.metadata)
+        if (
+            len(execution.metadata) != len(expected_codes)
+            or set(metadata_codes) != set(expected_codes)
+            or any(tuple(item) != tuple(EG4_METADATA_FIELDS) for item in execution.metadata)
+        ):
+            return "요청별 metadata 수·필드·Area 불일치"
+        if not execution.manifest or execution.manifest.get("hash_algorithm") != "sha256":
+            return "Manifest 또는 SHA-256 계약 누락"
+        if not execution.manifest_hashes_valid:
+            return "Manifest가 가리키는 참조·산출물 SHA-256 불일치"
+        if not execution.stage_only:
+            return "EG-6B 전용 단계 밖 산출물 생성"
+        rendered = json.dumps(
+            {
+                "metadata": execution.metadata,
+                "collection_log": log,
+                "manifest": execution.manifest,
+            },
+            ensure_ascii=False,
+        )
+        if EG6B_DUMMY_KEY in execution.output or EG6B_DUMMY_KEY in rendered or BASE_URL in execution.output:
+            return "Dummy Key 또는 인증 URL 노출"
+        return None
+
+    success_issue = execution_issue(
+        success,
+        expected_exit=0,
+        success_count=13,
+        failure_count=0,
+        failed_codes=[],
+    )
+    partial_issue = execution_issue(
+        partial,
+        expected_exit=1,
+        success_count=12,
+        failure_count=1,
+        failed_codes=[failed_code],
+    )
+    if success_issue or partial_issue or len(success.raw_area_codes) != 13 or len(partial.raw_area_codes) != 12:
+        return failed(
+            "H-706",
+            success_issue or partial_issue or "정상·부분실패 원본 수 불일치",
+            "freshmanager/eg6b.py",
+            "가짜 Transport",
+            "임시 출력",
+        )
+    return passed(
+        "H-706",
+        "승인 13개 Area 정상·부분실패 회차의 순서·1회 시도·소요시간·집계·Manifest SHA-256 확인",
+        "freshmanager/eg6b.py",
+        str(EG6_AREA_PANEL_RELATIVE_PATH),
+        "가짜 Transport",
+        "임시 출력",
+    )
+
+
 RUNNERS: dict[str, Callable[[ProjectGuardContext], CheckResult]] = {
     f"check_{check_id.lower().replace('-', '')}": globals()[f"check_{check_id.lower().replace('-', '')}"]
     for check_id in [
@@ -2211,7 +2482,7 @@ RUNNERS: dict[str, Callable[[ProjectGuardContext], CheckResult]] = {
         "H-204", "H-205", "H-206",
         "H-301", "H-302", "H-303", "H-304", "H-305",
         "H-401", "H-402", "H-403", "H-404",
-        "H-501", "H-502", "H-503", "H-506", "H-701", "H-702", "H-703", "H-704", "H-705",
+        "H-501", "H-502", "H-503", "H-506", "H-701", "H-702", "H-703", "H-704", "H-705", "H-706",
     ]
 }
 
@@ -2266,13 +2537,7 @@ CHECK_DEFINITIONS = [
     definition("H-703", "EG-6A 13지역 참조데이터", "EG-6A 이후"),
     definition("H-704", "실패 격리·재시도 제한", "EG-5 이후"),
     definition("H-705", "회차 결과 요약", "EG-5 이후"),
-    definition(
-        "H-706",
-        "EG-6B 13지역 1회 완전성",
-        "EG-6B 이후",
-        False,
-        "EG-6B 13지역 단일 수집 구현 후 적용",
-    ),
+    definition("H-706", "EG-6B 13지역 1회 완전성", "EG-6B 이후"),
     definition(
         "H-707",
         "EG-7 반복주기 승인 준수",
