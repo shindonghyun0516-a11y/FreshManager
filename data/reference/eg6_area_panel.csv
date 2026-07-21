@@ -1,0 +1,14 @@
+panel_version,panel_order,service_area_name,area_code,official_area_name,area_mapping_type,mapping_confidence,sdot_group,approved,active,decision_note
+eg6a-v1,1,구로디지털단지역,POI019,구로디지털단지역,EXACT_AREA_MATCH,HIGH,NO_NEARBY_SDOT,true,true,EG-5 검증 장소 유지
+eg6a-v1,2,가산디지털단지역,POI013,가산디지털단지역,EXACT_AREA_MATCH,HIGH,NO_NEARBY_SDOT,true,true,EG-5 검증 장소 유지
+eg6a-v1,3,강남역,POI014,강남역,EXACT_AREA_MATCH,HIGH,DIRECT_COVERAGE,true,true,EG-5 검증 장소 유지
+eg6a-v1,4,여의도역,POI072,여의도,RELATED_AREA_MATCH,MEDIUM,NO_NEARBY_SDOT,true,true,역 서비스 표시명과 공식 여의도 Area를 분리
+eg6a-v1,5,삼성역,POI001,강남 MICE 관광특구,RELATED_AREA_MATCH,HIGH,NO_NEARBY_SDOT,true,true,삼성동 무역센터·코엑스 중심의 공식 관광특구로 공간 관계 확인
+eg6a-v1,6,선릉역,POI034,선릉역,EXACT_AREA_MATCH,HIGH,NEARBY_SUPPORT,true,true,공식 장소명 정확히 일치
+eg6a-v1,7,역삼역,POI042,역삼역,EXACT_AREA_MATCH,HIGH,NO_NEARBY_SDOT,true,true,공식 장소명 정확히 일치
+eg6a-v1,8,뚝섬역,POI025,뚝섬역,EXACT_AREA_MATCH,HIGH,DIRECT_COVERAGE,true,true,서울시 범위 밖 판교역의 승인 대체 후보
+eg6a-v1,9,광화문역,POI088,광화문광장,RELATED_AREA_MATCH,HIGH,NEARBY_SUPPORT,true,true,대표 Spot을 광화문광장 방향으로 한정해 공식 Area와 연결
+eg6a-v1,10,을지로입구역,POI003,명동 관광특구,RELATED_AREA_MATCH,MEDIUM,NEARBY_SUPPORT,true,true,명동·다동 방향 Spot과 공식 관광특구의 공간 관계를 확인해 연결
+eg6a-v1,11,잠실역,POI119,잠실역,EXACT_AREA_MATCH,HIGH,NEARBY_SUPPORT,true,true,공식 장소명 정확히 일치
+eg6a-v1,12,서울역,POI033,서울역,EXACT_AREA_MATCH,HIGH,NO_NEARBY_SDOT,true,true,공식 장소명 정확히 일치
+eg6a-v1,13,마곡나루역,POI032,서울식물원·마곡나루역,RELATED_AREA_MATCH,HIGH,DIRECT_COVERAGE,true,true,공식 Area명이 마곡나루역을 명시적으로 포함
