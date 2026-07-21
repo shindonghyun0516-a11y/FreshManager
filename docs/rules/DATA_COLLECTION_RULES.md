@@ -103,7 +103,7 @@ POI072
 EG-4 여의도 1장소
 → EG-5 대표 3장소
 → EG-6A 13개 Area·Spot·S-DoT 패널 확정
-→ EG-6B 13개 Area 단일 수집·Batch·PM 확인용 CSV·로컬 스프레드시트 자동백업
+→ EG-6B 13개 Area 단일 수집·Batch Log·Manifest·SHA-256 검증
 → EG-7 동일 13개 Area 반복수집 파일럿
 → EG-8 시간·장소·Forecast·S-DoT Feature 분석
 → 후속 검토에서 필요 시 121개 Area 확대
@@ -127,8 +127,9 @@ EG-5는 세 코드를 위 순서로 각각 최대 1회 처리하고 자동 재�
 별도 PM 승인 아래 실제 수집과 구조 분석을 완료했다.
 
 EG-6A는 실제 수집 없이 13개 Area·Spot·S-DoT 참조 패널을 확정한다. EG-6B는
-같은 13개 Area의 단일 수집, Batch 구조, PM 확인용 CSV와 로컬 스프레드시트
-자동백업을 검증한다. EG-7은 같은 13개 Area 반복수집 파일럿으로 제한하며,
+같은 13개 Area의 단일 수집, Batch Log, Manifest와 SHA-256 무결성을 검증한다.
+PM 확인용 CSV와 로컬·Google Spreadsheet 자동백업은 Issue #53 구현 범위에 포함하지
+않으며 필요하면 별도 PM 승인을 받는다. EG-7은 같은 13개 Area 반복수집 파일럿으로 제한하며,
 EG-8은 시간·장소·Forecast·S-DoT Feature를 분석한다. 현재 MVP 분석 범위는
 유동인구·혼잡·Forecast·S-DoT Feature와 스팟 이동 기회이며 실제 판매효과 분석은
 포함하지 않는다.
@@ -168,6 +169,52 @@ JSON이나 metadata 확장자를 사용하지 않으며 정상 종료와 검사 
 
 저장 probe는 실행 직전의 최소 쓰기 가능성만 확인한다. 실행 중 발생할 수 있는
 디스크 고장·용량 소진이나 모든 파일시스템 경쟁조건을 방지한다고 해석하지 않는다.
+
+### 3.3 EG-6B 단일 회차 저장·무결성 계약
+
+EG-6B는 승인된 `eg6_area_panel.csv`의 `panel_order`에 따라 고정된 13개 Area를
+각각 최대 1회 순차 처리한다. 사용자가 장소코드, 단계명, raw 경로 또는 metadata
+경로를 직접 지정하는 옵션은 제공하지 않는다. 자동 재시도와 반복수집은 포함하지 않는다.
+
+고정 단계 경로:
+
+```text
+<output-root>/stages/eg6b_single_13/data/raw/population/YYYY/MM/DD/
+<output-root>/stages/eg6b_single_13/data/processed/collection_logs/YYYY/MM/DD/
+<output-root>/stages/eg6b_single_13/data/processed/batches/<batch_id>/collection_log.json
+<output-root>/stages/eg6b_single_13/data/processed/batches/<batch_id>/manifest.json
+```
+
+요청별 metadata는 승인된 8개 필드를 유지한다. Batch Collection Log는 최소한 다음을
+별도로 기록한다.
+
+- `collector_version`: EG-6B 실행 코드 계약 버전
+- `data_version`: Batch 산출물 스키마 버전
+- `batch_id`, `panel_version`, `collection_purpose`
+- 대상·시도·성공·실패 수와 실패 장소코드
+- 시작·종료시각과 총 소요시간
+- `retry_count=0`
+- 생성된 raw·metadata 수
+- 장소별 상태와 단계 root 기준 상대경로
+- 종료코드 `0`, `1`, `2`
+
+Manifest는 공식 장소 CSV, EG-6A 참조 CSV 3개와 생성된 raw·metadata·Collection Log의
+파일 크기와 SHA-256을 기록한다. Manifest 자신은 순환 해시를 피하기 위해 자기 항목에
+포함하지 않는다. 참조파일과 이미 저장된 raw·metadata는 다시 읽어 크기와 SHA-256을
+검증하고, Collection Log는 최종 직렬화 bytes의 크기·SHA-256을 Manifest와 대조한 뒤
+같은 bytes를 마지막에 원자적으로 공개한다. 불일치나 최종 공개 실패 시 종료코드 `2`로
+보고하고 기존 정상 산출물을 삭제·이동·덮어쓰지 않는다.
+
+종료코드 계약:
+
+- `0`: 승인 13개 모두 성공하고 Batch 무결성 검증 통과
+- `1`: 단일 회차 완료, 장소별 실패가 하나 이상 있으며 Batch 무결성 검증 통과
+- `2`: 공통 사전검사·설정·저장·보안·참조 또는 Batch 무결성·내부 오류
+
+`api_error`, `timeout`, `parse_error`, `validation_error`는 장소별 실패로 기록하고 다음
+Area를 처리한다. 공통 오류에서는 추가 호출을 중단하되 이미 저장된 결과를 되돌리지 않는다.
+`--execute-live`는 실제 호출 PM 승인을 대체하지 않으며 Issue #53 구현과 일반 검증은
+Fake Transport와 임시 output root만 사용한다.
 
 ---
 
@@ -609,8 +656,8 @@ API가 JSON 형태의 오류를 반환해도 정상 데이터로 처리하지 �
 retry_count = 0
 ```
 
-EG-5 대표 3장소 단일 회차는 `retry_count=0`으로 고정한다. 장소별 실패는 다음
-장소 처리를 막지 않지만 같은 회차에서 실패 장소를 재호출하지 않는다.
+EG-5 대표 3장소와 EG-6B 승인 13개 Area 단일 회차는 `retry_count=0`으로 고정한다.
+장소별 실패는 다음 장소 처리를 막지 않지만 같은 회차에서 실패 장소를 재호출하지 않는다.
 
 재시도는 시험 결과를 본 뒤 PM 승인으로 적용한다.
 
@@ -668,8 +715,9 @@ EG-5 대표 3장소 단일 회차는 `retry_count=0`으로 고정한다. 장소�
 유지하고 백업 작업만 별도로 수행한다. Issue #46은 백업 기능과 반복수집을 구현하지
 않으며 `H-707`은 그 전까지 `SKIP`한다.
 
-EG-6B의 로컬 스프레드시트 자동백업과 위 외장 저장장치·승인 클라우드 백업 Gate는
-서로 다른 목적이다. 반복수집 파일럿에 들어가기 전에는 위 백업 Gate와 다음 결과를
+Issue #53의 EG-6B 단일 수집 구현은 로컬·Google Spreadsheet 자동백업을 포함하지 않는다.
+향후 로컬 스프레드시트 산출물을 추가하더라도 위 외장 저장장치·승인 클라우드 백업
+Gate를 대체하지 않는다. 반복수집 파일럿에 들어가기 전에는 위 백업 Gate와 다음 결과를
 확인한 뒤 EG-7 진입을 PM이 승인한다.
 
 - API 호출한도
@@ -830,6 +878,7 @@ EG-6B의 로컬 스프레드시트 자동백업과 위 외장 저장장치·승�
 
 | 버전 | 날짜 | 변경내용 | 작성자 | 승인상태 |
 |---|---|---|---|---|
+| v0.1.5 | 2026-07-21 | Issue #53 EG-6B 13개 단일 회차의 단계 경로·Batch Log·Manifest·SHA-256·재시도 0회 계약 반영 | 신동현 | PM 구현 승인 |
 | v0.1.4 | 2026-07-21 | EG-6A 13개 패널 전략과 EG-6B·EG-7·EG-8 현행 순서 및 121개 Area 후속 검토 범위 반영 | 신동현 | PM 승인 |
 | v0.1.3 | 2026-07-21 | EG-5 저장 root probe와 공식 CSV 실행 전·후 무결성 검사 및 한계 반영 | 신동현 | PM 승인 |
 | v0.1.2 | 2026-07-21 | EG-4 PASS, EG-5 고정 3장소·단계 경로·재시도 0회·원본 무삭제와 반복수집 전 백업 Gate 반영 | 신동현 | PM 승인 |

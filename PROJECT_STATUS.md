@@ -8,17 +8,17 @@
 ## 0. 30초 요약
 
 - 프로젝트: **프레시매니저 유동판매 추천 서비스 — 데이터 타당성 PoC**
-- 현재 목표: EG-5 실데이터 결과를 바탕으로 반복 관측 후보 13개 지역의 Area·Spot·S-DoT 참조 구조를 확정
-- `main` 반영 완료: EG-0~EG-5, CI 보강, 보호 경로 Hardening, 대표 3장소 수집기와 실제 수집 검증
-- 공식 진행 Issue: #51
+- 현재 목표: EG-6A에서 확정한 13개 Area의 EG-6B 단일 순차수집을 오프라인으로 구현·검증
+- `main` 반영 완료: EG-0~EG-6A, CI 보강, 보호 경로 Hardening, 대표 3장소 실제 수집과 13개 참조 패널
+- 공식 진행 Issue: #53
 - 공식 기준 Branch: `main`
-- 공식 작업 Branch: `feat/issue-51-eg6a-area-spot-panel`
-- 기준 Commit: `92e4512ec3033dd1d5e078966c8c52dd2cfdb54a`
-- 현재 작업: EG-6A 13개 지역 패널·대표 Spot·S-DoT 연결 기준 구현
-- 현재 Engineering Gate: EG-6A 진행 — 서로 다른 공식 Area 13개 매핑 완료, Diff 검토 전
+- 공식 작업 Branch: `feature/issue-53-eg6b-single-collection`
+- 기준 Commit: `289bd18a5b870bc6dfde1ca18febbc48a948b8dc`
+- 현재 작업: 승인 13개 Area 단일 회차 CLI·Batch Log·Manifest·SHA-256 오프라인 구현
+- 현재 Engineering Gate: EG-6B 구현 진행 — 실제 API 호출 전 오프라인 검증 단계
 - 현재 Codex Engineering Harness 개편 상태: P1~P7 완료
-- 다음 공식 단계: **Issue #51 전체 Diff 검토와 Stage·Commit 승인 여부 결정**
-- 실제 서울시 API 호출: EG-4 POI072와 EG-5 대표 3장소 수집 완료; EG-6A에서는 0회
+- 다음 공식 단계: **Issue #53 구현 Diff와 오프라인 검증 결과에 대한 PM 검토**
+- 실제 서울시 API 호출: EG-4 POI072와 EG-5 대표 3장소 수집 완료; EG-6A·EG-6B 구현 중 0회
 - Issue #43: 완료, PM이 EG-4 PASS 확정
 - 절대 주의:
   - API Key Commit 금지
@@ -29,8 +29,9 @@
 실제 작업 중 Issue와 Branch는 GitHub의 현재 Issue와
 `git branch --show-current` 결과를 우선한다.
 
-Issue #43의 POI072와 후속 EG-5 대표 3장소 수집을 완료했다. EG-6A는 기존 결과와
-공식 정적 자료만 사용해 참조데이터를 확정하며 실제 수집을 수행하지 않는다.
+Issue #43의 POI072와 후속 EG-5 대표 3장소 수집을 완료했다. PR #52에서 EG-6A
+13개 Area·Spot·S-DoT 참조데이터를 `main`에 반영했다. Issue #53은 같은 13개 Area의
+단일 수집 기능을 Fake Transport로 구현·검증하며 실제 호출은 별도 PM 승인 전 수행하지 않는다.
 
 ---
 
@@ -192,8 +193,8 @@ Issue 생성
 | EG-4 | 완료 | Issue #43에서 POI072 실제 정상 JSON과 원본·메타데이터 저장 확인, PM PASS |
 | EG-5 | 완료 | POI019·POI013·POI014 실제 수집 3건 성공, 재시도 0회, 데이터 구조·Feature 분석 완료 |
 | Issue #47 Hardening | 완료 | 보호 경로 제거와 H-206·Stacked PR CI 보강을 main에 반영 |
-| EG-6A | 진행 | Issue #51에서 13개 Area·Spot·S-DoT 참조 구현과 서로 다른 공식 Area 13개 매핑 완료; Diff 검토 전 |
-| EG-6B | 미진행 | EG-6A 패널 확정 후 동일 13개 Area 단일 수집 |
+| EG-6A | 완료 | Issue #51·PR #52에서 서로 다른 공식 Area 13개와 Spot·S-DoT 참조 패널을 main에 반영 |
+| EG-6B | 진행 | Issue #53에서 동일 13개 Area 단일 순차수집·Batch Log·Manifest·SHA-256을 오프라인 구현; 실제 호출 미승인 |
 | EG-7 | 미진행 | 주기와 백업 Gate 승인 후 동일 13개 반복수집 파일럿 |
 | EG-8 | 미진행 | 반복 관측 데이터의 Feature 유효성 분석 |
 
@@ -528,20 +529,21 @@ Python은 이 작업을 외부 패키지 없이 비교적 단순하게 수행할
 
 ---
 
-## 11. 현재 공식 단계 — EG-6A
+## 11. 현재 공식 단계 — EG-6B 구현
 
 EG-5에서 POI019·POI013·POI014를 각각 한 번 수집했고 모두 성공했다. 저장된 결과의
 데이터 구조·Feature 후보 분석과 최신 정적 자료 기반 S-DoT 커버리지 조사도 완료했다.
-Issue #51은 그 결과를 다음 단계의 공식 참조데이터로 정리한다.
+Issue #51과 PR #52는 그 결과를 13개 Area·Spot·S-DoT 공식 참조데이터로 정리해
+`main`에 반영했다. Issue #53은 확정한 Area 패널의 단일 회차 수집을 구현한다.
 
-### 11.1 EG-6A를 쉬운 말로 설명하면
+### 11.1 EG-6B를 쉬운 말로 설명하면
 
-서울시 API가 수집하는 `Area`, 프레시매니저가 실제로 이동할 후보인 `Spot`, Spot 주변의
-보조 유동 신호인 `S-DoT Link`를 분리한다. 13개 서비스 지역을 제안하되 공식 121장소와
-안전하게 연결되는 항목만 승인한다. 안전한 매핑이 없는 항목은 빈 장소코드와
-`approved=false`로 남겨 실제 수집 대상에 섞이지 않게 한다.
+승인된 13개 Area를 `panel_order` 순서로 한 번씩만 요청하고, 각 응답 원본과 요청
+metadata를 분리해 저장한다. 한 장소의 API·Timeout·Parsing·Validation 실패는 기록한 뒤
+다음 장소를 계속 처리한다. 회차가 끝나면 Collection Log와 Manifest를 만들고 SHA-256으로
+입력 참조파일과 생성 산출물이 바뀌지 않았는지 확인한다.
 
-### 11.2 현재 패널 판정
+### 11.2 확정 패널과 구현 계약
 
 - 제안 지역: 13개
 - 공식 Area 안전 매핑 승인: 13개
@@ -554,19 +556,28 @@ Issue #51은 그 결과를 다음 단계의 공식 참조데이터로 정리한�
 - 대표 Spot: 지역별 1개, 총 13개
 - Spot 좌표: 공식 출구 좌표가 아니라 역 중심 대리좌표 13개이며 모두 현장 검증 필요
 - S-DoT 분류: 직접 3개, 인근 4개, 미지원 6개
+- 수집 순서: 패널 1번부터 13번까지 고정
+- 장소별 최대 호출: 1회
+- 전체 최대 호출: 13회
+- 자동 재시도: 0회
+- 출력: raw JSON, 요청별 metadata, Collection Log, Manifest
+- 무결성: SHA-256 기록과 저장 후 재검증
+- 종료코드: 모두 성공 `0`, 장소별 실패 존재 `1`, 공통 오류 `2`
 
-### 11.3 EG-6A에서 하지 않는 것
+### 11.3 Issue #53 구현에서 하지 않는 것
 
-- 실제 API 호출 또는 13개 지역 수집
+- 실제 API 호출 또는 실데이터 13개 지역 수집
 - 반복수집·Scheduler·자동 재시도
+- Google Spreadsheet 자동백업
 - S-DoT 실시간 API 연동
 - 추천 점수·머신러닝·판매량 예측
 - UI와 프레시매니저 위치 추적
-- 미확정 Area를 임의 코드로 승인
+- Feature 분석과 실제 판매효과 분석
 
-다음 EG-6B는 PM이 3개 미확정 지역의 유지·대체·공식 Area 연결을 결정해 13개 패널을
-확정한 뒤 진행한다. 반복수집 전에는 외장 저장장치 주기적 복사 또는 PM 승인 클라우드
-폴더 주기적 백업 중 하나를 별도 Gate로 준비하며 수집 실행은 로컬 Python에 유지한다.
+Issue #53 구현과 오프라인 검증이 통과해도 실제 호출을 자동 승인하지 않는다. PM이 Diff,
+테스트, Project Guard 결과를 검토한 뒤 실제 output root·env-file과 최대 13회 호출을 별도로
+승인해야 한다. 반복수집 전에는 외장 저장장치 주기적 복사 또는 PM 승인 클라우드 폴더
+주기적 백업 중 하나를 별도 Gate로 준비하며 수집 실행은 로컬 Python에 유지한다.
 
 ---
 
@@ -676,23 +687,24 @@ Branch, 최근 PR과 Git 상태를 확인해줘.
 
 ### 14.1 공식 진행 중인 작업
 
-- 공식 진행 Issue: #51
-- 공식 작업 Branch: `feat/issue-51-eg6a-area-spot-panel`
-- 기준 `main`: `92e4512ec3033dd1d5e078966c8c52dd2cfdb54a`
-- 현재 작업: 13개 서비스 지역의 공식 Area·대표 Spot·S-DoT Link 기준 구현
-- 실제 API 호출: EG-6A 작업 중 0회
+- 공식 진행 Issue: #53
+- 공식 작업 Branch: `feature/issue-53-eg6b-single-collection`
+- 기준 `main`: `289bd18a5b870bc6dfde1ca18febbc48a948b8dc`
+- 현재 작업: 승인 13개 Area 단일 회차와 Batch 무결성 증거 오프라인 구현
+- 실제 API 호출: Issue #53 구현 중 0회
 
-### 14.2 다음 행동 — Issue #51 검토
+### 14.2 다음 행동 — Issue #53 검토
 
-1. 3개 참조 CSV와 문서·테스트 Diff를 읽기 전용으로 검토
-2. H-703과 전체 Project Guard의 `FAIL=0`, `WARN=0`, `EXIT_CODE=0` 확인
-3. 13개 `area_code`가 공식 CSV에 있고 서로 다른지 확인
-4. 삼성역·광화문역·을지로입구역의 방향 조건과 관련 Area 근거를 확인
+1. 승인된 7개 파일만 변경됐는지 Diff를 읽기 전용으로 검토
+2. EG-6B Target Tests, 전체 Unit Tests와 Project Guard 결과 확인
+3. H-706의 13개 순서·1회 호출·소요시간·성공·실패·Manifest 검증 확인
+4. 비밀정보·실데이터·외부 네트워크 사용이 없는지 확인
 5. 별도 승인 후 Stage·Commit·Push·PR 진행
+6. `main` 반영 후 다시 검증하고 별도 PM 승인으로 실제 최대 13회 호출
 
 ### 14.3 다음 제품 Engineering Gate
 
-- EG-6B: 확정된 13개 Area를 한 회차에서 각각 최대 1회 수집
+- EG-6B: 구현·오프라인 검증 후 별도 승인으로 확정된 13개 Area 단일 수집
 - EG-7: 동일 패널 반복수집 파일럿; 실행 전 주기와 백업 방식 PM 승인 필요
 - EG-8: 반복 관측 결과를 이용한 Feature 유효성 분석
 - 121장소 확대는 위 MVP 검증 이후 후속 범위로 검토
@@ -701,14 +713,14 @@ Branch, 최근 PR과 Git 상태를 확인해줘.
 
 ## 15. 마지막 갱신 정보
 
-- 문서 버전: 1.15
+- 문서 버전: 1.16
 - 마지막 갱신일: 2026-07-21
-- 공식 진행 Issue: #51
+- 공식 진행 Issue: #53
 - 공식 기준 Branch: `main`
-- 기준 Commit: `92e4512ec3033dd1d5e078966c8c52dd2cfdb54a`
-- 공식 작업 Branch: `feat/issue-51-eg6a-area-spot-panel`
-- 현재 Engineering Gate: EG-6A 진행 — 서로 다른 공식 Area 13개 매핑 완료, Diff 검토 전
-- 현재 단계: Area·Spot·S-DoT 참조데이터와 무결성 검사 재검증
+- 기준 Commit: `289bd18a5b870bc6dfde1ca18febbc48a948b8dc`
+- 공식 작업 Branch: `feature/issue-53-eg6b-single-collection`
+- 현재 Engineering Gate: EG-6B 구현 진행 — 실제 호출 전 오프라인 검증
+- 현재 단계: 13개 단일 회차·Batch Log·Manifest·SHA-256 구현과 검증
 - 완료된 최근 작업:
   - Issue #28 완료 및 PR #29 Squash and merge 완료
   - Squash Commit `0201eee`
@@ -729,6 +741,7 @@ Branch, 최근 PR과 Git 상태를 확인해줘.
   - Issue #46·#47과 PR #48·#49 main 반영, 기준 Commit `92e4512e`
   - EG-5 대표 3장소 실제 수집 3건 성공·재시도 0회
   - EG-5 데이터 구조·Feature 분석과 S-DoT 커버리지 조사 완료
-- 다음 행동: Issue #51 전체 Diff와 13개 공식 Area 매핑 근거 검토
-- 다음 공식 단계: 패널 확정 후 EG-6B 13개 Area 단일 수집 구현 승인
-- 실제 서울시 API 호출: EG-6A 작업 중 0회
+  - Issue #51·PR #52로 EG-6A 13개 Area·Spot·S-DoT 참조 패널 main 반영
+- 다음 행동: Issue #53 구현 Diff와 오프라인 검증 결과 검토
+- 다음 공식 단계: Stage·Commit·PR 승인 후 별도 실제 13개 호출 승인
+- 실제 서울시 API 호출: Issue #53 구현 중 0회

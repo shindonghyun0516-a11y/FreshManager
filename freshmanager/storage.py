@@ -70,3 +70,25 @@ class FileStorage:
         payload = (json.dumps(dict(metadata), ensure_ascii=False, indent=2) + "\n").encode("utf-8")
         self._write_exclusive(path, payload)
         return path
+
+
+class BatchStorage:
+    """Write one immutable collection log and manifest for a batch."""
+
+    def __init__(self, batch_directory: Path) -> None:
+        self.batch_directory = batch_directory
+
+    @staticmethod
+    def json_payload(document: Mapping[str, object]) -> bytes:
+        return (json.dumps(dict(document), ensure_ascii=False, indent=2) + "\n").encode("utf-8")
+
+    def _save_json(self, filename: str, document: Mapping[str, object]) -> Path:
+        path = self.batch_directory / filename
+        FileStorage._write_exclusive(path, self.json_payload(document))
+        return path
+
+    def save_collection_log(self, document: Mapping[str, object]) -> Path:
+        return self._save_json("collection_log.json", document)
+
+    def save_manifest(self, document: Mapping[str, object]) -> Path:
+        return self._save_json("manifest.json", document)
