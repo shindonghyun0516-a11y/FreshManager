@@ -44,6 +44,9 @@ from freshmanager.storage import FileStorage, StorageError  # noqa: E402
 CSV_RELATIVE_PATH = Path("data/reference/seoul_121_places.csv")
 JSON_RELATIVE_PATH = Path("data/samples/population_yeouido_sample.json")
 SPEC_RELATIVE_PATH = Path("docs/testing/PROJECT_GUARD_SPEC.md")
+EG6_AREA_PANEL_RELATIVE_PATH = Path("data/reference/eg6_area_panel.csv")
+EG6_SPOT_MASTER_RELATIVE_PATH = Path("data/reference/eg6_spot_master.csv")
+EG6_SDOT_LINKS_RELATIVE_PATH = Path("data/reference/eg6_sdot_links.csv")
 
 EXPECTED_HEADERS = ["CATEGORY", "NO", "AREA_CD", "AREA_NM", "ENG_NM"]
 EXPECTED_CATEGORIES = {
@@ -92,6 +95,39 @@ EG5_APPROVED_AREA_NAMES = {
     "POI013": "가산디지털단지역",
     "POI014": "강남역",
 }
+EG6_PANEL_VERSION = "eg6a-v1"
+EG6_PROPOSED_AREA_COUNT = 13
+EG6_APPROVED_AREA_COUNT = 13
+EG6_PENDING_SERVICE_AREAS: set[str] = set()
+EG6_AREA_HEADERS = [
+    "panel_version", "panel_order", "service_area_name", "area_code",
+    "official_area_name", "area_mapping_type", "mapping_confidence",
+    "sdot_group", "approved", "active", "decision_note",
+]
+EG6_SPOT_HEADERS = [
+    "spot_id", "service_area_name", "spot_name", "latitude", "longitude",
+    "coordinate_source", "representative_coordinate_type", "connected_area_code",
+    "connected_area_name", "spot_type", "business_reason",
+    "selling_suitability_status", "field_verified", "active",
+]
+EG6_SDOT_HEADERS = [
+    "spot_id", "nearest_sdot_id", "nearest_sdot_distance_m", "coverage_class",
+    "sensor_recent_active", "activity_reference_period", "mapping_confidence",
+    "source_report",
+]
+EG6_MAPPING_TYPES = {
+    "EXACT_AREA_MATCH", "RELATED_AREA_MATCH", "NO_SAFE_AREA_MATCH",
+    "REPLACEMENT_REQUIRED",
+}
+EG6_COVERAGE_CLASSES = {"DIRECT_COVERAGE", "NEARBY_SUPPORT", "NO_NEARBY_SDOT"}
+EG6_MAPPING_CONFIDENCE = {"HIGH", "MEDIUM", "LOW", "UNRESOLVED"}
+EG6_SPOT_STATUSES = {
+    "COORDINATE_VERIFIED", "BUSINESS_REVIEW_REQUIRED", "FIELD_VALIDATION_REQUIRED",
+}
+EG6_COORDINATE_TYPES = {"OFFICIAL_STATION_EXIT", "STATION_CENTER_PROXY"}
+EG6_BOOLEAN_VALUES = {"true", "false"}
+EG6_SEOUL_LATITUDE_RANGE = (37.41, 37.72)
+EG6_SEOUL_LONGITUDE_RANGE = (126.73, 127.27)
 DOCUMENT_PATHS = [
     Path("AGENTS.md"),
     Path("README.md"),
@@ -267,7 +303,7 @@ def current_gate_status_conflicts(text: str) -> list[str]:
         return ["현재 게이트 상태 절 누락"]
 
     table_status: dict[str, str] = {}
-    for gate in ("EG-4", "EG-5"):
+    for gate in ("EG-4", "EG-5", "EG-6"):
         match = re.search(
             rf"^\|\s*{re.escape(gate)}\s*\|\s*([^|\n]+)\|",
             section,
@@ -290,17 +326,27 @@ def current_gate_status_conflicts(text: str) -> list[str]:
             issues.append("EG-4 통과 상태와 본문 미통과 표현 충돌")
 
     eg5_status = table_status.get("EG-5", "")
-    if "진행" in eg5_status and not any(value in eg5_status for value in ("미진행", "미구현")):
+    if "통과" in eg5_status and "미통과" not in eg5_status:
         eg5_stale = re.search(
-            r"EG-5[^\n]*(?:미구현|미진행|진입\s*전|시작(?:하지|되지)\s*않|아직[^\n]*진행하지)",
+            r"EG-5[^\n]*(?:미통과|미구현|미진행|미실행|진입\s*전|통과\s*전|"
+            r"완료되지\s*않|시작(?:하지|되지)\s*않|아직[^\n]*진행하지)",
             prose,
         )
         if eg5_stale:
-            issues.append("EG-5 진행 상태와 본문 미시작 표현 충돌")
+            issues.append("EG-5 통과 상태와 본문 미완료 표현 충돌")
+
+    eg6_status = table_status.get("EG-6", "")
+    if "진행" in eg6_status and not any(value in eg6_status for value in ("미진행", "미구현")):
+        eg6_stale = re.search(
+            r"EG-6A?[^\n]*(?:미구현|미진행|진입\s*전|시작(?:하지|되지)\s*않|"
+            r"아직[^\n]*진행하지)",
+            prose,
+        )
+        if eg6_stale:
+            issues.append("EG-6 진행 상태와 본문 미시작 표현 충돌")
 
     actual_not_run = "미실행" in eg5_status or re.search(
-        r"EG-5[^\n]*(?:실제|실응답)[^\n]*미실행",
-        prose,
+        r"EG-5[^\n]*(?:실제|실응답)[^\n]*미실행", prose
     )
     actual_completed = re.search(
         r"(?:EG-5|대표\s*3장소)[^\n]*(?:실제|실응답)[^\n]*(?:수집|호출|응답|검증)[^\n]*(?:완료|성공|확인)",
@@ -1884,6 +1930,208 @@ def check_h702(context: ProjectGuardContext) -> CheckResult:
     )
 
 
+def check_h703(context: ProjectGuardContext) -> CheckResult:
+    input_paths = (
+        EG6_AREA_PANEL_RELATIVE_PATH,
+        EG6_SPOT_MASTER_RELATIVE_PATH,
+        EG6_SDOT_LINKS_RELATIVE_PATH,
+    )
+    inspections: dict[Path, CsvInspection] = {}
+    for relative_path in input_paths:
+        path = context.root / relative_path
+        if not path.is_file():
+            return failed("H-703", "EG-6A 필수 참조 CSV 누락", *(str(item) for item in input_paths))
+        try:
+            inspections[relative_path] = inspect_csv(path)
+        except (OSError, UnicodeError, csv.Error):
+            return failed("H-703", "EG-6A 참조 CSV 읽기 실패", *(str(item) for item in input_paths))
+
+    areas = inspections[EG6_AREA_PANEL_RELATIVE_PATH]
+    spots = inspections[EG6_SPOT_MASTER_RELATIVE_PATH]
+    links = inspections[EG6_SDOT_LINKS_RELATIVE_PATH]
+    if (
+        list(areas.fieldnames) != EG6_AREA_HEADERS
+        or list(spots.fieldnames) != EG6_SPOT_HEADERS
+        or list(links.fieldnames) != EG6_SDOT_HEADERS
+    ):
+        return failed("H-703", "EG-6A 참조 CSV 헤더 계약 불일치", *(str(item) for item in input_paths))
+
+    area_rows = list(areas.rows)
+    spot_rows = list(spots.rows)
+    link_rows = list(links.rows)
+    try:
+        panel_orders = [int(normalized_cell(row, "panel_order")) for row in area_rows]
+    except ValueError:
+        return failed("H-703", "패널 순서가 정수가 아님", str(EG6_AREA_PANEL_RELATIVE_PATH))
+    service_names = [normalized_cell(row, "service_area_name") for row in area_rows]
+    area_codes = [normalized_cell(row, "area_code") for row in area_rows]
+    nonempty_codes = [code for code in area_codes if code]
+    approved_rows = [row for row in area_rows if normalized_cell(row, "approved") == "true"]
+    pending_rows = [row for row in area_rows if normalized_cell(row, "approved") == "false"]
+    if (
+        len(area_rows) != EG6_PROPOSED_AREA_COUNT
+        or panel_orders != list(range(1, EG6_PROPOSED_AREA_COUNT + 1))
+        or {normalized_cell(row, "panel_version") for row in area_rows} != {EG6_PANEL_VERSION}
+        or not all(service_names)
+        or len(service_names) != len(set(service_names))
+        or len(nonempty_codes) != len(set(nonempty_codes))
+        or len(approved_rows) != EG6_APPROVED_AREA_COUNT
+        or {normalized_cell(row, "service_area_name") for row in pending_rows} != EG6_PENDING_SERVICE_AREAS
+    ):
+        return failed("H-703", "패널 수·순서·버전·중복·승인 수 계약 불일치", str(EG6_AREA_PANEL_RELATIVE_PATH))
+
+    official = csv_or_failure(context, "H-703")
+    if isinstance(official, CheckResult):
+        return official
+    official_names = {
+        normalized_cell(row, "AREA_CD"): normalized_cell(row, "AREA_NM")
+        for row in official.rows
+    }
+    approved_by_service: dict[str, dict[str | None, str | list[str] | None]] = {}
+    for row in area_rows:
+        service = normalized_cell(row, "service_area_name")
+        area_code = normalized_cell(row, "area_code")
+        official_name = normalized_cell(row, "official_area_name")
+        mapping_type = normalized_cell(row, "area_mapping_type")
+        confidence = normalized_cell(row, "mapping_confidence")
+        coverage = normalized_cell(row, "sdot_group")
+        approved = normalized_cell(row, "approved")
+        active = normalized_cell(row, "active")
+        if (
+            mapping_type not in EG6_MAPPING_TYPES
+            or confidence not in EG6_MAPPING_CONFIDENCE
+            or coverage not in EG6_COVERAGE_CLASSES
+            or approved not in EG6_BOOLEAN_VALUES
+            or active not in EG6_BOOLEAN_VALUES
+        ):
+            return failed("H-703", "Area Enum 또는 Boolean 계약 불일치", str(EG6_AREA_PANEL_RELATIVE_PATH))
+        if approved == "true":
+            if (
+                active != "true"
+                or mapping_type not in {"EXACT_AREA_MATCH", "RELATED_AREA_MATCH"}
+                or not area_code
+                or official_names.get(area_code) != official_name
+            ):
+                return failed("H-703", "승인 Area의 공식 코드·장소명·활성 상태 불일치", str(EG6_AREA_PANEL_RELATIVE_PATH), str(CSV_RELATIVE_PATH))
+            approved_by_service[service] = row
+        elif (
+            active != "false"
+            or mapping_type not in {"NO_SAFE_AREA_MATCH", "REPLACEMENT_REQUIRED"}
+            or area_code
+            or official_name
+        ):
+            return failed("H-703", "미승인 Area가 코드 또는 활성 상태를 보유함", str(EG6_AREA_PANEL_RELATIVE_PATH))
+
+    spot_ids = [normalized_cell(row, "spot_id") for row in spot_rows]
+    if (
+        len(spot_rows) != EG6_PROPOSED_AREA_COUNT
+        or not all(spot_ids)
+        or len(spot_ids) != len(set(spot_ids))
+        or {normalized_cell(row, "service_area_name") for row in spot_rows} != set(service_names)
+    ):
+        return failed("H-703", "Spot 수·식별자·서비스 지역 연결 불일치", str(EG6_SPOT_MASTER_RELATIVE_PATH))
+
+    spot_by_id: dict[str, dict[str | None, str | list[str] | None]] = {}
+    spot_by_service: dict[str, dict[str | None, str | list[str] | None]] = {}
+    for row in spot_rows:
+        spot_id = normalized_cell(row, "spot_id")
+        service = normalized_cell(row, "service_area_name")
+        connected_code = normalized_cell(row, "connected_area_code")
+        connected_name = normalized_cell(row, "connected_area_name")
+        coordinate_type = normalized_cell(row, "representative_coordinate_type")
+        suitability = normalized_cell(row, "selling_suitability_status")
+        field_verified = normalized_cell(row, "field_verified")
+        active = normalized_cell(row, "active")
+        try:
+            latitude = float(normalized_cell(row, "latitude"))
+            longitude = float(normalized_cell(row, "longitude"))
+        except ValueError:
+            return failed("H-703", "Spot 좌표가 숫자가 아님", str(EG6_SPOT_MASTER_RELATIVE_PATH))
+        if (
+            not -90 <= latitude <= 90
+            or not -180 <= longitude <= 180
+            or coordinate_type not in EG6_COORDINATE_TYPES
+            or suitability not in EG6_SPOT_STATUSES
+            or field_verified not in EG6_BOOLEAN_VALUES
+            or active not in EG6_BOOLEAN_VALUES
+        ):
+            return failed("H-703", "Spot 좌표·Enum·Boolean 계약 불일치", str(EG6_SPOT_MASTER_RELATIVE_PATH))
+        if active == "true":
+            area = approved_by_service.get(service)
+            if (
+                area is None
+                or connected_code != normalized_cell(area, "area_code")
+                or connected_name != normalized_cell(area, "official_area_name")
+                or not EG6_SEOUL_LATITUDE_RANGE[0] <= latitude <= EG6_SEOUL_LATITUDE_RANGE[1]
+                or not EG6_SEOUL_LONGITUDE_RANGE[0] <= longitude <= EG6_SEOUL_LONGITUDE_RANGE[1]
+            ):
+                return failed("H-703", "활성 Spot의 Area 참조 또는 서울 범위 불일치", str(EG6_SPOT_MASTER_RELATIVE_PATH), str(EG6_AREA_PANEL_RELATIVE_PATH))
+        elif connected_code or connected_name:
+            return failed("H-703", "미승인 Spot이 Area 참조를 보유함", str(EG6_SPOT_MASTER_RELATIVE_PATH))
+        if coordinate_type == "STATION_CENTER_PROXY" and (
+            suitability != "FIELD_VALIDATION_REQUIRED" or field_verified != "false"
+        ):
+            return failed("H-703", "역 중심 대용점이 검증된 출구로 표현됨", str(EG6_SPOT_MASTER_RELATIVE_PATH))
+        spot_by_id[spot_id] = row
+        spot_by_service[service] = row
+
+    link_spot_ids = [normalized_cell(row, "spot_id") for row in link_rows]
+    if (
+        len(link_rows) != EG6_PROPOSED_AREA_COUNT
+        or len(link_spot_ids) != len(set(link_spot_ids))
+        or set(link_spot_ids) != set(spot_ids)
+    ):
+        return failed("H-703", "S-DoT Link와 Spot 참조 무결성 불일치", str(EG6_SDOT_LINKS_RELATIVE_PATH), str(EG6_SPOT_MASTER_RELATIVE_PATH))
+
+    link_by_spot: dict[str, dict[str | None, str | list[str] | None]] = {}
+    for row in link_rows:
+        spot_id = normalized_cell(row, "spot_id")
+        coverage = normalized_cell(row, "coverage_class")
+        recent_active = normalized_cell(row, "sensor_recent_active")
+        confidence = normalized_cell(row, "mapping_confidence")
+        source_report = normalized_cell(row, "source_report")
+        try:
+            distance = float(normalized_cell(row, "nearest_sdot_distance_m"))
+        except ValueError:
+            return failed("H-703", "S-DoT 거리가 숫자가 아님", str(EG6_SDOT_LINKS_RELATIVE_PATH))
+        expected_coverage = (
+            "DIRECT_COVERAGE" if distance <= 150
+            else "NEARBY_SUPPORT" if distance <= 300
+            else "NO_NEARBY_SDOT"
+        )
+        if (
+            not normalized_cell(row, "nearest_sdot_id")
+            or distance < 0
+            or coverage not in EG6_COVERAGE_CLASSES
+            or coverage != expected_coverage
+            or recent_active != "true"
+            or confidence not in EG6_MAPPING_CONFIDENCE
+            or source_report != "EG6_AREA_SPOT_PANEL.md"
+        ):
+            return failed("H-703", "S-DoT 거리·활성·등급·출처 계약 불일치", str(EG6_SDOT_LINKS_RELATIVE_PATH))
+        link_by_spot[spot_id] = row
+
+    for area in area_rows:
+        service = normalized_cell(area, "service_area_name")
+        spot_id = normalized_cell(spot_by_service[service], "spot_id")
+        if normalized_cell(area, "sdot_group") != normalized_cell(link_by_spot[spot_id], "coverage_class"):
+            return failed("H-703", "Area와 S-DoT Link의 커버리지 불일치", str(EG6_AREA_PANEL_RELATIVE_PATH), str(EG6_SDOT_LINKS_RELATIVE_PATH))
+
+    forbidden = re.compile(r"/Users/|file://|https?://|SEOUL_OPEN_API_KEY|API[_-]?KEY\s*=", re.IGNORECASE)
+    for inspection in (areas, spots, links):
+        for row in inspection.rows:
+            rendered = "\n".join(normalized_cell(row, key) for key in inspection.fieldnames)
+            if forbidden.search(rendered):
+                return failed("H-703", "EG-6A 참조 CSV에 비밀정보·URL·로컬 절대경로 패턴 존재", *(str(item) for item in input_paths))
+
+    return passed(
+        "H-703",
+        "13개 제안·13개 고유 공식 Area 승인과 Area–Spot–S-DoT 참조 무결성 확인",
+        str(CSV_RELATIVE_PATH),
+        *(str(item) for item in input_paths),
+    )
+
+
 def check_h704(context: ProjectGuardContext) -> CheckResult:
     execution = run_eg5_guard(context, {"POI013"})
     summary = eg5_summary(execution.output)
@@ -1963,7 +2211,7 @@ RUNNERS: dict[str, Callable[[ProjectGuardContext], CheckResult]] = {
         "H-204", "H-205", "H-206",
         "H-301", "H-302", "H-303", "H-304", "H-305",
         "H-401", "H-402", "H-403", "H-404",
-        "H-501", "H-502", "H-503", "H-506", "H-701", "H-702", "H-704", "H-705",
+        "H-501", "H-502", "H-503", "H-506", "H-701", "H-702", "H-703", "H-704", "H-705",
     ]
 }
 
@@ -2015,14 +2263,20 @@ CHECK_DEFINITIONS = [
     definition("H-602", "상태값 구분", "EG-4 이후", False, "EG-4 상권 상태 처리 구현 후 적용"),
     definition("H-701", "여의도 1장소", "EG-4 이후"),
     definition("H-702", "EG-5 대표 3장소", "EG-5 이후"),
-    definition("H-703", "시험용 10장소", "EG-6 이후", False, "EG-6 시험용 10장소 구현 후 적용"),
+    definition("H-703", "EG-6A 13지역 참조데이터", "EG-6A 이후"),
     definition("H-704", "실패 격리·재시도 제한", "EG-5 이후"),
     definition("H-705", "회차 결과 요약", "EG-5 이후"),
-    definition("H-706", "121장소 1회 완전성", "EG-7 이후", False, "EG-7 121장소 1회 수집 후 적용"),
+    definition(
+        "H-706",
+        "EG-6B 13지역 1회 완전성",
+        "EG-6B 이후",
+        False,
+        "EG-6B 13지역 단일 수집 구현 후 적용",
+    ),
     definition(
         "H-707",
-        "반복주기 승인 준수",
-        "EG-8",
+        "EG-7 반복주기 승인 준수",
+        "EG-7 이후",
         False,
         "반복수집 전 PM 주기 승인과 외장 저장장치 또는 승인된 클라우드 폴더 백업 Gate 필요",
     ),

@@ -12,6 +12,7 @@ import subprocess
 import tempfile
 import unittest
 from collections import Counter
+from collections.abc import Callable
 from pathlib import Path
 from unittest import mock
 
@@ -214,10 +215,10 @@ def quality_gate_status_fixture(extra_current_text: str = "") -> str:
 | 게이트 | 현재 상태 |
 |---|---|
 | EG-4 | 통과: Issue #43 완료 |
-| EG-5 | 진행: 오프라인 구현 중; 실제 세 장소 호출 미실행 |
-| EG-6 | 미구현 |
+| EG-5 | 통과: 실제 세 장소 수집과 분석 완료 |
+| EG-6 | 진행: EG-6A 참조데이터 구현 중 |
 
-EG-4는 통과했고 EG-5는 오프라인 구현을 진행한다.
+EG-4와 EG-5는 통과했고 EG-6A 참조데이터를 구현한다.
 {extra_current_text}
 
 ## 4. 다음 절
@@ -236,8 +237,8 @@ class H003CurrentGateStatusTests(unittest.TestCase):
     def test_current_gate_status_conflicts_are_detected(self) -> None:
         conflicts = {
             "eg4_not_passed": "EG-4 전체 통과 전 상태다.",
-            "eg5_not_started": "EG-5는 아직 시작되지 않았다.",
-            "actual_collection_complete": "EG-5 대표 3장소 정상 실응답 검증 완료.",
+            "eg5_not_complete": "EG-5 실제 호출은 미실행 상태다.",
+            "eg6_not_started": "EG-6A는 아직 시작되지 않았다.",
         }
         for case_name, text in conflicts.items():
             with self.subTest(case_name=case_name):
@@ -1773,6 +1774,106 @@ class Eg5ProjectGuardTests(unittest.TestCase):
         self.assertEqual(result.status, project_guard.Status.FAIL)
 
 
+class Eg6ReferenceProjectGuardTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.project = TemporaryProject()
+        shutil.copyfile(ROOT / project_guard.CSV_RELATIVE_PATH, self.project.csv_path)
+        for relative_path in (
+            project_guard.EG6_AREA_PANEL_RELATIVE_PATH,
+            project_guard.EG6_SPOT_MASTER_RELATIVE_PATH,
+            project_guard.EG6_SDOT_LINKS_RELATIVE_PATH,
+        ):
+            target = self.project.root / relative_path
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(ROOT / relative_path, target)
+
+    def tearDown(self) -> None:
+        self.project.close()
+
+    def check(self) -> project_guard.CheckResult:
+        return project_guard.check_h703(self.project.context())
+
+    @staticmethod
+    def mutate_csv(
+        path: Path,
+        fieldnames: list[str],
+        mutate: Callable[[list[dict[str, str]]], None],
+    ) -> None:
+        with path.open("r", encoding="utf-8", newline="") as source:
+            rows = list(csv.DictReader(source, strict=True))
+        mutate(rows)
+        write_csv(path, rows, fieldnames)
+
+    def test_h703_reference_contract_passes(self) -> None:
+        result = self.check()
+        self.assertEqual(result.status, project_guard.Status.PASS, result.evidence)
+
+    def test_h703_missing_required_csv_fails(self) -> None:
+        (self.project.root / project_guard.EG6_SDOT_LINKS_RELATIVE_PATH).unlink()
+        self.assertEqual(self.check().status, project_guard.Status.FAIL)
+
+    def test_h703_changed_header_contract_fails(self) -> None:
+        path = self.project.root / project_guard.EG6_AREA_PANEL_RELATIVE_PATH
+        with path.open("r", encoding="utf-8", newline="") as source:
+            rows = list(csv.DictReader(source, strict=True))
+        write_csv(path, rows, project_guard.EG6_AREA_HEADERS[:-1])
+        self.assertEqual(self.check().status, project_guard.Status.FAIL)
+
+    def test_h703_duplicate_area_code_fails(self) -> None:
+        path = self.project.root / project_guard.EG6_AREA_PANEL_RELATIVE_PATH
+        self.mutate_csv(
+            path,
+            project_guard.EG6_AREA_HEADERS,
+            lambda rows: rows[1].update({"area_code": rows[0]["area_code"]}),
+        )
+        self.assertEqual(self.check().status, project_guard.Status.FAIL)
+
+    def test_h703_duplicate_spot_id_fails(self) -> None:
+        path = self.project.root / project_guard.EG6_SPOT_MASTER_RELATIVE_PATH
+        self.mutate_csv(
+            path,
+            project_guard.EG6_SPOT_HEADERS,
+            lambda rows: rows[1].update({"spot_id": rows[0]["spot_id"]}),
+        )
+        self.assertEqual(self.check().status, project_guard.Status.FAIL)
+
+    def test_h703_approved_panel_count_change_fails(self) -> None:
+        path = self.project.root / project_guard.EG6_AREA_PANEL_RELATIVE_PATH
+        self.mutate_csv(
+            path,
+            project_guard.EG6_AREA_HEADERS,
+            lambda rows: rows[4].update({"approved": "false", "active": "false"}),
+        )
+        self.assertEqual(self.check().status, project_guard.Status.FAIL)
+
+    def test_h703_broken_active_spot_reference_fails(self) -> None:
+        path = self.project.root / project_guard.EG6_SPOT_MASTER_RELATIVE_PATH
+        self.mutate_csv(
+            path,
+            project_guard.EG6_SPOT_HEADERS,
+            lambda rows: rows[0].update({"connected_area_code": "POI999"}),
+        )
+        self.assertEqual(self.check().status, project_guard.Status.FAIL)
+
+    def test_h703_invalid_coverage_enum_fails(self) -> None:
+        path = self.project.root / project_guard.EG6_SDOT_LINKS_RELATIVE_PATH
+        self.mutate_csv(
+            path,
+            project_guard.EG6_SDOT_HEADERS,
+            lambda rows: rows[0].update({"coverage_class": "UNKNOWN"}),
+        )
+        self.assertEqual(self.check().status, project_guard.Status.FAIL)
+
+    def test_h703_approved_outside_seoul_coordinate_fails(self) -> None:
+        path = self.project.root / project_guard.EG6_SPOT_MASTER_RELATIVE_PATH
+        self.mutate_csv(
+            path,
+            project_guard.EG6_SPOT_HEADERS,
+            lambda rows: rows[0].update({"latitude": "37.3947610", "longitude": "127.1117170"}),
+        )
+        self.assertEqual(self.check().status, project_guard.Status.FAIL)
+
+
 class RegistryAndExitCodeTests(unittest.TestCase):
     def test_all_46_ids_are_unique_and_in_spec_order(self) -> None:
         registry = [item.check_id for item in project_guard.CHECK_DEFINITIONS]
@@ -1786,10 +1887,12 @@ class RegistryAndExitCodeTests(unittest.TestCase):
         counts = Counter(item.status for item in results)
         self.assertEqual(counts[project_guard.Status.FAIL], 0)
         self.assertEqual(counts[project_guard.Status.WARN], 0)
+        self.assertEqual(counts[project_guard.Status.PASS], 40)
+        self.assertEqual(counts[project_guard.Status.SKIP], 6)
         self.assertEqual(len(results), 46)
         self.assertEqual(sum(counts.values()), 46)
         status_by_id = {item.check_id: item.status for item in results}
-        for check_id in ("H-206", "H-702", "H-704", "H-705"):
+        for check_id in ("H-206", "H-702", "H-703", "H-704", "H-705"):
             self.assertEqual(status_by_id[check_id], project_guard.Status.PASS)
         self.assertEqual(status_by_id["H-707"], project_guard.Status.SKIP)
 
