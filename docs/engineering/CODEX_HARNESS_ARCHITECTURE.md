@@ -276,21 +276,21 @@ flowchart TB
 현재 저장소 전용 Skill은 없다. Git, 선택적 Worktree, Python과 GitHub Actions가
 현재 확인되는 주요 실행 수단이다.
 
-### 5.3 Target State
+### 5.3 현재 구현 상태
 
-P3~P7에서 목표로 한 명칭과 경로는 현재 Working Tree에 반영됐다. 다음 상태는
-로컬 구현 기준이며 Pull Request, CI와 Merge 완료를 의미하지 않는다.
+P3~P7에서 목표로 한 명칭과 경로 전환은 Pull Request, CI와 `main` 재검증까지
+완료됐다.
 
 | 목표 역할 | 목표 경로 또는 상태 | 현재 상태 |
 |---|---|---|
-| Project Guard 실행 스크립트 | `scripts/project_guard_check.py` | 이름 전환 구현 |
-| Project Guard 공식 명세 | `docs/testing/PROJECT_GUARD_SPEC.md` | 단일 공식 기준으로 이름 전환 구현 |
-| 통합 CI Workflow | `.github/workflows/ci.yml` | 이름과 실행 명령 전환 구현 |
-| 결과 보고 템플릿 | `docs/testing/PROJECT_GUARD_REPORT_TEMPLATE.md` | 이름 전환 구현 |
-| 검사 Unit Test | `tests/test_project_guard_check.py` | 이름과 import 전환 구현 |
+| Project Guard 실행 스크립트 | `scripts/project_guard_check.py` | `main` 반영·검증 완료 |
+| Project Guard 공식 명세 | `docs/testing/PROJECT_GUARD_SPEC.md` | 단일 공식 기준 전환 완료 |
+| 통합 CI Workflow | `.github/workflows/ci.yml` | PR·`main` Push 실행 검증 완료 |
+| 결과 보고 템플릿 | `docs/testing/PROJECT_GUARD_REPORT_TEMPLATE.md` | 이름 전환 완료 |
+| 검사 Unit Test | `tests/test_project_guard_check.py` | 이름·import 전환과 회귀검증 완료 |
 
-최종 완료 판정은 Pull Request의 독립 CI 검증, PM Review와 Merge 후 `main`
-재검증까지 끝난 뒤 수행한다.
+후속 변경도 Pull Request의 독립 CI 검증, PM Review와 Merge 후 `main` 재검증을
+완료해야 공식 상태로 반영한다.
 
 ### 5.4 단일 공식 기준 원칙
 
@@ -305,11 +305,11 @@ P3~P7에서 목표로 한 명칭과 경로는 현재 Working Tree에 반영됐�
 
 | 역할 | 당시 경로 | 현재 공식 경로 | 구현 상태 |
 |---|---|---|---|
-| 검사 실행 스크립트 | `scripts/harness_check.py` | `scripts/project_guard_check.py` | 로컬 전환 구현·검증, PR·CI·Merge 대기 |
-| 검사 명세 | `docs/testing/HARNESS_SPEC.md` | `docs/testing/PROJECT_GUARD_SPEC.md` | 단일 공식 기준 전환 구현·검증 |
-| CI Workflow | `.github/workflows/harness.yml` | `.github/workflows/ci.yml` | Trigger를 유지한 이름 전환 구현·검증 |
-| 결과 보고 템플릿 | `docs/testing/HARNESS_REPORT_TEMPLATE.md` | `docs/testing/PROJECT_GUARD_REPORT_TEMPLATE.md` | 이름 전환 구현·검증 |
-| 검사 Unit Test | `tests/test_harness_check.py` | `tests/test_project_guard_check.py` | 이름과 import 전환 구현·검증 |
+| 검사 실행 스크립트 | `scripts/harness_check.py` | `scripts/project_guard_check.py` | `main` 전환 완료 |
+| 검사 명세 | `docs/testing/HARNESS_SPEC.md` | `docs/testing/PROJECT_GUARD_SPEC.md` | 단일 공식 기준 전환 완료 |
+| CI Workflow | `.github/workflows/harness.yml` | `.github/workflows/ci.yml` | Trigger를 유지해 전환·검증 완료 |
+| 결과 보고 템플릿 | `docs/testing/HARNESS_REPORT_TEMPLATE.md` | `docs/testing/PROJECT_GUARD_REPORT_TEMPLATE.md` | 전환 완료 |
+| 검사 Unit Test | `tests/test_harness_check.py` | `tests/test_project_guard_check.py` | 이름·import 전환 완료 |
 
 ---
 
@@ -321,6 +321,8 @@ P3~P7에서 목표로 한 명칭과 경로는 현재 Working Tree에 반영됐�
 |---|---|
 | README | 프로젝트 소개, 핵심 범위 요약과 시작 안내 |
 | PROJECT_STATUS | 현재 완료 상태, 작업, 최근 이력과 다음 행동 |
+| PRD | 제품 문제·대상 사용자·범위·요구사항·수용 기준 |
+| TRD | 현재 구현과 목표 기술 구조·데이터·보안·검증 계약 |
 | AGENTS | Codex가 새 세션에서 따라야 할 행동과 문서 진입점 |
 | GitHub Issue | 단일 작업의 승인된 범위와 완료조건 |
 | Pull Request | 실제 변경, 검증 결과, 위험과 승인 기록 |
@@ -333,24 +335,23 @@ PROJECT_STATUS는 상태 복원을 지원하지만 Git 기록이나 현재 Issue
 
 ### 6.2 현재 정보 우선순위
 
-현재 정보 우선순위는
-[`PROJECT_STATUS.md`](../../PROJECT_STATUS.md)에 정의된 순서를 그대로 따른다.
-이 Architecture는 새로운 순서를 만들거나 기존 순서를 자의적으로 바꾸지 않는다.
+현재 정보 우선순위는 [`AGENTS.md`](../../AGENTS.md)와
+[`PROJECT_STATUS.md`](../../PROJECT_STATUS.md)에 같은 순서로 정의한다.
 
-1. 현재 `main` 코드와 실제 테스트 결과
-2. 현재 GitHub Issue의 PM 확정 댓글
-3. 병합된 Pull Request
-4. `PROJECT_STATUS.md`
-5. `AGENTS.md`
-6. `docs/testing/QUALITY_GATES.md`
-7. `docs/testing/PROJECT_GUARD_SPEC.md`
-8. `README.md`
-9. 작업일지
-10. 과거 AI 대화
+1. PM의 최신 명시적 지시와 승인·금지사항
+2. 현재 `main` 코드와 실제 테스트 결과
+3. 현재 Issue의 PM 승인 범위와 병합된 Pull Request
+4. [`FreshManager_PRD_v1.0.md`](../product/FreshManager_PRD_v1.0.md)
+5. [`FreshManager_TRD_v1.0.md`](FreshManager_TRD_v1.0.md)
+6. [`DATA_COLLECTION_RULES.md`](../rules/DATA_COLLECTION_RULES.md)
+7. [`QUALITY_GATES.md`](../testing/QUALITY_GATES.md)
+8. `AGENTS.md`
+9. `PROJECT_STATUS.md`
 
 이 순서에서 현재 코드와 테스트는 구현 사실을, Issue는 승인 범위를, 병합된 PR과
-Commit은 변경 이력을 증명한다. AGENTS와 rules는 행동과 영구 정책을 정의하고,
-Project Guard 명세는 자동검사 기준을, Quality Gates는 단계 전환 기준을 제공한다.
+Commit은 변경 이력을 증명한다. PRD는 제품 목적을, TRD는 기술 계약을, AGENTS와
+rules는 행동과 분야별 정책을 정의한다. Project Guard 명세는 검사 ID·판정·종료코드의
+유일한 기준이고 Quality Gates는 단계 전환 기준이다.
 
 정보 우선순위와 목표 문서 책임 모델 사이의 해석이 불분명해지면 Architecture에서
 임의로 우선순위를 수정하지 않고 PM 승인 대상의 문서 정렬 작업으로 분리한다.
@@ -398,8 +399,10 @@ rules의 권한·보안·범위 제한을 따른다.
 
 요구사항은 제품이 무엇을 해결하고 어떤 범위와 수용 기준을 가지는지 정의한다.
 FreshManager의 상위 제품 범위는
-[`requirements-definition-freshmanager-poc-v0.4.md`](../../requirements-definition-freshmanager-poc-v0.4.md)
-같은 승인된 요구사항 문서를 따른다.
+[`FreshManager_PRD_v1.0.md`](../product/FreshManager_PRD_v1.0.md)를 따른다. 기술 구조와
+구현 계약은 [`FreshManager_TRD_v1.0.md`](FreshManager_TRD_v1.0.md)가 PRD를 변환해
+정의한다. `requirements-definition-freshmanager-poc-v0.4.md`는 PRD 이전의 역사적
+요구사항 기준선으로만 보존한다.
 
 ### 8.2 Issue의 책임
 
@@ -775,10 +778,10 @@ Project Guard 로직 보강은 P12 후속 검토 대상으로 남긴다.
 
 ## 15. 문서별 공식 책임과 중복 방지 원칙
 
-### 15.1 현재 구조의 문제
+### 15.1 현재 책임 정렬 상태
 
-현재 저장소는 운영 가능한 기준을 갖추고 있지만 책임 정리는 아직 완료되지 않았다.
-확인된 중복과 계층 혼선은 다음과 같다.
+PRD·TRD를 공식 기준으로 연결하고 다음 중복 방지 원칙을 적용한다. 아래 항목은
+완료 상태를 과장하지 않기 위해 계속 관리할 문서 부채와 회귀 위험이다.
 
 - 프로젝트 소개와 목표가 README, AGENTS와 PROJECT_STATUS에 반복된다.
 - 현재 상태와 Gate 상태가 여러 문서에 반복된다.
@@ -787,14 +790,16 @@ Project Guard 로직 보강은 P12 후속 검토 대상으로 남긴다.
 - 자동검사 통과와 Quality Gate 통과가 같은 완료 의미로 읽힐 수 있다.
 - Merge 판단 조건과 Git 실행 절차가 여러 문서에 반복된다.
 
-따라서 다음 책임표는 현재 문서가 이미 완전히 정리됐다는 상태표가 아니라,
-P8~P10에서 문서를 정렬할 공식 목표 책임 모델이다.
+다음 책임표는 현행 공식 책임 모델이다. 문서 내용이나 경로가 바뀌면 소유 문서와
+참조 문서를 같은 변경에서 정렬한다.
 
 ### 15.2 목표 문서 책임 모델
 
 | 정보 유형 | 공식 기준 문서 | 다른 문서에서 허용되는 요약 | 금지되는 상세 중복 | 갱신 시점 | 책임 주체 |
 |---|---|---|---|---|---|
-| 제품 문제·대상 사용자·상세 포함·제외 범위·요구사항·수용 기준 | [`requirements-definition-freshmanager-poc-v0.4.md`](../../requirements-definition-freshmanager-poc-v0.4.md) | README의 핵심 요약과 Issue의 작업 관련 발췌 | 요구사항 상세를 Architecture·상태 문서에 재정의 | 제품 문제·범위·요구사항·수용 기준 변경 시 | PM |
+| 제품 문제·대상 사용자·상세 포함·제외 범위·요구사항·수용 기준 | [`FreshManager_PRD_v1.0.md`](../product/FreshManager_PRD_v1.0.md) | README의 핵심 요약과 Issue의 작업 관련 발췌 | 제품 요구사항 상세를 Architecture·상태 문서에 재정의 | 제품 문제·범위·요구사항·수용 기준 변경 시 | PM |
+| 현재 구현과 목표 기술 구조·인터페이스·데이터·보안·검증 계약 | [`FreshManager_TRD_v1.0.md`](FreshManager_TRD_v1.0.md) | Rules·Issue·PR의 관련 기술 계약 링크 | 제품 목적을 TRD에서 재정의하거나 미래 목표를 구현 완료로 표현 | 구현 또는 목표 기술 계약 변경 시 | 구현자, PM 승인 |
+| PRD 이전 요구사항 이력 | [`requirements-definition-freshmanager-poc-v0.4.md`](../../requirements-definition-freshmanager-poc-v0.4.md) | PRD 근거 자료에서 역사 문서로 참조 | 현행 수집 순서·운영 승인 기준으로 사용 | 역사적 근거 보정 시 | PM |
 | 프로젝트 소개·목표와 범위의 핵심 요약·시작 안내·주요 문서 링크 | [`README.md`](../../README.md) | 프로젝트 한 줄 소개와 README 링크 | 요구사항 정의서의 상세 포함·제외 범위와 수용 기준 반복 | 소개·핵심 요약·진입점 변경 시 | PM 승인, Codex 반영 |
 | 현재 상태·현재 작업·최근 이력·다음 행동 | [`PROJECT_STATUS.md`](../../PROJECT_STATUS.md) | 현재 단계 한 줄과 상태 문서 링크 | 일시적 Issue·Branch·실행 결과 표 | 현행 PROJECT_STATUS 갱신 규칙을 따르며 구체적 체크포인트는 P10에서 재검토 | Codex 초안, PM 확인 |
 | Codex 시작 순서·행동 규칙·금지사항·PM 승인 지점 | [`AGENTS.md`](../../AGENTS.md) | Architecture에서 역할과 진입점만 설명 | 상세 시작 순서·금지사항 복사 | 행동 정책 또는 승인 지점 변경 시 | PM |
@@ -906,7 +911,9 @@ Codex Engineering Harness 안에서 진행되는 방식을 설명하는 시나�
 - [README](../../README.md)
 - [AGENTS](../../AGENTS.md)
 - [PROJECT_STATUS](../../PROJECT_STATUS.md)
-- [요구사항 정의서](../../requirements-definition-freshmanager-poc-v0.4.md)
+- [FreshManager PRD v1.0](../product/FreshManager_PRD_v1.0.md)
+- [FreshManager TRD v1.0](FreshManager_TRD_v1.0.md)
+- [이전 요구사항 정의서 v0.4](../../requirements-definition-freshmanager-poc-v0.4.md)
 - [Coding Rules](../rules/CODING_RULES.md)
 - [Git Workflow](../rules/GIT_WORKFLOW.md)
 - [Security Rules](../rules/SECURITY_RULES.md)

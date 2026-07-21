@@ -23,6 +23,12 @@ python3 scripts/project_guard_check.py
 `scripts/project_guard_check.py`는 EG-3의 현재 구현체이며 위 명령으로 실행한다.
 실행 결과는 `docs/testing/PROJECT_GUARD_REPORT_TEMPLATE.md` 형식으로 기록한다.
 
+제품 기준은 `docs/product/FreshManager_PRD_v1.0.md`, 기술 기준은
+`docs/engineering/FreshManager_TRD_v1.0.md`다. 현재 H-001·H-002의 자동검사 입력은
+아래 명세의 기존 여섯 문서를 유지하며, PRD·TRD의 Git 포함 여부·Markdown 구조·링크는
+이번 문서 정렬에서 별도로 확인한다. 자동검사 입력 확대는 코드 변경 승인을 받은 별도
+작업에서만 수행한다.
+
 - 일반 Project Guard와 일반 테스트에서는 네트워크 연결과 실제 서울시 API 호출을 금지한다.
 - 저장된 샘플 JSON, 가짜 응답과 임시 파일만 사용한다.
 - 실제 API 호출은 EG-3 오프라인 Project Guard 통과 후 PM 승인을 받아
@@ -71,7 +77,7 @@ python3 scripts/project_guard_check.py
 |---|---|---|---|---|---|---|---|
 | `H-001` | 필수 문서 존재 | 문서 기준선 확보 | `AGENTS.md`, `README.md`, `docs/rules/CODING_RULES.md`, `docs/testing/PROJECT_GUARD_SPEC.md`, `docs/testing/QUALITY_GATES.md`, `docs/testing/PROJECT_GUARD_REPORT_TEMPLATE.md` | 여섯 파일이 존재하고 비어 있지 않음 | 파일 누락 또는 빈 파일 | 불가 | EG-0 사전검증, EG-3 이후 회귀 |
 | `H-002` | Markdown 구조 | 제목과 코드 블록 손상 방지 | 위 여섯 문서 | 모든 코드 블록이 닫히고 제목 계층이 정상 | 미종료 코드 블록 또는 제목 계층 손상 | 불가 | EG-0, EG-3 이후 |
-| `H-003` | 문서 규칙 일치 | 핵심 계약 충돌 방지 | 위 여섯 문서 | 기준파일 역할, EG 순서, PM 승인, 메타데이터, 보안, 오프라인 테스트와 호출주기가 일치하고 현재 상태 절의 EG-4·EG-5 통과와 EG-6A 진행 표현이 상충하지 않음 | 한 항목 이상 상충하거나 현재 상태표와 본문이 직접 충돌 | 불가 | EG-0, EG-3 이후 |
+| `H-003` | 문서 규칙 일치 | 핵심 계약 충돌 방지 | 위 여섯 문서 | 기준파일 역할, EG 순서, PM 승인, 메타데이터, 보안, 오프라인 테스트와 호출주기가 일치하고 현재 상태 절의 EG-4·EG-5·EG-6A 완료와 EG-6B 구현 완료·실호출 대기 표현이 상충하지 않음 | 한 항목 이상 상충하거나 현재 상태표와 본문이 직접 충돌 | 불가 | EG-0, EG-3 이후 |
 | `H-004` | README 상태·실행방법 정확성 | 허위 완료와 허위 실행 명령 방지 | `README.md`, 실제 프로젝트 파일 | 완료·미완료 상태가 실제와 맞고 구현된 기능만 실행방법 제공 | 없는 기능을 완료·실행 가능으로 표현하거나 구현 기능 안내 누락 | 불가 | EG-0, EG-3 이후 모든 게이트 |
 
 ### 4.2 장소 기준데이터
@@ -227,11 +233,13 @@ PM 승인된 실제 호출은 별도 수동 단계이며 Project Guard가 호출
   CLI를 `main`에 반영했다. Issue #43에서 PM 승인 범위의 실제 POI072 정상 JSON
   수집과 원본·메타데이터 저장을 확인해 EG-4를 통과했다.
 - EG-5: 대표 3장소 실제 수집과 데이터 구조·Feature 분석을 완료했다.
-- EG-6A: 13개 서비스 지역 제안, Area 매핑, Spot과 S-DoT 연결 참조데이터를 구현했다.
-  세 관련 매핑의 공간 관계를 확인해 서로 다른 공식 Area 13개를 승인했으며 Diff 검토 전이다.
-- EG-6B~EG-8: 미진행
+- EG-6A: 13개 서비스 지역 제안, Area 매핑, Spot과 S-DoT 연결 참조데이터를 구현해
+  PR #52로 `main`에 반영하고 통과했다.
+- EG-6B: 13개 Area 단일 순차수집·실패 격리·Batch Log·Manifest·SHA-256 구현을
+  PR #54로 `main`에 반영하고 H-706을 PASS했다. 실제 단일 회차와 PM PASS는 대기 중이다.
+- EG-7~EG-8: 미진행
 
-EG-6A에서는 `H-206`, `H-702`, `H-703`, `H-704`, `H-705`를 활성화하고 `H-707`은
+현재 `H-206`, `H-702`, `H-703`, `H-704`, `H-705`, `H-706`을 활성화하고 `H-707`은
 반복수집 전까지 `SKIP`한다. 총 검사 ID는 46개다.
 `H-504`, `H-505`, `H-601`, `H-602`는 Issue #32 결정에 따라 계속 `SKIP`한다.
 

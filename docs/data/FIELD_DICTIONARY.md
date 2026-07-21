@@ -1,15 +1,17 @@
 # Field Dictionary
 
 - 문서 상태: Draft
-- 버전: v0.1.1
+- 버전: v0.1.2
 - 작성자: 신동현
 - 최종 승인자: 신동현
 - 최초 작성일: 2026-07-17
-- 최종 수정일: 2026-07-20
+- 최종 수정일: 2026-07-22
 - 적용 프로젝트: Freshmanager Data PoC
 - 관련 문서:
   - `AGENTS.md`
-  - `requirements-definition-freshmanager-poc-v0.4.md`
+  - `docs/product/FreshManager_PRD_v1.0.md`
+  - `docs/engineering/FreshManager_TRD_v1.0.md`
+  - `requirements-definition-freshmanager-poc-v0.4.md` (역사 문서)
   - `docs/rules/DATA_COLLECTION_RULES.md`
   - `docs/analysis/ANALYSIS_PLAN.md`
   - `data/reference/seoul_121_places.csv`
@@ -63,12 +65,12 @@
 | 데이터셋 | 역할 | 현재 상태 |
 |---|---|---|
 | `places` | 공식 121장소 기준정보 | 공식 CSV 정비·main 반영 완료, 정확한 5개 컬럼·유효 장소 121개, EG-1 PASS |
-| `population_observations` | 현재 인구값 | 여의도 샘플 확인 |
-| `population_forecasts` | 미래 인구예측 | 여의도 샘플 확인 |
+| `population_observations` | 현재 인구값 | 여의도 공식 샘플과 EG-4·EG-5 실제 응답 확인; EG-6B 13개 회차 미실행 |
+| `population_forecasts` | 미래 인구예측 | 여의도 공식 샘플과 EG-4·EG-5 실제 응답 확인; EG-6B 13개 회차 미실행 |
 | `commerce_observations` | 카드소비 기반 상권현황 | 실응답 확인 필요 |
 | `weather_observations` | 날씨 관측 | 실응답 확인 필요 |
 | `weather_forecasts` | 날씨 예보 | 실응답 확인 필요 |
-| `collection_logs` | 수집 성공·실패 기록 | 구조 정의 |
+| `collection_logs` | 수집 성공·실패 기록 | EG-6B Batch Log·Manifest 계약 구현·오프라인 검증, 실제 13개 회차 미실행 |
 | `derived_features` | 분석용 파생필드 | 분석계획에 따라 생성 |
 
 ---

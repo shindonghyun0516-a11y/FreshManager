@@ -1,7 +1,7 @@
 # Data Collection Rules
 
-- 문서 상태: Draft
-- 버전: v0.1.4
+- 문서 상태: 공식 수집 기준
+- 버전: v0.1.6
 - 작성자: 신동현
 - 최종 승인자: 신동현
 - 최초 작성일: 2026-07-17
@@ -9,7 +9,9 @@
 - 적용 프로젝트: Freshmanager Data PoC
 - 관련 문서:
   - `AGENTS.md`
-  - `requirements-definition-freshmanager-poc-v0.4.md`
+  - `docs/product/FreshManager_PRD_v1.0.md`
+  - `docs/engineering/FreshManager_TRD_v1.0.md`
+  - `requirements-definition-freshmanager-poc-v0.4.md` (역사 문서)
   - `docs/rules/CODING_RULES.md`
   - `docs/rules/SECURITY_RULES.md`
   - `docs/data/FIELD_DICTIONARY.md`
@@ -41,7 +43,8 @@
 
 ### 2.1 공식 장소 범위
 
-수집 대상은 서울시 주요 121장소다.
+서울시 주요 121장소는 장기 공식 후보군이다. 현재 MVP 수집 대상은 EG-6A에서
+확정한 13개 Area이며, 121개 Area 확대는 EG-7·EG-8 결과와 별도 PM 승인 후 검토한다.
 
 유일한 공식 장소 기준파일:
 
@@ -126,8 +129,10 @@ POI014 강남역
 EG-5는 세 코드를 위 순서로 각각 최대 1회 처리하고 자동 재시도를 하지 않았으며,
 별도 PM 승인 아래 실제 수집과 구조 분석을 완료했다.
 
-EG-6A는 실제 수집 없이 13개 Area·Spot·S-DoT 참조 패널을 확정한다. EG-6B는
-같은 13개 Area의 단일 수집, Batch Log, Manifest와 SHA-256 무결성을 검증한다.
+EG-6A는 실제 수집 없이 13개 Area·Spot·S-DoT 참조 패널을 확정해 PR #52로
+`main`에 반영했다. EG-6B는 같은 13개 Area의 단일 수집, Batch Log, Manifest와
+SHA-256 무결성 파이프라인을 PR #54로 `main`에 반영했다. 실제 단일 회차와 결과
+검토는 아직 수행하지 않았으며 PM PASS 전에는 EG-6B를 통과로 표시하지 않는다.
 PM 확인용 CSV와 로컬·Google Spreadsheet 자동백업은 Issue #53 구현 범위에 포함하지
 않으며 필요하면 별도 PM 승인을 받는다. EG-7은 같은 13개 Area 반복수집 파일럿으로 제한하며,
 EG-8은 시간·장소·Forecast·S-DoT Feature를 분석한다. 현재 MVP 분석 범위는
@@ -213,8 +218,8 @@ Manifest는 공식 장소 CSV, EG-6A 참조 CSV 3개와 생성된 raw·metadata�
 
 `api_error`, `timeout`, `parse_error`, `validation_error`는 장소별 실패로 기록하고 다음
 Area를 처리한다. 공통 오류에서는 추가 호출을 중단하되 이미 저장된 결과를 되돌리지 않는다.
-`--execute-live`는 실제 호출 PM 승인을 대체하지 않으며 Issue #53 구현과 일반 검증은
-Fake Transport와 임시 output root만 사용한다.
+`--execute-live`는 실제 호출 PM 승인을 대체하지 않는다. Issue #53 구현과 일반 검증은
+Fake Transport와 임시 output root만 사용했고, 실제 최대 13회 단일 회차는 별도 승인 전이다.
 
 ---
 
@@ -712,10 +717,10 @@ EG-5 대표 3장소와 EG-6B 승인 13개 Area 단일 회차는 `retry_count=0`�
 - PM이 승인한 클라우드 폴더에 주기적으로 백업
 
 이 Gate는 수집 실행을 클라우드로 옮기는 것이 아니다. 수집은 로컬 Python에서
-유지하고 백업 작업만 별도로 수행한다. Issue #46은 백업 기능과 반복수집을 구현하지
-않으며 `H-707`은 그 전까지 `SKIP`한다.
+유지하고 백업 작업만 별도로 수행한다. EG-5와 EG-6B는 백업 기능과 반복수집을
+구현하지 않았으며 `H-707`은 EG-7 전까지 `SKIP`한다.
 
-Issue #53의 EG-6B 단일 수집 구현은 로컬·Google Spreadsheet 자동백업을 포함하지 않는다.
+Issue #53·PR #54의 EG-6B 단일 수집 구현은 로컬·Google Spreadsheet 자동백업을 포함하지 않는다.
 향후 로컬 스프레드시트 산출물을 추가하더라도 위 외장 저장장치·승인 클라우드 백업
 Gate를 대체하지 않는다. 반복수집 파일럿에 들어가기 전에는 위 백업 Gate와 다음 결과를
 확인한 뒤 EG-7 진입을 PM이 승인한다.
@@ -878,6 +883,7 @@ Gate를 대체하지 않는다. 반복수집 파일럿에 들어가기 전에는
 
 | 버전 | 날짜 | 변경내용 | 작성자 | 승인상태 |
 |---|---|---|---|---|
+| v0.1.6 | 2026-07-22 | PRD·TRD 공식 기준 연결, PR #54 병합 완료와 EG-6B 실제 단일 회차 대기 상태 정렬 | 신동현 | PM 승인 |
 | v0.1.5 | 2026-07-21 | Issue #53 EG-6B 13개 단일 회차의 단계 경로·Batch Log·Manifest·SHA-256·재시도 0회 계약 반영 | 신동현 | PM 구현 승인 |
 | v0.1.4 | 2026-07-21 | EG-6A 13개 패널 전략과 EG-6B·EG-7·EG-8 현행 순서 및 121개 Area 후속 검토 범위 반영 | 신동현 | PM 승인 |
 | v0.1.3 | 2026-07-21 | EG-5 저장 root probe와 공식 CSV 실행 전·후 무결성 검사 및 한계 반영 | 신동현 | PM 승인 |

@@ -8,17 +8,17 @@
 ## 0. 30초 요약
 
 - 프로젝트: **프레시매니저 유동판매 추천 서비스 — 데이터 타당성 PoC**
-- 현재 목표: EG-6A에서 확정한 13개 Area의 EG-6B 단일 순차수집을 오프라인으로 구현·검증
-- `main` 반영 완료: EG-0~EG-6A, CI 보강, 보호 경로 Hardening, 대표 3장소 실제 수집과 13개 참조 패널
-- 공식 진행 Issue: #53
+- 현재 목표: EG-6B 실제 13개 Area 단일 회차를 별도 PM 승인 아래 실행하고 결과를 검토
+- `main` 반영 완료: EG-0~EG-6A, EG-6B 단일 수집 파이프라인, CI 보강과 보호 경로 Hardening
+- 최근 완료 Issue: #53
 - 공식 기준 Branch: `main`
-- 공식 작업 Branch: `feature/issue-53-eg6b-single-collection`
-- 기준 Commit: `289bd18a5b870bc6dfde1ca18febbc48a948b8dc`
-- 현재 작업: 승인 13개 Area 단일 회차 CLI·Batch Log·Manifest·SHA-256 오프라인 구현
-- 현재 Engineering Gate: EG-6B 구현 진행 — 실제 API 호출 전 오프라인 검증 단계
+- 공식 작업 Branch: 없음
+- 기준 Commit: `6253cc502c9a3c4bc248cf6972f077a99e13f09d`
+- 현재 작업: 실제 단일 회차 실행 조건 확인과 PM의 최대 13회 호출 승인 대기
+- 현재 Engineering Gate: EG-6B 구현·오프라인 검증·병합 완료 / 실제 단일 회차·PM PASS 대기
 - 현재 Codex Engineering Harness 개편 상태: P1~P7 완료
-- 다음 공식 단계: **Issue #53 구현 Diff와 오프라인 검증 결과에 대한 PM 검토**
-- 실제 서울시 API 호출: EG-4 POI072와 EG-5 대표 3장소 수집 완료; EG-6A·EG-6B 구현 중 0회
+- 다음 공식 단계: **EG-6B 실제 최대 13회 호출에 대한 별도 PM 승인**
+- 실제 서울시 API 호출: EG-4 POI072와 EG-5 대표 3장소 완료; EG-6B 13개 Area 회차는 0회
 - Issue #43: 완료, PM이 EG-4 PASS 확정
 - 절대 주의:
   - API Key Commit 금지
@@ -30,8 +30,9 @@
 `git branch --show-current` 결과를 우선한다.
 
 Issue #43의 POI072와 후속 EG-5 대표 3장소 수집을 완료했다. PR #52에서 EG-6A
-13개 Area·Spot·S-DoT 참조데이터를 `main`에 반영했다. Issue #53은 같은 13개 Area의
-단일 수집 기능을 Fake Transport로 구현·검증하며 실제 호출은 별도 PM 승인 전 수행하지 않는다.
+13개 Area·Spot·S-DoT 참조데이터를, PR #54에서 같은 13개 Area의 단일 순차수집·
+Batch Log·Manifest·SHA-256 파이프라인을 `main`에 반영했다. 실제 최대 13회 호출은
+아직 수행하지 않았으며, 저장 결과 검토와 PM PASS 전에는 EG-6B를 통과로 표시하지 않는다.
 
 ---
 
@@ -164,16 +165,15 @@ Issue 생성
 내용이 서로 충돌할 때 다음 순서로 판단한다.
 
 ```text
-1. 현재 main 코드와 실제 테스트 결과
-2. 현재 GitHub Issue의 PM 확정 댓글
-3. 병합된 Pull Request
-4. PROJECT_STATUS.md
-5. AGENTS.md
-6. docs/testing/QUALITY_GATES.md
-7. docs/testing/PROJECT_GUARD_SPEC.md
-8. README.md
-9. 작업일지
-10. 과거 AI 대화
+1. PM의 최신 명시적 지시와 승인·금지사항
+2. 현재 main 코드와 실제 테스트 결과
+3. 현재 Issue의 PM 승인 범위와 병합된 Pull Request
+4. docs/product/FreshManager_PRD_v1.0.md
+5. docs/engineering/FreshManager_TRD_v1.0.md
+6. docs/rules/DATA_COLLECTION_RULES.md
+7. docs/testing/QUALITY_GATES.md
+8. AGENTS.md
+9. PROJECT_STATUS.md
 ```
 
 `PROJECT_STATUS.md`는 빠른 복원을 위한 문서다.
@@ -194,9 +194,19 @@ Issue 생성
 | EG-5 | 완료 | POI019·POI013·POI014 실제 수집 3건 성공, 재시도 0회, 데이터 구조·Feature 분석 완료 |
 | Issue #47 Hardening | 완료 | 보호 경로 제거와 H-206·Stacked PR CI 보강을 main에 반영 |
 | EG-6A | 완료 | Issue #51·PR #52에서 서로 다른 공식 Area 13개와 Spot·S-DoT 참조 패널을 main에 반영 |
-| EG-6B | 진행 | Issue #53에서 동일 13개 Area 단일 순차수집·Batch Log·Manifest·SHA-256을 오프라인 구현; 실제 호출 미승인 |
+| EG-6B | 진행 | Issue #53·PR #54로 단일 수집 파이프라인 구현·오프라인 검증·main 병합 완료; 실제 최대 13회 호출과 PM PASS 대기 |
 | EG-7 | 미진행 | 주기와 백업 Gate 승인 후 동일 13개 반복수집 파일럿 |
 | EG-8 | 미진행 | 반복 관측 데이터의 Feature 유효성 분석 |
+
+현재 `main` 최신 검증 기준:
+
+```text
+EG-6B Target Tests: 19/19 PASS
+Full Unit Tests: 243/243 PASS
+Project Guard: PASS=41, FAIL=0, WARN=0, SKIP=5, TOTAL=46, EXIT_CODE=0
+PR #54 CI: SUCCESS
+Merge 후 main CI: SUCCESS
+```
 
 > EG-0~EG-2의 상세 완료조건은 저장소 문서와 병합된 Issue·PR을 확인한다.
 
@@ -267,7 +277,15 @@ OK
 
 이 두 파일은 별도 Issue와 PM 승인 없이 수정하지 않는다.
 
-### 6.6 Codex Engineering Harness Architecture — Issue #24 / PR #25
+### 6.6 공식 제품·기술 기준문서
+
+- `docs/product/FreshManager_PRD_v1.0.md`: 제품 목적·범위·수용 기준
+- `docs/engineering/FreshManager_TRD_v1.0.md`: 현재 구현과 목표 기술 계약
+
+`requirements-definition-freshmanager-poc-v0.4.md`는 PRD v1.0 이전의 역사적
+요구사항 기준선으로 보존하며 현행 실행 순서나 승인 근거로 사용하지 않는다.
+
+### 6.7 Codex Engineering Harness Architecture — Issue #24 / PR #25
 
 - Issue #24 완료 및 Close
 - PR #25 Merge 완료
@@ -529,12 +547,13 @@ Python은 이 작업을 외부 패키지 없이 비교적 단순하게 수행할
 
 ---
 
-## 11. 현재 공식 단계 — EG-6B 구현
+## 11. 현재 공식 단계 — EG-6B 실제 단일 회차 대기
 
 EG-5에서 POI019·POI013·POI014를 각각 한 번 수집했고 모두 성공했다. 저장된 결과의
 데이터 구조·Feature 후보 분석과 최신 정적 자료 기반 S-DoT 커버리지 조사도 완료했다.
 Issue #51과 PR #52는 그 결과를 13개 Area·Spot·S-DoT 공식 참조데이터로 정리해
-`main`에 반영했다. Issue #53은 확정한 Area 패널의 단일 회차 수집을 구현한다.
+`main`에 반영했다. Issue #53과 PR #54는 확정한 Area 패널의 단일 회차 수집을
+구현·오프라인 검증해 `main`에 병합했다. 실제 13개 Area 회차는 아직 실행하지 않았다.
 
 ### 11.1 EG-6B를 쉬운 말로 설명하면
 
@@ -564,7 +583,7 @@ metadata를 분리해 저장한다. 한 장소의 API·Timeout·Parsing·Validat
 - 무결성: SHA-256 기록과 저장 후 재검증
 - 종료코드: 모두 성공 `0`, 장소별 실패 존재 `1`, 공통 오류 `2`
 
-### 11.3 Issue #53 구현에서 하지 않는 것
+### 11.3 현재 승인되지 않은 것
 
 - 실제 API 호출 또는 실데이터 13개 지역 수집
 - 반복수집·Scheduler·자동 재시도
@@ -574,10 +593,11 @@ metadata를 분리해 저장한다. 한 장소의 API·Timeout·Parsing·Validat
 - UI와 프레시매니저 위치 추적
 - Feature 분석과 실제 판매효과 분석
 
-Issue #53 구현과 오프라인 검증이 통과해도 실제 호출을 자동 승인하지 않는다. PM이 Diff,
-테스트, Project Guard 결과를 검토한 뒤 실제 output root·env-file과 최대 13회 호출을 별도로
-승인해야 한다. 반복수집 전에는 외장 저장장치 주기적 복사 또는 PM 승인 클라우드 폴더
-주기적 백업 중 하나를 별도 Gate로 준비하며 수집 실행은 로컬 Python에 유지한다.
+PR #54 병합과 오프라인 검증 통과는 실제 호출을 자동 승인하지 않는다. PM이 현재
+`main`, 실제 output root·env-file과 최대 13회 호출을 별도로 승인해야 한다. 실행 후
+Raw·Metadata·Collection Log·Manifest·SHA-256과 실패 목록을 검토해 PM이 EG-6B PASS를
+판정한다. 반복수집 전에는 외장 저장장치 주기적 복사 또는 PM 승인 클라우드 폴더 주기적
+백업 중 하나를 별도 Gate로 준비하며 수집 실행은 로컬 Python에 유지한다.
 
 ---
 
@@ -586,15 +606,14 @@ Issue #53 구현과 오프라인 검증이 통과해도 실제 호출을 자동 
 ### 12.1 AI가 먼저 확인할 자료
 
 1. `PROJECT_STATUS.md`
-2. `AGENTS.md`
-3. `docs/engineering/CODEX_HARNESS_ARCHITECTURE.md`
-4. `README.md`
-5. `docs/testing/QUALITY_GATES.md`
-6. `docs/testing/PROJECT_GUARD_SPEC.md`
-7. 현재 GitHub Issue
-8. 현재 Branch
-9. `git status --short`
-10. 최근 병합된 PR과 Commit
+2. `docs/product/FreshManager_PRD_v1.0.md`
+3. `docs/engineering/FreshManager_TRD_v1.0.md`
+4. `AGENTS.md`
+5. `docs/engineering/CODEX_HARNESS_ARCHITECTURE.md`
+6. `docs/rules/DATA_COLLECTION_RULES.md`
+7. `docs/testing/QUALITY_GATES.md`
+8. `docs/testing/PROJECT_GUARD_SPEC.md`
+9. 현재 GitHub Issue, Branch, `main` HEAD, `git status --short`와 최근 병합 PR
 
 ### 12.2 AI가 작업 전 보고할 내용
 
@@ -616,9 +635,10 @@ Issue #53 구현과 오프라인 검증이 통과해도 실제 호출을 자동 
 ```text
 저장소의 PROJECT_STATUS.md부터 읽고 프로젝트 상태를 복원해줘.
 
-그다음 AGENTS.md, docs/engineering/CODEX_HARNESS_ARCHITECTURE.md,
-README.md, QUALITY_GATES.md, PROJECT_GUARD_SPEC.md, 현재 GitHub Issue,
-Branch, 최근 PR과 Git 상태를 확인해줘.
+그다음 FreshManager PRD v1.0, TRD v1.0, AGENTS.md,
+docs/engineering/CODEX_HARNESS_ARCHITECTURE.md, DATA_COLLECTION_RULES.md,
+QUALITY_GATES.md, PROJECT_GUARD_SPEC.md, 현재 GitHub Issue, Branch,
+main HEAD, 최근 PR과 Git 상태를 확인해줘.
 
 나는 비개발자 PM이다. 반드시 다음 순서로 설명해줘.
 
@@ -685,26 +705,26 @@ Branch, 최근 PR과 Git 상태를 확인해줘.
 
 ## 14. 현재 다음 행동
 
-### 14.1 공식 진행 중인 작업
+### 14.1 공식 진행 상태
 
-- 공식 진행 Issue: #53
-- 공식 작업 Branch: `feature/issue-53-eg6b-single-collection`
-- 기준 `main`: `289bd18a5b870bc6dfde1ca18febbc48a948b8dc`
-- 현재 작업: 승인 13개 Area 단일 회차와 Batch 무결성 증거 오프라인 구현
-- 실제 API 호출: Issue #53 구현 중 0회
+- 최근 완료 Issue: #53
+- 공식 작업 Branch: 없음
+- 기준 `main`: `6253cc502c9a3c4bc248cf6972f077a99e13f09d`
+- 구현 상태: EG-6B 단일 회차 파이프라인 `main` 병합 완료
+- 실제 API 호출: EG-6B 13개 Area 회차 0회
 
-### 14.2 다음 행동 — Issue #53 검토
+### 14.2 다음 행동 — EG-6B 실제 단일 회차 승인
 
-1. 승인된 7개 파일만 변경됐는지 Diff를 읽기 전용으로 검토
-2. EG-6B Target Tests, 전체 Unit Tests와 Project Guard 결과 확인
-3. H-706의 13개 순서·1회 호출·소요시간·성공·실패·Manifest 검증 확인
-4. 비밀정보·실데이터·외부 네트워크 사용이 없는지 확인
-5. 별도 승인 후 Stage·Commit·Push·PR 진행
-6. `main` 반영 후 다시 검증하고 별도 PM 승인으로 실제 최대 13회 호출
+1. 현재 `main`과 Working Tree 상태를 확인
+2. 승인할 env-file·저장소 밖 output root·최대 호출 13회를 확정
+3. 실제 API 호출 없는 Preflight를 분리해 확인
+4. PM의 별도 실제 호출 승인 후 단일 회차를 한 번 실행
+5. Raw·Metadata·Collection Log·Manifest·SHA-256과 실패 목록 검토
+6. PM이 EG-6B PASS 또는 보완을 판정한 뒤에만 EG-7 설계로 전환
 
 ### 14.3 다음 제품 Engineering Gate
 
-- EG-6B: 구현·오프라인 검증 후 별도 승인으로 확정된 13개 Area 단일 수집
+- EG-6B: 구현·오프라인 검증·병합 완료; 실제 13개 Area 단일 회차와 PM PASS 대기
 - EG-7: 동일 패널 반복수집 파일럿; 실행 전 주기와 백업 방식 PM 승인 필요
 - EG-8: 반복 관측 결과를 이용한 Feature 유효성 분석
 - 121장소 확대는 위 MVP 검증 이후 후속 범위로 검토
@@ -713,14 +733,14 @@ Branch, 최근 PR과 Git 상태를 확인해줘.
 
 ## 15. 마지막 갱신 정보
 
-- 문서 버전: 1.16
-- 마지막 갱신일: 2026-07-21
-- 공식 진행 Issue: #53
+- 문서 버전: 1.17
+- 마지막 갱신일: 2026-07-22
+- 최근 완료 Issue: #53
 - 공식 기준 Branch: `main`
-- 기준 Commit: `289bd18a5b870bc6dfde1ca18febbc48a948b8dc`
-- 공식 작업 Branch: `feature/issue-53-eg6b-single-collection`
-- 현재 Engineering Gate: EG-6B 구현 진행 — 실제 호출 전 오프라인 검증
-- 현재 단계: 13개 단일 회차·Batch Log·Manifest·SHA-256 구현과 검증
+- 기준 Commit: `6253cc502c9a3c4bc248cf6972f077a99e13f09d`
+- 공식 작업 Branch: 없음
+- 현재 Engineering Gate: EG-6B 구현·오프라인 검증·병합 완료 / 실제 회차·PM PASS 대기
+- 현재 단계: 실제 최대 13회 단일 회차 승인 전
 - 완료된 최근 작업:
   - Issue #28 완료 및 PR #29 Squash and merge 완료
   - Squash Commit `0201eee`
@@ -742,6 +762,8 @@ Branch, 최근 PR과 Git 상태를 확인해줘.
   - EG-5 대표 3장소 실제 수집 3건 성공·재시도 0회
   - EG-5 데이터 구조·Feature 분석과 S-DoT 커버리지 조사 완료
   - Issue #51·PR #52로 EG-6A 13개 Area·Spot·S-DoT 참조 패널 main 반영
-- 다음 행동: Issue #53 구현 Diff와 오프라인 검증 결과 검토
-- 다음 공식 단계: Stage·Commit·PR 승인 후 별도 실제 13개 호출 승인
-- 실제 서울시 API 호출: Issue #53 구현 중 0회
+  - Issue #53·PR #54로 EG-6B 단일 순차수집·Batch Log·Manifest·SHA-256 파이프라인 main 반영
+  - PR #54와 병합 후 main CI 성공, Target 19/19·Full 243/243·Guard 41 PASS
+- 다음 행동: 실제 EG-6B 최대 13회 단일 회차에 대한 별도 PM 승인
+- 다음 공식 단계: 실제 결과 검토와 PM EG-6B PASS 후 EG-7 진입 결정
+- 실제 서울시 API 호출: EG-6B 13개 Area 회차 0회
