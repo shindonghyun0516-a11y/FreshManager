@@ -63,11 +63,27 @@ EG-0 문서 기준선
 | EG-8 | 미결정 |
 
 EG-3의 로컬 Project Guard와 단위 테스트 검증은 완료됐다. GitHub Actions Workflow가
-구현되어 `main` 대상 Pull Request와 `main` Push에서 Project Guard와 단위 테스트를
-자동 실행한다. 첫 Pull Request에서 `pull_request` Trigger를 검증하고, Merge 후
-`main` Push Trigger를 검증한다. Branch 보호 규칙은 아직 적용하지 않았으며,
+구현되어 Base Branch와 관계없이 모든 Pull Request와 `main` Push에서 Project Guard와
+단위 테스트를 자동 실행한다. Stacked·Draft Pull Request도 같은 CI Gate를 통과해야
+하며, Branch 필터 때문에 Workflow run이 생성되지 않은 상태는 `IN_PROGRESS`가 아니라
+`NOT_TRIGGERED_BY_BRANCH_FILTER`로 분류하고 CI 없이 Merge하지 않는다. 첫 Pull Request에서
+`pull_request` Trigger를 검증하고, Merge 후 `main` Push Trigger를 검증한다.
+Branch 보호 규칙은 아직 적용하지 않았으며,
 EG-4는 통과했고 EG-5는 Issue #46 범위의 오프라인 구현·보완 중이다. EG-5 대표
 3장소 실제 API 호출은 수행하지 않았으며 EG-6 이후는 미진행 상태다.
+
+Issue #47에서는 PR #48의 부모 Commit 위 stacked Branch에서 저장소 최상위
+`work log/` 폐기와 H-206 보호 경로 검사를 구현한다. GitHub Actions checkout은
+H-206의 PR Base·Head 삭제-only 비교에 필요한 전체 이력을 확보한다. 신규 작업일지는
+저장소 밖에서만 관리하고 Legacy 추적 예외는 두지 않으며, 병합 후 추적 허용 개수는
+0이다. `.gitignore`는 정확한 최상위 `/work log/` 규칙 하나만 사용하고 유사·중첩·
+일반 로그와 정상 프로젝트 경로까지 제외하는 광범위 규칙을 금지한다. 보호 내부
+파일명·상대경로·내용과 Git stdout·stderr 원문은 출력하지 않고 상태를 Boolean·개수로만
+보고한다. Issue #47의
+승인된 삭제-only 전환과 병합 후 항목 0 상태를 구분하며 Git 이력은 재작성하지 않는다.
+H-206은 EG-3 이후 활성 검사이고 현재 Project Guard는 `TOTAL=46`이다. PR #48은
+Issue #47 해결, 전체 회귀검증과 별도 PM 승인 전까지 Merge 보류다. Issue #47
+구현·검증에서는 실제 API 호출과 EG-5 대표 3장소 수집을 수행하지 않는다.
 
 ---
 
@@ -226,6 +242,8 @@ EG-0부터 EG-2까지의 기준을 반복 가능한 자동검사로 다시 검�
 - 실제 `.env`를 생성하거나 실제 인증키를 저장하지 않고 임시 fixture와 가짜 키만 사용한다.
 - 일반 Project Guard와 테스트의 네트워크·실제 API 호출이 0회다.
 - 적용 대상 필수검사가 모두 PASS이고 종료 코드가 `0`이다.
+- `H-206`은 보호 경로를 순회하거나 이름을 출력하지 않고 폐기 상태와 Git 비교를
+  검사하며 EG-3 이후 `SKIP`할 수 없다.
 - 아직 적용되지 않은 기능 검사는 사유를 기록해 SKIP할 수 있지만,
   EG-3 필수검사는 SKIP할 수 없다.
 - 결과를 `PROJECT_GUARD_REPORT_TEMPLATE.md` 형식으로 기록한다.

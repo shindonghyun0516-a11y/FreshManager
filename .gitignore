@@ -31,6 +31,9 @@ data/quality/**
 logs/**
 !logs/.gitkeep
 
+# 저장소 밖에서만 관리하는 개인 작업일지
+/work log/
+
 # 임시파일
 *.tmp
 *.temp
