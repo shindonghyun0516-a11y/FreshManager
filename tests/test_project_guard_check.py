@@ -947,6 +947,753 @@ class H206ProtectedWorkLogTests(unittest.TestCase):
         self.assertIn(project_guard.PROTECTED_GIT_HEAD_ENV, workflow)
 
 
+class CiWorkflowContractTests(unittest.TestCase):
+    FEATURE_BRANCH_PREFIXES = ("feat/", "feature/", "hardening/")
+    CHECKOUT_ACTION = "actions/checkout@v6"
+    PYTHON_ACTION = "actions/setup-python@v6"
+    PROJECT_GUARD_COMMAND = "python3 scripts/project_guard_check.py"
+    UNIT_TEST_COMMAND = 'python3 -B -m unittest discover -s tests -p "test_*.py" -v'
+    BASE_CONTEXT = "${{ github.event.pull_request.base.sha || github.event.before }}"
+    HEAD_CONTEXT = "${{ github.event.pull_request.head.sha || github.sha }}"
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.workflow_path = ROOT / ".github/workflows/ci.yml"
+        cls.workflow = cls.workflow_path.read_text(encoding="utf-8")
+
+    @staticmethod
+    def strip_yaml_comment(line: str) -> str:
+        single_quoted = False
+        double_quoted = False
+        index = 0
+        while index < len(line):
+            character = line[index]
+            if single_quoted:
+                if character == "'":
+                    if index + 1 < len(line) and line[index + 1] == "'":
+                        index += 2
+                        continue
+                    single_quoted = False
+            elif double_quoted:
+                if character == "\\":
+                    index += 2
+                    continue
+                if character == '"':
+                    double_quoted = False
+            elif character == "'":
+                single_quoted = True
+            elif character == '"':
+                double_quoted = True
+            elif character == "#" and (index == 0 or line[index - 1].isspace()):
+                return line[:index].rstrip()
+            index += 1
+        return line.rstrip()
+
+    def semantic_lines(self, workflow: str) -> list[tuple[int, str]]:
+        semantic: list[tuple[int, str]] = []
+        for raw_line in workflow.splitlines():
+            line = self.strip_yaml_comment(raw_line)
+            if not line.strip():
+                continue
+            leading = line[: len(line) - len(line.lstrip())]
+            self.assertNotIn("\t", leading, "workflow indentation must use spaces")
+            semantic.append((len(leading), line.strip()))
+        return semantic
+
+    @staticmethod
+    def strip_matching_yaml_quotes(value: str) -> str:
+        if (
+            len(value) >= 2
+            and value[0] == value[-1]
+            and value[0] in {"'", '"'}
+        ):
+            return value[1:-1]
+        return value
+
+    @classmethod
+    def normalize_yaml_scalar(cls, value: str) -> str:
+        return cls.strip_matching_yaml_quotes(value.strip())
+
+    @classmethod
+    def normalize_yaml_key(cls, key: str) -> str:
+        return cls.strip_matching_yaml_quotes(key.strip())
+
+    @classmethod
+    def mapping_pair(cls, content: str) -> tuple[str, str] | None:
+        candidate = content[2:].lstrip() if content.startswith("- ") else content
+        single_quoted = False
+        double_quoted = False
+        index = 0
+        while index < len(candidate):
+            character = candidate[index]
+            if single_quoted:
+                if character == "'":
+                    if index + 1 < len(candidate) and candidate[index + 1] == "'":
+                        index += 2
+                        continue
+                    single_quoted = False
+            elif double_quoted:
+                if character == "\\":
+                    index += 2
+                    continue
+                if character == '"':
+                    double_quoted = False
+            elif character == "'":
+                single_quoted = True
+            elif character == '"':
+                double_quoted = True
+            elif character == ":" and (
+                index + 1 == len(candidate) or candidate[index + 1].isspace()
+            ):
+                key = candidate[:index].strip()
+                if not key:
+                    return None
+                return cls.normalize_yaml_key(key), candidate[index + 1 :].strip()
+            index += 1
+        return None
+
+    def mapping_index(
+        self,
+        lines: list[tuple[int, str]],
+        key: str,
+        *,
+        indent: int,
+    ) -> int:
+        matches = []
+        for index, (line_indent, content) in enumerate(lines):
+            pair = self.mapping_pair(content)
+            if line_indent == indent and pair is not None and pair[0] == key:
+                matches.append(index)
+        self.assertEqual(len(matches), 1, f"missing or duplicate mapping: {key}")
+        return matches[0]
+
+    @staticmethod
+    def descendant_indices(lines: list[tuple[int, str]], parent_index: int) -> list[int]:
+        parent_indent = lines[parent_index][0]
+        descendants: list[int] = []
+        for index in range(parent_index + 1, len(lines)):
+            line_indent = lines[index][0]
+            if line_indent <= parent_indent:
+                break
+            descendants.append(index)
+        return descendants
+
+    def direct_mapping(
+        self,
+        lines: list[tuple[int, str]],
+        parent_index: int,
+    ) -> dict[str, tuple[str, int]]:
+        descendants = self.descendant_indices(lines, parent_index)
+        if not descendants:
+            return {}
+        child_indent = min(lines[index][0] for index in descendants)
+        entries: dict[str, tuple[str, int]] = {}
+        for index in descendants:
+            line_indent, content = lines[index]
+            if line_indent != child_indent or content.startswith("- "):
+                continue
+            pair = self.mapping_pair(content)
+            self.assertIsNotNone(pair, "invalid YAML mapping entry")
+            assert pair is not None
+            key, value = pair
+            self.assertNotIn(key, entries, f"duplicate mapping entry: {key}")
+            entries[key] = (value.strip(), index)
+        return entries
+
+    def list_values(self, lines: list[tuple[int, str]], parent_index: int) -> list[str]:
+        descendants = self.descendant_indices(lines, parent_index)
+        if not descendants:
+            return []
+        item_indent = min(lines[index][0] for index in descendants)
+        values: list[str] = []
+        for index in descendants:
+            line_indent, content = lines[index]
+            if line_indent != item_indent:
+                continue
+            self.assertTrue(content.startswith("- "), "expected a YAML list item")
+            values.append(self.normalize_yaml_scalar(content[2:]))
+        return values
+
+    def step_blocks(
+        self,
+        lines: list[tuple[int, str]],
+        steps_index: int,
+    ) -> list[list[tuple[int, str]]]:
+        descendants = self.descendant_indices(lines, steps_index)
+        self.assertTrue(descendants, "workflow steps must not be empty")
+        item_indent = min(lines[index][0] for index in descendants)
+        starts: list[int] = []
+        for index in descendants:
+            line_indent, content = lines[index]
+            if line_indent != item_indent or not content.startswith("- "):
+                continue
+            pair = self.mapping_pair(content)
+            self.assertIsNotNone(pair, "workflow step must start with a mapping")
+            assert pair is not None
+            self.assertEqual(pair[0], "name", "workflow step must start with name")
+            self.assertTrue(self.normalize_yaml_scalar(pair[1]), "workflow step name must not be empty")
+            starts.append(index)
+        blocks: list[list[tuple[int, str]]] = []
+        for position, start in enumerate(starts):
+            end = starts[position + 1] if position + 1 < len(starts) else descendants[-1] + 1
+            blocks.append(lines[start:end])
+        return blocks
+
+    def values_for_key(self, lines: list[tuple[int, str]], key: str) -> list[str]:
+        values: list[str] = []
+        for _, content in lines:
+            pair = self.mapping_pair(content)
+            if pair is not None and pair[0] == key:
+                values.append(self.normalize_yaml_scalar(pair[1]))
+        return values
+
+    def identify_step_semantics(self, block: list[tuple[int, str]]) -> str:
+        settings = self.direct_mapping(block, 0)
+        uses = settings.get("uses")
+        run = settings.get("run")
+        self.assertFalse(uses is not None and run is not None, "workflow step cannot combine uses and run")
+        if uses is not None:
+            uses_value = self.normalize_yaml_scalar(uses[0])
+            return {
+                self.CHECKOUT_ACTION: "checkout",
+                self.PYTHON_ACTION: "python_setup",
+            }.get(uses_value, "unknown")
+        if run is not None:
+            run_value = self.normalize_yaml_scalar(run[0])
+            return {
+                self.PROJECT_GUARD_COMMAND: "project_guard",
+                self.UNIT_TEST_COMMAND: "unit_tests",
+            }.get(run_value, "unknown")
+        return "unknown"
+
+    def normalized_mapping_values(
+        self,
+        mapping: dict[str, tuple[str, int]],
+    ) -> dict[str, str]:
+        return {
+            key: self.normalize_yaml_scalar(value)
+            for key, (value, _) in mapping.items()
+        }
+
+    def contains_yaml_key(self, lines: list[tuple[int, str]], key: str) -> bool:
+        return any(
+            pair is not None and pair[0] == key
+            for _, content in lines
+            if (pair := self.mapping_pair(content)) is not None
+        )
+
+    def contains_feature_branch_condition(self, lines: list[tuple[int, str]]) -> bool:
+        for _, content in lines:
+            pair = self.mapping_pair(content)
+            if pair is None or pair[0] != "if":
+                continue
+            condition = self.normalize_yaml_scalar(pair[1]).casefold()
+            if any(prefix in condition for prefix in self.FEATURE_BRANCH_PREFIXES):
+                return True
+        return False
+
+    @staticmethod
+    def contains_secret_expression(lines: list[tuple[int, str]]) -> bool:
+        for _, content in lines:
+            compacted = "".join(content.split()).casefold()
+            if "${{secrets." in compacted or "${{secrets[" in compacted:
+                return True
+        return False
+
+    def trigger_contract(
+        self,
+        lines: list[tuple[int, str]],
+    ) -> tuple[dict[str, tuple[str, int]], dict[str, tuple[str, int]]]:
+        on_index = self.mapping_index(lines, "on", indent=0)
+        events = self.direct_mapping(lines, on_index)
+        self.assertEqual(set(events), {"pull_request", "push"})
+
+        pull_request_value, pull_request_index = events["pull_request"]
+        self.assertIn(
+            self.normalize_yaml_scalar(pull_request_value).casefold(),
+            {"", "null", "~", "{}"},
+        )
+        self.assertEqual(
+            self.descendant_indices(lines, pull_request_index),
+            [],
+            "pull_request must not contain branch or activity filters",
+        )
+
+        push_value, push_index = events["push"]
+        self.assertEqual(self.normalize_yaml_scalar(push_value), "")
+        push_settings = self.direct_mapping(lines, push_index)
+        self.assertEqual(set(push_settings), {"branches"})
+        branches_value, branches_index = push_settings["branches"]
+        self.assertEqual(self.normalize_yaml_scalar(branches_value), "")
+        self.assertEqual(self.list_values(lines, branches_index), ["main"])
+        return events, push_settings
+
+    def safety_contract(self, lines: list[tuple[int, str]]) -> None:
+        self.assertFalse(self.contains_yaml_key(lines, "continue-on-error"))
+        self.assertFalse(self.contains_feature_branch_condition(lines))
+        self.assertFalse(self.contains_secret_expression(lines))
+
+    def job_contract(self, lines: list[tuple[int, str]]) -> None:
+        permissions_index = self.mapping_index(lines, "permissions", indent=0)
+        permissions = self.direct_mapping(lines, permissions_index)
+        self.assertEqual(
+            {key: self.normalize_yaml_scalar(value) for key, (value, _) in permissions.items()},
+            {"contents": "read"},
+        )
+
+        jobs_index = self.mapping_index(lines, "jobs", indent=0)
+        jobs = self.direct_mapping(lines, jobs_index)
+        self.assertEqual(set(jobs), {"project_guard"})
+        _, project_guard_index = jobs["project_guard"]
+        job_settings = self.direct_mapping(lines, project_guard_index)
+        self.assertEqual(set(job_settings), {"name", "runs-on", "steps"})
+        self.assertEqual(
+            self.normalize_yaml_scalar(job_settings["name"][0]),
+            "Project Guard and Unit Tests",
+        )
+        self.assertEqual(self.normalize_yaml_scalar(job_settings["runs-on"][0]), "ubuntu-latest")
+
+        steps = self.step_blocks(lines, job_settings["steps"][1])
+        self.assertEqual(
+            [self.identify_step_semantics(block) for block in steps],
+            ["checkout", "python_setup", "project_guard", "unit_tests"],
+        )
+        checkout_step, python_step, guard_step, unit_test_step = steps
+
+        checkout_settings = self.direct_mapping(checkout_step, 0)
+        self.assertEqual(set(checkout_settings), {"uses", "with"})
+        self.assertEqual(
+            self.normalize_yaml_scalar(checkout_settings["uses"][0]),
+            self.CHECKOUT_ACTION,
+        )
+        checkout_with = self.direct_mapping(checkout_step, checkout_settings["with"][1])
+        self.assertEqual(
+            self.normalized_mapping_values(checkout_with),
+            {"fetch-depth": "0", "persist-credentials": "false"},
+        )
+
+        python_settings = self.direct_mapping(python_step, 0)
+        self.assertEqual(set(python_settings), {"uses", "with"})
+        self.assertEqual(
+            self.normalize_yaml_scalar(python_settings["uses"][0]),
+            self.PYTHON_ACTION,
+        )
+        python_with = self.direct_mapping(python_step, python_settings["with"][1])
+        self.assertEqual(
+            self.normalized_mapping_values(python_with),
+            {"python-version": "3.12"},
+        )
+
+        guard_settings = self.direct_mapping(guard_step, 0)
+        self.assertIn("env", guard_settings)
+        self.assertEqual(
+            self.normalize_yaml_scalar(guard_settings["run"][0]),
+            self.PROJECT_GUARD_COMMAND,
+        )
+        guard_env = self.direct_mapping(guard_step, guard_settings["env"][1])
+        self.assertEqual(
+            self.normalize_yaml_scalar(guard_env[project_guard.PROTECTED_GIT_BASE_ENV][0]),
+            self.BASE_CONTEXT,
+        )
+        self.assertEqual(
+            self.normalize_yaml_scalar(guard_env[project_guard.PROTECTED_GIT_HEAD_ENV][0]),
+            self.HEAD_CONTEXT,
+        )
+
+        unit_test_settings = self.direct_mapping(unit_test_step, 0)
+        self.assertEqual(set(unit_test_settings), {"run"})
+        self.assertEqual(
+            self.normalize_yaml_scalar(unit_test_settings["run"][0]),
+            self.UNIT_TEST_COMMAND,
+        )
+        action_uses = self.values_for_key(lines, "uses")
+        self.assertEqual(action_uses, [self.CHECKOUT_ACTION, self.PYTHON_ACTION])
+
+    def build_ci_fixture(
+        self,
+        *,
+        indent_width: int = 2,
+        include_pull_request: bool = True,
+        pull_request_key: str = "pull_request",
+        pull_request_value: str = "",
+        pull_request_filter_key: str | None = None,
+        pull_request_filter_depth: int = 1,
+        pull_request_comment: bool = False,
+        extra_event_key: str | None = None,
+        push_branch_key: str | None = "branches",
+        push_branch_value: str = "main",
+        permissions_key: str = "permissions",
+        permission_content_key: str = "contents",
+        permission_value: str = "read",
+        job_if_key: str = "if",
+        job_if: str | None = None,
+        guard_if_key: str = "if",
+        guard_if: str | None = None,
+        continue_on_error_key: str | None = None,
+        continue_on_error_value: str = "true",
+        step_names: dict[str, str] | None = None,
+        guard_description: str | None = None,
+        checkout_uses: str = CHECKOUT_ACTION,
+        python_uses: str = PYTHON_ACTION,
+        python_version: str = "3.12",
+        guard_run: str = PROJECT_GUARD_COMMAND,
+        unit_test_run: str = UNIT_TEST_COMMAND,
+        include_checkout: bool = True,
+        include_python: bool = True,
+        include_guard: bool = True,
+        include_unit_tests: bool = True,
+        extra_action: str | None = None,
+        fetch_depth: str = "0",
+        persist_credentials: str = "false",
+        secret_expression: bool = False,
+        header_comment: str | None = None,
+    ) -> str:
+        self.assertGreater(indent_width, 0)
+        self.assertGreaterEqual(pull_request_filter_depth, 1)
+        indent = lambda level: " " * (indent_width * level)
+        names = {
+            "checkout": "Checkout repository",
+            "python_setup": "Set up Python",
+            "project_guard": "Run Project Guard",
+            "unit_tests": "Run unit tests",
+        }
+        if step_names is not None:
+            names.update(step_names)
+
+        lines = ["name: CI Validation"]
+        if header_comment is not None:
+            lines.append(f"# {header_comment}")
+        lines.extend(["", "on:"])
+        if include_pull_request:
+            suffix = f" {pull_request_value}" if pull_request_value else ""
+            lines.append(f"{indent(1)}{pull_request_key}:{suffix}")
+            if pull_request_filter_key is not None:
+                if pull_request_comment:
+                    lines.extend([f"{indent(2)}# trigger filter", ""])
+                for level in range(2, pull_request_filter_depth + 1):
+                    lines.append(f"{indent(level)}nested_filter_{level}:")
+                filter_level = pull_request_filter_depth + 1
+                lines.extend(
+                    [
+                        f"{indent(filter_level)}{pull_request_filter_key}:",
+                        f"{indent(filter_level + 1)}- feature/example",
+                    ]
+                )
+            elif pull_request_comment:
+                lines.extend([f"{indent(1)}# trigger comment", ""])
+        if extra_event_key is not None:
+            lines.append(f"{indent(1)}{extra_event_key}:")
+        lines.append(f"{indent(1)}push:")
+        if push_branch_key is not None:
+            lines.extend(
+                [
+                    f"{indent(2)}{push_branch_key}:",
+                    f"{indent(3)}- {push_branch_value}",
+                ]
+            )
+        lines.extend(
+            [
+                "",
+                f"{permissions_key}:",
+                f"{indent(1)}{permission_content_key}: {permission_value}",
+                "",
+                "jobs:",
+                f"{indent(1)}project_guard:",
+            ]
+        )
+        if job_if is not None:
+            lines.append(f"{indent(2)}{job_if_key}: {job_if}")
+        lines.extend(
+            [
+                f"{indent(2)}name: Project Guard and Unit Tests",
+                f"{indent(2)}runs-on: ubuntu-latest",
+                f"{indent(2)}steps:",
+            ]
+        )
+
+        def add_step(name: str, body: list[str]) -> None:
+            lines.append(f"{indent(3)}- name: {name}")
+            lines.extend(f"{indent(4)}{entry}" for entry in body)
+
+        if include_checkout:
+            add_step(
+                names["checkout"],
+                [
+                    f"uses: {checkout_uses}",
+                    "with:",
+                    f"{indent(1)}fetch-depth: {fetch_depth}",
+                    f"{indent(1)}persist-credentials: {persist_credentials}",
+                ],
+            )
+        if include_python:
+            add_step(
+                names["python_setup"],
+                [
+                    f"uses: {python_uses}",
+                    "with:",
+                    f'{indent(1)}python-version: "{python_version}"',
+                ],
+            )
+        if extra_action is not None:
+            add_step("Additional action", [f"uses: {extra_action}"])
+        if include_guard:
+            guard_body: list[str] = []
+            if guard_if is not None:
+                guard_body.append(f"{guard_if_key}: {guard_if}")
+            if continue_on_error_key is not None:
+                guard_body.append(f"{continue_on_error_key}: {continue_on_error_value}")
+            guard_body.extend(
+                [
+                    "env:",
+                    f"{indent(1)}{project_guard.PROTECTED_GIT_BASE_ENV}: {self.BASE_CONTEXT}",
+                    f"{indent(1)}{project_guard.PROTECTED_GIT_HEAD_ENV}: {self.HEAD_CONTEXT}",
+                ]
+            )
+            if guard_description is not None:
+                guard_body.append(f'{indent(1)}DESCRIPTION: "{guard_description}"')
+            if secret_expression:
+                guard_body.append(f'{indent(1)}"CI_TOKEN": ${{{{ secrets.CI_TOKEN }}}}')
+            guard_body.append(f"run: {guard_run}")
+            add_step(names["project_guard"], guard_body)
+        if include_unit_tests:
+            add_step(names["unit_tests"], [f"run: {unit_test_run}"])
+        return "\n".join(lines) + "\n"
+
+    def assert_workflow_contract(self, workflow: str) -> None:
+        lines = self.semantic_lines(workflow)
+        self.trigger_contract(lines)
+        self.safety_contract(lines)
+        self.job_contract(lines)
+
+    def assert_workflow_rejected(self, workflow: str) -> None:
+        with self.assertRaises(AssertionError):
+            self.assert_workflow_contract(workflow)
+
+    def test_pull_request_runs_for_all_base_branches(self) -> None:
+        lines = self.semantic_lines(self.workflow)
+        events, _ = self.trigger_contract(lines)
+        pull_request_value, pull_request_index = events["pull_request"]
+        self.assertEqual(self.normalize_yaml_scalar(pull_request_value), "")
+        self.assertEqual(self.descendant_indices(lines, pull_request_index), [])
+
+    def test_push_remains_limited_to_main(self) -> None:
+        lines = self.semantic_lines(self.workflow)
+        _, push_settings = self.trigger_contract(lines)
+        _, branches_index = push_settings["branches"]
+        self.assertEqual(self.list_values(lines, branches_index), ["main"])
+
+    def test_trigger_has_no_unsafe_or_branch_specific_bypass(self) -> None:
+        lines = self.semantic_lines(self.workflow)
+        events, _ = self.trigger_contract(lines)
+        self.assertNotIn("pull_request_target", events)
+        self.assertNotIn("workflow_dispatch", events)
+        self.safety_contract(lines)
+
+    def test_existing_job_and_steps_are_preserved(self) -> None:
+        self.job_contract(self.semantic_lines(self.workflow))
+
+    def test_ci_audit_001_rejects_pull_request_filters_at_any_indentation(self) -> None:
+        mutations = (
+            ("two_space_child", 2, 1, False),
+            ("four_space_child", 4, 1, False),
+            ("deeper_nested_filter", 2, 3, False),
+            ("hidden_after_comments", 2, 1, True),
+        )
+        for name, indent_width, depth, comment in mutations:
+            with self.subTest(name=name):
+                candidate = self.build_ci_fixture(
+                    indent_width=indent_width,
+                    pull_request_filter_key="branches",
+                    pull_request_filter_depth=depth,
+                    pull_request_comment=comment,
+                )
+                self.assert_workflow_rejected(candidate)
+
+        for null_value in ("", "null", "~", "{}"):
+            with self.subTest(null_value=null_value):
+                self.assert_workflow_contract(self.build_ci_fixture(pull_request_value=null_value))
+        self.assert_workflow_contract(self.workflow)
+
+    def test_ci_audit_002_rejects_continue_on_error_key_spacing(self) -> None:
+        for key, value in (
+            ("continue-on-error", "true"),
+            ("continue-on-error ", "true"),
+            ("continue-on-error", "false"),
+            ("continue-on-error ", "false"),
+        ):
+            with self.subTest(key=key, value=value):
+                self.assert_workflow_rejected(
+                    self.build_ci_fixture(
+                        continue_on_error_key=key,
+                        continue_on_error_value=value,
+                    )
+                )
+        self.assert_workflow_contract(
+            self.build_ci_fixture(
+                header_comment="continue-on-error : true",
+                step_names={"project_guard": "Review continue-on-error documentation"},
+            )
+        )
+        self.assert_workflow_contract(
+            self.build_ci_fixture(guard_description="continue-on-error: true")
+        )
+
+    def test_ci_reaudit_001_rejects_quoted_safety_keys(self) -> None:
+        for key, value in (
+            ("'continue-on-error'", "true"),
+            ('"continue-on-error"', "true"),
+            ("'continue-on-error' ", "false"),
+            ('"continue-on-error" ', "false"),
+        ):
+            with self.subTest(setting="continue_on_error", key=key, value=value):
+                self.assert_workflow_rejected(
+                    self.build_ci_fixture(
+                        continue_on_error_key=key,
+                        continue_on_error_value=value,
+                    )
+                )
+
+        for key, condition, location in (
+            ("'if'", "github.head_ref == 'feature/example'", "job"),
+            ('"if"', "github.head_ref == 'hardening/example'", "step"),
+        ):
+            with self.subTest(setting="if", key=key, location=location):
+                if location == "job":
+                    candidate = self.build_ci_fixture(job_if_key=key, job_if=condition)
+                else:
+                    candidate = self.build_ci_fixture(guard_if_key=key, guard_if=condition)
+                    self.assertTrue(
+                        self.contains_feature_branch_condition(self.semantic_lines(candidate))
+                    )
+                self.assert_workflow_rejected(candidate)
+
+        for key in ("'branches'", '"branches-ignore"'):
+            with self.subTest(setting="pull_request_filter", key=key):
+                self.assert_workflow_rejected(
+                    self.build_ci_fixture(pull_request_filter_key=key)
+                )
+
+        for event_key in ("'pull_request_target'", '"workflow_dispatch"'):
+            with self.subTest(setting="event", key=event_key):
+                if "pull_request_target" in event_key:
+                    candidate = self.build_ci_fixture(pull_request_key=event_key)
+                else:
+                    candidate = self.build_ci_fixture(extra_event_key=event_key)
+                self.assert_workflow_rejected(candidate)
+
+        self.assert_workflow_rejected(
+            self.build_ci_fixture(permissions_key="'permissions'", permission_value="write")
+        )
+        self.assert_workflow_contract(
+            self.build_ci_fixture(
+                permissions_key='"permissions"',
+                permission_content_key="'contents'",
+                push_branch_key='"branches"',
+            )
+        )
+        self.assert_workflow_rejected(self.build_ci_fixture(secret_expression=True))
+        self.assert_workflow_contract(
+            self.build_ci_fixture(
+                header_comment="'continue-on-error': true",
+                guard_description='"if": feature/example is documentation',
+            )
+        )
+
+    def test_ci_audit_003_checks_branch_fields_not_comments_or_descriptions(self) -> None:
+        for filter_key in ("branches", "branches-ignore"):
+            with self.subTest(filter_key=filter_key):
+                self.assert_workflow_rejected(
+                    self.build_ci_fixture(pull_request_filter_key=filter_key)
+                )
+        self.assert_workflow_rejected(
+            self.build_ci_fixture(job_if="github.head_ref == 'feature/example'")
+        )
+        self.assert_workflow_rejected(
+            self.build_ci_fixture(guard_if="github.head_ref == 'hardening/example'")
+        )
+        self.assert_workflow_contract(
+            self.build_ci_fixture(
+                header_comment="feature/example and hardening/example are documentation only",
+                guard_description="review feature/example safely",
+                step_names={"project_guard": "Review feature/example"},
+            )
+        )
+
+    def test_ci_reaudit_002_allows_step_display_name_changes(self) -> None:
+        replacements = {
+            "checkout": "Fetch trusted sources",
+            "python_setup": "Prepare feature/example runtime",
+            "project_guard": "Review hardening/example safely",
+            "unit_tests": "Execute complete verification",
+        }
+        for semantic, display_name in replacements.items():
+            with self.subTest(semantic=semantic):
+                self.assert_workflow_contract(
+                    self.build_ci_fixture(step_names={semantic: display_name})
+                )
+        self.assert_workflow_contract(
+            self.build_ci_fixture(guard_description="hardening/example documentation")
+        )
+
+    def test_ci_reaudit_002_rejects_missing_or_changed_step_semantics(self) -> None:
+        mutations = {
+            "checkout_removed": {"include_checkout": False},
+            "python_removed": {"include_python": False},
+            "guard_removed": {"include_guard": False},
+            "unit_tests_removed": {"include_unit_tests": False},
+            "checkout_action_changed": {"checkout_uses": "actions/cache@v4"},
+            "python_action_changed": {"python_uses": "actions/cache@v4"},
+            "python_version_changed": {"python_version": "3.11"},
+            "guard_run_removed": {"guard_run": ""},
+            "unit_test_run_changed": {"unit_test_run": "python3 -B -m unittest"},
+            "same_name_fake_guard": {"guard_run": "python3 harmless.py"},
+            "external_action_added": {"extra_action": "actions/cache@v4"},
+        }
+        for name, kwargs in mutations.items():
+            with self.subTest(name=name):
+                self.assert_workflow_rejected(self.build_ci_fixture(**kwargs))
+
+    def test_ci_reaudit_003_uses_independent_reindentable_fixtures(self) -> None:
+        for indent_width in (2, 4):
+            with self.subTest(indent_width=indent_width):
+                self.assert_workflow_contract(
+                    self.build_ci_fixture(
+                        indent_width=indent_width,
+                        pull_request_comment=True,
+                        header_comment="blank lines and comments are harmless",
+                        step_names={"unit_tests": "Validate feature/example"},
+                    )
+                )
+        unsafe_mutations = (
+            {"pull_request_filter_key": "branches"},
+            {"continue_on_error_key": "continue-on-error"},
+            {"permission_value": "write"},
+            {"secret_expression": True},
+            {"include_guard": False},
+            {"include_unit_tests": False},
+        )
+        for kwargs in unsafe_mutations:
+            with self.subTest(kwargs=kwargs):
+                self.assert_workflow_rejected(self.build_ci_fixture(**kwargs))
+
+    def test_rejects_existing_ci_contract_regressions(self) -> None:
+        mutations = {
+            "pull_request_removed": {"include_pull_request": False},
+            "pull_request_target": {"pull_request_key": "pull_request_target"},
+            "workflow_dispatch": {"extra_event_key": "workflow_dispatch"},
+            "push_all_branches": {"push_branch_key": None},
+            "project_guard_step_removed": {"include_guard": False},
+            "unit_test_step_removed": {"include_unit_tests": False},
+            "fetch_depth_reduced": {"fetch_depth": "1"},
+            "credentials_protection_removed": {"persist_credentials": "true"},
+            "permissions_expanded": {"permission_value": "write"},
+            "secret_added": {"secret_expression": True},
+        }
+        for name, kwargs in mutations.items():
+            with self.subTest(name=name):
+                self.assert_workflow_rejected(self.build_ci_fixture(**kwargs))
+
+
 class Eg4ProjectGuardTests(unittest.TestCase):
     def setUp(self) -> None:
         self.project = TemporaryProject()

@@ -63,9 +63,12 @@ EG-0 문서 기준선
 | EG-8 | 미결정 |
 
 EG-3의 로컬 Project Guard와 단위 테스트 검증은 완료됐다. GitHub Actions Workflow가
-구현되어 `main` 대상 Pull Request와 `main` Push에서 Project Guard와 단위 테스트를
-자동 실행한다. 첫 Pull Request에서 `pull_request` Trigger를 검증하고, Merge 후
-`main` Push Trigger를 검증한다. Branch 보호 규칙은 아직 적용하지 않았으며,
+구현되어 Base Branch와 관계없이 모든 Pull Request와 `main` Push에서 Project Guard와
+단위 테스트를 자동 실행한다. Stacked·Draft Pull Request도 같은 CI Gate를 통과해야
+하며, Branch 필터 때문에 Workflow run이 생성되지 않은 상태는 `IN_PROGRESS`가 아니라
+`NOT_TRIGGERED_BY_BRANCH_FILTER`로 분류하고 CI 없이 Merge하지 않는다. 첫 Pull Request에서
+`pull_request` Trigger를 검증하고, Merge 후 `main` Push Trigger를 검증한다.
+Branch 보호 규칙은 아직 적용하지 않았으며,
 EG-4는 통과했고 EG-5는 Issue #46 범위의 오프라인 구현·보완 중이다. EG-5 대표
 3장소 실제 API 호출은 수행하지 않았으며 EG-6 이후는 미진행 상태다.
 

@@ -1,7 +1,7 @@
 # Git Workflow
 
 - 문서 상태: Draft
-- 버전: v0.1.3
+- 버전: v0.1.4
 - 작성자: 신동현
 - 최종 승인자: 신동현
 - 최초 작성일: 2026-07-17
@@ -28,7 +28,7 @@
 2. 작업 목적과 범위를 Issue 단위로 명확히 한다.
 3. 모든 변경을 Branch 또는 Worktree에서 분리한다.
 4. 변경 결과와 검증 근거를 Pull Request에 기록한다.
-5. 적용 대상 Project Guard와 Unit Tests를 통과하고, 구성된 경우 GitHub Actions도 통과한 변경만 병합한다.
+5. 적용 대상 Project Guard와 Unit Tests 및 모든 Pull Request의 GitHub Actions를 통과한 변경만 병합한다.
 6. PM이 최종 승인권을 유지한다.
 7. 문제가 발생했을 때 변경 이유와 이력을 추적할 수 있게 한다.
 
@@ -69,7 +69,7 @@
 | Commit | 의미 있는 변경사항을 저장한 하나의 기록 |
 | Push | 로컬 Commit을 GitHub에 업로드하는 작업 |
 | Issue | 한 번의 작업 목적·범위·완료조건을 정의한 작업요청서 |
-| Pull Request | 작업 Branch를 `main`에 반영하기 위한 검토·승인 요청 |
+| Pull Request | 작업 Branch를 `main` 또는 PM이 승인한 부모 Branch에 반영하기 위한 검토·승인 요청 |
 | Merge | 승인된 작업 Branch의 변경을 `main`에 반영하는 작업 |
 | Project Guard | 파일·데이터·문서·보안·정책 등 저장소 규칙을 자동검사하는 하위 시스템 |
 | Unit Tests | 코드 또는 Project Guard 검사 로직의 개별 동작을 검증하는 별도 검증 요소 |
@@ -89,7 +89,7 @@
 - 관련 문서가 업데이트됨
 - 적용 대상 Project Guard 검사 통과 또는 Project Guard 미구현 단계의 문서 수동검증 완료
 - 적용 대상 Unit Tests 통과
-- GitHub Actions가 구성돼 현재 작업에 적용되는 경우 통과
+- Pull Request 대상 GitHub Actions 통과
 - 보안 위반 없음
 - PM 최종 승인 완료
 
@@ -546,6 +546,8 @@ Push 전 확인:
 
 ### 13.1 방향
 
+일반 Pull Request는 다음 방향을 사용한다.
+
 ```text
 base: main
 compare: 작업 Branch
@@ -557,6 +559,9 @@ compare: 작업 Branch
 작업 Branch의 변경을
 main에 반영하기 위한 검토 요청
 ```
+
+PM이 승인한 Stacked Pull Request는 부모 PR의 Head Branch를 Base로 사용할 수 있다.
+일반 PR과 Stacked PR 모두 Base Branch와 관계없이 GitHub Actions CI를 실행한다.
 
 ### 13.2 PR 제목
 
@@ -598,6 +603,17 @@ Closes #이슈번호
 
 PR 병합 시 연결된 Issue가 종료되도록 한다.
 
+### 13.5 GitHub Actions CI 계약
+
+- `pull_request` Trigger는 Base Branch와 관계없이 모든 Pull Request에 적용한다.
+- Draft와 Stacked Pull Request도 `opened`, `synchronize`, `reopened` 기본 이벤트에서
+  Project Guard와 Unit Tests를 실행한다.
+- `push` Trigger는 `main` Branch로 제한한다.
+- `pull_request_target`과 `workflow_dispatch`를 CI 우회책으로 사용하지 않는다.
+- Branch 필터 때문에 Workflow run이 생성되지 않은 상태는 `IN_PROGRESS`가 아니라
+  `NOT_TRIGGERED_BY_BRANCH_FILTER`로 분류한다.
+- GitHub Actions CI가 생성되지 않았거나 통과하지 않은 Pull Request는 Merge하지 않는다.
+
 ---
 
 ## 14. 리뷰 순서
@@ -610,7 +626,7 @@ PR 병합 시 연결된 Issue가 종료되도록 한다.
 → Commit
 → Push
 → Pull Request
-→ 구성된 경우 GitHub Actions/CI에서 Project Guard와 Unit Tests
+→ 모든 Pull Request의 GitHub Actions/CI에서 Project Guard와 Unit Tests
 → 필요 시 Codex GitHub Review
 → PM Review
 → Merge
@@ -675,7 +691,7 @@ PR 병합 시 연결된 Issue가 종료되도록 한다.
 - 변경 파일 검토 완료
 - 적용 대상 Project Guard `FAIL=0` 또는 Project Guard 미구현 단계의 문서 수동검증 완료
 - 적용 대상 Unit Tests 통과
-- GitHub Actions/CI가 구성돼 현재 작업에 적용되는 경우 Project Guard와 Unit Tests 통과
+- Pull Request의 GitHub Actions/CI에서 Project Guard와 Unit Tests 통과
 - 보안 위반 없음
 - 범위 밖 변경 없음
 - 남은 위험 보고
@@ -856,7 +872,7 @@ Git 작업은 다음 조건을 모두 만족해야 완료다.
 - 적용 대상 Project Guard 통과 또는 Project Guard 미구현 단계의 문서 수동검증 완료
 - 적용 대상 Unit Tests 통과
 - PR 생성
-- GitHub Actions/CI가 구성돼 현재 작업에 적용되는 경우 Project Guard와 Unit Tests 통과
+- Pull Request의 GitHub Actions/CI에서 Project Guard와 Unit Tests 통과
 - PM 승인
 - `main` Merge
 - `main`에서 Project Guard와 Unit Tests 재검증 통과
@@ -875,6 +891,7 @@ Git 작업은 다음 조건을 모두 만족해야 완료다.
 
 | 버전 | 날짜 | 변경내용 | 작성자 | 승인상태 |
 |---|---|---|---|---|
+| v0.1.4 | 2026-07-21 | 모든 Pull Request CI, `main` Push 제한과 Stacked PR 상태 분류 계약 반영 | 신동현 | PM 승인 구현 중 |
 | v0.1.3 | 2026-07-21 | Commit 전 Git 출력을 승인 파일 pathspec과 보호 경로 Boolean·개수 검증으로 분리 | 신동현 | PM 승인 구현 중 |
 | v0.1.2 | 2026-07-21 | 저장소 작업일지 경로 폐기, Legacy 예외 제거와 H-206 안전 검증 정책 반영 | 신동현 | PM 승인 구현 중 |
 | v0.1.1 | 2026-07-20 | PROJECT_STATUS 영향 판정의 Merge 전·후 절차와 책임·완료조건 보완 | 신동현 | Draft |
