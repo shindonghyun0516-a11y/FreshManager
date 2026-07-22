@@ -17,7 +17,7 @@
 - EG-6B 기술 기준 Commit: `6253cc502c9a3c4bc248cf6972f077a99e13f09d`
 - 현재 작업: Issue #63 EG-6B Collector `--batch-id` 계약 구현·검증·Pull Request 준비
 - Issue #63 상태: `OPEN` · `OPTION_A_APPROVED` · `NO_LIVE_API_CALL`
-- Issue #63 Pull Request: 생성 예정 · PM 승인 전 Merge 금지
+- Issue #63 Pull Request: PR #64 `DRAFT` · CI 확인 중 · PM 승인 전 Merge 금지
 - PR #61 상태: `MERGED`
 - Issue #60 상태: `CLOSED`
 - Backup Worker 상태: `IMPLEMENTED_ON_MAIN` · `VERIFIED_LOCALLY`
@@ -780,7 +780,7 @@ Score·가중치·임계값은 `OPEN_DECISION`이다. Recommendation MVP Workstr
 ### 14.2 다음 행동 — Batch ID 계약과 Live 재진입
 
 1. Issue #63 Target·Full Unit Tests와 Project Guard를 통과
-2. Feature Branch를 Push하고 Draft Pull Request의 CI를 통과
+2. PR #64 Draft Pull Request의 CI를 통과
 3. PM이 Issue #63 Pull Request를 검토하고 `main` Merge를 별도로 승인
 4. Merge 후 새 Live Batch ID를 제안해 Issue #57 무호출 Live Preflight를 재검증
 5. PM이 정확한 Batch ID·최대 13회·retry 0·즉시 Backup 조건으로 실제 호출을 별도 승인
@@ -839,6 +839,6 @@ Score·가중치·임계값은 `OPEN_DECISION`이다. Recommendation MVP Workstr
   - Issue #60·PR #61로 독립 Backup Worker·33개 Target Test·H-708을 `main`에 반영, Squash Commit `62f30d4`
   - Issue #57 실제 환경 Fake Backup·Restore·멱등 검증과 PM 수동 원격 확인 PASS
   - Issue #63 PM Option A 승인으로 Collector canonical `--batch-id` 계약 구현 진행
-- 다음 행동: Issue #63 Draft Pull Request·CI·PM Merge 검토
+- 다음 행동: Issue #63 PR #64 Draft Pull Request·CI·PM Merge 검토
 - 다음 공식 단계: Issue #63 병합 후 새 Batch ID 무호출 Live Preflight와 실제 최대 13회 별도 승인
 - 실제 서울시 API 호출: EG-6B 13개 Area 회차 0회
