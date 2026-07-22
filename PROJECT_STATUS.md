@@ -17,7 +17,7 @@
 - EG-6B 기술 기준 Commit: `6253cc502c9a3c4bc248cf6972f077a99e13f09d`
 - 현재 작업: Issue #63 EG-6B Collector `--batch-id` 계약 구현·검증·Pull Request 준비
 - Issue #63 상태: `OPEN` · `OPTION_A_APPROVED` · `NO_LIVE_API_CALL`
-- Issue #63 Pull Request: PR #64 `DRAFT` · CI 확인 중 · PM 승인 전 Merge 금지
+- Issue #63 Pull Request: PR #64 `DRAFT` · CI `PASS` · PM 승인 전 Merge 금지
 - PR #61 상태: `MERGED`
 - Issue #60 상태: `CLOSED`
 - Backup Worker 상태: `IMPLEMENTED_ON_MAIN` · `VERIFIED_LOCALLY`
