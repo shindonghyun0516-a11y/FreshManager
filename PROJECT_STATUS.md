@@ -8,16 +8,16 @@
 ## 0. 30초 요약
 
 - 프로젝트: **프레시매니저 유동판매 추천 서비스 — 데이터 타당성 PoC**
-- 현재 목표: Issue #63에서 PM 승인 Batch ID를 Collector·Source·Log·Manifest·Backup에 동일하게 전파하는 Live CLI 계약 구현
+- 현재 목표: Issue #63에서 PM 승인 Batch ID를 원자적으로 예약한 단일 Collector만 인증정보·Transport에 접근하도록 보완
 - `main` 반영 완료: EG-0~EG-6A, EG-6B 단일 수집 파이프라인, Backup Worker, CI 보강과 보호 경로 Hardening
 - 최근 완료 Issue: #60
 - 공식 기준 Branch: `main`
 - 현재 Branch: `feature/issue-63-eg6b-collector-batch-id`
 - 문서 정렬 시작 기준 Commit: `62f30d42e6082910ae06f4bb9cb539145a426870`
 - EG-6B 기술 기준 Commit: `6253cc502c9a3c4bc248cf6972f077a99e13f09d`
-- 현재 작업: Issue #63 EG-6B Collector `--batch-id` 계약 구현·검증·Pull Request 준비
+- 현재 작업: Issue #63 EG-6B Collector 원자적 Batch ID 예약·중단 후 재사용 방지 보완과 독립 재검토 준비
 - Issue #63 상태: `OPEN` · `OPTION_A_APPROVED` · `NO_LIVE_API_CALL`
-- Issue #63 Pull Request: PR #64 `DRAFT` · CI `PASS` · PM 승인 전 Merge 금지
+- Issue #63 Pull Request: PR #64 `DRAFT` · 원자적 예약 보완 후 독립 재검토 필요 · PM 승인 전 Merge 금지
 - PR #61 상태: `MERGED`
 - Issue #60 상태: `CLOSED`
 - Backup Worker 상태: `IMPLEMENTED_ON_MAIN` · `VERIFIED_LOCALLY`
@@ -771,8 +771,8 @@ Score·가중치·임계값은 `OPEN_DECISION`이다. Recommendation MVP Workstr
 - 최근 완료 Issue: #60
 - 현재 구현 Issue: #63
 - 현재 Branch: `feature/issue-63-eg6b-collector-batch-id`
-- 구현 상태: Collector `--batch-id`·공통 validator·충돌 사전검사 구현 및 PR 검증 진행
-- 로컬 검증: Project Guard PASS 42 / FAIL 0 / WARN 0 / SKIP 5, Unit Tests 289/289 PASS
+- 구현 상태: Collector `--batch-id`·공통 validator·충돌 사전검사에 원자적 Source Batch 예약과 중단 후 재사용 방지를 보완 중
+- 로컬 검증: Project Guard PASS 42 / FAIL 0 / WARN 0 / SKIP 5, Unit Tests 293/293 PASS
 - 실제 API 호출: EG-6B 13개 Area 회차 0회
 - 실제 Live Batch Backup: 0건
 - Fake Backup Environment Preflight·Restore·PM 원격 확인: `PASS`

@@ -587,7 +587,7 @@ SEOUL_OPEN_API_KEY=your_api_key_here
 
 Python 기반 Project Guard가 `scripts/project_guard_check.py`에 구현돼 있다.
 Issue #63 작업 Branch의 로컬 검증은 Project Guard `PASS 42`, `FAIL 0`, `WARN 0`,
-`SKIP 5`, `TOTAL 47`, 종료코드 `0`이며 전체 Unit Tests는 289/289 PASS다.
+`SKIP 5`, `TOTAL 47`, 종료코드 `0`이며 전체 Unit Tests는 293/293 PASS다.
 
 표준 Project Guard 실행 명령:
 
@@ -627,6 +627,12 @@ python3 -m freshmanager.backup --batch-id "$FM_LIVE_BATCH_ID"
 사용하며 공백 제거·대소문자 변경·재생성을 하지 않는다. 누락·형식 오류 또는 기존
 Source Batch·Sync Backup·Receipt·Lock 충돌은 API Key 사용, 네트워크와 영속 파일
 쓰기 전에 종료코드 `2`로 중단한다. Backup 실패는 Collector 재실행 사유가 아니다.
+
+읽기 전용 충돌검사와 참조검증이 끝나면 Collector는 정확한 Source Batch ID 디렉터리를
+원자적으로 예약한다. 동시에 같은 ID를 사용한 실행 중 예약 승자 하나만 API Key와
+Transport에 접근한다. 불완전하거나 중단된 예약은 자동 삭제·재사용하지 않으며,
+Collection Log와 Manifest가 없으므로 Backup 대상이 아니다. stale 예약 복구는 별도
+PM 검토 절차가 필요하다.
 
 현재 EG-6B 실제 단일 회차는 미실행 상태다. 실행 후 Raw·Metadata·Collection Log·
 Manifest·SHA-256과 실패 목록을 검토하고 PM이 PASS 또는 보완을 판정해야 한다.

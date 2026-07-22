@@ -192,6 +192,13 @@ EG-6B는 승인된 `eg6_area_panel.csv`의 `panel_order`에 따라 고정된 13�
 동일 ID의 Source Batch, 설정된 Sync Backup, Receipt 또는 Lock이 있으면 충돌로 중단하고
 기존 증거를 변경·삭제·덮어쓰지 않는다.
 
+읽기 전용 충돌검사와 공식 참조검증을 마치면 API Key·Transport·Raw·Metadata 접근 전에
+정확한 Source Batch ID 디렉터리를 배타적 `mkdir` 한 번으로 원자적으로 예약한다. 오직
+예약에 성공한 실행만 수집을 시작한다. 예약은 성공·부분실패·공통오류·예외·중단 뒤에도
+자동 삭제하지 않으며, 불완전 예약 ID를 자동 재사용하지 않는다. Collection Log와
+Manifest가 없는 예약 증거만으로는 Backup 대상이 될 수 없다. abandoned 또는 stale
+예약 복구는 별도 PM 검토가 필요한 수동 절차이며 현재 런타임 범위가 아니다.
+
 고정 단계 경로:
 
 ```text

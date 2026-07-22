@@ -6,7 +6,9 @@ import io
 import json
 import shutil
 import tempfile
+import threading
 import unittest
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 from typing import Callable
@@ -133,6 +135,18 @@ class FailThirdRawStorage(FileStorage):
         if area_code == eg6b.EG6B_AREA_CODES[2]:
             raise StorageError("private storage detail")
         return super().save_raw(area_code, requested_at, request_id, payload)  # type: ignore[arg-type]
+
+
+class InterruptAfterFirstRawStorage(FileStorage):
+    def save_raw(
+        self,
+        area_code: str,
+        requested_at: object,
+        request_id: str,
+        payload: bytes,
+    ) -> Path:
+        super().save_raw(area_code, requested_at, request_id, payload)  # type: ignore[arg-type]
+        raise KeyboardInterrupt("synthetic interruption")
 
 
 class FailingManifestStorage(BatchStorage):
@@ -514,8 +528,208 @@ class Eg6bTests(unittest.TestCase):
                 self.assertEqual(after, before)
                 self.assertFalse((output_root / eg6b.RAW_OUTPUT_PATH).exists())
                 self.assertFalse((output_root / eg6b.METADATA_OUTPUT_PATH).exists())
+                self.assertEqual(
+                    list((output_root / eg6b.BATCH_OUTPUT_PATH).rglob("collection_log.json")),
+                    [],
+                )
+                self.assertEqual(
+                    list((output_root / eg6b.BATCH_OUTPUT_PATH).rglob("manifest.json")),
+                    [],
+                )
                 load_key.assert_not_called()
                 factory.assert_not_called()
+
+    def test_reservation_precedes_credential_and_transport_access(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="freshmanager-eg6b-") as temporary:
+            root = Path(temporary)
+            output_root = root / "output"
+            batch_directory = output_root / eg6b.BATCH_OUTPUT_PATH / BATCH_ID
+            transport = FakeTransport()
+            events: list[str] = []
+
+            def load_key(env_path: Path) -> str:
+                del env_path
+                self.assertTrue(batch_directory.is_dir())
+                events.append("credential")
+                return DUMMY_KEY
+
+            def make_transport() -> FakeTransport:
+                self.assertTrue(batch_directory.is_dir())
+                events.append("transport")
+                return transport
+
+            with mock.patch.object(eg6b, "load_api_key", side_effect=load_key):
+                code, _ = self.invoke(
+                    [
+                        "--env-file", str(root / "approved.env"),
+                        "--output-root", str(output_root),
+                        "--batch-id", BATCH_ID,
+                        "--execute-live",
+                    ],
+                    transport_factory=make_transport,
+                )
+
+        self.assertEqual(code, 0)
+        self.assertEqual(events, ["credential", "transport"])
+        self.assertEqual(transport.calls, list(eg6b.EG6B_AREA_CODES))
+
+    def test_concurrent_same_id_has_exactly_one_atomic_transport_winner(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="freshmanager-eg6b-") as temporary:
+            root = Path(temporary)
+            output_root = root / "output"
+            env_path = self.write_env(root)
+            argv = [
+                "--env-file", str(env_path),
+                "--output-root", str(output_root),
+                "--batch-id", BATCH_ID,
+                "--execute-live",
+            ]
+            transports = (FakeTransport(), FakeTransport())
+            factories = (
+                mock.Mock(return_value=transports[0]),
+                mock.Mock(return_value=transports[1]),
+            )
+            reservation_boundary = threading.Barrier(2)
+            actual_reserve = eg6b.reserve_batch_directory
+
+            def synchronized_reserve(path: Path) -> object:
+                reservation_boundary.wait(timeout=5)
+                return actual_reserve(path)
+
+            def execute(index: int) -> int:
+                return eg6b.run(
+                    argv,
+                    transport_factory=factories[index],
+                    environ={},
+                )
+
+            with mock.patch.object(
+                eg6b,
+                "reserve_batch_directory",
+                side_effect=synchronized_reserve,
+            ), mock.patch("builtins.print"):
+                with ThreadPoolExecutor(max_workers=2) as executor:
+                    results = tuple(executor.map(execute, (0, 1)))
+
+            raw_files = list((output_root / eg6b.RAW_OUTPUT_PATH).rglob("*.json"))
+            metadata_files = list(
+                (output_root / eg6b.METADATA_OUTPUT_PATH).rglob("*.metadata.json")
+            )
+            log_files = list(
+                (output_root / eg6b.BATCH_OUTPUT_PATH).rglob("collection_log.json")
+            )
+            manifest_files = list(
+                (output_root / eg6b.BATCH_OUTPUT_PATH).rglob("manifest.json")
+            )
+
+        self.assertEqual(sorted(results), [0, 2])
+        self.assertEqual(sorted(factory.call_count for factory in factories), [0, 1])
+        self.assertEqual(sorted(len(transport.calls) for transport in transports), [0, 13])
+        self.assertEqual(len(raw_files), 13)
+        self.assertEqual(len(metadata_files), 13)
+        self.assertEqual(len(log_files), 1)
+        self.assertEqual(len(manifest_files), 1)
+
+    def test_interrupted_batch_id_remains_reserved_and_cannot_be_reused(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="freshmanager-eg6b-") as temporary:
+            root = Path(temporary)
+            output_root = root / "output"
+            env_path = self.write_env(root)
+            argv = [
+                "--env-file", str(env_path),
+                "--output-root", str(output_root),
+                "--batch-id", BATCH_ID,
+                "--execute-live",
+            ]
+            first_transport = FakeTransport()
+            with self.assertRaises(KeyboardInterrupt):
+                self.invoke(
+                    argv,
+                    transport_factory=lambda: first_transport,
+                    storage_factory=InterruptAfterFirstRawStorage,
+                )
+
+            batch_directory = output_root / eg6b.BATCH_OUTPUT_PATH / BATCH_ID
+            raw_files = list((output_root / eg6b.RAW_OUTPUT_PATH).rglob("*.json"))
+            metadata_files = list(
+                (output_root / eg6b.METADATA_OUTPUT_PATH).rglob("*.metadata.json")
+            )
+            before = {path.relative_to(output_root).as_posix(): sha256(path) for path in raw_files}
+            second_transport = FakeTransport()
+            factory = mock.Mock(return_value=second_transport)
+            with mock.patch.object(eg6b, "load_api_key") as load_key:
+                second_code, output = self.invoke(argv, transport_factory=factory)
+            after_files = list((output_root / eg6b.RAW_OUTPUT_PATH).rglob("*.json"))
+            after = {
+                path.relative_to(output_root).as_posix(): sha256(path)
+                for path in after_files
+            }
+            eligibility = backup.assess_batch(output_root / eg6b.STAGE_PATH, BATCH_ID)
+
+            self.assertEqual(first_transport.calls, [eg6b.EG6B_AREA_CODES[0]])
+            self.assertTrue(batch_directory.is_dir())
+            self.assertEqual(len(raw_files), 1)
+            self.assertEqual(metadata_files, [])
+            self.assertEqual(
+                list(batch_directory.glob("collection_log.json")),
+                [],
+            )
+            self.assertEqual(list(batch_directory.glob("manifest.json")), [])
+            self.assertEqual(second_code, 2)
+            self.assertIn("preflight_status=batch_id_conflict", output)
+            load_key.assert_not_called()
+            factory.assert_not_called()
+            self.assertEqual(second_transport.calls, [])
+            self.assertEqual(after, before)
+            self.assertFalse(eligibility.eligible)
+
+    def test_reservation_survives_setup_exception_without_artifacts(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="freshmanager-eg6b-") as temporary:
+            root = Path(temporary)
+            output_root = root / "output"
+            batch_directory = output_root / eg6b.BATCH_OUTPUT_PATH / BATCH_ID
+            factory = mock.Mock(return_value=FakeTransport())
+            with mock.patch.object(eg6b, "load_api_key", side_effect=RuntimeError("synthetic")):
+                code, _ = self.invoke(
+                    [
+                        "--env-file", str(root / "approved.env"),
+                        "--output-root", str(output_root),
+                        "--batch-id", BATCH_ID,
+                        "--execute-live",
+                    ],
+                    transport_factory=factory,
+                )
+
+            self.assertEqual(code, 2)
+            self.assertTrue(batch_directory.is_dir())
+            self.assertEqual(list(batch_directory.iterdir()), [])
+            self.assertEqual(
+                list((output_root / eg6b.RAW_OUTPUT_PATH).rglob("*.json")),
+                [],
+            )
+            self.assertEqual(
+                list((output_root / eg6b.METADATA_OUTPUT_PATH).rglob("*.metadata.json")),
+                [],
+            )
+            factory.assert_not_called()
+
+            second_factory = mock.Mock(return_value=FakeTransport())
+            with mock.patch.object(eg6b, "load_api_key") as second_load_key:
+                second_code, second_output = self.invoke(
+                    [
+                        "--env-file", str(root / "approved.env"),
+                        "--output-root", str(output_root),
+                        "--batch-id", BATCH_ID,
+                        "--execute-live",
+                    ],
+                    transport_factory=second_factory,
+                )
+            self.assertEqual(second_code, 2)
+            self.assertIn("preflight_status=batch_id_conflict", second_output)
+            second_load_key.assert_not_called()
+            second_factory.assert_not_called()
+            self.assertTrue(batch_directory.is_dir())
+            self.assertEqual(list(batch_directory.iterdir()), [])
 
     def test_invalid_panel_fails_before_transport_and_output(self) -> None:
         with tempfile.TemporaryDirectory(prefix="freshmanager-eg6b-") as temporary:
@@ -572,6 +786,7 @@ class Eg6bTests(unittest.TestCase):
             )
             raw_paths = list((output_root / eg6b.RAW_OUTPUT_PATH).rglob("*.json"))
             _, log, _, _ = self.batch_documents(output_root)
+            reservation_exists = (output_root / eg6b.BATCH_OUTPUT_PATH / BATCH_ID).is_dir()
         self.assertEqual(code, 2)
         self.assertEqual(transport.calls, list(eg6b.EG6B_AREA_CODES[:3]))
         self.assertEqual(len(raw_paths), 2)
@@ -579,6 +794,7 @@ class Eg6bTests(unittest.TestCase):
         self.assertEqual(log["success_count"], 2)
         self.assertEqual(log["failure_count"], 11)
         self.assertEqual(parse_summary(output)["retry_count"], "0")
+        self.assertTrue(reservation_exists)
 
     def test_manifest_write_failure_does_not_delete_raw_or_metadata(self) -> None:
         with tempfile.TemporaryDirectory(prefix="freshmanager-eg6b-") as temporary:

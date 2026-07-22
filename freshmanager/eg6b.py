@@ -20,7 +20,13 @@ from .batch_id import BatchIdValidationError, canonical_batch_id
 from .collector import EXPECTED_HEADERS, Collector, HttpResponse, Place, now_seoul
 from .config import load_api_key
 from .http_adapter import SeoulPopulationHttpClient, Transport, UrllibTransport
-from .storage import BatchStorage, FileStorage
+from .storage import (
+    BatchReservation,
+    BatchReservationConflict,
+    BatchStorage,
+    FileStorage,
+    reserve_batch_directory,
+)
 
 
 EG6B_AREA_CODES = (
@@ -835,7 +841,7 @@ def _run(
     *,
     transport_factory: Callable[[], Transport] | None,
     storage_factory: Callable[[Path, Path], FileStorage],
-    batch_storage_factory: Callable[[Path], BatchStorage],
+    batch_storage_factory: Callable[[BatchReservation], BatchStorage],
     reference_paths: ReferencePaths,
     clock: Callable[[], datetime],
     monotonic_clock: Callable[[], float],
@@ -862,11 +868,12 @@ def _run(
             environ=environ,
         )
         snapshot = _validate_references(reference_paths)
-        api_key = load_api_key(arguments.env_file)
-        _probe_storage_roots(raw_root, metadata_root, batch_root)
         batch_id = arguments.batch_id
+        reservation = reserve_batch_directory(batch_root / batch_id)
+        _probe_storage_roots(raw_root, metadata_root, reservation.batch_directory)
         storage = storage_factory(raw_root, metadata_root)
-        batch_storage = batch_storage_factory(batch_root / batch_id)
+        batch_storage = batch_storage_factory(reservation)
+        api_key = load_api_key(arguments.env_file)
         client = _LazyHttpClient(transport_factory if transport_factory is not None else UrllibTransport)
         collector = Collector(
             reference_paths.official_csv,
@@ -876,7 +883,7 @@ def _run(
             request_id_factory=request_id_factory,
             timeout_seconds=arguments.timeout,
         )
-    except BatchIdConflictError:
+    except (BatchIdConflictError, BatchReservationConflict):
         return _preflight_failure("batch_id_conflict")
     except Exception:
         return _preflight_failure()
@@ -898,7 +905,7 @@ def run(
     *,
     transport_factory: Callable[[], Transport] | None = None,
     storage_factory: Callable[[Path, Path], FileStorage] = FileStorage,
-    batch_storage_factory: Callable[[Path], BatchStorage] = BatchStorage,
+    batch_storage_factory: Callable[[BatchReservation], BatchStorage] = BatchStorage,
     reference_paths: ReferencePaths = DEFAULT_REFERENCE_PATHS,
     clock: Callable[[], datetime] = now_seoul,
     monotonic_clock: Callable[[], float] = time.monotonic,
