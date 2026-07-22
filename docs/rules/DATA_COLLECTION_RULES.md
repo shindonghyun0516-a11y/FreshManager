@@ -132,14 +132,13 @@ POI014 강남역
 EG-5는 세 코드를 위 순서로 각각 최대 1회 처리하고 자동 재시도를 하지 않았으며,
 별도 PM 승인 아래 실제 수집과 구조 분석을 완료했다.
 
-EG-6A는 실제 수집 없이 13개 Area·Spot·S-DoT 참조 패널을 확정해 PR #52로
-`main`에 반영했다. EG-6B는 같은 13개 Area의 단일 수집, Batch Log, Manifest와
-SHA-256 무결성 파이프라인을 PR #54로 `main`에 반영했다. 실제 단일 회차와 결과
-검토는 아직 수행하지 않았으며 PM PASS 전에는 EG-6B를 통과로 표시하지 않는다.
-PM 확인용 CSV와 Google Drive Backup Worker는 Issue #53 구현 범위에 포함하지
-않았다. Backup Worker는 Issue #60 Branch에 독립 1회 실행형으로 구현돼 Fake Batch와
-H-708 검증을 통과했으며 `main` 병합 전이다. CSV는 첫 실제 Batch 품질 감사 후 별도
-Issue와 PM 승인으로 구현한다. EG-7은 같은 13개 Area 반복수집 파일럿과 독립
+완료 이력으로 EG-6A 참조 패널은 PR #52, EG-6B 단일 수집·Batch Log·Manifest·
+SHA-256 파이프라인은 PR #54, 독립 1회 실행형 Backup Worker·Fake Batch·H-708은
+Issue #60과 PR #61에서 각각 정리됐다. 현재 Branch·PR·Issue·실행·검증 상태는
+[`PROJECT_STATUS.md`](../../PROJECT_STATUS.md)를 단일 기준으로 사용한다.
+
+CSV는 첫 실제 Batch 품질 감사 후 별도 Issue와 PM 승인으로 구현한다. EG-7은 같은
+13개 Area 반복수집 파일럿과 독립
 S-DoT 관측 수집 가능성 검토로 제한한다. EG-8은 Area Feature와 승인·확보된 경우의
 S-DoT Feature를 이용한 Spot Candidate Evaluation을 수행한다. Recommendation MVP는
 `PLANNED`, Gate number `NOT_ASSIGNED`이며 별도 PM 승인 전 공식 Gate가 아니다.
@@ -774,9 +773,9 @@ EG-5 대표 3장소와 EG-6B 승인 13개 Area 단일 회차는 `retry_count=0`�
 수집은 로컬 Python에 유지하고 Collector와 분리된 1회 실행형 Backup Worker를 Batch
 완료 직후 호출한다. 시간 간격 기반 백업 Scheduler는 두지 않는다.
 
-Issue #53·PR #54의 EG-6B Collector 자체에는 Backup Worker와 CSV Exporter가 없다.
-Issue #60 Branch의 독립 Worker·Fake Batch·H-708 검증을 PM이 승인하고 PR·CI·`main`
-병합 및 Live Preflight를 재통과한 뒤에만 PM이 실제 최대 13회 호출을 승인한다.
+EG-6B Collector 자체에는 Backup Worker와 CSV Exporter가 없다. 독립 Worker의
+구현·오프라인 검증·병합과 Live Preflight를 모두 확인한 뒤에만 PM이 실제 최대
+13회 호출을 승인한다. 현재 승인 지점과 실행 상태는 `PROJECT_STATUS.md`를 따른다.
 EG-6C는 새로 만들지 않으며 `H-707`은 EG-7 전까지 `SKIP`한다.
 
 반복수집 파일럿에 들어가기 전에는 즉시 백업 운영 결과와 다음 항목을 확인한 뒤
@@ -945,7 +944,7 @@ EG-7 진입을 PM이 승인한다.
 
 | 버전 | 날짜 | 변경내용 | 작성자 | 승인상태 |
 |---|---|---|---|---|
-| v0.1.7 | 2026-07-22 | Issue #60 독립 Backup Worker·append-only Receipt·`LOCAL_SYNC_COPY_VERIFIED`·H-708 Branch 구현 상태 반영 | 신동현 | PM Diff 검토 전 |
+| v0.1.7 | 2026-07-22 | Issue #60·PR #61 독립 Backup Worker·append-only Receipt·`LOCAL_SYNC_COPY_VERIFIED`·H-708 완료 이력 반영 | 신동현 | 완료 이력 |
 | v0.1.6 (Issue #58 보완) | 2026-07-22 | Google Drive 자동 백업과 Area·S-DoT·Spot Candidate·Recommendation 데이터 계층 경계 정렬 | 신동현 | PM Diff 검토 전 |
 | v0.1.6 | 2026-07-22 | PRD·TRD 공식 기준 연결, PR #54 병합 완료와 EG-6B 실제 단일 회차 대기 상태 정렬 | 신동현 | PM 승인 |
 | v0.1.5 | 2026-07-21 | Issue #53 EG-6B 13개 단일 회차의 단계 경로·Batch Log·Manifest·SHA-256·재시도 0회 계약 반영 | 신동현 | PM 구현 승인 |

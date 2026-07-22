@@ -11,6 +11,8 @@ EG-0부터 EG-8까지의 순서, 진입조건과 통과조건을 정의한다.
 제품 목적·범위·수용 기준은 `docs/product/FreshManager_PRD_v1.0.md`, 현재 구현과
 목표 기술 계약은 `docs/engineering/FreshManager_TRD_v1.0.md`를 따른다. 이 문서는
 두 기준을 재정의하지 않고 다음 단계 진입·통과 조건만 소유한다.
+현재 Branch·PR·Issue·실행·검증 상태는 [`PROJECT_STATUS.md`](../../PROJECT_STATUS.md)를
+단일 기준으로 사용한다.
 
 ---
 
@@ -44,6 +46,8 @@ EG-1과 EG-2의 읽기 전용 사전검증에는 Project Guard가 필요하지 �
 
 ## 3. 전체 순서와 현재 상태
 
+### 현재 게이트 상태 기준
+
 ```text
 EG-0 문서 기준선
 → EG-1 장소 기준데이터 사전검증
@@ -59,39 +63,25 @@ EG-0 문서 기준선
 → 121장소 확대 후속 검토
 ```
 
-| 게이트 | 현재 상태 |
-|---|---|
-| EG-0 | 통과: PM 승인 완료 |
-| EG-1 | 통과: 공식 CSV 정비·`main` 반영 및 읽기 전용 재검증 완료 |
-| EG-2 | 통과: 공식 샘플 배치 및 `H-301`~`H-304` PASS |
-| EG-3 | 구현·로컬 검증 완료: 활성 28개 PASS, 후속 17개 SKIP, 종료 코드 0 |
-| EG-4 | 통과: Issue #43에서 PM 승인 범위의 POI072 실제 정상 JSON 수집과 원본·메타데이터 저장 확인 |
-| EG-5 | 통과: 대표 3장소 실제 수집 3건 성공·재시도 0회와 데이터 구조·Feature 분석 완료 |
-| EG-6 | 진행: EG-6A 통과, EG-6B 구현·오프라인 검증·PR #54 병합 완료; 실제 단일 회차·PM PASS 대기 |
-| Backup Readiness | 진행: Issue #60 Branch에 즉시 Worker·Fake Batch·H-708 구현; PM Diff·PR·CI·`main` 병합과 실환경 확인 대기, EG-6C 같은 새 Gate가 아님 |
-| EG-7 | 미구현: EG-6B PASS·Google Drive 백업 운영·CSV 누적·재생성 계약 전 실행하지 않음 |
-| EG-8 | 미구현: 반복 관측 이후 Area Feature·선택적 S-DoT Feature와 Spot Candidate Evaluation 단계 |
-| Recommendation MVP Workstream | `PLANNED`; Gate number `NOT_ASSIGNED`, EG-8 증거와 별도 PM 승인 필요 |
+현재 게이트와 완료·대기 상태는 `PROJECT_STATUS.md`에서만 관리한다. 완료 이력으로
+`EG-1 | 통과:` 공식 CSV 정비·검증, EG-4는 Issue #43, EG-6A는 PR #52,
+EG-6B 구현은 PR #54, 독립 Backup Worker는 Issue #60·PR #61에서 각각 정리됐다.
+이 완료 이력은 실제 EG-6B Live 실행이나 다음 게이트 승인을 자동으로 뜻하지 않는다.
 
-EG-3의 로컬 Project Guard와 단위 테스트 검증은 완료됐다. GitHub Actions Workflow가
+GitHub Actions Workflow는
 구현되어 Base Branch와 관계없이 모든 Pull Request와 `main` Push에서 Project Guard와
 단위 테스트를 자동 실행한다. Stacked·Draft Pull Request도 같은 CI Gate를 통과해야
 하며, Branch 필터 때문에 Workflow run이 생성되지 않은 상태는 `IN_PROGRESS`가 아니라
 `NOT_TRIGGERED_BY_BRANCH_FILTER`로 분류하고 CI 없이 Merge하지 않는다. 첫 Pull Request에서
 `pull_request` Trigger를 검증하고, Merge 후 `main` Push Trigger를 검증한다.
-Branch 보호 규칙은 아직 적용하지 않았다. EG-5는 PM 승인 범위의 실제 호출 3회로
-세 장소 수집에 성공했고 재시도는 0회였다. 후속 데이터 분석과 S-DoT 커버리지 조사를
-완료했다. EG-6A의 13개 제안 지역 Area·Spot·센서 참조는 PR #52로 `main`에
-반영했고, 삼성역은 강남 MICE 관광특구, 광화문역은 광화문광장, 을지로입구역은
+EG-6A의 13개 제안 지역 Area·Spot·센서 참조에서 삼성역은 강남 MICE 관광특구,
+광화문역은 광화문광장, 을지로입구역은
 명동 관광특구와 공식 공간 관계를 조건으로 연결해 서로 다른 공식 Area 13개를 승인했다.
-모든 좌표와 S-DoT 등급은 실제 출구가 아니라 역 중심 대리좌표 기준이다. EG-6B
-단일 회차 파이프라인은 PR #54로 `main`에 반영하고 오프라인 H-706을 통과했지만,
-실제 최대 13회 단일 회차와 PM PASS 판정은 아직 남아 있다.
+모든 좌표와 S-DoT 등급은 실제 출구가 아니라 역 중심 대리좌표 기준이다.
 
-H-206은 EG-3 이후 활성 검사이고 Project Guard의 고유 ID는 `TOTAL=47`이다.
 EG-6A에서 기존 `H-703`을 13지역 참조데이터 무결성 검사로 활성화했고, EG-6B
-구현과 함께 `H-706`을 활성화했다. Issue #60 Branch에서 `H-708`을 Backup Worker
-로컬 복사 무결성 검사로 활성화했으며 `H-707`은 EG-7 전까지 `SKIP`한다.
+구현과 함께 `H-706`을, Backup Worker 계약에서 `H-708`을 로컬 복사 무결성
+검사로 정의했다. 검사별 현재 PASS·SKIP과 집계는 `PROJECT_STATUS.md`를 따른다.
 
 ---
 
@@ -360,13 +350,13 @@ EG-4 통과 후 PM이 다음 구현 단계 전환을 승인하면 EG-5로 진행
 - 불확실한 Area는 승인 상태로 위장하지 않고 PM 결정사항으로 보고한다.
 - Batch 필드 계약만 정의하며 실행 코드·반복수집·Scheduler는 구현하지 않는다.
 
-### EG-6B 진입·구현 상태·통과조건
+### EG-6B 진입·구현 계약·통과조건
 
 - 진입조건: 13개 Area가 모두 안전하게 확정되고 PM이 EG-6B 구현을 승인한다.
 - 구현 완료: 확정한 13개 코드를 중복·누락 없이 각각 최대 1회 순차 처리하고,
   장소별 실패 격리·회차 집계·원본·메타데이터·Collection Log·Manifest·SHA-256을
   Fake Transport로 검증해 PR #54로 `main`에 반영했다.
-- 실제 통과조건: PM이 실제 최대 13회 단일 회차를 별도로 승인하고, 실행 결과의
+- 통과조건: PM이 실제 최대 13회 단일 회차를 별도로 승인하고, 실행 결과의
   대상·성공·실패·실패 목록·원본·메타데이터·Collection Log·Manifest·SHA-256을
   검토해 PASS를 판정한다.
 - 자동 재시도와 반복수집은 포함하지 않는다.
@@ -391,9 +381,9 @@ EG-4 통과 후 PM이 다음 구현 단계 전환을 승인하면 EG-5로 진행
 - 위 조건과 Live Preflight가 통과한 뒤 PM이 최대 13회 실제 호출을 별도로 승인한다.
 
 Backup Readiness는 EG-6B와 EG-7 사이의 선행 작업 묶음이지 EG-6C라는 새 Engineering
-Gate가 아니다. Issue #60 Branch의 Worker와 H-708은 오프라인 검증을 통과했지만
-`main` 병합과 실제 Sync Root·원격 동기화 확인은 아직 완료되지 않았다. CSV Exporter는
-첫 실제 Batch 품질 감사 후 별도 Issue에서 구현한다.
+Gate가 아니다. 독립 Worker·H-708·실제 Sync Root·원격 동기화 확인의 현재 상태는
+`PROJECT_STATUS.md`에서 확인한다. CSV Exporter는 첫 실제 Batch 품질 감사 후 별도
+Issue에서 구현한다.
 
 EG-6B 단일 수집 결과와 별도 PM 승인을 받은 뒤 EG-7로 진행한다.
 

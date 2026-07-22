@@ -1,10 +1,11 @@
 # Cloud Backup and CSV Management Plan
 
-- 문서 상태: `IN_IMPLEMENTATION` · Issue #60 Branch Diff 검토 대기
+- 문서 역할: Google Drive Backup·Restore·CSV 후속 도입 계약
 - 적용 프로젝트: FreshManager Data PoC
 - 기준일: 2026-07-22
 - 공식 클라우드 제공자: Google Drive
-- 현재 구현 상태: Backup Worker `IMPLEMENTED_ON_BRANCH` · CSV Exporter `NOT_IMPLEMENTED`
+- 현재 상태 기준: Branch·PR·Issue·실행 상태는
+  [`PROJECT_STATUS.md`](../../PROJECT_STATUS.md)를 단일 기준으로 사용
 - 변경 시 PM 승인: 필요
 
 ---
@@ -38,23 +39,17 @@ Google Drive다. iCloud Drive와 수동 백업은 현행 운영방식으로 사�
 - 실제 Google Drive 폴더·파일 생성과 실제 데이터 복사
 - EG-7 반복수집 구현, 추천 모델과 판매효과 분석
 
-## 3. 현재 구현 상태
+## 3. 상태 기준과 완료 이력
 
-| 항목 | 현재 상태 |
-|---|---|
-| EG-6B Collector | 구현·오프라인 검증·`main` 병합 완료 |
-| EG-6B 실제 13개 Area Batch | 미실행 |
-| env-file·output-root Probe | PASS |
-| Google Drive 공식 제공자 선택 | PM 결정 완료 |
-| Google Drive for Desktop Sync 설치·로그인 | 확인 필요; 계정 이메일 기록 금지 |
-| Backup Root | 논리 루트 `FreshManager-Data/` 승인; 실제 동기화 절대경로는 저장소에 기록하지 않음 |
-| Backup Worker | Issue #60 Branch 구현·Fake Batch 검증 완료; `main` 미병합 |
-| 로컬 append-only Receipt | Issue #60 Branch 구현; 비동기화 Ledger 사용 |
-| 원격 동기화 확인·일일 감사·실제 복원시험 | `NOT_IMPLEMENTED` / `NOT_CONFIRMED` |
-| Raw-to-CSV Exporter | `NOT_IMPLEMENTED` |
+이 문서는 구현·운영 계약만 정의한다. 현재 Branch·PR·Issue, Fake·실환경 실행,
+원격 동기화 확인, 실제 Batch와 CSV 구현 상태는 `PROJECT_STATUS.md`에서만 관리한다.
 
-자동 백업을 문서화한 사실은 구현·운영 완료를 의미하지 않는다. Google Drive
-실제 계정 이메일이나 동기화 절대경로를 저장소·Receipt·로그에 기록하지 않는다.
+완료 이력으로 Issue #60에서 독립 1회 실행형 Backup Worker, 비동기화 Lock,
+append-only Receipt와 H-708을 구현했고 PR #61로 `main`에 병합했다. 이 이력은 실제
+Google Drive 동기화·실제 Batch 백업·복원 완료를 뜻하지 않는다.
+
+Google Drive 실제 계정 이메일이나 동기화 절대경로는 저장소·Receipt·로그에
+기록하지 않는다.
 
 ## 4. 목표 운영 상태
 
@@ -190,8 +185,8 @@ Backup Worker는 Batch의 Collection Log·Manifest 게시와 무결성 검증이
 ## 13. 백업 상태 모델
 
 아래 상태 중 `PENDING`, `IN_PROGRESS`, `LOCAL_SYNC_COPY_VERIFIED`, `FAILED`,
-`CONFLICT`는 Issue #60 Branch의 Worker가 생성할 수 있다. 원격 상태 두 개는
-`FUTURE_CONTRACT`이며 Worker가 생성하지 않는다.
+`CONFLICT`는 Backup Worker가 생성할 수 있다. 원격 상태 두 개는 후속 확인 계층의
+계약이며 Worker가 생성하지 않는다.
 
 | 상태 | 의미 | 주요 전이조건 |
 |---|---|---|
@@ -219,7 +214,7 @@ PENDING
 
 ## 14. 백업 Receipt와 운영 감사 목표
 
-Issue #60 Branch의 Backup Worker는 원본 Batch와 Sync Root 밖의 로컬 비동기화 Ledger에
+Backup Worker는 원본 Batch와 Sync Root 밖의 로컬 비동기화 Ledger에
 상태 전이별 append-only JSON Receipt를 남긴다. Receipt 최소 정보는 다음과 같다.
 
 - `backup_attempt_id`, `batch_id`, 상태
@@ -231,7 +226,8 @@ Issue #60 Branch의 Backup Worker는 원본 Batch와 Sync Root 밖의 로컬 비
 - Worker 버전
 
 원격 동기화 확인 결과와 확인시각은 이번 Worker가 생성하지 않으며 별도 확인 계층의
-후속 계약이다. 실제 Batch Receipt와 실제 Restore는 아직 생성·수행하지 않았다.
+후속 계약이다. 실제 Batch Receipt와 Restore 수행 여부는 `PROJECT_STATUS.md`에서
+확인한다.
 
 Receipt와 로그에는 Google 계정 이메일, 실제 동기화 절대경로와 사용자 식별정보를
 기록하지 않는다. 목적지는 `FreshManager-Data` 아래의 비민감 논리 식별자로만 남긴다.
@@ -277,14 +273,15 @@ CSV는 첫 실제 EG-6B Batch 전에 구현하지 않는다. 순서는 다음과
 - Area 관측값과 S-DoT 관측·Spot Candidate Context를 같은 측정값으로 혼합하지 않는다.
 - 시스템 생성 CSV와 PM의 수동 메모 시트를 분리한다.
 
-## 16. 단계별 구현·운영 순서
+## 16. 구현·운영 의존 순서
+
+아래는 현재 상태표가 아니라 반드시 지켜야 할 의존 순서다. 현재 완료 지점은
+`PROJECT_STATUS.md`에서 확인한다.
 
 ```text
 Google Drive for Desktop Sync 백업 계획 문서화
 → Desktop Sync 설치·로그인과 논리 루트 접근 가능 여부 확인
-→ Backup Worker 구현(Issue #60 Branch 완료)
-→ Fake Batch 백업 검증과 H-708(Issue #60 Branch 완료)
-→ Backup Worker PR·CI·main 병합
+→ Backup Worker 구현·오프라인 검증·H-708·PR·CI·main 병합
 → EG-6B Live 최종 Preflight 재검증
 → PM 최대 13회 실제 호출 승인
 → 첫 13개 Area 실제 Batch
@@ -311,11 +308,11 @@ EG-6B Live·EG-7 사이의 명시적 선행 작업이지만 새 EG 번호가 아
 - 일일 무결성 감사와 복원시험 주기
 - CSV 세부 스키마·인코딩·원자적 게시 방식
 
-## 18. 완료조건
+## 18. 계약 완료조건
 
 문서 계획 완료조건:
 
-- 현재 구현과 목표 계약이 구분돼 있다.
+- 기술 계약과 `PROJECT_STATUS.md`의 현재 상태가 구분돼 있다.
 - Google Drive가 공식 제공자이고 iCloud·수동 백업이 현행 운영방식이 아님을 명시한다.
 - 실제 계정 이메일·동기화 절대경로는 기록하지 않고 `FreshManager-Data` 논리 구조만 정의한다.
 - Collector·Worker·Desktop Sync 책임이 분리돼 있다.
