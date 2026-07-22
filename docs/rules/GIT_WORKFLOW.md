@@ -317,7 +317,7 @@ git pull --ff-only origin main
 - 병합 후 정상 상태에서는 보호 경로의 추적·미추적·Stage·Working Tree 항목이
   모두 0이어야 한다.
 - 기존 추적 항목 유지 예외와 Legacy 허용 개수는 폐지한다.
-- H-206은 EG-3 이후 `SKIP`할 수 없는 활성 검사이며 Project Guard는 `TOTAL=46`이다.
+- H-206은 EG-3 이후 `SKIP`할 수 없는 활성 검사이며 Project Guard는 `TOTAL=47`이다.
 - 과거 Commit의 Git 이력은 재작성하지 않는다.
 - PR #48은 Issue #47 해결·전체 검증·PM 승인 전까지 Merge하지 않는다.
 - Issue #47 구현·검증에서는 실제 API 호출과 EG-5 대표 3장소 수집을 수행하지 않는다.

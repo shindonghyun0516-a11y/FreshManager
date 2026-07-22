@@ -583,6 +583,14 @@ EG-3에서 Project Guard가 구현된 이후에는 모든 구현 작업 후 현�
 python3 scripts/project_guard_check.py
 ```
 
+Issue #60 Branch의 현재 Project Guard 계약은 다음과 같다.
+
+- `H-707`은 EG-7 반복주기 승인 검사이며 EG-7 이전까지 `SKIP`을 유지한다.
+- `H-708`은 Backup Worker의 Fake Batch 기반 로컬 복사 무결성 검사이며
+  실제 Google Drive 원격 동기화 완료를 판정하지 않는다.
+- 정상 예상치는 `PASS=42`, `FAIL=0`, `WARN=0`, `SKIP=5`, `TOTAL=47`,
+  `EXIT_CODE=0`이다.
+
 검사에 실패한 상태로 완료 보고하지 않는다.
 
 ---
@@ -828,7 +836,7 @@ Pull Request는 해당 Issue를 연결하며 PM의 최종 Merge 승인을 받는
   H-401은 해당 최상위 경로를 순회하지 않고, H-206은 경로 존재 여부와 이름
   비노출 Boolean·개수만 검사한다.
 - H-206은 EG-3 이후 `SKIP`할 수 없는 활성 검사이며 현재 Project Guard는
-  `TOTAL=46`을 유지한다.
+  `TOTAL=47`을 유지한다.
 - 정상 병합 상태의 보호 경로 추적·미추적·Stage·Working Tree 항목 수는 모두 0이다.
 - Issue #47의 승인된 삭제 Diff는 기존 항목 전부의 삭제-only 전환으로만 허용한다.
 - 과거 Git 이력은 재작성하지 않는다.

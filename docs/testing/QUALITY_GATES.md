@@ -68,7 +68,7 @@ EG-0 문서 기준선
 | EG-4 | 통과: Issue #43에서 PM 승인 범위의 POI072 실제 정상 JSON 수집과 원본·메타데이터 저장 확인 |
 | EG-5 | 통과: 대표 3장소 실제 수집 3건 성공·재시도 0회와 데이터 구조·Feature 분석 완료 |
 | EG-6 | 진행: EG-6A 통과, EG-6B 구현·오프라인 검증·PR #54 병합 완료; 실제 단일 회차·PM PASS 대기 |
-| Backup Readiness | 미구현: Google Drive for Desktop Sync 논리 루트·즉시 Worker·Fake Batch 검증 필요; EG-6C 같은 새 Gate가 아님 |
+| Backup Readiness | 진행: Issue #60 Branch에 즉시 Worker·Fake Batch·H-708 구현; PM Diff·PR·CI·`main` 병합과 실환경 확인 대기, EG-6C 같은 새 Gate가 아님 |
 | EG-7 | 미구현: EG-6B PASS·Google Drive 백업 운영·CSV 누적·재생성 계약 전 실행하지 않음 |
 | EG-8 | 미구현: 반복 관측 이후 Area Feature·선택적 S-DoT Feature와 Spot Candidate Evaluation 단계 |
 | Recommendation MVP Workstream | `PLANNED`; Gate number `NOT_ASSIGNED`, EG-8 증거와 별도 PM 승인 필요 |
@@ -88,9 +88,10 @@ Branch 보호 규칙은 아직 적용하지 않았다. EG-5는 PM 승인 범위�
 단일 회차 파이프라인은 PR #54로 `main`에 반영하고 오프라인 H-706을 통과했지만,
 실제 최대 13회 단일 회차와 PM PASS 판정은 아직 남아 있다.
 
-H-206은 EG-3 이후 활성 검사이고 Project Guard의 고유 ID는 `TOTAL=46`을 유지한다.
+H-206은 EG-3 이후 활성 검사이고 Project Guard의 고유 ID는 `TOTAL=47`이다.
 EG-6A에서 기존 `H-703`을 13지역 참조데이터 무결성 검사로 활성화했고, EG-6B
-구현과 함께 `H-706`을 활성화했다. `H-707`은 EG-7 전까지 `SKIP`한다.
+구현과 함께 `H-706`을 활성화했다. Issue #60 Branch에서 `H-708`을 Backup Worker
+로컬 복사 무결성 검사로 활성화했으며 `H-707`은 EG-7 전까지 `SKIP`한다.
 
 ---
 
@@ -381,6 +382,8 @@ EG-4 통과 후 PM이 다음 구현 단계 전환을 승인하면 EG-5로 진행
 - 실제 계정 이메일과 동기화 절대경로는 저장소·Receipt·로그에 기록하지 않는다.
 - 별도 1회 실행형 Backup Worker가 완료·부분 실패 Fake Batch를 Google Drive 로컬
   동기화 폴더에 복사하고 파일 수·Manifest SHA-256·중복·충돌·Secret 제외를 검증한다.
+- Worker는 `LOCAL_SYNC_COPY_VERIFIED`까지만 기록하며 원격 업로드 완료 상태를
+  생성하지 않는다. Lock·Receipt는 Sync Root 밖의 비동기화 Ledger에 둔다.
 - Batch 완료 판정 직후 1회 실행형 Worker를 호출하고 중복 실행을 방지한다.
 - Worker·테스트·설정이 별도 PR·CI·PM 승인으로 `main`에 병합된다.
 - Backup Worker는 백업 실패를 API 재호출로 전환하지 않는다.
@@ -388,7 +391,9 @@ EG-4 통과 후 PM이 다음 구현 단계 전환을 승인하면 EG-5로 진행
 - 위 조건과 Live Preflight가 통과한 뒤 PM이 최대 13회 실제 호출을 별도로 승인한다.
 
 Backup Readiness는 EG-6B와 EG-7 사이의 선행 작업 묶음이지 EG-6C라는 새 Engineering
-Gate가 아니다. CSV Exporter는 첫 실제 Batch 품질 감사 후 별도 Issue에서 구현한다.
+Gate가 아니다. Issue #60 Branch의 Worker와 H-708은 오프라인 검증을 통과했지만
+`main` 병합과 실제 Sync Root·원격 동기화 확인은 아직 완료되지 않았다. CSV Exporter는
+첫 실제 Batch 품질 감사 후 별도 Issue에서 구현한다.
 
 EG-6B 단일 수집 결과와 별도 PM 승인을 받은 뒤 EG-7로 진행한다.
 

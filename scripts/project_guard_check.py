@@ -38,6 +38,7 @@ from freshmanager.collector import Collector, HttpResponse  # noqa: E402
 from freshmanager.config import ConfigError, load_api_key, mask_secret  # noqa: E402
 from freshmanager import eg5 as eg5_cli  # noqa: E402
 from freshmanager import eg6b as eg6b_cli  # noqa: E402
+from freshmanager import backup as backup_worker  # noqa: E402
 from freshmanager.http_adapter import BASE_URL, SeoulPopulationHttpClient  # noqa: E402
 from freshmanager.offline import run as run_offline  # noqa: E402
 from freshmanager.storage import FileStorage, StorageError  # noqa: E402
@@ -1706,7 +1707,7 @@ def check_h402(context: ProjectGuardContext) -> CheckResult:
             str(SPEC_RELATIVE_PATH),
             "scripts/project_guard_check.py",
         )
-    return passed("H-402", "PROJECT_GUARD_SPEC와 registry의 46개 ID·순서가 정확히 일치", str(SPEC_RELATIVE_PATH), "scripts/project_guard_check.py")
+    return passed("H-402", "PROJECT_GUARD_SPEC와 registry의 47개 ID·순서가 정확히 일치", str(SPEC_RELATIVE_PATH), "scripts/project_guard_check.py")
 
 
 def check_h403(context: ProjectGuardContext) -> CheckResult:
@@ -2472,6 +2473,266 @@ def check_h706(context: ProjectGuardContext) -> CheckResult:
     )
 
 
+def _h708_write_json(path: Path, document: Mapping[str, object]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(dict(document), ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
+def _h708_artifact(
+    stage_root: Path,
+    relative_path: str,
+    artifact_type: str,
+    area_code: str | None,
+    request_id: str | None,
+) -> dict[str, object]:
+    path = stage_root / relative_path
+    return {
+        "artifact_type": artifact_type,
+        "relative_path": relative_path,
+        "byte_size": path.stat().st_size,
+        "sha256": sha256_file(path),
+        "area_code": area_code,
+        "request_id": request_id,
+    }
+
+
+def _write_h708_fake_batch(
+    root: Path,
+    batch_id: str,
+    *,
+    partial_failure: bool = False,
+    payload_marker: str = "original",
+) -> Path:
+    stage_root = root / "source" / backup_worker.STAGE_RELATIVE_PATH
+    artifacts: list[dict[str, object]] = []
+    area_results: list[dict[str, object]] = []
+    failed_codes: list[str] = []
+    raw_count = 0
+    for index, area_code in enumerate(eg6b_cli.EG6B_AREA_CODES, start=1):
+        request_id = f"00000000-0000-4000-8000-{index:012d}"
+        failed_area = partial_failure and index == 6
+        collection_status = "timeout" if failed_area else "success"
+        raw_relative: str | None = None
+        if not failed_area:
+            raw_relative = f"data/raw/population/2026/07/22/{area_code}_{request_id}.json"
+            raw_path = stage_root / raw_relative
+            _h708_write_json(
+                raw_path,
+                {"area_code": area_code, "payload_marker": payload_marker},
+            )
+            artifacts.append(
+                _h708_artifact(stage_root, raw_relative, "raw_json", area_code, request_id)
+            )
+            raw_count += 1
+        else:
+            failed_codes.append(area_code)
+        metadata_relative = (
+            f"data/processed/collection_logs/2026/07/22/"
+            f"{area_code}_{request_id}.metadata.json"
+        )
+        _h708_write_json(
+            stage_root / metadata_relative,
+            {
+                "request_id": request_id,
+                "area_code": area_code,
+                "endpoint_name": "citydata_ppltn",
+                "requested_at": "2026-07-22T12:00:00+09:00",
+                "received_at": "2026-07-22T12:00:01+09:00",
+                "http_status": None if failed_area else 200,
+                "collection_status": collection_status,
+                "raw_file_path": "synthetic-path-not-used-by-backup" if raw_relative else None,
+            },
+        )
+        artifacts.append(
+            _h708_artifact(stage_root, metadata_relative, "metadata", area_code, request_id)
+        )
+        area_results.append(
+            {
+                "panel_order": index,
+                "area_code": area_code,
+                "request_id": request_id,
+                "attempted": True,
+                "collection_status": collection_status,
+                "raw_file": raw_relative,
+                "metadata_file": metadata_relative,
+            }
+        )
+
+    log_relative = (
+        backup_worker.BATCHES_RELATIVE_PATH / batch_id / "collection_log.json"
+    ).as_posix()
+    log = {
+        "collector_version": eg6b_cli.COLLECTOR_VERSION,
+        "data_version": eg6b_cli.DATA_VERSION,
+        "batch_id": batch_id,
+        "panel_version": eg6b_cli.PANEL_VERSION,
+        "collection_purpose": eg6b_cli.COLLECTION_PURPOSE,
+        "expected_area_count": backup_worker.EXPECTED_AREA_COUNT,
+        "scheduled_at": None,
+        "started_at": "2026-07-22T12:00:00+09:00",
+        "finished_at": "2026-07-22T12:00:13+09:00",
+        "elapsed_seconds": 13.0,
+        "attempted_count": backup_worker.EXPECTED_AREA_COUNT,
+        "success_count": backup_worker.EXPECTED_AREA_COUNT - len(failed_codes),
+        "failure_count": len(failed_codes),
+        "failed_area_codes": failed_codes,
+        "retry_count": 0,
+        "raw_file_count": raw_count,
+        "metadata_file_count": backup_worker.EXPECTED_AREA_COUNT,
+        "exit_code": 1 if partial_failure else 0,
+        "area_results": area_results,
+    }
+    _h708_write_json(stage_root / log_relative, log)
+    artifacts.append(_h708_artifact(stage_root, log_relative, "collection_log", None, None))
+    manifest_relative = (
+        backup_worker.BATCHES_RELATIVE_PATH / batch_id / "manifest.json"
+    ).as_posix()
+    manifest = {
+        "data_version": eg6b_cli.DATA_VERSION,
+        "batch_id": batch_id,
+        "created_at": "2026-07-22T12:00:13+09:00",
+        "hash_algorithm": "sha256",
+        "reference_files": [
+            {
+                "reference_type": reference_type,
+                "path": relative_path,
+                "byte_size": 1,
+                "sha256": "a" * 64,
+            }
+            for reference_type, relative_path in (
+                ("official_places", "data/reference/seoul_121_places.csv"),
+                ("area_panel", "data/reference/eg6_area_panel.csv"),
+                ("spot_master", "data/reference/eg6_spot_master.csv"),
+                ("sdot_links", "data/reference/eg6_sdot_links.csv"),
+            )
+        ],
+        "artifacts": artifacts,
+    }
+    _h708_write_json(stage_root / manifest_relative, manifest)
+    return stage_root
+
+
+def check_h708(context: ProjectGuardContext) -> CheckResult:
+    backup_module = context.root / "freshmanager/backup.py"
+    if not backup_module.is_file():
+        return failed("H-708", "Backup Worker 모듈 누락", "freshmanager/backup.py")
+    success_batch_id = "11111111-1111-4111-8111-111111111111"
+    partial_batch_id = "22222222-2222-4222-8222-222222222222"
+    remote_statuses = {
+        backup_worker.BackupStatus.REMOTE_SYNC_PENDING.value,
+        backup_worker.BackupStatus.REMOTE_SYNC_CONFIRMED.value,
+    }
+    try:
+        with tempfile.TemporaryDirectory(prefix="freshmanager-h708-") as temporary:
+            root = Path(temporary)
+            sync_root = root / "sync"
+            sync_root.mkdir()
+
+            success_root = root / "success"
+            success_stage = _write_h708_fake_batch(success_root, success_batch_id)
+            success_ledger = success_root / "source/backup-ledger/eg6b-single-13"
+            success = backup_worker.backup_batch(
+                success_stage,
+                sync_root,
+                success_ledger,
+                success_batch_id,
+            )
+            idempotent = backup_worker.backup_batch(
+                success_stage,
+                sync_root,
+                success_ledger,
+                success_batch_id,
+            )
+            success_destination = (
+                sync_root / backup_worker.DESTINATION_RELATIVE_PATH / success_batch_id
+            )
+            success_verification = backup_worker.verify_backup_copy(success_destination)
+
+            partial_root = root / "partial"
+            partial_stage = _write_h708_fake_batch(
+                partial_root,
+                partial_batch_id,
+                partial_failure=True,
+            )
+            partial_ledger = partial_root / "source/backup-ledger/eg6b-single-13"
+            partial = backup_worker.backup_batch(
+                partial_stage,
+                sync_root,
+                partial_ledger,
+                partial_batch_id,
+            )
+            partial_destination = (
+                sync_root / backup_worker.DESTINATION_RELATIVE_PATH / partial_batch_id
+            )
+            partial_verification = backup_worker.verify_backup_copy(partial_destination)
+
+            conflict_root = root / "conflict"
+            conflict_stage = _write_h708_fake_batch(
+                conflict_root,
+                success_batch_id,
+                payload_marker="changed",
+            )
+            conflict = backup_worker.backup_batch(
+                conflict_stage,
+                sync_root,
+                conflict_root / "source/backup-ledger/eg6b-single-13",
+                success_batch_id,
+            )
+
+            receipt_paths = [
+                path
+                for ledger in (success_ledger, partial_ledger)
+                for path in ledger.rglob("*.receipt.json")
+            ]
+            receipt_documents = [json.loads(path.read_text(encoding="utf-8")) for path in receipt_paths]
+            rendered_receipts = json.dumps(receipt_documents, ensure_ascii=False)
+            receipt_statuses = {
+                str(document.get("backup_status"))
+                for document in receipt_documents
+                if isinstance(document, dict)
+            }
+            if (
+                success.backup_status != backup_worker.BackupStatus.LOCAL_SYNC_COPY_VERIFIED
+                or success.copied_file_count != success.source_file_count
+                or success.verified_file_count != success.source_file_count
+                or not success_verification.verified
+                or partial.backup_status != backup_worker.BackupStatus.LOCAL_SYNC_COPY_VERIFIED
+                or partial.eligible_batch_type != backup_worker.ELIGIBLE_PARTIAL_FAILURE
+                or not partial_verification.verified
+                or idempotent.reason_code != "ALREADY_VERIFIED"
+                or idempotent.copied_file_count != 0
+                or conflict.backup_status != backup_worker.BackupStatus.CONFLICT
+                or not conflict.conflict_detected
+                or not receipt_documents
+                or any(tuple(document) != backup_worker.RECEIPT_FIELDS for document in receipt_documents)
+                or str(root) in rendered_receipts
+                or remote_statuses & receipt_statuses
+                or remote_statuses & {item.value for item in backup_worker.WORKER_EMITTABLE_STATUSES}
+            ):
+                return failed(
+                    "H-708",
+                    "Backup Worker 합성 Batch 복사·무결성·멱등·충돌·Receipt 계약 불일치",
+                    "freshmanager/backup.py",
+                    "가짜 Batch",
+                    "임시 출력",
+                )
+    except Exception:
+        return failed(
+            "H-708",
+            "Backup Worker 합성 검증 내부 실패(세부정보 비노출)",
+            "freshmanager/backup.py",
+            "가짜 Batch",
+            "임시 출력",
+        )
+    return passed(
+        "H-708",
+        "성공·부분실패 Fake Batch의 파일 수·SHA-256·멱등·CONFLICT·비민감 Receipt와 원격상태 미생성 확인",
+        "freshmanager/backup.py",
+        "가짜 Batch",
+        "임시 출력",
+    )
+
+
 RUNNERS: dict[str, Callable[[ProjectGuardContext], CheckResult]] = {
     f"check_{check_id.lower().replace('-', '')}": globals()[f"check_{check_id.lower().replace('-', '')}"]
     for check_id in [
@@ -2482,7 +2743,7 @@ RUNNERS: dict[str, Callable[[ProjectGuardContext], CheckResult]] = {
         "H-204", "H-205", "H-206",
         "H-301", "H-302", "H-303", "H-304", "H-305",
         "H-401", "H-402", "H-403", "H-404",
-        "H-501", "H-502", "H-503", "H-506", "H-701", "H-702", "H-703", "H-704", "H-705", "H-706",
+        "H-501", "H-502", "H-503", "H-506", "H-701", "H-702", "H-703", "H-704", "H-705", "H-706", "H-708",
     ]
 }
 
@@ -2545,6 +2806,7 @@ CHECK_DEFINITIONS = [
         False,
         "반복수집 전 PM 주기 승인과 외장 저장장치 또는 승인된 클라우드 폴더 백업 Gate 필요",
     ),
+    definition("H-708", "Backup Worker 로컬 복사 무결성", "Backup Readiness 이후"),
 ]
 DEFINITION_BY_ID = {item.check_id: item for item in CHECK_DEFINITIONS}
 
@@ -2575,7 +2837,7 @@ def validate_final_results(results: list[CheckResult]) -> CheckResult:
     issues = []
     if ids != expected_ids:
         issues.append("결과 ID 또는 순서 불일치")
-    if len(ids) != 46 or len(set(ids)) != 46:
+    if len(ids) != 47 or len(set(ids)) != 47:
         issues.append(f"결과 수={len(ids)}, 고유={len(set(ids))}")
     if any(result.status not in valid_statuses for result in results):
         issues.append("허용되지 않은 상태값")
