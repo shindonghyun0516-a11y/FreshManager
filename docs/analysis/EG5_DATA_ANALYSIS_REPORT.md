@@ -250,6 +250,24 @@
 | 달력·공휴일 | 평일·휴일·특수일 | 기준 정의 필요 |
 | 행사 정보 | 일시적 피크 설명 | 선택 연동, 필수 아님 |
 | 실제 판매·현장 피드백 | 추천 적중 결과 | 현재 프로젝트 범위 밖, 별도 승인 필요 |
+
+### 8.4 공식 서비스 계층에서의 해석
+
+이 보고서의 인구·혼잡·Forecast Feature는 **Area Data Layer**의 후보 Feature다.
+특정 출구나 Spot의 직접 유동값이 아니다. 후속 구조는 다음처럼 분리한다.
+
+- S-DoT 관측은 Area 내부 활성 위치를 판단하는 독립 보조 Feature다.
+- Spot Master의 `STATION_CENTER_PROXY`는 확정 판매 위치가 아니라 Spot Candidate
+  생성용 Anchor Point다.
+- Spot Candidate는 Area Feature·사용 가능한 경우의 S-DoT 근접성·공간 Context·
+  현장검증·운영 제약을 결합해 평가한다.
+- EG-8에서 Area Feature·선택적 S-DoT Feature·Spot Candidate Evaluation을 검증한다.
+  후속 Recommendation MVP Workstream은 충분한 후보에는 SPOT, 부족한 경우 AREA와
+  `fallback_reason`을 사용하며 Gate number는 `NOT_ASSIGNED`다.
+- S-DoT 미지원 Area도 Area 분석과 추천 후보에서 제외하지 않는다.
+
+따라서 EG-5 단일 회차 결과만으로 Spot Candidate나 Recommendation 결과를 만들거나
+성능을 주장하지 않는다.
 | 담당구역·이동시간 | 실행 가능성 | 개인정보·운영정책 검토 필요 |
 
 ## 9. 유동판매 추천 가능성 판정
@@ -332,10 +350,14 @@ Forecast는 구조적으로 사용할 수 있지만 실제 예측시점의 후�
 
 1. 이번 회차의 raw·metadata를 현재 외부 경로에 그대로 보존한다.
 2. PM 승인 없이 추가 API 호출이나 실패 재호출을 하지 않는다.
-3. 반복수집 진입 전 외장 저장장치 복사 또는 승인된 클라우드 폴더 백업 Gate를 충족한다.
+3. EG-6B Live 전 Google Drive for Desktop Sync의 `FreshManager-Data/` 논리 루트와
+   Batch 완료 직후 실행할 Backup Worker·Fake Batch 검증을 완료한다. 실제 계정
+   이메일·동기화 절대경로는 기록하지 않고 백업 실패로 API를 재호출하지 않는다.
 4. API 호출한도와 승인 수집주기를 확정한 뒤 예측-후속관측 연결이 가능한 반복 설계를 검토한다.
-5. 초기 규칙 기반 분석에서는 `인구 기회`와 `운영 혼잡 위험`을 별도 Feature로 유지한다.
-6. 판매결과 또는 현장 피드백이 승인되기 전에는 추천 점수나 모델 성능을 주장하지 않는다.
+5. EG-7에서 Area 반복수집과 독립 S-DoT 관측 수집 가능성을 검토한다.
+6. EG-8에서는 `인구 기회`, `운영 혼잡 위험`, 선택적 S-DoT Feature와 Spot Candidate Evaluation을
+   분리해 평가한다.
+7. 판매결과 또는 현장 피드백이 승인되기 전에는 후속 Recommendation MVP의 추천 성능이나 판매효과를 주장하지 않는다.
 
 ## 12. 추적성
 

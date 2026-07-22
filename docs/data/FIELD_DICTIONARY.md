@@ -14,6 +14,7 @@
   - `requirements-definition-freshmanager-poc-v0.4.md` (역사 문서)
   - `docs/rules/DATA_COLLECTION_RULES.md`
   - `docs/analysis/ANALYSIS_PLAN.md`
+  - `docs/data/CLOUD_BACKUP_AND_CSV_MANAGEMENT_PLAN.md`
   - `data/reference/seoul_121_places.csv`
   - `data/samples/population_yeouido_sample.json`
 - 변경 시 PM 승인: 필요
@@ -55,6 +56,9 @@
 | `Unverified` | 아직 공식 문서나 실응답에서 확정하지 못함 |
 | `Derived` | 원본 필드로 계산한 파생필드 |
 | `Deprecated` | 더 이상 사용하지 않음 |
+| `PLANNED` | 승인된 계획에 포함됐으나 필드 계약·구현이 아직 완료되지 않음 |
+| `FUTURE_CONTRACT` | 후속 구현이 따라야 할 목표 계약이며 현재 저장 데이터에는 존재하지 않음 |
+| `NOT_IMPLEMENTED` | 코드·저장·검증이 현재 존재하지 않음 |
 
 실제 응답 또는 공식 기준파일에서 확인하지 않은 필드를 `Confirmed`로 표시하지 않는다.
 
@@ -71,6 +75,15 @@
 | `weather_observations` | 날씨 관측 | 실응답 확인 필요 |
 | `weather_forecasts` | 날씨 예보 | 실응답 확인 필요 |
 | `collection_logs` | 수집 성공·실패 기록 | EG-6B Batch Log·Manifest 계약 구현·오프라인 검증, 실제 13개 회차 미실행 |
+| `backup_receipts` | Batch별 Google Drive 백업·검증·원격 동기화 상태 | FUTURE_CONTRACT / NOT_IMPLEMENTED |
+| `batches_csv` | 조회용 Batch 파생 CSV | 첫 실제 Batch 품질 감사 후 PLANNED |
+| `area_observations_csv` | 조회용 Area 현재 관측 파생 CSV | 첫 실제 Batch 품질 감사 후 PLANNED |
+| `area_forecasts_csv` | 조회용 예측 스냅샷 파생 CSV | 첫 실제 Batch 품질 감사 후 PLANNED |
+| `collection_errors_csv` | 조회용 요청·Area 오류 파생 CSV | 첫 실제 Batch 품질 감사 후 PLANNED |
+| `sdot_observations` | 센서 관측·시간대 변화의 독립 보조 계층 | FUTURE_CONTRACT / NOT_IMPLEMENTED |
+| `spot_candidate_context` | Area·S-DoT 근접성·공간 Context·현장검증 연결 | FUTURE_CONTRACT / NOT_IMPLEMENTED |
+| `spot_candidate_evaluations` | Area Feature·선택적 S-DoT Feature·Context 기반 후보 근거 평가 | FUTURE_CONTRACT / NOT_IMPLEMENTED |
+| `recommendations` | SPOT 또는 AREA fallback 추천 결과 | FUTURE_CONTRACT / NOT_IMPLEMENTED |
 | `derived_features` | 분석용 파생필드 | 분석계획에 따라 생성 |
 
 ---
@@ -298,6 +311,80 @@ storage_error
 config_error
 security_error
 ```
+
+### 8.1 `backup_receipts` 미래 계약
+
+아래 필드와 상태는 모두 `FUTURE_CONTRACT / NOT_IMPLEMENTED`다. 현재 EG-6B
+Collection Log·Manifest에 존재하는 필드로 해석하지 않는다.
+
+| 필드 | 의미 | 형식 | 상태 |
+|---|---|---|---|
+| `backup_attempt_id` | Backup Worker 실행별 식별자 | string | FUTURE_CONTRACT |
+| `batch_id` | 백업 대상 Batch | string | FUTURE_CONTRACT |
+| `backup_status` | 복사·검증·원격 동기화 단계 | categorical | FUTURE_CONTRACT |
+| `started_at` | 백업 시작시각 | datetime | FUTURE_CONTRACT |
+| `finished_at` | 백업 종료시각 | datetime | FUTURE_CONTRACT |
+| `source_file_count` | Manifest 기준 대상 파일 수 | integer | FUTURE_CONTRACT |
+| `verified_file_count` | 복사 후 검증 통과 파일 수 | integer | FUTURE_CONTRACT |
+| `manifest_verification_passed` | 파일 수·크기·SHA-256 검증 결과 | boolean | FUTURE_CONTRACT |
+| `remote_sync_checked_at` | 원격 업로드 완료 확인시각 | datetime | FUTURE_CONTRACT |
+
+계획 상태값:
+
+```text
+PENDING
+IN_PROGRESS
+LOCAL_CLOUD_COPY_VERIFIED
+REMOTE_SYNC_PENDING
+REMOTE_SYNC_CONFIRMED
+FAILED
+CONFLICT
+```
+
+`LOCAL_CLOUD_COPY_VERIFIED`는 Google Drive 로컬 동기화 폴더에서 파일 수와 해시를
+검증했다는 뜻이다. `REMOTE_SYNC_CONFIRMED`는 별도의 승인된 방법으로 실제 Google
+Drive 원격 업로드 완료를 확인한 상태다. 두 상태를 같은 의미로 사용하지 않는다.
+Backup Root는 `FreshManager-Data/` 논리 구조로만 표현한다. Receipt에는 실제 Google
+계정 이메일, 사용자 식별정보와 동기화 절대경로를 저장하지 않는다.
+
+### 8.2 CSV·S-DoT·Spot Candidate·추천 미래 계약
+
+예정 CSV와 키는 첫 실제 Batch 품질 감사 후 별도 Issue에서 확정한다.
+
+| CSV | 고유키 후보 | 상태 |
+|---|---|---|
+| `batches.csv` | `batch_id` | PLANNED / NOT_IMPLEMENTED |
+| `area_observations.csv` | `area_code + population_reference_time + request_id` | PLANNED / NOT_IMPLEMENTED |
+| `area_forecasts.csv` | `area_code + forecast_snapshot_time + forecast_target_time + request_id` | PLANNED / NOT_IMPLEMENTED |
+| `collection_errors.csv` | `request_id + area_code` | PLANNED / NOT_IMPLEMENTED |
+
+동적 S-DoT, Spot Candidate와 추천 필드는 현재 구현되지 않았다. 아래 필드는 목표
+계약이며 실제 API 응답 필드나 현행 EG-6B Metadata로 해석하지 않는다.
+
+| 필드 | 의미 | 상태 |
+|---|---|---|
+| `sensor_id` | S-DoT 센서 식별자 | FUTURE_CONTRACT |
+| `sensor_observed_at` | S-DoT 관측 기준시각 | FUTURE_CONTRACT |
+| `sdot_activity_value` | 공식 자료에서 확인된 센서 관측값 | FUTURE_CONTRACT; 실제 필드 확인 전 이름 확정 금지 |
+| `candidate_id` | Spot Candidate 식별자 | FUTURE_CONTRACT |
+| `anchor_spot_id` | 후보 생성에 사용한 Spot Master Anchor 식별자 | FUTURE_CONTRACT |
+| `candidate_evidence` | Area·선택적 S-DoT·공간·현장·운영 Context의 후보 평가 근거 | FUTURE_CONTRACT |
+| `evaluation_version` | 후보 근거 평가 계약 버전 | FUTURE_CONTRACT |
+| `candidate_score` | 정량 점수를 채택할 경우의 후보 점수 | PLANNED / OPEN_DECISION; 필수 필드 아님 |
+| `score_version` | 정량 점수를 채택할 경우의 계산 계약 버전 | PLANNED / OPEN_DECISION; 필수 필드 아님 |
+| `spatial_context_version` | 공간 Context 버전 | FUTURE_CONTRACT |
+| `target_level` | `SPOT` 또는 `AREA` 추천 단위 | FUTURE_CONTRACT |
+| `fallback_reason` | AREA fallback의 필수 이유 | FUTURE_CONTRACT |
+| `target_spot_id` | SPOT 추천으로 선택한 검증된 후보 식별자 | FUTURE_CONTRACT |
+| `field_verified` | 현장 검증 여부 | 참조 CSV에 존재; 추천 계약 연결은 FUTURE_CONTRACT |
+
+S-DoT 데이터는 지원·접근·수집·품질조건을 만족할 때 Area 내부 활성 위치 판단과
+후보 Feature를 보조하지만 Area 데이터를 대체하지 않는다. Area·선택적 S-DoT·공간
+Context·현장검증·운영 제약으로 신뢰 가능하고 운영 가능한 Spot Candidate가 생성되면
+`target_level=SPOT`을 사용한다. 후보가 없거나 근거가
+부족하면 `target_level=AREA`와 `fallback_reason`을 사용한다. 현재 Spot Master의
+`STATION_CENTER_PROXY`는 Candidate Anchor Point이며 검증된 판매 Spot이 아니다.
+S-DoT 미지원 Area도 Area 분석과 추천 후보에서 제외하지 않는다.
 
 ---
 
@@ -528,5 +615,6 @@ Field Dictionary v0.1은 다음 조건을 만족해야 한다.
 
 | 버전 | 날짜 | 변경내용 | 작성자 | 승인상태 |
 |---|---|---|---|---|
+| v0.1.2 (Issue #58 보완) | 2026-07-22 | 백업·CSV와 Area·S-DoT·Spot Candidate·Recommendation 미래 데이터 계약 분리 | 신동현 | PM Diff 검토 전 |
 | v0.1.1 | 2026-07-20 | collection_logs를 공식 8개 메타데이터 계약으로 정렬하고 parser_version을 향후 정규화·분석 추적 필드로 분리 | 신동현 | PM 검토 전 |
 | v0.1.0 | 2026-07-17 | 장소·인구·예측·로그 필드 초안 | 신동현 | Draft |

@@ -56,7 +56,8 @@ Codex는 다음 원칙을 지켜야 한다.
 
 - 여의도와 EG-5 대표 3개 Area
 - EG-6A에서 확정한 13개 Area·Spot·S-DoT 패널
-- 유동인구·혼잡·Forecast·S-DoT Feature와 스팟 이동 기회
+- Area Observation과 S-DoT 보조 Feature
+- Area Feature와, 사용 가능한 경우의 S-DoT Feature를 결합한 Spot Candidate Evaluation
 
 실제 판매효과 분석은 현재 MVP 분석 범위에 포함하지 않는다.
 
@@ -70,9 +71,26 @@ Codex는 다음 원칙을 지켜야 한다.
 ```text
 장기 공식 수집 후보군: 서울시 주요 121장소
 현재 구현 범위: 여의도 1개 Area → 대표 3개 Area → 13개 Area·Spot·S-DoT 패널과 단일 회차 파이프라인
-현재 분석 범위: 유동인구·혼잡·Forecast·S-DoT Feature와 스팟 이동 기회
+현재 분석 범위: Area Feature + 선택적 S-DoT Feature + 공간·현장 Context의 Candidate Evidence Assessment
 후속 검토: 13개 Area 단일·반복 수집과 분석 후 필요 시 121개 Area 확대
 ```
+
+### 4.1 공식 서비스 데이터 구조
+
+- **Core Observation — Area:** EG-6B Collector가 모든 승인 Area의 인구 범위·혼잡도·
+  Forecast·시간대 변화를 수집한다.
+- **Optional Supporting Observation — S-DoT:** 지원·접근·수집·품질조건을 만족할 때만
+  센서 위치·근접 관계·관측 변화를 독립적으로 사용한다. Area 데이터를 대체하지 않는다.
+- **Additional Context:** 공간 Context, 현장검증과 운영제약을 별도로 관리한다.
+- **Spot Candidate Evaluation:** Area Feature에 사용 가능한 S-DoT Feature와 추가
+  Context를 결합해 후보 근거를 평가한다. 점수·가중치·임계값은 `OPEN_DECISION`이다.
+- **Recommendation 결과:** 신뢰할 수 있는 후보는 `SPOT`, 그렇지 않으면 `AREA`와
+  `fallback_reason`을 사용한다. Recommendation MVP Workstream의 Gate 번호는
+  `NOT_ASSIGNED`다.
+
+EG-6B의 책임은 Area Observation 확보까지다. 동적 S-DoT 수집과 Spot Candidate
+Evaluation 실패는 Area Collector를 중단시키지 않는다. 다만 EG-6B 실행 전에는
+승인된 EG-6A 정적 참조 패널의 연결 무결성을 공통 사전검사로 확인한다.
 
 과거의 `시험용 10장소 → 121장소 1회 수집`은 이전 계획으로 보존하되,
 현재 승인된 실행 순서로 사용하지 않는다.
@@ -182,9 +200,10 @@ POI072
 - 13개 Area·Spot·S-DoT 패널 확정
 - PM 승인 후 13개 Area 단일 수집과 Batch 구조 검증
 - PM 승인 후 13개 Area 단일 회차 실제 수집과 결과 검증
-- 반복수집 전 외장 저장장치 또는 PM 승인 클라우드 폴더 백업 준비
+- Google Drive for Desktop Sync와 `FreshManager-Data/` 논리 Backup Root, 별도 즉시 Backup Worker 준비
 - PM 승인 후 동일 13개 Area 반복수집 파일럿
-- 시간·장소·Forecast·S-DoT Feature 분석
+- Area Feature와 승인·확보된 S-DoT Feature의 Spot Candidate Evaluation
+- PM 승인 후 Gate 번호가 지정되지 않은 Recommendation MVP Workstream 검토
 - 필요성이 확인된 경우 121개 Area 확대 검토
 - 장소별 실시간 인구 현재값 저장
 - 장소별 미래 인구예측 스냅샷 저장
@@ -235,8 +254,10 @@ EG-0 문서 기준선
 → EG-5 유형별 대표 3장소
 → EG-6A 13개 Area·Spot·S-DoT 패널 확정
 → EG-6B 13개 Area 단일 수집·Batch Log·Manifest·SHA-256 검증
+→ Google Drive for Desktop Sync·즉시 Backup Worker·Fake Batch 검증과 EG-6B Live
 → EG-7 동일 13개 Area 반복수집 파일럿
-→ EG-8 시간·장소·Forecast·S-DoT Feature 분석
+→ EG-8 Area Feature + 승인·확보된 경우 S-DoT Feature + Spot Candidate Evaluation
+→ 후속 Recommendation MVP Workstream (Gate number: NOT_ASSIGNED)
 → 후속 검토에서 필요 시 121개 Area 확대
 ```
 
@@ -261,9 +282,26 @@ EG-0 문서 기준선
 - EG-6B는 같은 13개 Area의 단일 수집과 Batch Log·Manifest·SHA-256 무결성을
   검증한다. 구현·오프라인 검증·`main` 병합은 완료됐지만 실제 단일 회차 결과와
   PM PASS 판정 전에는 EG-6B를 통과로 표시하지 않는다.
-- EG-7은 같은 13개 Area의 반복수집 파일럿으로 제한한다.
-- EG-8은 시간·장소·Forecast·S-DoT Feature를 분석하며 실제 판매효과를 분석하지 않는다.
-- 121개 Area 확대는 EG-8 이후 필요성이 확인된 경우 별도 PM 승인을 받아 검토한다.
+- Google Drive Backup Worker는 EG-6C 같은 새 Engineering Gate가 아니다. EG-6B
+  Live 전 별도 Issue에서 Batch 완료 직후 1회 실행하는 Worker를 구현하고 Fake Batch·
+  중복·충돌 검증·PR·CI·`main` 병합을 완료한다. 공식 방식은 Google Drive for
+  Desktop Sync이며 Google Drive API·OAuth·SDK는 구현하지 않는다.
+- Backup Root는 `FreshManager-Data/` 논리 구조로만 정의한다. 실제 Google 계정 이메일과
+  동기화 절대경로는 저장소·Receipt·로그에 기록하거나 출력하지 않는다.
+- 로컬 Raw·Metadata·Collection Log·Manifest가 공식 원본이며 Google Drive에는
+  검증된 복사본만 자동 백업한다. iCloud와 수동 백업은 현행 운영방식으로 사용하지
+  않고 백업 실패로 서울시 API를 재호출하지 않는다.
+- CSV Exporter는 첫 실제 Batch의 구조·결측·Forecast와 Manifest 품질을 확인한 뒤
+  별도 Issue에서 구현한다. CSV 실패로 서울시 API를 재호출하지 않는다.
+- EG-7은 같은 13개 Area의 반복수집 파일럿으로 제한하며, S-DoT 관측 수집 가능성은
+  Area 수집과 분리된 후속 데이터 계층으로 검토한다.
+- EG-8은 Area Feature와 승인·확보된 경우의 S-DoT Feature를 이용해 Spot Candidate
+  Evaluation을 수행하며 실제 판매효과를 분석하지 않는다. Candidate Score·가중치·
+  임계값은 확정 계약이 아니다.
+- Recommendation MVP는 `PLANNED` Workstream이고 Gate 번호는 `NOT_ASSIGNED`다.
+  별도 PM 승인 전 공식 Engineering Gate로 취급하거나 구현하지 않는다.
+- 121개 Area 확대는 EG-8 결과와 Recommendation MVP의 데이터 필요성을 확인한 뒤 별도 PM
+  승인을 받아 검토한다.
 
 Gate A·Gate B·Gate C는 데이터 PoC 판정 게이트다.
 구현 준비도와 엔지니어링 품질을 판정하는 EG-0~EG-8과 혼용하지 않는다.
@@ -640,18 +678,20 @@ PM의 최종 승인 전에는 main 브랜치 병합 또는
 
 새 대화나 새 Codex 세션은 다음 순서로 현재 상태를 복원한다.
 
-1. `PROJECT_STATUS.md`
-2. `docs/product/FreshManager_PRD_v1.0.md`
-3. `docs/engineering/FreshManager_TRD_v1.0.md`
-4. `AGENTS.md`
-5. `docs/engineering/CODEX_HARNESS_ARCHITECTURE.md`
-6. `docs/rules/DATA_COLLECTION_RULES.md`
-7. `docs/testing/QUALITY_GATES.md`
-8. `docs/testing/PROJECT_GUARD_SPEC.md`
-9. 현재 GitHub Issue, Branch, `main` HEAD, `git status`와 최근 병합 Pull Request
+1. `AGENTS.md` — 행동·보안·승인 규칙
+2. `PROJECT_STATUS.md` — 현재 단계·Issue·Branch·외부 실행·다음 행동
+3. `ai-context/PROJECT_MEMORY.md` — 장기 제품 맥락과 안정적 원칙
+4. `docs/product/FreshManager_PRD_v1.0.md`
+5. `docs/engineering/FreshManager_TRD_v1.0.md`
+6. 현재 GitHub Issue, 관련 PR·Commit과 현재 Git Diff
+7. 작업 관련 Rule·Quality Gate·Data·Analysis 문서
+8. `ai-context/DECISION_LOG.md`의 관련 Decision
+9. `ai-context/ARCHITECTURE_DECISIONS.md`의 관련 ADR
+10. `docs/engineering/CODEX_HARNESS_ARCHITECTURE.md`
 
-`PROJECT_STATUS.md`는 빠른 복원 요약이다. 현재 구현 사실은 마지막 단계에서 실제
-`main` 코드·검증 결과·Issue·병합 기록과 대조한다.
+`PROJECT_STATUS.md`가 현재 상태 복원의 공식 운영 문서다. AI Context 문서는 이를
+대체하지 않으며 PRD·TRD·Rule·코드·테스트와 충돌하면 해당 정본과 실제 검증 증거를
+기준으로 AI Context를 수정한다.
 
 기준문서의 역할은 다음과 같다.
 
@@ -663,6 +703,10 @@ PM의 최종 승인 전에는 main 브랜치 병합 또는
 | `DATA_COLLECTION_RULES.md` | 데이터 수집·보존·결측·반복주기 분야 규칙 |
 | `QUALITY_GATES.md` | EG 단계의 진입·통과와 다음 단계 전환 조건 |
 | `PROJECT_GUARD_SPEC.md` | 검사 ID·상태·종료코드의 유일한 기준 |
+| `CLOUD_BACKUP_AND_CSV_MANAGEMENT_PLAN.md` | Google Drive 백업·상태·복구·CSV 후속 계약과 미결정사항 |
+| `PROJECT_MEMORY.md` | 현재 상태를 복제하지 않는 장기 제품 맥락 복원 요약 |
+| `DECISION_LOG.md` | PM 제품·운영 결정과 대체 이력 |
+| `ARCHITECTURE_DECISIONS.md` | 기술·데이터 Architecture Decision Record |
 
 ### 24.2 코드·검증 작업의 필수 문서
 
@@ -699,8 +743,9 @@ Codex는 코드, 테스트, 설정 또는 Project Guard 작업을 시작하기 �
 | `docs/rules/DATA_COLLECTION_RULES.md` | 데이터 수집, 원본 보존, 예측·날씨 분리와 결측 처리 규칙 |
 | `docs/data/FIELD_DICTIONARY.md` | 원본·정규화·메타데이터·파생필드의 정의와 검증 상태 |
 | `docs/analysis/ANALYSIS_PLAN.md` | 분석 질문, 기준선, 평가기간과 Gate A·B·C 판정 계획 |
+| `docs/data/CLOUD_BACKUP_AND_CSV_MANAGEMENT_PLAN.md` | 로컬 원본과 Google Drive 복사본, Backup Worker·CSV 도입 목표 계약 |
 
-세 문서의 Project Guard 자동검사 대상 편입은 EG-3 후속 Issue에서 반영한다.
+네 문서의 Project Guard 자동검사 대상 편입은 별도 Issue와 PM 승인으로만 반영한다.
 
 Codex는 작업 시작 전에 다음을 확인한다.
 
@@ -711,6 +756,8 @@ Codex는 작업 시작 전에 다음을 확인한다.
 5. PM 승인 없이 변경할 수 없는 사항이 있는가
 6. 실제 API 호출이 필요한 작업인가
 7. 실제 API 호출에 대한 PM 승인이 있는가
+8. Live 작업이면 Google Drive for Desktop Sync 논리 루트 접근 확인, Backup Worker `main` 병합,
+   Fake Batch 검증과 Live Preflight 재통과가 확인됐는가
 
 현재 품질 게이트를 통과하지 않은 상태에서
 다음 단계의 코드를 임의로 구현하지 않는다.
@@ -746,6 +793,18 @@ Codex는 작업 시작 전에 다음을 확인한다.
 4. 선택 가능한 수정안
 5. 권장안
 6. PM 승인이 필요한 이유
+
+### 24.4 작업 종료 시 Context 영향검토
+
+의미 있는 Issue·PR·Merge가 끝나면 다음 책임에 해당하는 변화가 있었는지 확인한다.
+
+- 현재 단계·Issue·PR·외부 실행·다음 행동 변경: `PROJECT_STATUS.md`
+- 장기 제품 정의·핵심 원칙·Area–Spot–S-DoT 관계 변경: `PROJECT_MEMORY.md`
+- PM 제품·운영 결정 또는 대체·폐기: `DECISION_LOG.md`
+- 컴포넌트·데이터·저장·추천 구조 변경: `ARCHITECTURE_DECISIONS.md`
+
+모든 작업에서 네 문서를 의무적으로 수정하지 않는다. 책임에 해당하는 변화가 있을
+때만 갱신하며, 변경 필요 없음도 Review 결과로 보고할 수 있다.
 
 ## 25. GitHub Issue·Pull Request 템플릿
 

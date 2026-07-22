@@ -2,7 +2,7 @@
 
 # FreshManager 기술 요구사항 정의서
 
-> EG-6B 현행 단일 수집 파이프라인과 EG-7·EG-8 목표 아키텍처
+> EG-6B 현행 단일 수집 파이프라인과 EG-7·EG-8 및 후속 Recommendation 목표 아키텍처
 
 **문서 ID:** FM-TRD-001
 
@@ -14,9 +14,15 @@
 
 **검증 증거:** Target 19/19 · Full 243/243 · Project Guard PASS=41, SKIP=5, TOTAL=46
 
-**적용 범위:** 현재 EG-6B + 승인 후 EG-7 반복수집·EG-8 분석 목표 구조
+**적용 범위:** 현재 EG-6B + 승인 후 EG-7 반복수집·EG-8 Feature 분석 + `PLANNED`
+Recommendation MVP Workstream(Gate number `NOT_ASSIGNED`) 목표 구조
 
-> **설계 기준**  현행 구현과 목표 구조를 섞지 않는다. 현재 main은 13개 Area 단일 회차의 원본·메타데이터·Batch Log·Manifest를 제공한다. 반복주기, 잠금, 백업 자동화, 정규화 영속화, 날씨·상권, 분석 파이프라인은 아직 승인·구현되지 않았다.
+**2026-07-22 변경이력:** Issue #58 초안에서 Google Drive for Desktop Sync·분리된
+Backup Worker·Google Drive for Desktop Sync·CSV Exporter 목표구조와 Area Core Observation·선택적 S-DoT
+Supporting Observation·Spot Candidate Evaluation·Recommendation 결과 구조를 반영했다.
+파일 버전은 PM의 별도 결정 전 `v1.0`을 유지한다.
+
+> **설계 기준**  현행 구현과 목표 구조를 섞지 않는다. 현재 main은 13개 Area 단일 회차의 원본·메타데이터·Batch Log·Manifest를 제공한다. Google Drive for Desktop Sync와 `FreshManager-Data/` 논리 Backup Root 결정은 완료됐지만 Backup Worker, CSV Exporter, 정규화 영속화, 날씨·상권과 분석 파이프라인은 아직 구현되지 않았다.
 
 ## 문서 구성
 
@@ -30,7 +36,7 @@
 
 ## 1. 목적과 기술 범위
 
-이 TRD는 PRD의 제품 요구를 구현 계약으로 변환한다. 첫째, 현재 main에 병합된 EG-6B 단일 회차 수집기의 실제 동작·데이터·오류·보안·검증 계약을 정확히 기록한다. 둘째, EG-7 반복수집과 EG-8 분석으로 확장할 때 필요한 목표 구조와 승인 지점을 정의한다.
+이 TRD는 PRD의 제품 요구를 구현 계약으로 변환한다. 첫째, 현재 main에 병합된 EG-6B 단일 회차 수집기의 실제 동작·데이터·오류·보안·검증 계약을 정확히 기록한다. 둘째, EG-7 반복수집, EG-8 Feature 분석과 별도 Recommendation MVP Workstream으로 확장할 때 필요한 목표 구조와 승인 지점을 정의한다. Recommendation MVP는 공식 Gate가 아니라 별도 승인할 계획 Workstream이다.
 
 본 문서는 코드보다 우선하지 않는다. 현재 동작은 main commit 6253cc5의 코드와 테스트 결과를 기준으로 하며, 미래 항목은 ‘목표’ 또는 ‘결정 필요’로 표시한다. 실제 API 호출이나 저장구조 변경을 승인하는 문서가 아니다.
 
@@ -43,7 +49,9 @@
 - 실패 격리: Area 오류는 기록 후 계속하고, 공통 무결성·설정·저장 오류는 안전 중단한다.
 - 시간 의미 보존: 요청·수신·관측·예측 스냅샷·예측 대상·후속 관측 시각을 분리한다.
 - 증거 기반 Gate: 코드·테스트·CI·실제 실행 증거와 PM 승인을 모두 거쳐 다음 단계로 간다.
-- 경계 최소화: 현재 필요하지 않은 Scheduler·DB·클라우드·ML 의존성을 추가하지 않는다.
+- 경계 최소화: 현재 필요하지 않은 수집 Scheduler·DB·Google Drive API/OAuth/SDK·ML
+  의존성을 추가하지 않는다. Backup Worker는 Batch 완료 직후 한 번 호출하고 원격
+  동기화는 Google Drive for Desktop Sync에 위임하는 목표구조다.
 
 ## 3. 현행 구현 상태
 
@@ -56,10 +64,15 @@
 | 13개 단일 회차 | 구현·병합·오프라인 검증 | eg6b.py |
 | 실제 13개 단일 회차 | 미실행 | PM 승인 필요 |
 | 반복수집·Scheduler | 미구현 | EG-7 |
-| 백업 자동화·잠금 | 미구현 | EG-7 선행 |
+| Google Drive Backup Worker·잠금 | 미구현 | EG-6B Live 선행 준비 |
+| Google Drive for Desktop Sync·논리 Backup Root | 방식 확정 | `FreshManager-Data/`; 계정 이메일·절대경로 비기록 |
+| Raw-to-CSV Exporter | 미구현 | 첫 실제 Batch 품질 감사 후 |
 | 예측·관측 정규화 영속화 | 부분 | Parser 반환만 구현 |
 | 날씨·상권 영속화 | 미구현 | Guard H-505/H-601/H-602 SKIP |
+| S-DoT 관측 데이터 계층 | 미구현·가능성 검토 전 | EG-7에서 독립 수집 가능성 검토 |
+| Spot Candidate Evaluation | 미구현 | EG-8; Score·가중치·임계값은 OPEN_DECISION |
 | Feature 분석 파이프라인 | 미구현 | EG-8 |
+| Recommendation MVP | `PLANNED` | Gate number `NOT_ASSIGNED`, 별도 PM 승인 필요 |
 
 > **문서 정렬**  PROJECT_STATUS.md, Quality Gates와 비개발자 실행 가이드는 PR #54 병합 이후 상태와 이 TRD의 로컬 Python·주기 미정 원칙을 따른다. 현재 동작 판단은 main 코드·merge commit·검증 기록이 우선이다.
 
@@ -78,6 +91,24 @@
 | scripts/project_guard_check.py | 문서·데이터·보안·수집 계약 검사 | offline guard |
 | tests/* | Fake Transport·임시 파일 기반 단위·통합 계약 | offline tests |
 | .github/workflows/ci.yml | PR·main Push에서 Guard와 전체 테스트 | CI |
+
+### 4.1 공식 목표 서비스 데이터 아키텍처
+
+```text
+Core Observation: EG-6B Area Observation — 모든 승인 Area에서 필수
+Optional Supporting Observation: S-DoT — 지원·접근·수집·품질조건 충족 시만 사용
+Additional Context: Spatial Context + Field Validation + Operational Constraints
+
+Area Feature + 선택적 S-DoT Feature + Additional Context
+→ Spot Candidate Evaluation
+→ 신뢰 가능한 Spot: SPOT / 없는 경우: AREA + fallback_reason
+```
+
+현행 EG-6B는 Core Area Observation만 수집한다. `eg6_spot_master.csv`와
+`eg6_sdot_links.csv`는 승인된 정적 패널 연결을 검증하는 immutable input이지만
+Spot 좌표나 센서 관측값을 API 요청에 사용하지 않는다. 동적 S-DoT 수집과 Spot
+Candidate Evaluation은 후속 독립 책임이며, 그 실패는 Area 회차를 중단시키지
+않는다. S-DoT 미지원 6개 Area도 Area 분석과 추천 후보에서 제외하지 않는다.
 
 ## 5. EG-6B 실행 시퀀스
 
@@ -267,7 +298,10 @@ output-root 아래 단계별 경로를 자동 적용한다. 참조파일과 소�
 
 ## 14. 목표 정규화 데이터 모델
 
-EG-7 전에 Raw와 Metadata만으로는 리드타임별 평가를 반복하기 어렵다. 다음 데이터셋은 목표 계약이며 저장 형식(CSV 분할 또는 경량 로컬 DB)은 PM 승인 후 결정한다.
+첫 실제 EG-6B Batch 품질 감사 후 Raw와 Metadata만으로는 리드타임별 평가를
+반복하기 어렵다는 사실을 실제 구조로 확인한 뒤 정규화 계약을 확정한다. CSV는 첫
+Batch 전에 구현하지 않으며 다음 데이터셋은 목표 계약이다. 저장 형식은 별도 Issue와
+PM 승인으로 결정한다.
 
 | **데이터셋** | **고유키** | **핵심 내용** |
 | --- | --- | --- |
@@ -278,19 +312,48 @@ EG-7 전에 Raw와 Metadata만으로는 리드타임별 평가를 반복하기 �
 | weather_forecasts | area + issue + target + request | 예보값과 사용가능 시각 |
 | weather_observations | area + observation_time + request | 사후 실제 날씨 |
 | commerce_observations | area + reference_time + request | 활동단계·지원상태·시간차 |
-| spot_context | context_version + spot_id | Area–Spot–S-DoT·현장검증 상태 |
+| sdot_observations | sensor_id + observation_time + source_snapshot | 센서 관측·시간대 변화; Area와 독립 저장 |
+| spot_candidate_context | context_version + candidate_id | Area–S-DoT 근접성·공간 Context·현장검증 상태 |
+| spot_candidate_evaluations | evaluation_version + candidate_id + decision_time | Area Feature·선택적 S-DoT Feature·Context 기반 후보 근거 평가 |
+| recommendations | recommendation_id | target_level·target_id·fallback_reason·사용 Feature 버전 |
 
 ### 14.1 버전 계약
 
 - collector_version: 수집 실행 의미가 바뀔 때 증가한다.
 - data_version: 저장 스키마·필드 의미가 바뀔 때 증가한다.
 - panel_version: Area 패널과 순서가 바뀔 때 증가한다.
-- context_version: Spot·S-DoT·현장검증 문맥이 바뀔 때 목표 구조로 추가한다.
+- context_version: Spot Candidate·S-DoT 근접성·공간·현장검증 문맥이 바뀔 때 목표 구조로 추가한다.
 - parser_version: 현재 최소 8필드 메타데이터에는 넣지 않으며 정규화 저장 설계에서 별도 승인한다.
+
+### 14.2 S-DoT·Spot Candidate·Recommendation 목표 계약
+
+Area Collector는 Spot 추천 여부와 무관하게 공식 Area 관측을 계속한다. S-DoT
+관측과 Spot Candidate Evaluation 오류가 EG-6B Area 수집을 중단시켜서는 안 된다.
+후속 구조는 필수 직렬 파이프라인이 아니라 다음 독립 입력을 결합한다.
+
+```text
+필수: Area Observation → Area Feature
+선택: S-DoT Observation → 지원·접근·수집·품질조건을 통과한 S-DoT Feature
+추가: Spatial Context + Field Validation + Operational Constraints
+결합: Spot Candidate Evaluation
+결과: target_level=SPOT 또는 target_level=AREA + fallback_reason
+```
+
+- S-DoT는 Area 데이터를 대체하지 않고 후보 생성과 공간 Feature 분석을 보조한다.
+- 검증된 Spot Candidate가 있으면 반드시 `SPOT`을 선택한다.
+- 후보가 없거나 운영 가능성이 미확인이면 `AREA`로 fallback하고 이유를 기록한다.
+- 현재 Spot Master의 `STATION_CENTER_PROXY`, `field_verified=false` 행은 Candidate
+  Anchor Point이며 추천 가능한 Spot이나 고정 판매 위치가 아니다.
+- Area 값은 특정 출구·Spot의 직접 유동인구 측정값이 아니다.
+- EG-6B의 정적 Spot/S-DoT CSV 사전검사는 패널 참조 무결성 계약이며 동적 계층
+  실행이나 추천 성공을 의미하지 않는다.
+- S-DoT 미지원 6개 Area도 Area Feature와 추천 후보를 계속 평가한다.
+- 후보 Score·가중치·임계값은 `PLANNED` 또는 `OPEN_DECISION`이며 필수 데이터
+  계약이 아니다.
 
 ## 15. EG-7 목표 아키텍처
 
-> **목표 흐름**  승인 Scheduler/수동 Runner → 단일 실행 Lock → EG-6B Batch Core → 불변 Raw·Metadata·Batch → 정규화 Observation·Forecast → 품질 집계 → 검증된 백업 → 상태 보고
+> **목표 흐름**  승인 Runner → 단일 실행 Lock → EG-6B Batch Core → 불변 Raw·Metadata·Batch → 정규화 Observation·Forecast → 품질 집계 → 별도 Google Drive Backup Worker → 상태 보고
 
 | **컴포넌트** | **책임** | **상태** |
 | --- | --- | --- |
@@ -299,7 +362,9 @@ EG-7 전에 Raw와 Metadata만으로는 리드타임별 평가를 반복하기 �
 | Batch Core | 현 EG-6B 로직 재사용; 장소별 1회·실패 격리 | 재사용 |
 | Normalizer | 관측·예측 스냅샷 영속화 | 신규 |
 | Quality Aggregator | 지연·결측·스키마·성공률·용량 | 신규 |
-| Backup Worker | 외장 또는 승인 클라우드 복사·SHA-256·실패 기록 | 신규 |
+| S-DoT Feasibility Probe | 센서 데이터 접근성·갱신주기·키·결측·Area 연결 가능성 확인 | EG-7 별도 검토 |
+| Backup Worker | 완료 Batch의 Google Drive 로컬 동기화 폴더 복사·SHA-256·Receipt | 신규 |
+| Post-Batch Trigger | Batch 완료 판정 직후 1회 실행형 Worker 호출 | 신규 |
 | Run Registry | 예정 슬롯·실행·누락·중복·종료 상태 | 결정 필요 |
 | Context Registry | 패널·Spot·S-DoT 버전 연결 | 결정 필요 |
 
@@ -320,13 +385,28 @@ EG-7 전에 Raw와 Metadata만으로는 리드타임별 평가를 반복하기 �
 
 ## 16. 백업과 복구
 
-- EG-7 진입 전 외장 저장장치 주기 복사 또는 PM 승인 클라우드 폴더 백업 중 하나를 선택한다.
-- 수집 실행은 로컬 Python에 유지하며 백업 목적지 장애가 수집 원본을 삭제·덮어쓰게 해서는 안 된다.
-- 백업 단위는 완결된 batch directory와 해당 날짜의 Raw·Metadata다.
-- 원본 Manifest 또는 별도 backup manifest로 byte_size·SHA-256을 재검증한다.
-- 백업 성공·실패·완료시각·대상 batch_id를 별도 상태로 기록한다.
-- 정기적으로 샘플 회차를 복구해 해시·경로·JSON 파싱을 확인한다.
-- 보관·삭제 정책은 5주 PoC와 최종 리포트 완료 전 삭제 금지를 기본으로 별도 승인한다.
+- 공식 제공자는 Google Drive다. iCloud와 수동 백업은 현행 운영방식으로 사용하지 않는다.
+- Google Drive API·OAuth·SDK 대신 Google Drive for Desktop Sync의 로컬 동기화
+  폴더를 사용한다. Backup Root는 `FreshManager-Data/` 논리 구조만 정의한다.
+- 실제 계정 이메일과 동기화 절대경로는 저장소·Receipt·로그에 기록하지 않는다.
+- Collector는 로컬 원본만 생성하고, Batch 완료 판정 직후 별도 1회 실행형 Backup
+  Worker를 호출해 복사·검증한다. 시간 간격 기반 폴링은 사용하지 않는다.
+- 백업 단위는 완결된 Raw·Metadata·Collection Log·Manifest 전체다. 종료코드 `1`의
+  부분 실패 Batch도 증거와 Manifest가 완결되면 보존한다. 실행 중 Batch는 복사하지 않는다.
+- 동기화 루트의 임시 디렉터리로 복사하고 파일 수·Manifest SHA-256을 확인한 뒤
+  최종 `batch_id` 경로로 원자적으로 게시한다.
+- 동일 `batch_id`의 파일 수·해시가 같으면 중복을 생략하고, 다르면 `CONFLICT`로
+  중단한다. 기존 원본이나 복사본을 덮어쓰지 않는다.
+- `LOCAL_CLOUD_COPY_VERIFIED`와 `REMOTE_SYNC_CONFIRMED`를 구분한다. 로컬 폴더
+  복사만으로 실제 Google Drive 원격 업로드 완료를 주장하지 않는다.
+- 백업 실패는 서울시 API 재호출 사유가 아니며 `.env`, Secret, 인증 URL과 임시
+  파일을 백업하지 않는다.
+- Backup Receipt, 일일 무결성 감사, 새 위치 복원시험과 보존기간은 후속 구현·PM
+  승인 대상이다.
+
+상태·충돌·복원·CSV 상세 목표 계약은
+`docs/data/CLOUD_BACKUP_AND_CSV_MANAGEMENT_PLAN.md`를 따른다. 모두 목표 구조이며
+현재 코드에 구현된 것으로 해석하지 않는다.
 
 ## 17. 데이터 품질 계약
 
@@ -355,9 +435,18 @@ EG-7 전에 Raw와 Metadata만으로는 리드타임별 평가를 반복하기 �
 - 백업 용량 = 원본 보관 용량 × 복제본 수 + Manifest/운영 여유
 - 병렬 호출은 현재 금지한다. 향후 검토 시 API 제한·시각 정렬·실패 격리 영향을 다시 설계한다.
 
-## 19. EG-8 분석 기술 구조
+## 19. EG-8 Feature 분석 기술 구조
 
-> **분석 흐름**  검증된 Batch → Point-in-time 정규화 → 포함·제외 규칙 → 기준선 B0/B1/B2 → 공식 예측 비교 → 피크·장소·소비·날씨 분석 → Gate A/B 리포트
+> **분석 흐름**  검증된 Batch → Point-in-time 정규화 → Area Feature + 승인·확보된 경우의 독립 S-DoT Feature + 공간·현장·운영 Context → Spot Candidate Evaluation → 기준선·예측 비교 → Gate A/B 리포트
+
+분석은 단계별 증거 수준을 구분한다.
+
+| 단계 | 데이터 | 기술적 산출물 |
+|---|---|---|
+| 첫 Batch 품질 감사 | 최초 실제 EG-6B Batch | 저장·Manifest·필드·결측·지연·오류 감사와 PASS/보완 근거 |
+| Snapshot 비교 | 품질 감사 통과한 한 회차 | Area별 현재값·구성·Forecast 방향·상대순위 |
+| 초기 EDA | EG-7 평일 5영업일 | 시간대 요약·증감·피크 후보·결측·초기 1시간 오차 |
+| 공식 EG-8 | 4주 기준선+5주차 | Area Feature·선택적 S-DoT Feature·Spot Candidate Evaluation·1/3/6시간 오차·Feature 유효성 |
 
 | **분석** | **방법** | **목적** |
 | --- | --- | --- |
@@ -367,6 +456,8 @@ EG-7 전에 Raw와 Metadata만으로는 리드타임별 평가를 반복하기 �
 | 서울시 예측 | 스냅샷·대상·후속 관측 연결 | 리드타임별 비교 |
 | 피크 | 기준선 대비 상승·지속·비관행 시간 | 후보 시간창 |
 | 장소 | 절대값·상대순위·변동성 | 분별력 |
+| S-DoT | 센서 시간대 변화·Area 근접 관계 | Area 내부 활성 위치 판단 보조 |
+| Spot Candidate | Area·선택적 S-DoT·공간·현장검증 Feature 조합 | 후보별 Candidate Evidence Assessment |
 | 소비·날씨 | 지원상태와 point-in-time join | 보조 설명 |
 
 ### 19.1 분석 산출물
@@ -375,7 +466,21 @@ EG-7 전에 Raw와 Metadata만으로는 리드타임별 평가를 반복하기 �
 - 예측 평가표: MAE, RMSE, 상대오차, 구간 포함률, 혼잡도 일치율, 리드타임
 - 시간패턴 차트: 요일·시간 기준선, 변화율, 변동성, 피크 지속시간
 - 장소 비교표: Area 유형, 인구 기회, 혼잡 위험, S-DoT 지원 여부
+- Spot Candidate 표: 후보 Anchor, Area·선택적 S-DoT·공간 Feature, 현장검증, 근거와 제한
 - Gate A/B 판정 메모: 사실·해석·가설·한계·다음 행동
+
+### 19.2 후속 Recommendation MVP Workstream 목표
+
+이 Workstream은 EG-8에서 유효성이 확인된 Area Feature, 선택적으로 승인·확보된
+S-DoT Feature와 Candidate Evidence Assessment를 입력으로 사용하는 별도 Recommendation
+MVP다. 상태는 `PLANNED`, Gate number는 `NOT_ASSIGNED`이며 EG-8 분석 결과와 PM 승인
+전에는 구현하지 않는다.
+
+- 충분하고 신뢰 가능한 Spot Candidate가 있으면 `target_level=SPOT`을 출력한다.
+- 후보 근거가 부족하면 `target_level=AREA`와 `fallback_reason`을 출력한다.
+- 추천 근거에는 사용한 Feature·Evaluation·Context 버전을 남긴다.
+- 추천 실패가 원본 Area Observation을 변경하거나 API 재호출을 유발하지 않는다.
+- 실제 판매효과와 추천 적중은 Recommendation MVP 구현만으로 입증됐다고 표현하지 않는다.
 
 ## 20. 관측성·운영 보고
 
@@ -407,12 +512,16 @@ Project Guard의 H-706은 EG-6B 완전성을 검증해 PASS했다. H-707은 반�
 ## 22. 배포·Rollout 계획
 
 - T0 완료 — PR #54 병합, main/PR CI, 19 Target·243 Full·Guard 41 PASS
-- T1 승인 필요 — 실제 env/output Preflight, 참조 해시, 저장공간·Probe, 최대 13회 호출
-- T2 판정 — Raw·Metadata·Collection Log·Manifest·hash와 실패 목록 검토 후 EG-6B PASS 결정
-- T3 설계 승인 — 주기·호출예산·Lock·백업·정규화·버전 계약
-- T4 EG-7 Pilot — 제한된 기간 동일 13개 반복, 품질·용량·운영 안정성 측정
-- T5 EG-8 — 4주 기준선+5주차 평가, Gate A/B 분석
-- T6 후속 — 현장·인터뷰 결과로 121개 확대 또는 서비스 실증 여부 결정
+- T1 완료 — Issue #57 env/output Preflight Probe; 실제 API 호출·데이터 생성 0
+- T2 준비 — Google Drive for Desktop Sync 설치·로그인·논리 루트 접근 확인
+- T3 구현 — 완료 직후 Backup Worker·Fake Batch 검증·PR·CI·`main` 병합
+- T4 승인 — Live Preflight 재통과와 최대 13회 실제 호출 별도 승인
+- T5 판정 — 첫 Batch 원본·Manifest·자동 백업·품질 감사와 EG-6B PASS/보완
+- T6 CSV — 실제 구조 기반 CSV 계약·Exporter 별도 구현·누적·재생성 검증
+- T7 EG-7 Pilot — 제한된 기간 동일 13개 Area 반복, 5영업일 EDA·품질·용량 측정과 S-DoT 수집 가능성 검토
+- T8 EG-8 — 4주 기준선+5주차 Area·선택적 S-DoT Feature와 Spot Candidate Evaluation, Gate A/B 분석
+- T9 후속 — Recommendation MVP Workstream(`PLANNED`, Gate number `NOT_ASSIGNED`)
+- T10 후속 — 현장·인터뷰 결과로 121개 확대 또는 서비스 실증 여부 결정
 
 ## 23. 중단·복구·변경관리
 
@@ -437,21 +546,27 @@ Project Guard의 H-706은 EG-6B 완전성을 검증해 PASS했다. H-707은 반�
 | ADR-06 | Manifest·SHA-256 | 참조·산출물 무결성 | 유지 |
 | ADR-07 | output-root 저장소 밖 | 소스·기준데이터와 실데이터 분리 | 유지 |
 | ADR-08 | Google Sheets 수집 미채택 | 현행 로컬 Python·원본 보존·승인 Gate와 충돌 | 폐기 지침 |
-| ADR-09 | Spot은 Recommendation Context | Area 수집기와 현장 후보 문맥 분리 | 후속 설계 |
+| ADR-09 | Spot Master는 Candidate Anchor Point | 고정 판매 위치가 아니라 Area·S-DoT·공간·현장검증 기반 후보 생성의 입력 | 유지 |
+| ADR-10 | Google Drive for Desktop Sync 백업 | API·OAuth·SDK 없이 로컬 파일 계약과 원격 동기화 책임 분리 | PM 방식 결정·구현 전 |
+| ADR-11 | Batch 완료 직후 1회 실행형 Worker | 수집기·백업 책임 분리와 장애 격리 | 목표 구조 |
+| ADR-12 | CSV는 첫 Batch 이후 | 실제 필드·결측·Forecast를 확인한 뒤 파생 계약 확정 | 목표 구조 |
+| ADR-13 | S-DoT는 독립·선택적 보조 데이터 계층 | Area를 대체하거나 필수 직렬 단계가 아니며 Spot Candidate 근거만 보조 | 목표 구조 |
+| ADR-14 | Recommendation MVP Workstream 분리 | EG-8 Feature 검증과 추천 제품 동작을 분리; Gate number NOT_ASSIGNED | 목표 구조 |
 
 ## 25. 미결정 기술사항
 
-- O-01 실제 EG-6B env-file·output-root·실행시각과 수집 승인
+- O-01 Google Drive for Desktop Sync 설치·로그인과 논리 루트 접근·용량 확인 방법
 - O-02 반복수집 간격·운영시간·일 호출예산·공휴일 처리
 - O-03 단일 실행 Lock 방식과 stale lock 복구 규칙
 - O-04 정규화 저장 형식: 분할 CSV vs SQLite 등 표준 라이브러리 기반 로컬 DB
 - O-05 parser_version과 schema migration 기록 방식
-- O-06 백업 목적지·주기·암호화·보관·복구 시험
+- O-06 원격 완료 확인, Receipt, 보관·일일 감사·복구 시험
 - O-07 디스크 여유 임계치와 수집 중단 정책
 - O-08 날씨·상권 Endpoint·실응답 필드·지원상태 Enum
 - O-09 context_version과 현장검증 갱신 방식
 - O-10 EG-7 재시도 도입 여부와 호출량·시간 정렬 영향
 - O-11 Quality Gate·Project Status의 post-merge 상태 정렬
+- O-12 Backup Worker `main` 병합 후 Live Preflight·env-file·output-root·실행시각·최대 13회 호출 승인
 
 ## 26. PRD–구현 추적성
 
@@ -465,9 +580,11 @@ Project Guard의 H-706은 EG-6B 완전성을 검증해 PASS했다. H-707은 반�
 | FR-06 | Project Guard + Batch evidence | 부분: 장기 품질 집계 미구현 |
 | FR-07 | 목표 weather datasets | H-505 SKIP |
 | FR-08 | 목표 commerce_observations | H-601/H-602 SKIP |
-| FR-09 | docs/analysis/ANALYSIS_PLAN.md | EG-8 미구현 |
+| FR-09 | docs/analysis/ANALYSIS_PLAN.md | EG-8·후속 Recommendation MVP Workstream 미구현 |
 | FR-10 | EG5 report + 목표 reporting | 부분 |
 | FR-11 | Collector statuses + eg6b exit 0/1/2 | H-704/H-705/H-706 |
+| FR-13 | 목표 즉시 Backup Worker·Google Drive for Desktop Sync | 미구현; Cloud Backup Plan·별도 Issue 필요 |
+| FR-14 | 목표 S-DoT·Spot Candidate·Recommendation 계층 | 미구현; EG6 Panel·EG-8 Feature·현장검증 필요 |
 | FR-12 | --execute-live + AGENTS/Git workflow | Project Guard/CI/PM |
 
 ## 근거 자료
@@ -510,4 +627,7 @@ Project Guard의 H-706은 EG-6B 완전성을 검증해 PASS했다. H-707은 반�
 | Point-in-time join | 의사결정 시점에 실제로 이용 가능했던 데이터만 연결하는 방식 |
 | Common failure | 회차 전체의 안전성을 해치는 설정·저장·무결성·내부 오류 |
 | Area failure | 해당 Area만 실패하고 다음 Area 진행이 가능한 API·Timeout·파싱·검증 오류 |
-| Recommendation Context | Area 신호와 Spot·S-DoT·현장 상태를 연결하는 후속 문맥 계층 |
+| S-DoT Data Layer | 센서 위치·근접 관계·관측 변화의 독립 보조 계층; Area 데이터를 대체하지 않음 |
+| Spot Candidate | Area·S-DoT·공간 Context·현장검증을 결합해 생성하는 판매 후보 위치 |
+| Candidate Anchor Point | Spot 후보 생성의 기준점; 현재 역 중심 대리좌표이며 고정 판매 위치가 아님 |
+| Recommendation 결과 | 후보 근거에 따라 SPOT 또는 AREA+fallback_reason을 결정하는 후속 Workstream 결과 |

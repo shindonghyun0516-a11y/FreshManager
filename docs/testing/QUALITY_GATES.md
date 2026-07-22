@@ -17,6 +17,8 @@ EG-0부터 EG-8까지의 순서, 진입조건과 통과조건을 정의한다.
 ## 2. 게이트 명칭과 PM 승인
 
 EG-0~EG-8은 구현 준비도와 엔지니어링 품질을 판정하는 게이트다.
+Recommendation MVP Workstream은 `PLANNED`, Gate number `NOT_ASSIGNED`이며 PM이
+별도로 승인하기 전에는 공식 Engineering Gate가 아니다.
 Gate A·Gate B·Gate C는 데이터 PoC 판정을 위한 별도 게이트다.
 
 - 어떤 EG의 통과도 Gate A·B·C 통과를 뜻하지 않는다.
@@ -52,7 +54,8 @@ EG-0 문서 기준선
 → EG-6A 13개 Area·Spot 패널
 → EG-6B 동일 13개 Area 단일 수집
 → EG-7 동일 13개 반복수집 파일럿
-→ EG-8 Feature 유효성 분석
+→ EG-8 Area Feature + 승인·확보된 경우 S-DoT Feature + Spot Candidate Evaluation
+→ 후속 Recommendation MVP Workstream(PLANNED, Gate number NOT_ASSIGNED)
 → 121장소 확대 후속 검토
 ```
 
@@ -65,8 +68,10 @@ EG-0 문서 기준선
 | EG-4 | 통과: Issue #43에서 PM 승인 범위의 POI072 실제 정상 JSON 수집과 원본·메타데이터 저장 확인 |
 | EG-5 | 통과: 대표 3장소 실제 수집 3건 성공·재시도 0회와 데이터 구조·Feature 분석 완료 |
 | EG-6 | 진행: EG-6A 통과, EG-6B 구현·오프라인 검증·PR #54 병합 완료; 실제 단일 회차·PM PASS 대기 |
-| EG-7 | 미구현: 동일 13개 반복수집 파일럿은 주기·백업 승인 전 실행하지 않음 |
-| EG-8 | 미구현: 반복 관측 이후 Feature 유효성 분석 단계 |
+| Backup Readiness | 미구현: Google Drive for Desktop Sync 논리 루트·즉시 Worker·Fake Batch 검증 필요; EG-6C 같은 새 Gate가 아님 |
+| EG-7 | 미구현: EG-6B PASS·Google Drive 백업 운영·CSV 누적·재생성 계약 전 실행하지 않음 |
+| EG-8 | 미구현: 반복 관측 이후 Area Feature·선택적 S-DoT Feature와 Spot Candidate Evaluation 단계 |
+| Recommendation MVP Workstream | `PLANNED`; Gate number `NOT_ASSIGNED`, EG-8 증거와 별도 PM 승인 필요 |
 
 EG-3의 로컬 Project Guard와 단위 테스트 검증은 완료됐다. GitHub Actions Workflow가
 구현되어 Base Branch와 관계없이 모든 Pull Request와 `main` Push에서 Project Guard와
@@ -347,7 +352,7 @@ EG-4 통과 후 PM이 다음 구현 단계 전환을 승인하면 EG-5로 진행
 ### EG-6A 통과조건
 
 - 13개 제안 지역을 공식 CSV와 대조하고 안전한 Area 매핑만 `approved=true`로 기록한다.
-- 각 서비스 지역에 대표 Spot 후보 1개와 좌표 출처·현장검증 상태를 기록한다.
+- 각 서비스 지역에 Spot Candidate Anchor Point 1개와 좌표 출처·현장검증 상태를 기록한다.
 - 역 중심 대용점을 공식 출입구나 특정 출구 앞 인구로 표현하지 않는다.
 - 최신 공개 측정 자료에 나타난 S-DoT 센서만 보조 연결로 인정한다.
 - `H-703`과 참조 데이터 Unit Tests를 포함한 전체 오프라인 검증을 통과한다.
@@ -364,6 +369,26 @@ EG-4 통과 후 PM이 다음 구현 단계 전환을 승인하면 EG-5로 진행
   대상·성공·실패·실패 목록·원본·메타데이터·Collection Log·Manifest·SHA-256을
   검토해 PASS를 판정한다.
 - 자동 재시도와 반복수집은 포함하지 않는다.
+- EG-6B는 Area Observation 확보 단계이며 Spot 좌표와 S-DoT 관측값을 API 요청에
+  사용하거나 Spot Candidate Evaluation을 수행하지 않는다.
+- 정적 Spot/S-DoT CSV는 승인 Area 패널의 연결 무결성 입력이다. 동적 S-DoT 수집·
+  후보 생성 실패는 후속 계층 책임이며 Area 호출 재시도 사유가 아니다.
+
+실제 EG-6B Live 재진입조건:
+
+- Issue #57의 env-file·output-root Probe PASS를 기준으로 하되 Live 직전 다시 확인한다.
+- Google Drive for Desktop Sync 설치·로그인과 `FreshManager-Data/` 논리 루트 접근을 확인한다.
+- 실제 계정 이메일과 동기화 절대경로는 저장소·Receipt·로그에 기록하지 않는다.
+- 별도 1회 실행형 Backup Worker가 완료·부분 실패 Fake Batch를 Google Drive 로컬
+  동기화 폴더에 복사하고 파일 수·Manifest SHA-256·중복·충돌·Secret 제외를 검증한다.
+- Batch 완료 판정 직후 1회 실행형 Worker를 호출하고 중복 실행을 방지한다.
+- Worker·테스트·설정이 별도 PR·CI·PM 승인으로 `main`에 병합된다.
+- Backup Worker는 백업 실패를 API 재호출로 전환하지 않는다.
+- Google Drive API·OAuth·SDK를 구현하지 않고 Desktop Sync에 원격 동기화를 위임한다.
+- 위 조건과 Live Preflight가 통과한 뒤 PM이 최대 13회 실제 호출을 별도로 승인한다.
+
+Backup Readiness는 EG-6B와 EG-7 사이의 선행 작업 묶음이지 EG-6C라는 새 Engineering
+Gate가 아니다. CSV Exporter는 첫 실제 Batch 품질 감사 후 별도 Issue에서 구현한다.
 
 EG-6B 단일 수집 결과와 별도 PM 승인을 받은 뒤 EG-7로 진행한다.
 
@@ -375,15 +400,19 @@ EG-6B 단일 수집 결과와 별도 PM 승인을 받은 뒤 EG-7로 진행한�
 
 - EG-6B 통과
 - PM의 반복수집 주기·호출량·운영시간 승인
-- 외장 저장장치 주기적 복사 또는 PM 승인 클라우드 폴더 백업 Gate 충족
+- Google Drive 자동 백업 Worker의 로컬 복사·무결성·원격 동기화 확인 계약 검증
+- 첫 실제 Batch 기반 CSV 계약과 누적·재생성 계약 검증
 
 ### 통과조건
 
 - EG-6B에서 확정한 동일 13개 Area만 승인 주기로 반복 관측한다.
+- Area 반복수집과 독립적으로 S-DoT 관측 데이터의 접근성·갱신주기·결측·Area 연결
+  가능성을 검토하며, 센서 수집 실패로 Area 수집을 중단하지 않는다.
 - 한 장소 실패가 다른 장소와 후속 회차의 정상 결과를 삭제하지 않는다.
 - 회차별 Batch 계약과 원본·메타데이터·예측 스냅샷을 보존한다.
 - 실제 호출량·성공률·실패율·갱신주기·저장공간 증가량을 보고한다.
 - 수집은 로컬 Python에서 유지하고 백업만 별도로 운영한다.
+- Backup Worker 실패와 CSV 생성 실패는 서울시 API 재호출 사유가 아니다.
 
 ### 다음 단계
 
@@ -391,26 +420,63 @@ EG-6B 단일 수집 결과와 별도 PM 승인을 받은 뒤 EG-7로 진행한�
 
 ---
 
-## 12. EG-8 Feature 유효성 분석
+## 12. EG-8 Area Feature·선택적 S-DoT Feature와 Spot Candidate Evaluation
 
 ### 목표
 
-동일 13개 지역의 반복 관측으로 EG-5에서 정의한 Feature의 재현성과 분석 타당성을 검증한다.
+동일 13개 지역의 반복 관측으로 Area Feature의 재현성을 검증한다. S-DoT는 지원·
+접근·수집·품질조건을 만족하는 경우에만 독립 보조 Feature로 사용한다. Area Feature,
+선택적 S-DoT Feature, 공간 Context, 현장검증과 운영 제약을 결합한 Spot Candidate
+Evaluation의 분석 타당성을 평가한다.
 
 ### 통과조건
 
 - 시간대 기준선·변화율·변동성·피크 지속시간과 예측오차를 평가한다.
-- S-DoT 지원·미지원 지역의 차이를 보조 근거로만 비교한다.
+- S-DoT 지원·미지원 지역의 차이를 Area 대체값이 아닌 보조 근거로만 비교한다.
+- 현재 Spot Master를 Candidate Anchor Point로 사용하고 고정 판매 위치로 표현하지 않는다.
+- 후보 평가에 사용한 Area·선택적 S-DoT·공간·현장검증 Feature와 버전을 추적한다.
+- S-DoT 미지원 6개 Area도 Area 분석과 추천 후보에서 제외하지 않는다.
+- Score·가중치·임계값은 `PLANNED` 또는 `OPEN_DECISION`이며 현 단계 필수 계약이 아니다.
 - 카드소비 기반 소비활동을 실제 판매량으로 표현하지 않는다.
 - 판매결과나 현장 피드백이 없으면 추천 성능·판매효과를 확정하지 않는다.
 - Gate A·B·C 판정과 Engineering Gate를 구분한다.
 
-121장소 전체 확대는 13개 패널의 단일·반복 수집과 Feature 분석 결과를 확인한 뒤
-별도 PM 승인과 후속 게이트에서 검토한다.
+### 다음 단계
+
+Feature와 Spot Candidate Evaluation의 유효성 및 제한을 PM이 확인한다. 후속
+Recommendation MVP Workstream은 Gate number `NOT_ASSIGNED`이며 별도 PM 승인이
+있을 때만 시작한다.
 
 ---
 
-## 13. Gate A·B·C 데이터 PoC 판정 게이트
+## 13. 후속 Recommendation MVP Workstream — 공식 Gate 아님
+
+### 목표
+
+EG-8에서 검증된 Area Feature와, 승인·확보된 경우의 S-DoT Feature 및 Candidate
+Evidence Assessment를 사용해 추천 단위와 근거를 제시하는 최소 Workstream을
+검토한다. 상태는 `PLANNED`, Gate number는 `NOT_ASSIGNED`다.
+
+### 진입조건
+
+- EG-8 통과와 Feature·후보 평가 증거 계약 확인
+- SPOT 판단 근거와 AREA fallback 사유 Enum에 대한 PM 승인
+- 실제 판매효과와 추천 산출물을 구분하는 표시 계약 승인
+
+### 통과조건
+
+- 충분하고 신뢰 가능한 Spot Candidate가 있으면 `target_level=SPOT`을 반환한다.
+- 후보 근거가 부족하면 `target_level=AREA`와 `fallback_reason`을 반환한다.
+- 추천 결과가 사용한 Area·선택적 S-DoT·공간 Context·현장검증 근거를 추적한다.
+- 추천 실패로 원본 Area 데이터가 변경되거나 서울시 API가 재호출되지 않는다.
+- 실제 판매량·판매효과·개인 최적화를 구현 또는 입증했다고 표현하지 않는다.
+
+121장소 전체 확대는 13개 패널의 단일·반복 수집과 Feature 분석 결과를 확인한 뒤
+Recommendation MVP Workstream의 데이터 필요성과 별도 PM 승인을 거쳐 후속 범위에서 검토한다.
+
+---
+
+## 14. Gate A·B·C 데이터 PoC 판정 게이트
 
 Gate A·Gate B·Gate C는 EG와 독립된 데이터 PoC 판정 게이트다.
 현재 세 게이트 모두 이 문서에서 통과로 판정하지 않는다.

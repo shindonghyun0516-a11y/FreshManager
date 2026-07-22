@@ -14,9 +14,14 @@
 
 **기술 기준:** main · 6253cc502c9a3c4bc248cf6972f077a99e13f09d
 
-**현재 단계:** EG-6B 구현·오프라인 검증·병합 완료 / 실제 13개 Area 단일 호출 승인 전
+**현재 단계:** EG-6B 구현·오프라인 검증·병합·경로 Probe 완료 / Google Drive Backup Readiness와 실제 단일 호출 승인 전
 
-> **핵심 결론**  현재 제품은 추천 앱이 아니라, 추천 서비스가 성립할 데이터 전제조건을 검증하는 1인 운영 PoC다. 장기 후보군은 서울시 121개 Area지만, 현재 승인 MVP는 13개 Area 패널이다. EG-6B 수집 파이프라인은 main에 병합됐으나 실제 13개 Area 단일 수집과 EG-6B 최종 통과는 별도 PM 승인 전이다.
+**2026-07-22 변경이력:** Issue #58 초안에서 Google Drive 자동 백업,
+첫 Batch 이후 CSV와 Area·선택적 S-DoT·Spot Candidate Evaluation·Recommendation
+Workstream 결정을 반영했다.
+파일 버전은 PM의 별도 버전 변경 결정 전 `v1.0`을 유지한다.
+
+> **핵심 결론**  현재 제품은 추천 앱이 아니라, 추천 서비스가 성립할 데이터 전제조건을 검증하는 1인 운영 PoC다. 장기 후보군은 서울시 121개 Area지만, 현재 승인 MVP는 13개 Area 패널이다. EG-6B 수집 파이프라인과 경로 Probe는 완료됐으나 Google Drive Backup Worker 준비, 실제 13개 Area 단일 수집과 EG-6B 최종 통과는 아직 남아 있다.
 
 ## 문서 구성
 
@@ -78,7 +83,9 @@ EG-4에서 여의도 POI072 실제 응답과 원본·메타데이터 저장을 �
 
 **유동인구 ≠ 매출:** 인구·혼잡은 기회와 운영 난이도의 대리신호이며, 카드소비는 일반 소비활동 대리변수다.
 
-**Area ≠ Spot:** 서울시 Area 수집값을 특정 출구·건물 앞 보행량으로 표현하지 않는다. Spot은 후속 현장검토 후보일 뿐이다.
+**Area ≠ Spot:** 서울시 Area 수집값을 특정 출구·건물 앞 보행량으로 표현하지 않는다.
+Spot은 고정 판매 위치가 아니라 Area·S-DoT·공간 Context와 현장검증을 바탕으로
+생성하는 판매 후보 위치다.
 
 **시점 무결성:** 요청·관측·예측 스냅샷·예측 대상·후속 관측 시각을 분리하고 미래정보 누수를 금지한다.
 
@@ -87,6 +94,14 @@ EG-4에서 여의도 POI072 실제 응답과 원본·메타데이터 저장을 �
 **Human-in-the-loop:** 실제 API 호출, 주기, 저장구조, 다음 Gate와 Merge는 PM 명시 승인 후 진행한다.
 
 **1인 운영 적합성:** 표준 라이브러리와 최소 구성으로 시작하고 실제 필요가 확인된 복잡성만 추가한다.
+
+**로컬 원본 우선:** 로컬 Raw·Metadata·Collection Log·Manifest가 공식 원본이다.
+Google Drive에는 검증된 복사본을 자동 백업하며 백업 실패는 API 재호출 사유가 아니다.
+
+**추천 대상 우선순위:** 신뢰할 수 있고 추천 가능한 Spot이 있으면 반드시
+`target_level=SPOT`을 사용한다. Spot이 없거나 운영 가능성이 미확인일 때만
+`target_level=AREA`와 필수 `fallback_reason`을 사용한다. 현재
+`STATION_CENTER_PROXY`는 검증된 판매 Spot이 아니다.
 
 ## 5. 목표와 비목표
 
@@ -114,15 +129,31 @@ EG-4에서 여의도 POI072 실제 응답과 원본·메타데이터 저장을 �
 
 ### 6.1 단계별 공간 범위
 
-> **공식 범위**  장기 후보군은 서울시 121개 Area다. 현재 MVP 수집·분석 패널은 EG-6A에서 확정한 13개 Area·Spot·S-DoT 연결이다. 121개 확대는 EG-7 반복수집과 EG-8 Feature 분석 후 필요성이 확인된 경우에만 검토한다.
+> **공식 범위**  장기 후보군은 서울시 121개 Area다. 현재 MVP 수집·분석 패널은 EG-6A에서 확정한 13개 Area·Spot·S-DoT 연결이다. 121개 확대는 EG-7 반복수집, EG-8 Feature 분석과 별도 승인된 Recommendation MVP Workstream의 데이터 필요성을 확인한 뒤에만 검토한다.
 
 | **계층** | **정의** | **현재 사용** | **금지되는 해석** |
 | --- | --- | --- | --- |
 | Area | 서울시 API의 공식 공간 단위 | 13개 승인 패널 | 특정 출구·건물 앞 직접 인구 |
-| Spot | 후속 현장검토용 대표 이동 후보 | 역 중심 대리좌표 13개 | 검증된 판매지점 |
-| S-DoT Link | Spot 주변 최근 활성 센서 보조 연결 | 직접 3·인근 4·미지원 6 | 판매량·추천 적중 결과 |
+| Spot Candidate | Area·S-DoT·공간 Context 기반 판매 후보 위치 | 역 중심 Candidate Anchor 13개 | 검증된 고정 판매지점 |
+| S-DoT Link | Area 내부 활성 위치 판단을 위한 센서 보조 연결 | 직접 3·인근 4·미지원 6 | Area 대체값·판매량·추천 적중 결과 |
 
-### 6.2 승인된 13개 Area 패널
+### 6.2 공식 서비스 데이터 구조
+
+| **구조** | **목적** | **핵심 데이터·책임** |
+| --- | --- | --- |
+| Core Observation | 판매 가능 Area 탐색 | 모든 승인 Area에서 확보하는 인구 범위·혼잡도·Forecast·시간대 변화 |
+| Optional Supporting Observation | Area 내부 활성 위치 판단 보조 | 지원·접근·수집·품질조건을 만족할 때만 쓰는 S-DoT 위치·관측; Area Collector와 독립 |
+| Additional Context | 후보의 공간·운영 타당성 보강 | Spatial Context·Field Validation·Operational Constraints |
+| Spot Candidate Evaluation | Area 내부 판매 후보 위치 평가 | Area Feature + 선택적 S-DoT Feature + Additional Context의 Candidate Evidence Assessment |
+| Recommendation 결과 | 추천 단위 결정 | 신뢰 가능한 Spot은 `SPOT`, 없으면 `AREA`와 `fallback_reason` |
+
+EG-6B는 필수 Area Observation을 확보한다. 정적 EG-6A 참조 연결은 실행 전 무결성
+입력이지만, 동적 S-DoT 관측 수집과 Spot Candidate Evaluation은 후속 독립 책임이므로
+EG-6B Collector의 요청 책임에 포함하지 않는다. S-DoT 미지원 6개 Area도 Area 분석과
+추천 후보에서 제외하지 않는다. Score·가중치·임계값은 `PLANNED` 또는
+`OPEN_DECISION`이다.
+
+### 6.3 승인된 13개 Area 패널
 
 | **#** | **서비스 지역** | **코드** | **공식 Area** | **매핑** | **S-DoT** |
 | --- | --- | --- | --- | --- | --- |
@@ -140,7 +171,9 @@ EG-4에서 여의도 POI072 실제 응답과 원본·메타데이터 저장을 �
 | 12 | 서울역 | POI033 | 서울역 | 정확 | 미지원 |
 | 13 | 마곡나루역 | POI032 | 서울식물원·마곡나루역 | 관련 | 직접 |
 
-*모든 Spot은 STATION_CENTER_PROXY이며 field_verified=false다. 판교역은 서울시 범위 밖이므로 뚝섬역으로 대체됐다.*
+*현재 Spot Master의 모든 행은 STATION_CENTER_PROXY·field_verified=false인 Candidate
+Anchor Point다. 실제 판매 Spot 확정 데이터가 아니며, 판교역은 서울시 범위 밖이므로
+뚝섬역으로 대체됐다.*
 
 ## 7. 제품 가설
 
@@ -180,6 +213,8 @@ EG-4에서 여의도 POI072 실제 응답과 원본·메타데이터 저장을 �
 | FR-10 | P0 | 리포트·판정·한계 표시 | 부분 |
 | FR-11 | P0 | 실패 격리·종료코드 | 구현 |
 | FR-12 | P0 | PM 승인·범위 통제 | 구현 |
+| FR-13 | P0 | Google Drive 자동 백업·복구 | 계획 |
+| FR-14 | P0 | SPOT 필수·AREA fallback | 계획 |
 
 ### 8.3 FR-01 공식 기준·패널 검증
 
@@ -277,6 +312,38 @@ Area 단위 api_error, timeout, parse_error, validation_error는 해당 결과�
 - 승인 없이 5분 주기·121개 확대를 확정하지 않는다.
 - 결정 필요사항은 대안·장단점·권장안·승인 이유로 보고한다.
 
+### 8.15 FR-13 Google Drive 자동 백업·복구
+
+완료된 Batch의 로컬 공식 원본을 Google Drive for Desktop Sync의 로컬 동기화
+폴더에 Batch 완료 직후 자동 백업해야 한다. Collector와 Backup Worker를 분리하고,
+완료 판정 후 1회 실행형 Worker를 즉시 호출하는 구조를 사용한다.
+
+- 공식 제공자는 Google Drive이며 iCloud와 수동 백업은 현행 운영방식이 아니다.
+- Backup Root는 `FreshManager-Data/` 논리 구조만 정의한다.
+- 실제 계정 이메일과 동기화 절대경로는 저장소·Receipt·로그에 기록하지 않는다.
+- Google Drive API·OAuth·SDK는 구현하지 않는다.
+- 완료·부분 실패 Batch는 Manifest 파일 수·SHA-256 검증 후 함께 복사한다.
+- 실행 중 Batch, `.env`, Secret, 인증 URL과 임시 파일은 복사하지 않는다.
+- 로컬 동기화 폴더 복사와 실제 원격 업로드 완료를 별도 상태로 관리한다.
+- 백업 실패·충돌로 서울시 API를 재호출하거나 기존 원본·복사본을 덮어쓰지 않는다.
+
+상세 상태·충돌·Receipt·복원 목표 계약은
+`docs/data/CLOUD_BACKUP_AND_CSV_MANAGEMENT_PLAN.md`가 소유한다.
+
+### 8.16 FR-14 Spot Candidate·SPOT 우선·AREA fallback
+
+Spot Candidate는 Area 데이터와 S-DoT 근접성·공간 Context·현장검증 상태로 생성한다.
+추천 기능을 후속 구현할 때 근거가 충분하고 운영 가능한 후보가 있으면 반드시 SPOT을
+추천한다. 후보 근거가 부족하거나 현장 운영 가능성이 확인되지 않으면 AREA로 fallback하고
+이유를 기록한다.
+
+- `target_level=SPOT`: 신뢰 가능한 Spot과 현장 운영 가능성이 확인됨
+- `target_level=AREA`: 추천 가능한 Spot이 없거나 운영 가능성이 미확인
+- AREA fallback에는 `fallback_reason`이 필수다.
+- Area Observation은 특정 출구나 Spot의 직접 유동인구가 아니다.
+- 동적 S-DoT 관측과 Spot Candidate Evaluation 오류가 EG-6B Area 수집을 중단시키면 안 된다.
+- EG-6B의 정적 Spot/S-DoT CSV 검사는 승인된 Area 패널 연결 무결성 확인이며 추천 생성이 아니다.
+
 ## 9. 비기능 요구사항
 
 | **ID** | **속성** | **요구** |
@@ -291,6 +358,7 @@ Area 단위 api_error, timeout, parse_error, validation_error는 해당 결과�
 | NFR-08 | 개인정보 | 현재 집계 공개데이터만 사용하고 개인 위치·고객정보를 수집하지 않는다. |
 | NFR-09 | 법적 준수 | 공공누리 제1유형의 출처표시와 재배포 범위를 결과 공개 전에 확인한다. |
 | NFR-10 | 확장성 | 13개 반복 결과가 정당화할 때만 121개로 확대하며 구조는 Area 목록 주입으로 확장 가능해야 한다. |
+| NFR-11 | 복구성 | 완료 Batch를 Google Drive 복사본에서 새 로컬 경로로 복원하고 Manifest로 검증할 수 있어야 한다. |
 
 ## 10. 성공 지표와 판정 게이트
 
@@ -304,8 +372,10 @@ Area 단위 api_error, timeout, parse_error, validation_error는 해당 결과�
 | EG-6A | 완료 | 13개 Area·Spot·S-DoT 패널 확정·main 반영 |
 | EG-6B 구현 | 완료 | PR #54 병합, 오프라인 H-706 PASS |
 | EG-6B 실호출 | 대기 | PM 승인 후 실제 최대 13회 단일 회차 |
-| EG-7 | 미진행 | 주기·백업·동시실행 방지 승인 후 반복수집 |
-| EG-8 | 미진행 | Feature 유효성·Gate A/B 분석 |
+| Backup Readiness | 미구현 | Desktop Sync 논리 루트·즉시 Worker·Fake Batch·CI·main 병합 필요; 새 EG 번호 아님 |
+| EG-7 | 미진행 | EG-6B PASS·백업 운영·CSV 누적·재생성 계약 후 반복수집 |
+| EG-8 | 미진행 | Area Feature·선택적 S-DoT Feature·Spot Candidate Evaluation과 Gate A/B 분석 |
+| Recommendation MVP Workstream | `PLANNED` | Gate number `NOT_ASSIGNED`; 검증 Feature와 별도 PM 승인 필요 |
 
 > **상태 해석**  코드가 main에 병합된 사실과 EG-6B가 통과한 사실은 다르다. EG-6B 통과에는 실제 13개 단일 수집 결과와 PM 판정이 추가로 필요하다.
 
@@ -326,9 +396,18 @@ Area 단위 api_error, timeout, parse_error, validation_error는 해당 결과�
 - 예측: 리드타임별 MAE·RMSE·상대오차·예측범위 포함률·혼잡 등급 일치율
 - 패턴: 요일·시간 기준선, 변동성, 피크 지속시간, 비관행 피크 반복 횟수
 - 운영성: 한 회차 소요시간, 호출량, 저장공간 증가량, 백업 성공·복구 검증
-- 서비스 연결성: 이동 가능한 리드타임, Area–Spot 해석 적합성, 현장 검증 필요 비율
+- 서비스 연결성: 이동 가능한 리드타임, Candidate Evidence Assessment, Area–Spot 해석 적합성, 현장 검증 필요 비율
 
 ## 11. 실험 설계와 데이터 기간
+
+| **단계** | **시점** | **허용 분석** |
+| --- | --- | --- |
+| 첫 Batch 품질 감사 | 최초 실제 13개 Area 수집 직후 | 저장·Manifest·필드·결측·지연·오류와 EG-6B PASS/보완 |
+| 단일 Snapshot 비교 | 품질 감사 통과 직후 | Area별 규모·혼잡·구성·Forecast 방향·상대순위 |
+| 초기 EDA | EG-7에서 평일 5영업일 확보 후 | 시간대 평균·중앙값·증감·피크 후보·결측·초기 Forecast 오차 |
+| 공식 EG-8 분석 | 4주 기준선 후 5주차 | Area Feature·선택적 S-DoT Feature·Spot Candidate Evaluation과 Feature 유효성 |
+
+첫 Batch 또는 5영업일 데이터로 반복패턴·판매성과·SPOT 직접 유동인구를 확정하지 않는다.
 
 | **시점** | **판정 목적** | **허용 결론** |
 | --- | --- | --- |
@@ -346,11 +425,13 @@ Area 단위 api_error, timeout, parse_error, validation_error는 해당 결과�
 1. R0 완료 — EG-0~EG-5: 기준선, 오프라인 검증, 여의도와 대표 3개 실제 수집
 2. R1 완료 — EG-6A: 13개 Area·Spot·S-DoT 참조 패널 확정
 3. R2 완료 — EG-6B 구현: 단일 순차수집, 회차 로그, Manifest, SHA-256, H-706
-4. R3 다음 승인 — 실제 13개 단일 회차 Preflight와 최대 13회 호출
-5. R4 다음 Gate — 반복주기·호출량·운영시간·백업·동시실행 방지 계약
-6. R5 EG-7 — 동일 13개 반복수집 파일럿과 품질·용량 측정
-7. R6 EG-8 — 기준선·예측·피크·장소·S-DoT Feature 분석과 Gate A/B 판정
-8. R7 후속 — Gate C 인터뷰, 현장 Spot 검증, 필요 시 121개 확대·Gate D 설계
+4. R3 현재 — Google Drive for Desktop Sync 계획, 논리 루트 확인, 즉시 Backup Worker·Fake Batch 검증과 `main` 병합
+5. R4 — EG-6B Live Preflight 재통과, 최대 13회 승인, 첫 Batch·자동 백업·품질 감사
+6. R5 — 첫 Batch 구조를 기준으로 CSV 계약·Exporter를 별도 구현하고 누적·재생성을 검증
+7. R6 EG-7 — 동일 13개 Area 반복수집 파일럿과 독립 S-DoT 관측 수집 가능성 검토
+8. R7 EG-8 — 4주 기준선·5주차 Area Feature·선택적 S-DoT Feature·Spot Candidate Evaluation과 Gate A/B 판정
+9. R8 후속 — Recommendation MVP Workstream(`PLANNED`, Gate number `NOT_ASSIGNED`, 별도 PM 승인)
+10. R9 후속 — Gate C 인터뷰, 현장 Spot 검증, 필요 시 121개 확대·Gate D 설계
 
 ## 13. 의존성
 
@@ -359,7 +440,8 @@ Area 단위 api_error, timeout, parse_error, validation_error는 해당 결과�
 | 외부 데이터 | 서울 실시간 도시데이터 일반 인증키와 API 가용성 | PM 승인 실제 실행 |
 | 공식 기준 | 121개 장소 CSV와 13개 참조 패널의 불변성 | 변경 시 별도 Issue |
 | 운영 환경 | Python 3.12 호환 로컬 실행·안전한 외부 output-root | 실행 전 확인 |
-| 백업 | 외장 저장장치 정기 복사 또는 승인 클라우드 폴더 | EG-7 선행 Gate |
+| 백업 | Google Drive for Desktop Sync 논리 루트와 별도 즉시 Backup Worker | EG-6B Live 선행 준비 |
+| CSV | 첫 실제 Batch의 필드·결측·Forecast 구조 | 품질 감사 후 별도 Issue |
 | 분석 데이터 | 예측 스냅샷·후속 관측 영속화와 시간 정렬 | EG-7/8 구현 |
 | 현장 연결 | 담당구역·이동시간·재고·판매 가능 공간 | Gate C/D |
 | 법적 | 공공누리 출처표시·재배포 범위 | 대외 공개 전 확인 |
@@ -381,10 +463,10 @@ Area 단위 api_error, timeout, parse_error, validation_error는 해당 결과�
 
 ## 15. PM 결정 필요사항
 
-- D-01 실제 EG-6B 최대 13회 호출의 env-file·output-root·실행 시간 승인
-- D-02 실제 단일 회차 결과를 기준으로 EG-6B PASS 또는 보완 판정
+- D-01 Google Drive for Desktop Sync 설치·로그인과 `FreshManager-Data/` 논리 루트 접근 가능 여부 확인
+- D-02 Backup Worker `main` 병합 후 Live Preflight 재통과, env-file·output-root·실행시각·최대 13회 호출 승인과 결과의 EG-6B PASS·보완 판정
 - D-03 EG-7 호출주기·운영시간·호출예산·실패 재처리 정책 승인
-- D-04 외장 저장장치 복사와 승인 클라우드 폴더 중 백업 방식 선택
+- D-04 Batch 완료 직후 Worker 호출, 원격 확인·보존·복원시험의 세부 운영 승인
 - D-05 반복수집 전 동시 실행 잠금과 중단·재개 정책 승인
 - D-06 예측·관측 정규화 저장구조와 schema/data version 정책 승인
 - D-07 날씨·상권현황을 EG-7에 포함할지, 인구 반복수집 안정화 후 추가할지 결정
@@ -410,6 +492,8 @@ Area 단위 api_error, timeout, parse_error, validation_error는 해당 결과�
 | FR-05~06 | TRD 13~18장 | EG-7 정규화·품질 목표 구조 |
 | FR-07~08 | TRD 15~18장 | 날씨·상권 Adapter와 시간 정렬 |
 | FR-09~10 | TRD 19~22장 | 분석 파이프라인·관측성·Rollout |
+| FR-13 | TRD 16·20~24장과 Cloud Backup Plan | 백업 Worker·상태·복구·운영 목표 |
+| FR-14 | TRD 14·19장과 EG6 Area Spot Panel | 추천 문맥과 target level 선택 |
 | NFR-01~10 | TRD 10~24장 | 보안·저장·검증·운영·복구 |
 
 ## 근거 자료
@@ -432,10 +516,12 @@ Area 단위 api_error, timeout, parse_error, validation_error는 해당 결과�
 | **용어** | **정의** |
 | --- | --- |
 | Area | 서울시 실시간 도시데이터가 제공하는 공식 공간 단위 |
-| Spot | 후속 현장검토를 위한 대표 이동 후보; 현재는 역 중심 대리좌표 |
-| S-DoT | 서울시 센서 데이터의 보조 신호; 판매량이 아님 |
+| Spot Candidate | Area·S-DoT 근접성·공간 Context·현장검증으로 생성하는 판매 후보 위치 |
+| Candidate Anchor Point | 후보 생성의 출발점; 현재 Spot Master의 역 중심 대리좌표이며 판매 Spot 확정값이 아님 |
+| S-DoT | Area 내부 활성 위치 판단을 보조하는 독립 센서 계층; Area 대체값이나 판매량이 아님 |
 | 예측 스냅샷 | 한 수집시점에 확보한 미래 예측 묶음 |
 | 후속 관측값 | 예측 대상시각이 지난 뒤 API로 다시 받은 서울시 추정 인구 |
 | Engineering Gate | 구현 준비도·품질 단계 EG-0~EG-8 |
+| Recommendation MVP Workstream | `PLANNED`, Gate number `NOT_ASSIGNED`; 별도 PM 승인 전 공식 Gate가 아닌 후속 작업축 |
 | Gate A~D | 데이터·사용자·현장 타당성의 제품 판정 게이트 |
 | Project Guard | 문서·데이터·보안·수집 계약의 오프라인 자동검사 |

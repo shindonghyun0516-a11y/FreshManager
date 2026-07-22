@@ -14,6 +14,7 @@
   - `requirements-definition-freshmanager-poc-v0.4.md` (역사 문서)
   - `docs/rules/DATA_COLLECTION_RULES.md`
   - `docs/data/FIELD_DICTIONARY.md`
+  - `docs/data/CLOUD_BACKUP_AND_CSV_MANAGEMENT_PLAN.md`
   - `docs/testing/QUALITY_GATES.md`
 - 변경 시 PM 승인: 필요
 
@@ -174,8 +175,23 @@ EG-6A에서 확정한 13개 Area 패널
 
 ### 6.3 후속 분석 범위
 
-13개 Area 단일·반복 수집과 Feature 분석에서 필요성이 확인되고 PM이 승인한 경우
-121개 Area의 장소 유형별·시간대별 비교로 확대한다.
+13개 Area 단일·반복 수집, EG-8 Feature 분석과 별도 승인된 Recommendation MVP Workstream의 데이터
+필요성이 확인되고 PM이 승인한 경우 121개 Area의 장소 유형별·시간대별 비교로 확대한다.
+
+### 6.4 공식 Feature 구조
+
+```text
+필수: Area Observation → Area Feature
+선택: S-DoT Observation → 지원·접근·수집·품질조건을 통과한 S-DoT Feature
+추가: 공간 Context + 현장검증 + 운영 제약
+결합: Spot Candidate Evaluation
+결과: SPOT 또는 AREA + fallback_reason
+```
+
+S-DoT는 Area 내부 활성 위치 판단을 보조하는 독립·선택적 데이터 계층이며 Area 값을
+대체하지 않는다. S-DoT 미지원 6개 Area도 Area 분석과 추천 후보에서 제외하지 않는다.
+Spot Candidate Evaluation은 고정 판매 위치나 판매효과가 아니라 후속 추천 입력
+근거다. Score·가중치·임계값은 `PLANNED` 또는 `OPEN_DECISION`이다.
 
 ---
 
@@ -190,6 +206,12 @@ AREA_CD
 장소명만으로 데이터를 연결하지 않는다.
 
 POI 단위 값은 특정 지하철 출구, 건물 앞, 흡연부스 앞의 값으로 해석하지 않는다.
+
+Area 관측값, S-DoT 관측값과 Spot Candidate Context는 분리한다. 현재 Spot Master의
+`STATION_CENTER_PROXY`는 Candidate Anchor Point이며 현장 검증이 끝난 판매 Spot이
+아니다. Area 값을 해당 좌표의 직접 유동인구로 해석하지 않는다. 후속 추천에서 Area·
+S-DoT·공간·현장검증 근거가 충분한 Spot Candidate가 확인되면 `target_level=SPOT`,
+그렇지 않으면 `target_level=AREA`와 `fallback_reason`을 사용한다.
 
 ---
 
@@ -236,6 +258,43 @@ POI 단위 값은 특정 지하철 출구, 건물 앞, 흡연부스 앞의 값�
 
 최종 분석과 보고서 작성이 끝날 때까지 데이터를 보관한다.
 
+### 9.1 첫 Batch 데이터 품질 감사
+
+최초 실제 13개 Area Batch 직후에는 다음만 감사한다.
+
+- 성공·실패 Area 수와 실패 목록
+- 요청·수신·관측시각과 관측 지연
+- 인구 최소·최대, 혼잡도와 필수필드 누락·비정상값
+- Forecast 개수·대상시각·파싱 오류
+- EXACT·RELATED Area의 해석 차이
+- Raw·Metadata·Collection Log·Manifest 파일 수와 SHA-256
+
+결과는 `EG-6B PASS` 또는 `보완 필요` 판정 근거다.
+
+### 9.2 단일 Snapshot 비교
+
+첫 Batch 품질 감사 통과 직후에는 Area별 인구 규모·혼잡도·상주/비상주·연령/성별
+구성, Forecast 방향과 동일 시점 상대순위를 비교할 수 있다. 한 회차만으로 시간대
+반복패턴, 요일 기준선, Forecast 정확도, 피크 반복성, 판매성과와 Spot 직접 유동인구를
+판단하지 않는다.
+
+### 9.3 평일 5영업일 초기 EDA
+
+EG-7에서 평일 5일 데이터가 확보되면 시간대 평균·중앙값, Area별 증감, 피크 후보,
+장소 순위 안정성, 결측률, 관측 지연, Forecast 1시간 초기 오차와 S-DoT 지원·미지원
+비교 가능성을 탐색한다. S-DoT 동적 관측 수집은 Area 반복수집과 분리해 접근성·
+갱신주기·결측·연결 가능성을 먼저 검토한다. 이는 초기 EDA이며 공식 서비스 성능·
+판매효과 판정이 아니다.
+
+### 9.4 4주 기준선과 5주차 공식 분석
+
+1~4주 데이터로 요일·시간대 기준선과 Area 변동성·장소 순위 안정성을 만들고,
+5주차 데이터로 피크 사전탐지, Forecast 1·3·6시간 오차, S-DoT 보조가치,
+Area Feature·선택적 S-DoT Feature·Spot Candidate Evaluation, SPOT 추천 가능조건과 AREA fallback
+적정성을 평가한다. 이 시점을 EG-8 공식 Feature 분석과 PoC 데이터 타당성 판정
+시점으로 사용한다. Recommendation MVP Workstream은 `PLANNED`, Gate number
+`NOT_ASSIGNED`이며 이 결과와 별도 PM 승인 후 시작한다.
+
 ---
 
 ## 10. 학습·평가 기간 분리
@@ -278,6 +337,9 @@ POI 단위 값은 특정 지하철 출구, 건물 앞, 흡연부스 앞의 값�
 | `weather_observations` | 사후 날씨 조건 분석 |
 | `weather_forecasts` | 예측시점 입력조건 |
 | `collection_logs` | 수집 품질과 결측 분석 |
+| `sdot_observations` | 센서별 시간대 변화와 Area 내부 활성 위치 보조; FUTURE_CONTRACT |
+| `spot_candidate_context` | Anchor·공간·현장검증 Context; FUTURE_CONTRACT |
+| `spot_candidate_evaluations` | Area·선택적 S-DoT Feature·Context 기반 후보 근거 평가; FUTURE_CONTRACT |
 
 ---
 
@@ -904,4 +966,5 @@ ANALYSIS_PLAN은 다음 조건을 만족해야 Approved 상태로 전환할 수 
 
 | 버전 | 날짜 | 변경내용 | 작성자 | 승인상태 |
 |---|---|---|---|---|
+| v0.1.1 (Issue #58 보완) | 2026-07-22 | 첫 Batch·5영업일·4주/5주차 분석과 Area·선택적 S-DoT·Spot Candidate Evaluation·후속 Recommendation 경계 정렬 | 신동현 | PM Diff 검토 전 |
 | v0.1.0 | 2026-07-17 | 최초 분석계획 초안 작성 | 신동현 | Draft |
