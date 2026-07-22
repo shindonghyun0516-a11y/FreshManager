@@ -9,9 +9,9 @@
 
 장기 목표는 서울시 주요 121장소를 공식 후보군으로 유지하면서 장소별·시간대별
 인구 변화, 미래 인구예측, 카드소비 기반 소비활동과 날씨정보를 비교할 수 있는
-데이터 기반을 만드는 것이다. 현재 MVP는 EG-6A에서 확정한 13개 Area 패널이며,
-EG-6B 수집 파이프라인은 구현·오프라인 검증·`main` 병합을 완료했고 실제 단일
-회차 수집과 PM PASS 판정은 아직 남아 있다.
+데이터 기반을 만드는 것이다. 현재 MVP의 공간 범위는 EG-6A에서 확정한 13개
+Area 패널이다. 현재 Branch·Pull Request·Issue·실행 상태는
+`PROJECT_STATUS.md`를 단일 기준으로 확인한다.
 
 ---
 
@@ -583,13 +583,12 @@ EG-3에서 Project Guard가 구현된 이후에는 모든 구현 작업 후 현�
 python3 scripts/project_guard_check.py
 ```
 
-Issue #60 Branch의 현재 Project Guard 계약은 다음과 같다.
+`H-707`과 `H-708`의 책임 계약은 다음과 같다. 현재 PASS·SKIP 상태와 Project Guard
+집계는 `PROJECT_STATUS.md`를 단일 기준으로 확인한다.
 
 - `H-707`은 EG-7 반복주기 승인 검사이며 EG-7 이전까지 `SKIP`을 유지한다.
 - `H-708`은 Backup Worker의 Fake Batch 기반 로컬 복사 무결성 검사이며
   실제 Google Drive 원격 동기화 완료를 판정하지 않는다.
-- 정상 예상치는 `PASS=42`, `FAIL=0`, `WARN=0`, `SKIP=5`, `TOTAL=47`,
-  `EXIT_CODE=0`이다.
 
 검사에 실패한 상태로 완료 보고하지 않는다.
 
@@ -775,6 +774,10 @@ Codex는 작업 시작 전에 다음을 확인한다.
 단, 구현 완료로 보고한 기능에 필요한 검사를 `SKIP`으로 처리하면 안 된다.
 
 문서 간 규칙이 충돌할 경우 정보의 역할을 구분하고 다음 우선순위를 적용한다.
+
+아래 순서는 제품·기술·작업 규칙의 충돌 판단용이다. 현재 Branch·Pull Request·
+Issue·외부 실행 상태에는 적용하지 않으며, 그 네 상태는 `PROJECT_STATUS.md`를
+단일 기준으로 사용한다.
 
 1. PM의 최신 명시적 지시와 승인·금지사항
 2. 현재 `main` 코드와 실제 검증 결과 — 구현 사실

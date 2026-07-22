@@ -67,8 +67,10 @@ Decision Record, 기술 구조 결정 기록) 형식으로 보존한다. 현행 
 - Consequences: 백업 실패로 API를 재호출하지 않고, `.env`·Secret·임시파일을 제외하며,
   Manifest SHA-256과 충돌을 검증한다. 실제 계정 이메일과 동기화 절대경로는 기록하지
   않는다. Worker는 `LOCAL_SYNC_COPY_VERIFIED`까지만 생성하고 원격 완료 상태는 생성하지 않는다.
-- Validation: Issue #60 Branch의 Fake 성공·부분 실패·중복·충돌·잠금·Fake Restore와
-  H-708로 검증했다. `main` 병합·실제 Sync Root·실제 Batch·원격 완료 확인은 남아 있다.
+- Completed validation history: Issue #60에서 Fake 성공·부분 실패·중복·충돌·잠금·
+  Fake Restore와 H-708을 검증하고 PR #61로 `main`에 병합했다.
+- Operational status boundary: 실제 Sync Root·실제 Batch·원격 완료 확인의 현재 상태는
+  [`PROJECT_STATUS.md`](../PROJECT_STATUS.md)를 따른다.
 - Related decision: D-007, D-010.
 
 ## ADR-007 — Raw 원본과 CSV 파생자료를 분리

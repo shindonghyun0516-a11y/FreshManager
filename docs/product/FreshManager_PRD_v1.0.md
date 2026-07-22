@@ -12,16 +12,18 @@
 
 **제품 책임자:** PM/PO 신동현
 
-**기술 기준:** main · 6253cc502c9a3c4bc248cf6972f077a99e13f09d
-
-**현재 단계:** EG-6B 구현·오프라인 검증·병합·경로 Probe 완료 / Google Drive Backup Readiness와 실제 단일 호출 승인 전
+**기술 기준:** 구현 계약은 `docs/engineering/FreshManager_TRD_v1.0.md`, 현재
+Branch·Pull Request·Issue·실행 상태는 `PROJECT_STATUS.md`를 단일 기준으로 사용
 
 **2026-07-22 변경이력:** Issue #58 초안에서 Google Drive 자동 백업,
 첫 Batch 이후 CSV와 Area·선택적 S-DoT·Spot Candidate Evaluation·Recommendation
 Workstream 결정을 반영했다.
 파일 버전은 PM의 별도 버전 변경 결정 전 `v1.0`을 유지한다.
 
-> **핵심 결론**  현재 제품은 추천 앱이 아니라, 추천 서비스가 성립할 데이터 전제조건을 검증하는 1인 운영 PoC다. 장기 후보군은 서울시 121개 Area지만, 현재 승인 MVP는 13개 Area 패널이다. EG-6B 수집 파이프라인과 경로 Probe는 완료됐으나 Google Drive Backup Worker 준비, 실제 13개 Area 단일 수집과 EG-6B 최종 통과는 아직 남아 있다.
+> **핵심 결론**  현재 제품은 추천 앱이 아니라, 추천 서비스가 성립할 데이터
+> 전제조건을 검증하는 1인 운영 PoC다. 장기 후보군은 서울시 121개 Area지만 승인
+> MVP 공간 범위는 13개 Area 패널이다. 구현·실행 완료 여부와 다음 작업은
+> `PROJECT_STATUS.md`에서 확인한다.
 
 ## 문서 구성
 
@@ -36,7 +38,10 @@ Workstream 결정을 반영했다.
 
 FreshManager의 장기 비전은 프레시매니저가 정기배송 이후 유동판매를 수행할 때, 이동 가능한 장소와 시간을 데이터로 보조하는 서비스다. 그러나 현재 릴리즈의 제품은 모바일 앱이나 추천 화면이 아니라 서울시 공개데이터가 그 의사결정을 뒷받침할 수 있는지를 검증하는 데이터 타당성 PoC다.
 
-이 PRD는 기존 요구사항 정의서 v0.4, 현재 main 코드, EG-5 실제 수집 분석, EG-6A 패널, EG-6B 병합 상태를 하나의 제품 기준으로 정리한다. 제품이 무엇을 해결해야 하는지, 무엇을 아직 주장할 수 없는지, 어떤 상태를 성공으로 볼지를 정의하며 구현 세부는 별도 TRD에 위임한다.
+이 PRD는 기존 요구사항 정의서 v0.4, 병합된 구현 계약, EG-5 실제 수집 분석과
+EG-6A 패널을 하나의 제품 기준으로 정리한다. 제품이 무엇을 해결해야 하는지,
+무엇을 아직 주장할 수 없는지, 어떤 결과를 성공으로 볼지를 정의하며 구현 세부는
+별도 TRD에, 현재 진행 상태는 `PROJECT_STATUS.md`에 위임한다.
 
 > **범위 경계**  본 PoC가 낼 수 있는 결론은 ‘공개데이터가 유동판매 후보 탐색에 쓸 수 있는가’까지다. ‘이 장소·시간에 야쿠르트가 더 잘 팔린다’는 결론은 실제 판매·현장 결과 없이 내릴 수 없다.
 
@@ -362,22 +367,25 @@ Spot Candidate는 Area 데이터와 S-DoT 근접성·공간 Context·현장검�
 
 ## 10. 성공 지표와 판정 게이트
 
-### 10.1 Engineering Gate 상태
+### 10.1 Engineering Gate 정의
 
-| **단계** | **상태** | **판정 근거** |
-| --- | --- | --- |
-| EG-0~3 | 완료 | 문서·기준데이터·샘플·Project Guard |
-| EG-4 | 완료 | POI072 실제 수집과 원본·메타데이터 확인 |
-| EG-5 | 완료 | 대표 3개 실제 수집 3/3 성공·Feature 구조 분석 |
-| EG-6A | 완료 | 13개 Area·Spot·S-DoT 패널 확정·main 반영 |
-| EG-6B 구현 | 완료 | PR #54 병합, 오프라인 H-706 PASS |
-| EG-6B 실호출 | 대기 | PM 승인 후 실제 최대 13회 단일 회차 |
-| Backup Readiness | 미구현 | Desktop Sync 논리 루트·즉시 Worker·Fake Batch·CI·main 병합 필요; 새 EG 번호 아님 |
-| EG-7 | 미진행 | EG-6B PASS·백업 운영·CSV 누적·재생성 계약 후 반복수집 |
-| EG-8 | 미진행 | Area Feature·선택적 S-DoT Feature·Spot Candidate Evaluation과 Gate A/B 분석 |
-| Recommendation MVP Workstream | `PLANNED` | Gate number `NOT_ASSIGNED`; 검증 Feature와 별도 PM 승인 필요 |
+이 절은 제품 판정 단계를 정의하며 현재 통과·대기 상태를 중복 관리하지 않는다.
+현재 Gate와 실행 상태는 `PROJECT_STATUS.md`를 단일 기준으로 확인한다.
 
-> **상태 해석**  코드가 main에 병합된 사실과 EG-6B가 통과한 사실은 다르다. EG-6B 통과에는 실제 13개 단일 수집 결과와 PM 판정이 추가로 필요하다.
+| **단계** | **제품 판정 의미** |
+| --- | --- |
+| EG-0~3 | 문서·기준데이터·샘플·Project Guard 기준 수립 |
+| EG-4 | POI072 단일 실제 수집 검증 |
+| EG-5 | 대표 3개 Area 실제 수집과 구조 검증 |
+| EG-6A | 13개 Area·Spot·S-DoT 참조 패널 확정 |
+| EG-6B | 13개 Area 단일 회차 구현·실행·품질 판정 |
+| Backup Readiness | EG-6B Live 전 Desktop Sync·Worker·복구 검증 묶음; 새 EG 번호가 아님 |
+| EG-7 | 승인된 주기의 동일 13개 Area 반복수집 파일럿 |
+| EG-8 | Area·선택적 S-DoT Feature와 Spot Candidate Evaluation |
+| Recommendation MVP Workstream | Gate number `NOT_ASSIGNED`; 검증 Feature와 별도 PM 승인 필요 |
+
+> **상태 해석**  코드 병합과 Gate 통과는 별개다. 현재 구현·실행 증거와 PM 판정은
+> `PROJECT_STATUS.md`에서 확인한다.
 
 ### 10.2 Gate A·B·C·D
 
@@ -422,10 +430,10 @@ Spot Candidate는 Area 데이터와 S-DoT 근접성·공간 Context·현장검�
 
 ## 12. 로드맵과 승인 지점
 
-1. R0 완료 — EG-0~EG-5: 기준선, 오프라인 검증, 여의도와 대표 3개 실제 수집
-2. R1 완료 — EG-6A: 13개 Area·Spot·S-DoT 참조 패널 확정
-3. R2 완료 — EG-6B 구현: 단일 순차수집, 회차 로그, Manifest, SHA-256, H-706
-4. R3 현재 — Google Drive for Desktop Sync 계획, 논리 루트 확인, 즉시 Backup Worker·Fake Batch 검증과 `main` 병합
+1. R0 — EG-0~EG-5: 기준선, 오프라인 검증, 여의도와 대표 3개 실제 수집
+2. R1 — EG-6A: 13개 Area·Spot·S-DoT 참조 패널 확정
+3. R2 — EG-6B 구현: 단일 순차수집, 회차 로그, Manifest, SHA-256, H-706
+4. R3 — Google Drive for Desktop Sync 계획, 논리 루트 확인, 즉시 Backup Worker·Fake Batch 검증
 5. R4 — EG-6B Live Preflight 재통과, 최대 13회 승인, 첫 Batch·자동 백업·품질 감사
 6. R5 — 첫 Batch 구조를 기준으로 CSV 계약·Exporter를 별도 구현하고 누적·재생성을 검증
 7. R6 EG-7 — 동일 13개 Area 반복수집 파일럿과 독립 S-DoT 관측 수집 가능성 검토
@@ -457,14 +465,15 @@ Spot Candidate는 Area 데이터와 S-DoT 근접성·공간 Context·현장검�
 | R-05 | 반복수집 중 저장 손실 | 높음 | 불변 저장·Manifest·백업 Gate·복구 시험 |
 | R-06 | 중복 실행·호출량 초과 | 높음 | EG-7 전 잠금·주기·호출예산 승인 |
 | R-07 | 날씨 미래정보 누수 | 높음 | 예보·관측 분리와 point-in-time join |
-| R-08 | 문서 상태가 코드보다 뒤처짐 | 중간 | PRD/TRD 기준일·commit 명시, 상태 문서 후속 정렬 |
+| R-08 | 문서 상태가 코드보다 뒤처짐 | 중간 | 현재 Branch·PR·Issue·실행 상태를 PROJECT_STATUS 한 곳에서 갱신 |
 | R-09 | 과거 Google Sheets·5분 지침 재사용 | 중간 | 현행 로컬 Python·주기 미정 원칙을 단일 운영 기준으로 지정 |
 | R-10 | 1인 운영 과부하 | 중간 | 최소 필드·표준 라이브러리·승인 단계별 확장 |
 
 ## 15. PM 결정 필요사항
 
 - D-01 Google Drive for Desktop Sync 설치·로그인과 `FreshManager-Data/` 논리 루트 접근 가능 여부 확인
-- D-02 Backup Worker `main` 병합 후 Live Preflight 재통과, env-file·output-root·실행시각·최대 13회 호출 승인과 결과의 EG-6B PASS·보완 판정
+- D-02 PROJECT_STATUS에 기록된 선행 Preflight를 확인한 뒤 env-file·output-root·
+  실행시각·최대 13회 호출 승인과 결과의 EG-6B PASS·보완 판정
 - D-03 EG-7 호출주기·운영시간·호출예산·실패 재처리 정책 승인
 - D-04 Batch 완료 직후 Worker 호출, 원격 확인·보존·복원시험의 세부 운영 승인
 - D-05 반복수집 전 동시 실행 잠금과 중단·재개 정책 승인

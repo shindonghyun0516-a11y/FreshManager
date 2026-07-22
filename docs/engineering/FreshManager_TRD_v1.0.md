@@ -10,21 +10,24 @@
 
 **기준일:** 2026-07-22 (Asia/Seoul)
 
-**기술 기준:** main · b99804faa6fb2ef3b22888c0f941a52e6027c5e9 · EG-6B Core 6253cc5
+**기술 기준:** EG-6B Area Collector와 독립 Backup Worker의 기술 계약
 
-**검증 증거:** EG-6B Target 19/19 · Backup Target 33/33 · Guard Tests 119/119 ·
-Full 280/280 · Project Guard PASS=42, SKIP=5, TOTAL=47
+**현재 상태 기준:** Branch·PR·Issue·실행·검증 상태는
+[`PROJECT_STATUS.md`](../../PROJECT_STATUS.md)를 단일 기준으로 사용한다.
 
 **적용 범위:** 현재 EG-6B + 승인 후 EG-7 반복수집·EG-8 Feature 분석 + `PLANNED`
 Recommendation MVP Workstream(Gate number `NOT_ASSIGNED`) 목표 구조
 
-**2026-07-22 변경이력:** Issue #60 Branch에 Google Drive for Desktop Sync와 분리된
-1회 실행형 Backup Worker·append-only Receipt·H-708을 구현했다. Issue #58의 Area
-Core Observation·선택적 S-DoT Supporting Observation·Spot Candidate Evaluation·
-Recommendation 결과 구조는 유지한다.
+**2026-07-22 완료 이력:** Issue #60에서 Google Drive for Desktop Sync와 분리된
+1회 실행형 Backup Worker·append-only Receipt·H-708을 구현했고 PR #61로 `main`에
+병합했다. Issue #58의 Area Core Observation·선택적 S-DoT Supporting Observation·
+Spot Candidate Evaluation·Recommendation 결과 구조는 유지한다.
 파일 버전은 PM의 별도 결정 전 `v1.0`을 유지한다.
 
-> **설계 기준**  현행 구현과 목표 구조를 섞지 않는다. 현재 main은 13개 Area 단일 회차의 원본·메타데이터·Batch Log·Manifest를 제공한다. Issue #60 Branch에는 독립 Backup Worker가 구현됐지만 아직 `main` 미병합이다. CSV Exporter, 정규화 영속화, 날씨·상권과 분석 파이프라인은 구현되지 않았다.
+> **설계 기준**  구현 계약과 목표 구조를 섞지 않는다. EG-6B는 13개 Area 단일
+> 회차의 원본·메타데이터·Batch Log·Manifest를 제공하고, 독립 Backup Worker는
+> 완료 Batch의 검증·복사·Receipt를 담당한다. CSV Exporter, 정규화 영속화,
+> 날씨·상권과 분석 파이프라인의 현재 상태는 `PROJECT_STATUS.md`에서 확인한다.
 
 ## 문서 구성
 
@@ -40,9 +43,10 @@ Recommendation 결과 구조는 유지한다.
 
 이 TRD는 PRD의 제품 요구를 구현 계약으로 변환한다. 첫째, 현재 main에 병합된 EG-6B 단일 회차 수집기의 실제 동작·데이터·오류·보안·검증 계약을 정확히 기록한다. 둘째, EG-7 반복수집, EG-8 Feature 분석과 별도 Recommendation MVP Workstream으로 확장할 때 필요한 목표 구조와 승인 지점을 정의한다. Recommendation MVP는 공식 Gate가 아니라 별도 승인할 계획 Workstream이다.
 
-본 문서는 코드보다 우선하지 않는다. EG-6B Collector 동작은 commit 6253cc5,
-Backup Worker 검토 대상은 Issue #60 Branch의 코드와 테스트 결과를 기준으로 한다.
-미래 항목은 ‘목표’ 또는 ‘결정 필요’로 표시하며 실제 API 호출을 승인하지 않는다.
+본 문서는 코드보다 우선하지 않는다. EG-6B Collector와 Backup Worker의 기술 계약은
+병합된 구현과 검증 결과를 기준으로 한다. 현재 Branch·PR·Issue·실행 상태는
+`PROJECT_STATUS.md`를 따르고, 미래 항목은 ‘목표’ 또는 ‘결정 필요’로 표시한다.
+이 문서 자체는 실제 API 호출을 승인하지 않는다.
 
 ## 2. 기술 원칙
 
@@ -57,28 +61,24 @@ Backup Worker 검토 대상은 Issue #60 Branch의 코드와 테스트 결과를
   의존성을 추가하지 않는다. Backup Worker는 Batch 완료 직후 한 번 호출하고 원격
   동기화는 Google Drive for Desktop Sync에 위임하는 목표구조다.
 
-## 3. 현행 구현 상태
+## 3. 기술 구성과 상태 기준
 
-| **기능** | **상태** | **근거/위치** |
+| **기능** | **기술 계약** | **근거/위치** |
 | --- | --- | --- |
-| 공식 121개 장소 검증 | 구현 | collector.py / Project Guard |
-| POI072 단일 CLI | 구현·실호출 검증 | live.py |
-| 대표 3개 순차수집 | 구현·실호출 3/3 | eg5.py |
-| 13개 Area 참조 패널 | 구현·승인 | eg6_*.csv |
-| 13개 단일 회차 | 구현·병합·오프라인 검증 | eg6b.py |
-| 실제 13개 단일 회차 | 미실행 | PM 승인 필요 |
-| 반복수집·Scheduler | 미구현 | EG-7 |
-| Google Drive Backup Worker·잠금·Receipt | Issue #60 Branch 구현·오프라인 검증 | `main` 병합 전 |
-| Google Drive for Desktop Sync·논리 Backup Root | 방식 확정 | `FreshManager-Data/`; 계정 이메일·절대경로 비기록 |
-| Raw-to-CSV Exporter | 미구현 | 첫 실제 Batch 품질 감사 후 |
-| 예측·관측 정규화 영속화 | 부분 | Parser 반환만 구현 |
-| 날씨·상권 영속화 | 미구현 | Guard H-505/H-601/H-602 SKIP |
-| S-DoT 관측 데이터 계층 | 미구현·가능성 검토 전 | EG-7에서 독립 수집 가능성 검토 |
-| Spot Candidate Evaluation | 미구현 | EG-8; Score·가중치·임계값은 OPEN_DECISION |
-| Feature 분석 파이프라인 | 미구현 | EG-8 |
-| Recommendation MVP | `PLANNED` | Gate number `NOT_ASSIGNED`, 별도 PM 승인 필요 |
+| 공식 121개 장소 검증 | 공식 CSV를 유일한 장소 기준으로 사용 | collector.py / Project Guard |
+| POI072 단일 CLI | 한 Area 수집 계약 | live.py |
+| 대표 3개 순차수집 | 고정 3개 Area·실패 격리 계약 | eg5.py |
+| 13개 Area 참조 패널 | Area·Spot Proxy·S-DoT 정적 연결 계약 | eg6_*.csv |
+| 13개 단일 회차 | 순차 수집·Batch Log·Manifest·SHA-256 계약 | eg6b.py |
+| Google Drive Backup Worker | 완료 Batch 검증·복사·잠금·Receipt 계약 | freshmanager.backup |
+| Google Drive for Desktop Sync | 논리 Backup Root와 동기화 책임 분리 | `FreshManager-Data/`; 계정 이메일·절대경로 비기록 |
+| Raw-to-CSV Exporter | 첫 실제 Batch 이후 확정할 파생자료 계약 | 별도 승인 대상 |
+| S-DoT 관측 데이터 계층 | Area Collector와 독립적인 보조 Feature 계층 | EG-7 검토 대상 |
+| Spot Candidate Evaluation | Area·선택적 S-DoT·공간 Context 결합 | EG-8; Score·가중치·임계값 OPEN_DECISION |
+| Recommendation MVP | 별도 계획 Workstream | Gate number `NOT_ASSIGNED` |
 
-> **문서 정렬**  PROJECT_STATUS.md, Quality Gates와 비개발자 실행 가이드는 PR #54 병합 이후 상태와 이 TRD의 로컬 Python·주기 미정 원칙을 따른다. 현재 동작 판단은 main 코드·merge commit·검증 기록이 우선이다.
+> **상태 정렬**  위 표는 기술 책임을 정의하며 완료·미완료 상태표가 아니다. 현재
+> Branch·PR·Issue·실행·검증 결과는 `PROJECT_STATUS.md`에서만 확인한다.
 
 ## 4. 현행 시스템 아키텍처
 
@@ -93,7 +93,7 @@ Backup Worker 검토 대상은 Issue #60 Branch의 코드와 테스트 결과를
 | freshmanager.storage | 배타적·비덮어쓰기 파일 저장·Batch JSON | persistence |
 | data/reference/* | 121개 장소와 13개 Area·Spot·S-DoT 기준 | immutable inputs |
 | scripts/project_guard_check.py | 문서·데이터·보안·수집 계약 검사 | offline guard |
-| freshmanager.backup | 완료 Batch 검증·로컬 Sync 복사·Lock·Receipt | Issue #60 Branch; 네트워크 없음 |
+| freshmanager.backup | 완료 Batch 검증·로컬 Sync 복사·Lock·Receipt | 네트워크 없음 |
 | tests/* | Fake Transport·임시 파일 기반 단위·통합 계약 | offline tests |
 | .github/workflows/ci.yml | PR·main Push에서 Guard와 전체 테스트 | CI |
 
@@ -368,7 +368,7 @@ Area Collector는 Spot 추천 여부와 무관하게 공식 Area 관측을 계�
 | Normalizer | 관측·예측 스냅샷 영속화 | 신규 |
 | Quality Aggregator | 지연·결측·스키마·성공률·용량 | 신규 |
 | S-DoT Feasibility Probe | 센서 데이터 접근성·갱신주기·키·결측·Area 연결 가능성 확인 | EG-7 별도 검토 |
-| Backup Worker | 완료 Batch의 Google Drive 로컬 동기화 폴더 복사·SHA-256·Receipt | Issue #60 Branch 구현; `main` 미병합 |
+| Backup Worker | 완료 Batch의 Google Drive 로컬 동기화 폴더 복사·SHA-256·Receipt | 독립 1회 실행 계약 |
 | Post-Batch Trigger | Batch 완료 판정 직후 1회 실행형 Worker 호출 | 신규 |
 | Run Registry | 예정 슬롯·실행·누락·중복·종료 상태 | 결정 필요 |
 | Context Registry | 패널·Spot·S-DoT 버전 연결 | 결정 필요 |
@@ -406,8 +406,9 @@ Area Collector는 Spot 추천 여부와 무관하게 공식 Area 관측을 계�
   복사만으로 실제 Google Drive 원격 업로드 완료를 주장하지 않는다.
 - 백업 실패는 서울시 API 재호출 사유가 아니며 `.env`, Secret, 인증 URL과 임시
   파일을 백업하지 않는다.
-- append-only Backup Receipt와 Fake Restore는 Issue #60 Branch에 구현됐다. 실제 Batch
-  Restore, 원격 동기화 확인, 일일 무결성 감사와 보존기간은 후속 구현·PM 승인 대상이다.
+- append-only Backup Receipt와 Fake Restore 계약은 Issue #60에서 구현됐다. 실제 Batch
+  Restore, 원격 동기화 확인, 일일 무결성 감사와 보존기간의 현재 진행 상태는
+  `PROJECT_STATUS.md`를 따르며 실행에는 별도 PM 승인이 필요하다.
 
 상태·충돌·복원·CSV 상세 목표 계약은
 `docs/data/CLOUD_BACKUP_AND_CSV_MANAGEMENT_PLAN.md`를 따른다. 모두 목표 구조이며
@@ -501,33 +502,36 @@ MVP다. 상태는 `PLANNED`, Gate number는 `NOT_ASSIGNED`이며 EG-8 분석 결
 
 ## 21. 검증 전략
 
-| **계층** | **검증 대상** | **현재 증거** |
+| **계층** | **검증 대상** | **검증 방법** |
 | --- | --- | --- |
 | Unit | 파서·설정·저장·요청·상태 | 가짜 bytes·임시 경로 |
 | Adapter | 정상·HTTP 오류·Timeout·Redirect·5 MiB | 주입 Transport |
 | Collector | 6개 오류·원본·8필드 Metadata | Fake Client |
-| EG-6B Target | 13개 순서·실패 격리·Manifest·경로 | 19/19 PASS |
-| Project Guard | 문서·데이터·보안·오프라인·H-708 | PASS 42 / SKIP 5 / TOTAL 47 |
-| Full | 저장소 전체 unittest | 280/280 PASS |
-| CI | 모든 PR·main Push | PR #54와 main CI SUCCESS |
-| Live smoke | 실제 API·외부 output-root | PM 승인 후 별도; 현재 미실행 |
+| EG-6B Target | 13개 순서·실패 격리·Manifest·경로 | 전용 오프라인 Target Tests |
+| Project Guard | 문서·데이터·보안·오프라인·H-708 | PROJECT_GUARD_SPEC의 상태·집계 계약 |
+| Full | 저장소 전체 unittest | 전체 Unit Test 실행 |
+| CI | 모든 PR·main Push | CI Validation Workflow |
+| Live smoke | 실제 API·외부 output-root | 별도 PM 승인 실행 |
 
-Project Guard의 H-706은 EG-6B 완전성을 검증해 PASS했다. H-707은 반복주기와 백업 Gate가 승인되지 않아 SKIP이며 현재 단계에서는 올바른 상태다. H-504·H-505·H-601·H-602는 예측 영속화·날씨·상권 구현 전이므로 남은 SKIP 범위에 포함된다.
+Project Guard 검사별 현재 PASS·SKIP, 전체 집계와 Live 실행 여부는
+`PROJECT_STATUS.md`에서 확인한다.
 
-## 22. 배포·Rollout 계획
+## 22. 배포·Rollout 계약
 
-- T0 완료 — PR #54 병합, main/PR CI, 19 Target·243 Full·Guard 41 PASS
-- T1 완료 — Issue #57 env/output Preflight Probe; 실제 API 호출·데이터 생성 0
-- T2 준비 — Google Drive for Desktop Sync 설치·로그인·논리 루트 접근 확인
-- T3 구현 — Issue #60 Branch의 Backup Worker·Fake Batch·H-708 완료; PM Diff 검토 대기
-- T4 병합 — 승인된 Stage·Commit·PR·CI·`main` 병합
-- T5 승인 — Live Preflight 재통과와 최대 13회 실제 호출 별도 승인
-- T6 판정 — 첫 Batch 원본·Manifest·자동 백업·품질 감사와 EG-6B PASS/보완
-- T7 CSV — 실제 구조 기반 CSV 계약·Exporter 별도 구현·누적·재생성 검증
-- T8 EG-7 Pilot — 제한된 기간 동일 13개 Area 반복, 5영업일 EDA·품질·용량 측정과 S-DoT 수집 가능성 검토
-- T9 EG-8 — 4주 기준선+5주차 Area·선택적 S-DoT Feature와 Spot Candidate Evaluation, Gate A/B 분석
-- T10 후속 — Recommendation MVP Workstream(`PLANNED`, Gate number `NOT_ASSIGNED`)
-- T11 후속 — 현장·인터뷰 결과로 121개 확대 또는 서비스 실증 여부 결정
+현재 완료 지점은 `PROJECT_STATUS.md`를 단일 기준으로 확인한다. 아래는 상태표가
+아니라 승인 순서와 의존관계다.
+
+- T0 — EG-6B Collector와 독립 Backup Worker 구현·병합·오프라인 검증
+- T1 — env/output 및 Google Drive for Desktop Sync 로컬 경로 Preflight
+- T2 — Fake Batch Backup·Receipt·Restore 무결성 검증
+- T3 — PM의 실제 원격 동기화 상태 확인
+- T4 — Live Preflight 재통과와 최대 13회 실제 호출 별도 승인
+- T5 — 첫 Batch 원본·Manifest·백업·품질 감사와 EG-6B PASS/보완
+- T6 — 실제 구조 기반 CSV 계약·Exporter 별도 구현·누적·재생성 검증
+- T7 — EG-7 제한 기간 동일 13개 Area 반복과 S-DoT 수집 가능성 검토
+- T8 — EG-8 Area·선택적 S-DoT Feature와 Spot Candidate Evaluation
+- T9 — Recommendation MVP Workstream(`PLANNED`, Gate number `NOT_ASSIGNED`)
+- T10 — 현장·인터뷰 결과로 121개 확대 또는 서비스 실증 여부 결정
 
 ## 23. 중단·복구·변경관리
 
@@ -554,7 +558,7 @@ Project Guard의 H-706은 EG-6B 완전성을 검증해 PASS했다. H-707은 반�
 | ADR-08 | Google Sheets 수집 미채택 | 현행 로컬 Python·원본 보존·승인 Gate와 충돌 | 폐기 지침 |
 | ADR-09 | Spot Master는 Candidate Anchor Point | 고정 판매 위치가 아니라 Area·S-DoT·공간·현장검증 기반 후보 생성의 입력 | 유지 |
 | ADR-10 | Google Drive for Desktop Sync 백업 | API·OAuth·SDK 없이 로컬 파일 계약과 원격 동기화 책임 분리 | 유지 |
-| ADR-11 | Batch 완료 직후 1회 실행형 Worker | 수집기·백업 책임 분리와 장애 격리 | Issue #60 Branch 구현 |
+| ADR-11 | Batch 완료 직후 1회 실행형 Worker | 수집기·백업 책임 분리와 장애 격리 | 채택 |
 | ADR-12 | CSV는 첫 Batch 이후 | 실제 필드·결측·Forecast를 확인한 뒤 파생 계약 확정 | 목표 구조 |
 | ADR-13 | S-DoT는 독립·선택적 보조 데이터 계층 | Area를 대체하거나 필수 직렬 단계가 아니며 Spot Candidate 근거만 보조 | 목표 구조 |
 | ADR-14 | Recommendation MVP Workstream 분리 | EG-8 Feature 검증과 추천 제품 동작을 분리; Gate number NOT_ASSIGNED | 목표 구조 |
@@ -571,8 +575,8 @@ Project Guard의 H-706은 EG-6B 완전성을 검증해 PASS했다. H-707은 반�
 - O-08 날씨·상권 Endpoint·실응답 필드·지원상태 Enum
 - O-09 context_version과 현장검증 갱신 방식
 - O-10 EG-7 재시도 도입 여부와 호출량·시간 정렬 영향
-- O-11 Quality Gate·Project Status의 post-merge 상태 정렬
-- O-12 Backup Worker `main` 병합 후 Live Preflight·env-file·output-root·실행시각·최대 13회 호출 승인
+- O-11 Live Preflight의 env-file·output-root·실행시각·최대 13회 호출 승인
+- O-12 실제 원격 동기화 확인과 운영자 확인 증거의 최소 계약
 
 ## 26. PRD–구현 추적성
 
@@ -589,7 +593,7 @@ Project Guard의 H-706은 EG-6B 완전성을 검증해 PASS했다. H-707은 반�
 | FR-09 | docs/analysis/ANALYSIS_PLAN.md | EG-8·후속 Recommendation MVP Workstream 미구현 |
 | FR-10 | EG5 report + 목표 reporting | 부분 |
 | FR-11 | Collector statuses + eg6b exit 0/1/2 | H-704/H-705/H-706 |
-| FR-13 | 즉시 Backup Worker·Google Drive for Desktop Sync | Issue #60 Branch 구현·H-708 PASS; `main` 병합·실환경 확인 필요 |
+| FR-13 | 즉시 Backup Worker·Google Drive for Desktop Sync | H-708 계약; 실환경 상태는 PROJECT_STATUS 참조 |
 | FR-14 | 목표 S-DoT·Spot Candidate·Recommendation 계층 | 미구현; EG6 Panel·EG-8 Feature·현장검증 필요 |
 | FR-12 | --execute-live + AGENTS/Git workflow | Project Guard/CI/PM |
 
