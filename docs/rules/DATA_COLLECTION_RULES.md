@@ -15,6 +15,7 @@
   - `docs/rules/CODING_RULES.md`
   - `docs/rules/SECURITY_RULES.md`
   - `docs/data/FIELD_DICTIONARY.md`
+  - `docs/data/CLOUD_BACKUP_AND_CSV_MANAGEMENT_PLAN.md`
   - `docs/testing/PROJECT_GUARD_SPEC.md`
   - `docs/testing/QUALITY_GATES.md`
   - `docs/analysis/ANALYSIS_PLAN.md`
@@ -44,7 +45,8 @@
 ### 2.1 공식 장소 범위
 
 서울시 주요 121장소는 장기 공식 후보군이다. 현재 MVP 수집 대상은 EG-6A에서
-확정한 13개 Area이며, 121개 Area 확대는 EG-7·EG-8 결과와 별도 PM 승인 후 검토한다.
+확정한 13개 Area이며, 121개 Area 확대는 EG-7·EG-8과 별도 승인된 Recommendation
+MVP Workstream 결과 및 별도 PM 승인 후 검토한다.
 
 유일한 공식 장소 기준파일:
 
@@ -108,7 +110,8 @@ EG-4 여의도 1장소
 → EG-6A 13개 Area·Spot·S-DoT 패널 확정
 → EG-6B 13개 Area 단일 수집·Batch Log·Manifest·SHA-256 검증
 → EG-7 동일 13개 Area 반복수집 파일럿
-→ EG-8 시간·장소·Forecast·S-DoT Feature 분석
+→ EG-8 Area Feature·승인·확보된 경우 S-DoT Feature·Spot Candidate Evaluation
+→ 후속 Recommendation MVP Workstream(PLANNED, Gate number NOT_ASSIGNED)
 → 후속 검토에서 필요 시 121개 Area 확대
 ```
 
@@ -133,11 +136,13 @@ EG-6A는 실제 수집 없이 13개 Area·Spot·S-DoT 참조 패널을 확정해
 `main`에 반영했다. EG-6B는 같은 13개 Area의 단일 수집, Batch Log, Manifest와
 SHA-256 무결성 파이프라인을 PR #54로 `main`에 반영했다. 실제 단일 회차와 결과
 검토는 아직 수행하지 않았으며 PM PASS 전에는 EG-6B를 통과로 표시하지 않는다.
-PM 확인용 CSV와 로컬·Google Spreadsheet 자동백업은 Issue #53 구현 범위에 포함하지
-않으며 필요하면 별도 PM 승인을 받는다. EG-7은 같은 13개 Area 반복수집 파일럿으로 제한하며,
-EG-8은 시간·장소·Forecast·S-DoT Feature를 분석한다. 현재 MVP 분석 범위는
-유동인구·혼잡·Forecast·S-DoT Feature와 스팟 이동 기회이며 실제 판매효과 분석은
-포함하지 않는다.
+PM 확인용 CSV와 Google Drive Backup Worker는 Issue #53 구현 범위에 포함하지
+않았다. CSV는 첫 실제 Batch 품질 감사 후, Backup Worker는 EG-6B Live 전 각각 별도
+Issue와 PM 승인으로 구현한다. EG-7은 같은 13개 Area 반복수집 파일럿과 독립
+S-DoT 관측 수집 가능성 검토로 제한한다. EG-8은 Area Feature와 승인·확보된 경우의
+S-DoT Feature를 이용한 Spot Candidate Evaluation을 수행한다. Recommendation MVP는
+`PLANNED`, Gate number `NOT_ASSIGNED`이며 별도 PM 승인 전 공식 Gate가 아니다.
+현재 MVP 분석 범위에는 실제 판매효과 분석을 포함하지 않는다.
 
 과거의 `시험용 10장소 → 121장소 1회 수집`은 이전 계획으로 보존하되 현재 승인된
 실행 순서로 사용하지 않는다. 121개 Area 확대는 13개 패널 검증에서 필요성이 확인된
@@ -220,6 +225,53 @@ Manifest는 공식 장소 CSV, EG-6A 참조 CSV 3개와 생성된 raw·metadata�
 Area를 처리한다. 공통 오류에서는 추가 호출을 중단하되 이미 저장된 결과를 되돌리지 않는다.
 `--execute-live`는 실제 호출 PM 승인을 대체하지 않는다. Issue #53 구현과 일반 검증은
 Fake Transport와 임시 output root만 사용했고, 실제 최대 13회 단일 회차는 별도 승인 전이다.
+
+EG-6B는 Area Observation 확보 단계다. `eg6_spot_master.csv`와
+`eg6_sdot_links.csv`는 승인된 정적 패널의 연결 무결성을 확인하는 참조 입력이며,
+Spot 좌표나 S-DoT 관측값을 서울시 Area API 요청값으로 사용하지 않는다.
+
+### 3.4 Area·S-DoT·Spot Candidate 데이터 구조
+
+- **Core Observation:** EG-6B가 모든 승인 Area의 인구 범위·혼잡도·Forecast·시간대
+  변화를 수집한다.
+- **Optional Supporting Observation:** S-DoT는 지원·접근·수집·품질조건을 만족할 때만
+  위치·근접 관계·관측·시간대 변화를 독립 저장한다. Area 데이터를 대체하거나 Area
+  값과 같은 측정값으로 합치지 않는다.
+- **Additional Context:** 공간 Context·현장검증·운영 제약을 Area Feature와 선택적
+  S-DoT Feature에 결합해 Spot Candidate Evaluation을 수행한다. 현재 Spot Master는
+  Candidate Anchor Point다.
+- **Recommendation 결과:** 후보 근거가 충분하면 `SPOT`, 부족하면 `AREA`와
+  `fallback_reason`을 기록한다.
+
+동적 S-DoT 수집이나 Spot Candidate Evaluation 실패로 EG-6B Area 수집을
+재호출·중단·롤백하지 않는다. 정적 참조 패널 자체의 연결 무결성 실패는 현재 코드의
+공통 Preflight 오류로 구분하며, 이는 동적 S-DoT 계층 실패와 다른 계약이다.
+S-DoT 미지원 6개 Area도 Area 분석과 추천 후보에서 제외하지 않는다. 후보 Score·
+가중치·임계값은 `PLANNED` 또는 `OPEN_DECISION`이다.
+
+### 3.5 Google Drive 백업과 CSV 경계
+
+- 로컬 Raw JSON·요청별 Metadata·Collection Log·Manifest가 공식 원본이다.
+- 공식 클라우드 제공자는 Google Drive다. iCloud와 수동 백업은 현행 운영방식이 아니다.
+- Google Drive에는 Google Drive for Desktop Sync의 로컬 동기화 폴더를 통해
+  공식 원본의 검증된 복사본만 Batch 완료 직후 자동 백업한다.
+- Backup Root는 `FreshManager-Data/` 논리 구조만 정의하고 실제 계정 이메일과
+  동기화 절대경로는 저장소·Receipt·로그에 기록하지 않는다.
+- Google Drive API·OAuth·SDK는 구현하지 않는다.
+- Collector는 백업을 수행하지 않는다. 별도 1회 실행형 Backup Worker가 완료 Batch만
+  임시 경로에 복사하고 파일 수·Manifest SHA-256을 검증한 뒤 원자적으로 게시한다.
+- 종료코드 `1`의 부분 실패 Batch도 Manifest 증거가 완결되면 전체 회차를 백업한다.
+- 실행 중이거나 증거가 불완전한 Batch는 백업하지 않는다.
+- 동일 `batch_id`는 덮어쓰지 않는다. 복사본이 다르면 충돌로 중단하고 PM에게 보고한다.
+- `.env`, API Key, 인증 URL, Probe·partial 파일은 백업하지 않는다.
+- 백업 실패는 서울시 API 재호출 사유가 아니다.
+- 로컬 동기화 폴더 복사 검증과 Google Drive 원격 업로드 완료 확인을 구분한다.
+
+CSV는 Raw의 조회·정렬·필터·분석용 파생자료다. 첫 실제 Batch의 필드·결측·Forecast와
+Manifest 품질을 확인하기 전에는 Exporter를 구현하지 않는다. CSV 생성 실패 시 Raw에서
+재생성하고 API를 재호출하지 않는다. Area 관측값과 S-DoT 관측·Spot Candidate Context를 같은 측정값으로
+혼합하지 않으며 시스템 CSV와 PM 메모 시트를 분리한다. 상세 목표 계약은
+`docs/data/CLOUD_BACKUP_AND_CSV_MANAGEMENT_PLAN.md`를 따른다.
 
 ---
 
@@ -711,19 +763,17 @@ EG-5 대표 3장소와 EG-6B 승인 13개 Area 단일 회차는 `retry_count=0`�
 
 반복수집 주기를 미리 확정하지 않는다.
 
-반복수집에 들어가기 전 다음 백업 Gate 중 최소 하나를 PM이 승인해야 한다.
+반복수집 전 백업 Gate는 Google Drive for Desktop Sync 기반 자동 백업으로 확정한다.
+수집은 로컬 Python에 유지하고 Collector와 분리된 1회 실행형 Backup Worker를 Batch
+완료 직후 호출한다. 시간 간격 기반 백업 Scheduler는 두지 않는다.
 
-- 외장 저장장치에 주기적으로 복사
-- PM이 승인한 클라우드 폴더에 주기적으로 백업
+Issue #53·PR #54의 EG-6B 단일 수집 구현에는 Backup Worker와 CSV Exporter가 없다.
+Google Drive for Desktop Sync 논리 루트 확인, Fake Batch 백업 검증, Worker의 PR·CI·
+`main` 병합 및 Live Preflight 재통과 후에만 PM이 실제 최대 13회 호출을 승인한다.
+EG-6C는 새로 만들지 않으며 `H-707`은 EG-7 전까지 `SKIP`한다.
 
-이 Gate는 수집 실행을 클라우드로 옮기는 것이 아니다. 수집은 로컬 Python에서
-유지하고 백업 작업만 별도로 수행한다. EG-5와 EG-6B는 백업 기능과 반복수집을
-구현하지 않았으며 `H-707`은 EG-7 전까지 `SKIP`한다.
-
-Issue #53·PR #54의 EG-6B 단일 수집 구현은 로컬·Google Spreadsheet 자동백업을 포함하지 않는다.
-향후 로컬 스프레드시트 산출물을 추가하더라도 위 외장 저장장치·승인 클라우드 백업
-Gate를 대체하지 않는다. 반복수집 파일럿에 들어가기 전에는 위 백업 Gate와 다음 결과를
-확인한 뒤 EG-7 진입을 PM이 승인한다.
+반복수집 파일럿에 들어가기 전에는 즉시 백업 운영 결과와 다음 항목을 확인한 뒤
+EG-7 진입을 PM이 승인한다.
 
 - API 호출한도
 - 13개 Area 1회 처리시간
@@ -733,6 +783,8 @@ Gate를 대체하지 않는다. 반복수집 파일럿에 들어가기 전에는
 - 저장공간 증가량
 - 운영 컴퓨터 안정성
 - 분석에 필요한 시간해상도
+- Google Drive 로컬 복사·원격 동기화 성공률과 지연
+- 백업 충돌·복원시험·보존기간 정책
 
 다음 주기는 후보일 뿐 기본값이 아니다.
 
@@ -743,6 +795,9 @@ Gate를 대체하지 않는다. 반복수집 파일럿에 들어가기 전에는
 30분
 특정 운영시간
 ```
+
+이 목록은 Area 수집주기 후보이며 Backup Worker 주기가 아니다. Backup Worker는
+각 Batch 완료 직후 한 번 실행한다.
 
 ---
 
@@ -883,6 +938,7 @@ Gate를 대체하지 않는다. 반복수집 파일럿에 들어가기 전에는
 
 | 버전 | 날짜 | 변경내용 | 작성자 | 승인상태 |
 |---|---|---|---|---|
+| v0.1.6 (Issue #58 보완) | 2026-07-22 | Google Drive 자동 백업과 Area·S-DoT·Spot Candidate·Recommendation 데이터 계층 경계 정렬 | 신동현 | PM Diff 검토 전 |
 | v0.1.6 | 2026-07-22 | PRD·TRD 공식 기준 연결, PR #54 병합 완료와 EG-6B 실제 단일 회차 대기 상태 정렬 | 신동현 | PM 승인 |
 | v0.1.5 | 2026-07-21 | Issue #53 EG-6B 13개 단일 회차의 단계 경로·Batch Log·Manifest·SHA-256·재시도 0회 계약 반영 | 신동현 | PM 구현 승인 |
 | v0.1.4 | 2026-07-21 | EG-6A 13개 패널 전략과 EG-6B·EG-7·EG-8 현행 순서 및 121개 Area 후속 검토 범위 반영 | 신동현 | PM 승인 |

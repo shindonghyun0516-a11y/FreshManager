@@ -15,14 +15,20 @@
 
 새 세션은 다음 문서를 순서대로 확인한다.
 
-1. [`PROJECT_STATUS.md`](PROJECT_STATUS.md) — 현재 단계와 다음 행동
-2. [`FreshManager_PRD_v1.0.md`](docs/product/FreshManager_PRD_v1.0.md) — 공식 제품 기준
-3. [`FreshManager_TRD_v1.0.md`](docs/engineering/FreshManager_TRD_v1.0.md) — 공식 기술 기준
-4. [`AGENTS.md`](AGENTS.md) — Codex 작업 절차와 금지사항
-5. [`CODEX_HARNESS_ARCHITECTURE.md`](docs/engineering/CODEX_HARNESS_ARCHITECTURE.md) — 문서·검증·승인 구조
-6. [`DATA_COLLECTION_RULES.md`](docs/rules/DATA_COLLECTION_RULES.md) — 데이터 수집·보존 규칙
-7. [`QUALITY_GATES.md`](docs/testing/QUALITY_GATES.md) — 단계 진입·통과 기준
-8. [`PROJECT_GUARD_SPEC.md`](docs/testing/PROJECT_GUARD_SPEC.md) — 자동검사 기준
+1. [`AGENTS.md`](AGENTS.md) — Codex 작업 절차와 금지사항
+2. [`PROJECT_STATUS.md`](PROJECT_STATUS.md) — 현재 단계와 다음 행동의 공식 운영 상태
+3. [`PROJECT_MEMORY.md`](ai-context/PROJECT_MEMORY.md) — 장기 제품 맥락과 안정적 원칙
+4. [`FreshManager_PRD_v1.0.md`](docs/product/FreshManager_PRD_v1.0.md) — 공식 제품 기준
+5. [`FreshManager_TRD_v1.0.md`](docs/engineering/FreshManager_TRD_v1.0.md) — 공식 기술 기준
+6. 현재 GitHub Issue와 Branch·Git 상태
+7. 관련 Rule·Quality·Data·Analysis 문서
+8. [`DECISION_LOG.md`](ai-context/DECISION_LOG.md)의 관련 Decision
+9. [`ARCHITECTURE_DECISIONS.md`](ai-context/ARCHITECTURE_DECISIONS.md)의 관련 ADR
+
+`ai-context/`는 상태·제품·기술 정본을 대체하지 않는 복원 보조 문서다. 전체 Harness
+구조는 [`CODEX_HARNESS_ARCHITECTURE.md`](docs/engineering/CODEX_HARNESS_ARCHITECTURE.md),
+백업·CSV 목표계약은
+[`CLOUD_BACKUP_AND_CSV_MANAGEMENT_PLAN.md`](docs/data/CLOUD_BACKUP_AND_CSV_MANAGEMENT_PLAN.md)를 따른다.
 
 ---
 
@@ -51,23 +57,44 @@
 - EG-6A 13개 Area·Spot·S-DoT 패널: 확정·`main` 반영 완료
 - EG-6B 동일 13개 Area 단일 회차 파이프라인: 구현·오프라인 검증·`main` 병합 완료
 - 실제 EG-6B 13개 Area 단일 회차: 미실행, 별도 PM 승인 필요
+- Issue #57 env-file·output-root Probe: PASS
+- Google Drive 자동 백업: Google Drive for Desktop Sync·`FreshManager-Data/` 논리 루트 승인, 즉시 Backup Worker 미구현
 
 ### 현재 분석 범위
 
 - 여의도와 EG-5 대표 3개 Area
 - EG-6A에서 확정한 13개 Area·Spot·S-DoT 패널
-- 유동인구·혼잡·Forecast·S-DoT Feature와 스팟 이동 기회
+- Area Observation과 S-DoT 보조 Feature
+- Area Feature와 선택적으로 사용할 수 있는 S-DoT Feature, 공간·현장 Context 기반
+  Spot Candidate Evaluation과 스팟 이동 기회
+
+### 공식 서비스 데이터 구조
+
+```text
+필수 Core Observation: Area Observation
+선택적 Supporting Observation: 사용 가능한 경우의 S-DoT Observation
+추가 Context: Spatial Context + Field Validation + Operational Constraints
+
+Area Feature + 선택적 S-DoT Feature + 추가 Context
+→ Spot Candidate Evaluation
+→ 신뢰 가능한 Spot: SPOT / 없는 경우: AREA + fallback_reason
+```
+
+현재 Spot Master는 확정 판매 위치가 아니라 `STATION_CENTER_PROXY` 기반 Candidate
+Anchor Point다. S-DoT는 Area 데이터를 대체하거나 모든 Area에 필수인 단계가 아니며,
+동적 센서 수집과 후보 근거 평가는 EG-6B Collector와 분리된 후속 책임이다. S-DoT
+미지원 6개 Area도 분석·추천 후보에서 제외하지 않는다.
 
 ### 후속 범위
 
-실제 EG-6B 단일 회차와 EG-7 반복수집, EG-8 Feature 분석에서 필요성이 확인된
-경우에만 별도 PM 승인으로 121개 Area 확대를 검토한다.
+실제 EG-6B 단일 회차와 EG-7 반복수집, EG-8 Feature 분석 및 후속 Recommendation
+MVP Workstream의 데이터 필요성을 확인한 뒤 별도 PM 승인으로 121개 Area 확대를 검토한다.
 
 ```text
 장기 후보군: 서울시 주요 121장소
 현재 MVP: 1개 Area → 대표 3개 Area → 13개 Area 패널
-현재 Gate: EG-6B 구현 완료 / 실제 단일 회차·PM PASS 대기
-후속 검토: EG-7·EG-8 결과 후 필요 시 121개 확대
+현재 Gate: EG-6B 구현·경로 Probe 완료 / Google Drive Backup Readiness와 실제 단일 회차·PM PASS 대기
+후속 검토: EG-7·EG-8과 별도 승인된 Recommendation MVP Workstream 결과 후 필요 시 121개 확대
 ```
 
 ### 현재 제외 범위
@@ -197,18 +224,27 @@ POI001부터 POI121까지 자동 생성
 
 ### 진행 예정
 
-- 별도 PM 승인 후 EG-6B 실제 최대 13회 단일 회차 실행
+- Google Drive for Desktop Sync 설치·로그인과 논리 루트 접근 가능 여부 확인
+- Batch 완료 직후 1회 실행형 Backup Worker·Fake Batch 검증과 `main` 병합
+- Live Preflight 재통과와 별도 PM 승인 후 EG-6B 실제 최대 13회 단일 회차 실행
 - Raw·Metadata·Collection Log·Manifest·SHA-256 검토
+- Batch 완료 직후 Google Drive 자동 백업과 복사본 무결성 검증
 - 실제 호출량·성공률·실패율·소요시간 확인
 - PM의 EG-6B PASS 또는 보완 판정
-- EG-6B PASS와 백업·주기 승인 후 EG-7 반복수집 파일럿 검토
+- 첫 Batch 품질 감사 후 Raw-to-CSV Exporter 별도 검토
+- EG-6B PASS와 백업 운영·주기 승인 후 EG-7 반복수집 파일럿 검토
+- EG-7에서 Area 반복수집과 분리해 S-DoT 관측 수집 가능성 검토
+- EG-8에서 Area Feature·승인·확보된 경우의 S-DoT Feature·Spot Candidate Evaluation 검증
+- 별도 PM 승인 후 Recommendation MVP Workstream 검토(`PLANNED`, Gate number `NOT_ASSIGNED`)
 
 ### 미진행
 
 - EG-6B 실제 13개 Area 단일 회차
 - EG-6B 최종 PASS 판정
+- Google Drive Backup Worker·CSV Exporter
 - EG-7 반복수집·Scheduler·자동 재시도
-- EG-8 Feature 유효성 분석
+- EG-8 Area Feature·선택적 S-DoT Feature와 Spot Candidate Evaluation
+- Recommendation MVP Workstream(`PLANNED`, Gate number `NOT_ASSIGNED`)
 - 121장소 자동수집
 - 장기 데이터 누적
 - 장소별 예측 성능 비교
@@ -326,8 +362,9 @@ Issue #32 PM 결정에 따라 이전 최소 계약의 `parser_version` 대신
 | EG-5 | 유형별 대표 3장소 | 통과: POI019·POI013·POI014 실제 수집 3/3, 재시도 0회와 구조 분석 완료 |
 | EG-6A | 13개 Area·Spot·S-DoT 패널 | 통과: Issue #51·PR #52로 13개 고유 공식 Area 패널 `main` 반영 |
 | EG-6B | 동일 13개 Area 단일 수집 | 진행: Issue #53·PR #54 구현·오프라인 검증·병합 완료, 실제 회차·PM PASS 대기 |
-| EG-7 | 동일 13개 Area 반복수집 파일럿 | 미진행: EG-6B PASS와 주기·백업 승인 필요 |
-| EG-8 | Feature 유효성 분석 | 미진행: 반복 관측 데이터 필요 |
+| EG-7 | 동일 13개 Area 반복수집 파일럿 | 미진행: EG-6B PASS와 Google Drive 백업 운영·주기 승인 필요 |
+| EG-8 | Area Feature·선택적 S-DoT Feature와 Spot Candidate Evaluation | 미진행: 반복 관측 데이터 필요 |
+| Recommendation MVP Workstream | SPOT 우선·AREA fallback 추천 | `PLANNED`; Gate number `NOT_ASSIGNED`, 별도 PM 승인 필요 |
 
 EG-1과 EG-2는 Project Guard 구현 전의 읽기 전용 사전검증이다.
 공식 여의도 실응답 샘플 경로는
@@ -338,7 +375,8 @@ EG-3에서 문서, 공식 CSV, 샘플 JSON을 네트워크 없이 자동 재검�
 일반 테스트와 분리해 진행한다.
 각 게이트 통과 후 다음 구현 단계로 전환하려면 PM 승인을 받는다.
 
-EG-0~EG-8은 구현 준비도와 엔지니어링 품질을 판정한다.
+EG-0~EG-8은 구현 준비도와 엔지니어링 품질을 판정한다. Recommendation MVP
+Workstream은 아직 공식 Engineering Gate가 아니다.
 Gate A·Gate B·Gate C는 별도의 데이터 PoC 판정 게이트이며,
 어떤 EG의 통과도 Gate A·B·C 통과를 의미하지 않는다.
 
@@ -418,6 +456,16 @@ Gate A·Gate B·Gate C는 별도의 데이터 PoC 판정 게이트이며,
 - 실제 야쿠르트 구매고객 수
 
 이름이 비슷한 장소도 임의로 합치지 않는다.
+
+Spot은 고정 판매 위치가 아니라 Area 데이터와 S-DoT 근접성·공간 Context·현장검증
+상태를 결합해 생성하는 판매 후보 위치다. 후속 추천에서 신뢰할 수 있고 운영 가능한
+Spot Candidate가 확인되면 반드시
+`target_level=SPOT`으로 추천한다. Spot이 없거나 운영 가능성이 미확인이면
+`target_level=AREA`로 fallback하고 이유를 기록한다. 현재 역 중심 대리좌표는
+`field_verified=false`인 Candidate Anchor Point이며 검증된 판매 Spot이 아니다.
+동적 S-DoT 관측과 Spot Candidate Evaluation 실패는 EG-6B Area 수집을 중단시키지
+않는다. EG-6B가 확인하는 정적 Spot/S-DoT CSV는 승인된 13개 Area 패널의 참조
+무결성 입력일 뿐 API 요청값이나 Spot 추천 결과가 아니다.
 
 ---
 
@@ -526,8 +574,12 @@ SEOUL_OPEN_API_KEY=your_api_key_here
 - EG-4·EG-5·EG-6B 결과는 단계별 하위 경로로 분리한다.
 - 기존 실제 원본과 메타데이터는 자동 삭제하거나 덮어쓰지 않는다.
 - `.env`는 Git 추적에서 제외하며 실제 값은 출력하지 않는다.
-- 반복수집 전에는 외장 저장장치 복사 또는 PM 승인 클라우드 폴더 백업 중 하나를
-  별도 Gate로 준비한다. 수집 실행 자체는 로컬 Python에 유지한다.
+- 로컬 Raw·Metadata·Collection Log·Manifest가 공식 원본이다. Google Drive에는
+  Google Drive for Desktop Sync 로컬 동기화 폴더를 통해 검증된 복사본을 자동 백업한다.
+- Backup Root는 `FreshManager-Data/` 논리 구조만 정의한다. 실제 계정 이메일과
+  동기화 절대경로는 저장소·Receipt·로그에 기록하지 않는다.
+- 백업은 Collector와 분리된 1회 실행형 Worker가 Batch 완료 직후 담당한다. 현재
+  Worker는 구현되지 않았고 Google Drive API·OAuth·SDK는 제외 범위다.
 
 ---
 

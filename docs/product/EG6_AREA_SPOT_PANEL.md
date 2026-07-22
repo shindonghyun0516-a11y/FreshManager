@@ -1,4 +1,4 @@
-# EG-6A 13개 지역·대표 판매 스팟 패널
+# EG-6A 13개 Area·Spot Candidate Anchor·S-DoT 연결 패널
 
 ## 1. 문서 상태
 
@@ -13,7 +13,8 @@
 - EG-6A 실제 API 호출과 실제 수집: 없음
 - EG-6B 실제 13개 Area 단일 회차: 미실행
 
-이 문서는 EG-6B가 사용하는 Area·Spot·S-DoT 보조 연결의 공식 기준이다. 13개
+이 문서는 EG-6B가 참조 무결성 검사에 사용하는 Area·Spot Candidate Anchor·S-DoT
+보조 연결의 공식 기준이다. 13개
 제안행은 서로 다른 공식 장소코드와 연결됐으며 서비스 표시명, 실제 수집 Area명과
 관계 근거를 분리해 기록한다. EG-6B 파이프라인은 PR #54로 `main`에 병합됐지만
 실제 단일 회차와 PM PASS 판정은 아직 남아 있다.
@@ -21,8 +22,11 @@
 ## 2. 개념과 해석 한계
 
 - Area는 서울 실시간 도시데이터의 수집 단위다.
-- Spot은 프레시매니저가 향후 현장 검토할 이동 목적지 후보다.
-- S-DoT Link는 Spot 주변 센서의 보조 신호이며 판매 적합성이나 실제 판매량이 아니다.
+- Spot은 고정 판매 위치가 아니라 Area·S-DoT 근접성·공간 Context·현장검증으로
+  생성하는 판매 후보 위치다.
+- 현재 Spot Master 행은 Spot Candidate 생성의 기준점인 Candidate Anchor Point다.
+- S-DoT Link는 Area 내부 활성 위치 판단과 Spot Candidate Feature를 위한 보조
+  연결이며 Area 데이터·판매 적합성·실제 판매량을 대체하지 않는다.
 - 모든 Spot 좌표는 공식 출입구 좌표가 아니라 서울시 역사마스터의 역 중심 대용점이다.
 - 역 중심 대용점을 특정 출구 앞 직접 인구 또는 현장 판매 가능 위치로 해석하지 않는다.
 
@@ -85,13 +89,31 @@ PM 원칙에 따라 대표 Spot을 광화문광장 방향으로 정의하고 `PO
 
 세 결정 후 13개 행은 모두 서로 다른 공식 `area_code`와 `official_area_name`을 갖고 `approved=true`, `active=true`다. 관련 매핑은 서비스 역 전체와 공식 Area가 같다는 뜻이 아니라 문서에 명시한 방향의 Spot을 해당 Area 수집값과 연결한다는 뜻이다.
 
-## 5. 대표 Spot 계약
+## 5. Spot Candidate Anchor 계약
 
-13개 서비스 지역마다 위치 후보 1개를 기록한다. 공식 출입구 좌표를 확보하지 않았으므로 전부 `STATION_CENTER_PROXY`이며 `FIELD_VALIDATION_REQUIRED`, `field_verified=false`다. Area 매핑이 승인된 13개 Spot은 `active=true`다.
+13개 서비스 지역마다 Candidate Anchor Point 1개를 기록한다. 공식 출입구 좌표를
+확보하지 않았으므로 전부 `STATION_CENTER_PROXY`이며 `FIELD_VALIDATION_REQUIRED`,
+`field_verified=false`다. Area 매핑이 승인된 13개 Anchor는 `active=true`다.
 
 Spot의 업무적 이유는 후속 출구·보행동선 조사의 출발점을 설명할 뿐 현장 판매
 적합성을 확정하지 않는다. 공식 출입구 좌표 확보와 현장 적합성 승인은 EG-6B
 파이프라인 구현과 별개인 후속 PM 결정이다.
+
+후속 추천정책:
+
+- Area Observation과, 사용할 수 있는 경우의 S-DoT Feature, 공간 Context·현장검증·
+  운영 제약으로 Spot Candidate Evaluation을 수행한다.
+- 신뢰할 수 있고 운영 가능한 Spot Candidate가 확인되면 반드시 `target_level=SPOT`으로 추천한다.
+- 추천 가능한 후보가 없거나 운영 가능성이 미확인이면 `target_level=AREA`로
+  fallback하고 `fallback_reason`을 반드시 기록한다.
+- 현재 13개 `STATION_CENTER_PROXY`는 모두 `field_verified=false`이므로 검증된
+  판매 Spot으로 승격하거나 고정 판매 위치로 표현하지 않는다.
+- Area 수집값은 특정 Spot·출구의 직접 유동인구가 아니다.
+- 동적 S-DoT 관측과 Spot Candidate Evaluation 오류는 EG-6B Area 수집을 중단시키지 않는다.
+- S-DoT 미지원 6개 Area도 Area 분석과 추천 후보에서 제외하지 않는다.
+- 후보 Score·가중치·임계값은 `PLANNED` 또는 `OPEN_DECISION`이다.
+- EG-6B의 이 정적 CSV 검사는 승인된 13개 패널 연결 무결성을 확인하는 사전검사이며
+  Spot 추천이나 S-DoT 동적 수집을 수행하지 않는다.
 
 ## 6. S-DoT 연결 근거 {#sdot-reference}
 
@@ -136,8 +158,8 @@ Issue #53·PR #54의 EG-6B Batch 실행 코드는 이 참조 패널을 입력으
 - `docs/product/FreshManager_PRD_v1.0.md`: 현재 13개 MVP 범위와 제품 수용 기준
 - `docs/engineering/FreshManager_TRD_v1.0.md`: EG-6B 구현·검증·실행 계약
 - `data/reference/eg6_area_panel.csv`: 13개 제안행과 공식 Area 매핑 상태
-- `data/reference/eg6_spot_master.csv`: 서비스 지역별 대표 Spot 후보
-- `data/reference/eg6_sdot_links.csv`: Spot별 최근 활성 S-DoT 보조 연결
+- `data/reference/eg6_spot_master.csv`: 서비스 지역별 Candidate Anchor Point
+- `data/reference/eg6_sdot_links.csv`: Anchor별 최근 활성 S-DoT 근접 보조 연결
 - `data/reference/seoul_121_places.csv`: 장소코드와 공식 장소명의 유일한 기준
 - `docs/analysis/EG5_DATA_ANALYSIS_REPORT.md`: EG-5 수집 데이터 구조·Feature 분석 근거
 
@@ -147,6 +169,12 @@ EG-6A는 참조 데이터와 오프라인 검증만 포함했다. 이후 EG-6B �
 수집 파이프라인만 추가했으며 실제 13개 수집, 반복수집, Scheduler, 자동 재시도,
 S-DoT 실시간 연동, 추천 점수, 머신러닝, 판매량 예측과 UI는 여전히 포함하지 않는다.
 
-다음 PM 결정은 EG-6B 실제 최대 13회 단일 회차 승인이다. 실행 결과의 Raw·Metadata·
+다음 PM 결정은 Google Drive for Desktop Sync 논리 루트와 Backup Worker 구현 범위다.
+Worker의 Fake Batch·Batch 완료 직후 호출 검증과 `main` 병합 후 EG-6B Live Preflight를 다시 통과하고,
+그 다음에 실제 최대 13회 단일 회차를 별도로 승인한다. 실행 결과의 Raw·Metadata·
 Collection Log·Manifest·SHA-256과 실패 목록을 검토한 뒤 PM이 EG-6B PASS 또는
-보완을 판정해야 EG-7 진입 여부를 논의할 수 있다.
+보완을 판정해야 EG-7 진입 여부를 논의할 수 있다. EG-7은 Area 반복수집과 독립
+S-DoT 관측 수집 가능성을 검토하고, EG-8은 Area Feature와 승인·확보된 경우의
+S-DoT Feature를 이용한 Spot Candidate Evaluation을 수행한다. Recommendation MVP
+Workstream은 `PLANNED`, Gate number `NOT_ASSIGNED`이며 그 결과와 별도 PM 승인
+후에만 시작한다. EG-6C는 신설하지 않는다.

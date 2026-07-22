@@ -323,6 +323,7 @@ P3~P7에서 목표로 한 명칭과 경로 전환은 Pull Request, CI와 `main` 
 | PROJECT_STATUS | 현재 완료 상태, 작업, 최근 이력과 다음 행동 |
 | PRD | 제품 문제·대상 사용자·범위·요구사항·수용 기준 |
 | TRD | 현재 구현과 목표 기술 구조·데이터·보안·검증 계약 |
+| Cloud Backup and CSV Plan | Google Drive 백업·상태·복구와 첫 Batch 이후 CSV 목표 계약 |
 | AGENTS | Codex가 새 세션에서 따라야 할 행동과 문서 진입점 |
 | GitHub Issue | 단일 작업의 승인된 범위와 완료조건 |
 | Pull Request | 실제 변경, 검증 결과, 위험과 승인 기록 |
@@ -682,7 +683,8 @@ Engineering Gate는 프로젝트의 단계이고, Quality Gate 확인은 해당 
 Approval까지 완료돼야 실행할 수 있으며, Gate 확인과 PM Approval을 같은 행위로
 표현하지 않는다. EG 하나의 조건 충족이 모든 후속 EG나 제품 전체 완료를 뜻하지
 않는다. 데이터 PoC 판단용 Gate A·B·C는 분석 가치와 사용자 가치를 판단하는 별도
-체계이며 EG-0~EG-8과 혼용하지 않는다.
+체계이며 EG-0~EG-8과 혼용하지 않는다. Recommendation MVP Workstream은
+`PLANNED`, Gate number `NOT_ASSIGNED`이며 별도 PM 승인 전 공식 Gate가 아니다.
 
 ---
 
@@ -802,9 +804,14 @@ PRD·TRD를 공식 기준으로 연결하고 다음 중복 방지 원칙을 적�
 | PRD 이전 요구사항 이력 | [`requirements-definition-freshmanager-poc-v0.4.md`](../../requirements-definition-freshmanager-poc-v0.4.md) | PRD 근거 자료에서 역사 문서로 참조 | 현행 수집 순서·운영 승인 기준으로 사용 | 역사적 근거 보정 시 | PM |
 | 프로젝트 소개·목표와 범위의 핵심 요약·시작 안내·주요 문서 링크 | [`README.md`](../../README.md) | 프로젝트 한 줄 소개와 README 링크 | 요구사항 정의서의 상세 포함·제외 범위와 수용 기준 반복 | 소개·핵심 요약·진입점 변경 시 | PM 승인, Codex 반영 |
 | 현재 상태·현재 작업·최근 이력·다음 행동 | [`PROJECT_STATUS.md`](../../PROJECT_STATUS.md) | 현재 단계 한 줄과 상태 문서 링크 | 일시적 Issue·Branch·실행 결과 표 | 현행 PROJECT_STATUS 갱신 규칙을 따르며 구체적 체크포인트는 P10에서 재검토 | Codex 초안, PM 확인 |
+| 장기 제품 맥락과 안정적 원칙 | [`PROJECT_MEMORY.md`](../../ai-context/PROJECT_MEMORY.md) | 새 세션 복원용 요약과 정본 링크 | 현재 Branch·HEAD·Issue 상태 또는 PRD·TRD 요구사항 복제 | 장기 목표·핵심 경계 변경 시 | Codex 초안, PM 확인 |
+| 승인된 제품·운영 결정 이력 | [`DECISION_LOG.md`](../../ai-context/DECISION_LOG.md) | 관련 Decision 링크 | 확인되지 않은 날짜·승인·완료 상태 추정 | PM 결정 또는 기존 결정의 폐기·대체 시 | PM 결정, Codex 기록 |
+| 기술 구조 결정과 대안·영향 | [`ARCHITECTURE_DECISIONS.md`](../../ai-context/ARCHITECTURE_DECISIONS.md) | 관련 ADR 링크 | PRD·TRD 또는 현재 상태의 대체 서술 | Architecture 결정·대안·영향 변경 시 | 구현자 초안, PM 승인 |
 | Codex 시작 순서·행동 규칙·금지사항·PM 승인 지점 | [`AGENTS.md`](../../AGENTS.md) | Architecture에서 역할과 진입점만 설명 | 상세 시작 순서·금지사항 복사 | 행동 정책 또는 승인 지점 변경 시 | PM |
 | Harness 전체 구조·계층·관계·책임 모델·피드백 루프 | `docs/engineering/CODEX_HARNESS_ARCHITECTURE.md` | README·AGENTS의 한 문장과 링크 | 전체 계층·책임표·피드백 루프 재작성 | 구성요소·책임·전환 상태 변경 시 | Codex 유지, PM 승인 |
 | 분야별 Rules | [`docs/rules/`](../rules/) | Architecture에서 문서별 역할과 링크 | 구현·Git·보안·수집 규칙 전문 복사 | 해당 분야 계약 변경 시 | 구현자와 PM |
+| Google Drive 백업·CSV 목표 계약 | [`CLOUD_BACKUP_AND_CSV_MANAGEMENT_PLAN.md`](../data/CLOUD_BACKUP_AND_CSV_MANAGEMENT_PLAN.md) | PRD·TRD·Rules·Status의 역할별 요약과 링크 | 상태 전이·충돌·Receipt·CSV 순서를 여러 문서에서 재정의 | 제공자·목적지·Worker·CSV 계약 변경 시 | PM 승인, 구현자 반영 |
+| Area·S-DoT·Spot Candidate·Recommendation 구조 | PRD 제품계약 + TRD 기술계약 | README·Panel·Analysis의 목적별 요약과 링크 | Spot을 고정 판매 위치로 표현하거나 S-DoT를 Area 대체값·필수 직렬 단계로 재정의 | Feature 구조·추천 정책·EG-8 또는 후속 Workstream 변경 시 | PM 승인, 구현자 반영 |
 | Project Guard 검사 항목과 판정 | [`docs/testing/PROJECT_GUARD_SPEC.md`](../testing/PROJECT_GUARD_SPEC.md) | 검사 범주와 공식 명세 링크 | 개별 검사 ID·조건 전체 복사 | 검사·상태·종료코드 변경 시 | 구현자, PM 승인 |
 | 단계 진입·통과·PR·Merge·Issue 종료 판단 | [`docs/testing/QUALITY_GATES.md`](../testing/QUALITY_GATES.md) | 현재 단계 이름과 공식 Gate 링크 | 단계별 조건 전체 복사 | 진입·통과·Merge·종료 기준 변경 시 | PM |
 | 단일 작업 범위와 완료조건 | GitHub Issue ([템플릿](../../.github/ISSUE_TEMPLATE/task.md)) | PR의 Issue 연결과 목적 요약 | 승인된 Issue 본문 전체 복사 | 작업 생성·범위 변경 승인 시 | PM |
@@ -834,6 +841,24 @@ PRD·TRD를 공식 기준으로 연결하고 다음 중복 방지 원칙을 적�
 13. 작업일지는 공식 상태나 정책을 대신하지 않는다.
 14. 현재 이름과 목표 이름을 동시에 공식 기준으로 사용하지 않는다.
 15. 공식 경로나 명령이 바뀌면 소유 문서와 참조 문서를 함께 갱신한다.
+
+### 15.4 AI Context Restoration 읽기 순서
+
+새 AI 세션은 다음 순서로 상태와 장기 맥락을 복원한다.
+
+1. `AGENTS.md`
+2. `PROJECT_STATUS.md`
+3. `ai-context/PROJECT_MEMORY.md`
+4. PRD
+5. TRD
+6. 현재 GitHub Issue와 Git 상태
+7. 작업 관련 Rule·Quality·Data·Analysis 문서
+8. `DECISION_LOG.md`의 관련 Decision
+9. `ARCHITECTURE_DECISIONS.md`의 관련 ADR
+
+`PROJECT_STATUS.md`가 현재 상태와 다음 행동의 공식 복원 문서다. `ai-context/`는
+정본을 대체하지 않으며, 매 작업 종료 시 장기 맥락·승인 결정·Architecture에 미친
+영향을 검토해 필요한 문서만 갱신한다.
 
 ---
 
@@ -906,11 +931,64 @@ Codex Engineering Harness 안에서 진행되는 방식을 설명하는 시나�
 각 확장은 현재 구현 상태와 Target State를 혼합하지 않고 이 Architecture와 관련
 공식 문서를 함께 갱신한다.
 
-### 16.4 관련 문서
+### 16.4 Backup Worker 적용 원칙
+
+Google Drive Backup Worker도 Collector와 동일한 Codex Engineering Harness를
+적용하는 독립 변경 작업이다.
+
+```text
+Google Drive for Desktop Sync 설치·로그인과 `FreshManager-Data/` 논리 루트 접근 확인
+→ Backup Worker Issue와 범위 승인
+→ 작업 Branch
+→ Fake Batch·충돌·Secret 제외·원격 상태 계약 구현
+→ Project Guard·Unit Tests
+→ Diff Review와 승인된 파일 Stage
+→ Commit·Push·Pull Request
+→ CI
+→ PM Merge 승인
+→ main 재검증
+→ Live Preflight와 외부 실행 승인
+```
+
+- Worker 범위 승인은 실제 서울시 API 호출이나 Google Drive 원격 업로드를 자동 승인하지 않는다.
+- Batch 완료 직후 1회 실행형 Worker를 호출하며 시간 간격 기반 백업 Scheduler는 두지 않는다.
+- 실제 Google 계정 이메일과 동기화 절대경로는 저장소·Receipt·로그에 기록하지 않는다.
+- Google Drive API·OAuth·SDK는 구현 범위에서 제외한다.
+- Fake Batch는 공식 Raw나 실제 Google Drive 파일을 대신하지 않으며 오프라인 계약 검증에만 사용한다.
+- Worker·CSV Exporter를 EG-6C라는 새 Engineering Gate로 만들지 않는다.
+- 자동 백업이 구현·검증·`main` 병합되기 전에는 목표 구조를 Current State로 표현하지 않는다.
+
+### 16.5 서비스 데이터 계층 적용 원칙
+
+Area Observation은 모든 승인 Area의 필수 Core Observation이다. S-DoT Observation은
+지원·접근·수집·품질조건을 만족하는 경우에만 사용하는 독립적 Supporting Observation이다.
+둘을 필수 직렬 단계로 연결하지 않는다.
+
+```text
+Core: EG-6B Area Observation → EG-7 Area 반복수집 → EG-8 Area Feature
+Optional: EG-7 S-DoT 접근성·스키마·품질 검증 → 승인·확보된 경우 S-DoT Feature
+Context: Spatial Context + Field Validation + Operational Constraints
+결합: Area Feature + 선택적 S-DoT Feature + Context → Spot Candidate Evaluation
+후속: Recommendation MVP Workstream(PLANNED, Gate number NOT_ASSIGNED)
+```
+
+- EG-6B 코드 변경은 Area Collector 결함이 확인된 경우에만 별도 Issue에서 검토한다.
+- 정적 Spot/S-DoT CSV의 연결 무결성 검사는 EG-6B Preflight 계약으로 유지한다.
+- 동적 S-DoT 수집·Spot Candidate Evaluation은 Area 수집과 다른 Issue·Branch·테스트
+  경계를 사용하며 그 실패로 Area API를 재호출하지 않는다.
+- 현재 Spot Master는 Candidate Anchor Point이며 현장 검증 전 SPOT 추천 근거가 아니다.
+- S-DoT 미지원 6개 Area도 Area 분석과 추천 후보에서 제외하지 않는다.
+- Score·가중치·임계값은 `PLANNED` 또는 `OPEN_DECISION`이다.
+- Recommendation MVP Workstream은 EG-8 Feature 증거와 PM 승인 전 구현하지 않는다.
+
+### 16.6 관련 문서
 
 - [README](../../README.md)
 - [AGENTS](../../AGENTS.md)
 - [PROJECT_STATUS](../../PROJECT_STATUS.md)
+- [Project Memory](../../ai-context/PROJECT_MEMORY.md)
+- [Decision Log](../../ai-context/DECISION_LOG.md)
+- [Architecture Decisions](../../ai-context/ARCHITECTURE_DECISIONS.md)
 - [FreshManager PRD v1.0](../product/FreshManager_PRD_v1.0.md)
 - [FreshManager TRD v1.0](FreshManager_TRD_v1.0.md)
 - [이전 요구사항 정의서 v0.4](../../requirements-definition-freshmanager-poc-v0.4.md)
@@ -918,6 +996,7 @@ Codex Engineering Harness 안에서 진행되는 방식을 설명하는 시나�
 - [Git Workflow](../rules/GIT_WORKFLOW.md)
 - [Security Rules](../rules/SECURITY_RULES.md)
 - [Data Collection Rules](../rules/DATA_COLLECTION_RULES.md)
+- [Cloud Backup and CSV Management Plan](../data/CLOUD_BACKUP_AND_CSV_MANAGEMENT_PLAN.md)
 - [Current Project Guard Spec](../testing/PROJECT_GUARD_SPEC.md)
 - [Quality Gates](../testing/QUALITY_GATES.md)
 - [Current Project Guard Report Template](../testing/PROJECT_GUARD_REPORT_TEMPLATE.md)

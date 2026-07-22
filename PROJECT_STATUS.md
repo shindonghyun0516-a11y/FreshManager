@@ -8,16 +8,18 @@
 ## 0. 30초 요약
 
 - 프로젝트: **프레시매니저 유동판매 추천 서비스 — 데이터 타당성 PoC**
-- 현재 목표: EG-6B 실제 13개 Area 단일 회차를 별도 PM 승인 아래 실행하고 결과를 검토
+- 현재 목표: Google Drive 자동 백업 준비를 먼저 완료한 뒤 EG-6B 실제 13개 Area 단일 회차를 실행·검토
 - `main` 반영 완료: EG-0~EG-6A, EG-6B 단일 수집 파이프라인, CI 보강과 보호 경로 Hardening
-- 최근 완료 Issue: #53
+- 최근 완료 Issue: #55
 - 공식 기준 Branch: `main`
-- 공식 작업 Branch: 없음
-- 기준 Commit: `6253cc502c9a3c4bc248cf6972f077a99e13f09d`
-- 현재 작업: 실제 단일 회차 실행 조건 확인과 PM의 최대 13회 호출 승인 대기
+- 공식 작업 Branch: `docs/issue-58-google-drive-backup-roadmap`
+- 기준 Commit: `59176e2448cb035498bcd28e1272ee01b8945cfb`
+- EG-6B 기술 기준 Commit: `6253cc502c9a3c4bc248cf6972f077a99e13f09d`
+- 현재 작업: Issue #58 데이터·백업 로드맵과 AI Context Restoration Harness 문서 정렬
 - 현재 Engineering Gate: EG-6B 구현·오프라인 검증·병합 완료 / 실제 단일 회차·PM PASS 대기
+- 공식 서비스 구조: 필수 Area Observation + 선택적 S-DoT Observation + 공간·현장 Context
 - 현재 Codex Engineering Harness 개편 상태: P1~P7 완료
-- 다음 공식 단계: **EG-6B 실제 최대 13회 호출에 대한 별도 PM 승인**
+- 다음 공식 단계: **Google Drive for Desktop Sync 논리 루트 확인과 즉시 Backup Worker 구현·Fake Batch 검증**
 - 실제 서울시 API 호출: EG-4 POI072와 EG-5 대표 3장소 완료; EG-6B 13개 Area 회차는 0회
 - Issue #43: 완료, PM이 EG-4 PASS 확정
 - 절대 주의:
@@ -33,6 +35,10 @@ Issue #43의 POI072와 후속 EG-5 대표 3장소 수집을 완료했다. PR #52
 13개 Area·Spot·S-DoT 참조데이터를, PR #54에서 같은 13개 Area의 단일 순차수집·
 Batch Log·Manifest·SHA-256 파이프라인을 `main`에 반영했다. 실제 최대 13회 호출은
 아직 수행하지 않았으며, 저장 결과 검토와 PM PASS 전에는 EG-6B를 통과로 표시하지 않는다.
+Issue #57의 env-file·output-root Probe는 PASS했지만, 실제 Live 전에 Google Drive for
+Desktop Sync 기반 자동 백업 준비를 완료하기로 했다. Backup Worker·CSV Exporter는
+아직 구현되지 않았다. Backup Root는 `FreshManager-Data/` 논리 구조로만 정의하며
+실제 계정 이메일과 동기화 절대경로는 문서·로그·Receipt에 기록하지 않는다.
 
 ---
 
@@ -196,7 +202,8 @@ Issue 생성
 | EG-6A | 완료 | Issue #51·PR #52에서 서로 다른 공식 Area 13개와 Spot·S-DoT 참조 패널을 main에 반영 |
 | EG-6B | 진행 | Issue #53·PR #54로 단일 수집 파이프라인 구현·오프라인 검증·main 병합 완료; 실제 최대 13회 호출과 PM PASS 대기 |
 | EG-7 | 미진행 | 주기와 백업 Gate 승인 후 동일 13개 반복수집 파일럿 |
-| EG-8 | 미진행 | 반복 관측 데이터의 Feature 유효성 분석 |
+| EG-8 | 미진행 | Area Feature, 승인·확보된 S-DoT Feature와 Spot Candidate Evaluation |
+| Recommendation MVP Workstream | PLANNED | Gate number `NOT_ASSIGNED`; 별도 PM 승인 전 공식 Gate 아님 |
 
 현재 `main` 최신 검증 기준:
 
@@ -547,7 +554,7 @@ Python은 이 작업을 외부 패키지 없이 비교적 단순하게 수행할
 
 ---
 
-## 11. 현재 공식 단계 — EG-6B 실제 단일 회차 대기
+## 11. 현재 공식 단계 — Google Drive 백업 준비 후 EG-6B Live
 
 EG-5에서 POI019·POI013·POI014를 각각 한 번 수집했고 모두 성공했다. 저장된 결과의
 데이터 구조·Feature 후보 분석과 최신 정적 자료 기반 S-DoT 커버리지 조사도 완료했다.
@@ -583,21 +590,54 @@ metadata를 분리해 저장한다. 한 장소의 API·Timeout·Parsing·Validat
 - 무결성: SHA-256 기록과 저장 후 재검증
 - 종료코드: 모두 성공 `0`, 장소별 실패 존재 `1`, 공통 오류 `2`
 
-### 11.3 현재 승인되지 않은 것
+### 11.3 공식 서비스 데이터 구조
+
+```text
+Core Observation: Area Observation (모든 승인 Area 필수)
+Optional Supporting Observation: S-DoT Observation (조건 충족 시만)
+Additional Context: Spatial Context + Field Validation + Operational Constraints
+
+Area Feature
++ 사용 가능한 경우 S-DoT Feature
++ Additional Context
+→ Spot Candidate Evaluation
+→ 신뢰 가능 SPOT / 근거 부족 AREA + fallback_reason
+```
+
+EG-6B는 Area Observation 확보 단계다. 현재 Spot Master의 13개
+`STATION_CENTER_PROXY`는 확정 판매 위치가 아니라 Candidate Anchor Point이며,
+S-DoT는 Area 데이터를 대체하지 않는다. EG-6B는 승인된 정적 패널 연결 무결성을
+사전검사하지만, 동적 S-DoT 관측 수집과 Spot Candidate Evaluation은 후속 독립 Workstream이므로
+그 실패가 Area Collector의 회차를 중단시키면 안 된다.
+
+### 11.4 Live 전 추가 선행조건과 미승인 범위
 
 - 실제 API 호출 또는 실데이터 13개 지역 수집
 - 반복수집·Scheduler·자동 재시도
-- Google Spreadsheet 자동백업
+- Backup Worker·CSV Exporter 구현 완료 주장
+- Google Drive 실제 계정 이메일·동기화 절대경로 기록
 - S-DoT 실시간 API 연동
 - 추천 점수·머신러닝·판매량 예측
 - UI와 프레시매니저 위치 추적
 - Feature 분석과 실제 판매효과 분석
 
-PR #54 병합과 오프라인 검증 통과는 실제 호출을 자동 승인하지 않는다. PM이 현재
-`main`, 실제 output root·env-file과 최대 13회 호출을 별도로 승인해야 한다. 실행 후
-Raw·Metadata·Collection Log·Manifest·SHA-256과 실패 목록을 검토해 PM이 EG-6B PASS를
-판정한다. 반복수집 전에는 외장 저장장치 주기적 복사 또는 PM 승인 클라우드 폴더 주기적
-백업 중 하나를 별도 Gate로 준비하며 수집 실행은 로컬 Python에 유지한다.
+PR #54 병합과 오프라인 검증 통과는 실제 호출을 자동 승인하지 않는다. Issue #57의
+env-file·output-root Probe는 PASS했지만 실제 호출은 0회다. Google Drive for Desktop
+Sync 설치·로그인과 `FreshManager-Data/` 논리 루트 접근 확인, Batch 완료 직후 실행할
+Backup Worker 구현, Fake Batch 검증과 `main` 병합 후 Live Preflight를 다시 통과해야 한다. 그 뒤 PM이 최대 13회
+호출을 별도로 승인한다. 실행 후 Raw·Metadata·Collection Log·Manifest·SHA-256과
+실패 목록을 검토해 PM이 EG-6B PASS를 판정한다.
+
+로컬 산출물이 공식 원본이고 Google Drive에는 Batch 완료 직후 검증된 복사본을 자동
+백업한다. iCloud와 수동 백업은 현행 운영방식으로 사용하지 않는다. 상세 목표 계약은
+`docs/data/CLOUD_BACKUP_AND_CSV_MANAGEMENT_PLAN.md`를 따른다.
+
+CSV는 첫 실제 Batch의 Raw·Metadata·Manifest 품질을 감사한 뒤 별도 Issue에서
+구현한다. 첫 Batch 직후에는 데이터 품질 감사와 단일 Snapshot 비교만 수행한다.
+평일 5영업일 데이터는 초기 EDA, 4주 기준선과 5주차 데이터는 EG-8의 Area Feature,
+승인·확보된 경우의 S-DoT Feature와 Spot Candidate Evaluation에 사용한다. Candidate
+Score·가중치·임계값은 `OPEN_DECISION`이다. Recommendation MVP Workstream은 Gate
+번호가 `NOT_ASSIGNED`이며 별도 PM 승인 후에만 시작한다.
 
 ---
 
@@ -605,15 +645,19 @@ Raw·Metadata·Collection Log·Manifest·SHA-256과 실패 목록을 검토해 P
 
 ### 12.1 AI가 먼저 확인할 자료
 
-1. `PROJECT_STATUS.md`
-2. `docs/product/FreshManager_PRD_v1.0.md`
-3. `docs/engineering/FreshManager_TRD_v1.0.md`
-4. `AGENTS.md`
-5. `docs/engineering/CODEX_HARNESS_ARCHITECTURE.md`
-6. `docs/rules/DATA_COLLECTION_RULES.md`
-7. `docs/testing/QUALITY_GATES.md`
-8. `docs/testing/PROJECT_GUARD_SPEC.md`
-9. 현재 GitHub Issue, Branch, `main` HEAD, `git status --short`와 최근 병합 PR
+1. `AGENTS.md`
+2. `PROJECT_STATUS.md`
+3. `ai-context/PROJECT_MEMORY.md`
+4. `docs/product/FreshManager_PRD_v1.0.md`
+5. `docs/engineering/FreshManager_TRD_v1.0.md`
+6. 현재 GitHub Issue, Branch, `main` HEAD, `git status --short`와 최근 병합 PR
+7. 관련 Rule·Quality·Data·Analysis 문서
+8. `ai-context/DECISION_LOG.md`의 현재 작업 관련 Decision
+9. `ai-context/ARCHITECTURE_DECISIONS.md`의 현재 작업 관련 ADR
+
+`PROJECT_STATUS.md`는 현재 진행 상태와 다음 행동을 복원하는 공식 운영 문서다.
+`ai-context/` 문서는 장기 맥락과 결정 근거를 보조하며 `PROJECT_STATUS.md`, PRD, TRD를
+대체하지 않는다.
 
 ### 12.2 AI가 작업 전 보고할 내용
 
@@ -633,12 +677,11 @@ Raw·Metadata·Collection Log·Manifest·SHA-256과 실패 목록을 검토해 P
 ### 12.3 새 대화 시작 프롬프트
 
 ```text
-저장소의 PROJECT_STATUS.md부터 읽고 프로젝트 상태를 복원해줘.
+저장소의 AGENTS.md를 먼저 읽고, PROJECT_STATUS.md로 현재 상태를 복원해줘.
 
-그다음 FreshManager PRD v1.0, TRD v1.0, AGENTS.md,
-docs/engineering/CODEX_HARNESS_ARCHITECTURE.md, DATA_COLLECTION_RULES.md,
-QUALITY_GATES.md, PROJECT_GUARD_SPEC.md, 현재 GitHub Issue, Branch,
-main HEAD, 최근 PR과 Git 상태를 확인해줘.
+그다음 ai-context/PROJECT_MEMORY.md, FreshManager PRD v1.0, TRD v1.0,
+현재 GitHub Issue·Branch·main HEAD·최근 PR·Git 상태, 관련 Rule·Quality·Data·Analysis
+문서, DECISION_LOG의 관련 Decision과 ARCHITECTURE_DECISIONS의 관련 ADR을 확인해줘.
 
 나는 비개발자 PM이다. 반드시 다음 순서로 설명해줘.
 
@@ -707,26 +750,30 @@ main HEAD, 최근 PR과 Git 상태를 확인해줘.
 
 ### 14.1 공식 진행 상태
 
-- 최근 완료 Issue: #53
-- 공식 작업 Branch: 없음
-- 기준 `main`: `6253cc502c9a3c4bc248cf6972f077a99e13f09d`
+- 최근 완료 Issue: #55
+- 공식 작업 Branch: `docs/issue-58-google-drive-backup-roadmap`
+- 기준 `main`: `59176e2448cb035498bcd28e1272ee01b8945cfb`
 - 구현 상태: EG-6B 단일 회차 파이프라인 `main` 병합 완료
 - 실제 API 호출: EG-6B 13개 Area 회차 0회
 
-### 14.2 다음 행동 — EG-6B 실제 단일 회차 승인
+### 14.2 다음 행동 — Google Drive Backup Readiness
 
-1. 현재 `main`과 Working Tree 상태를 확인
-2. 승인할 env-file·저장소 밖 output root·최대 호출 13회를 확정
-3. 실제 API 호출 없는 Preflight를 분리해 확인
-4. PM의 별도 실제 호출 승인 후 단일 회차를 한 번 실행
-5. Raw·Metadata·Collection Log·Manifest·SHA-256과 실패 목록 검토
-6. PM이 EG-6B PASS 또는 보완을 판정한 뒤에만 EG-7 설계로 전환
+1. Google Drive for Desktop Sync 설치·로그인과 논리 루트 접근 가능 여부를 확인
+2. 실제 계정 이메일·동기화 절대경로는 기록하지 않고 `FreshManager-Data/` 논리 구조만 사용
+3. Batch 완료 직후 한 번 실행하는 Backup Worker를 별도 Issue에서 구현
+4. Fake Batch 백업·파일 수·Manifest SHA-256·충돌·실패·중복 실행을 검증
+5. Backup Worker PR·CI·`main` 병합 후 EG-6B Live Preflight를 다시 실행
+6. PM의 최대 13회 실제 호출 승인 후 첫 Batch를 실행
+7. 로컬 원본·Google Drive 복사본과 첫 Batch 데이터 품질을 검토
+8. PM이 EG-6B PASS 또는 보완을 판정하고 CSV·EG-7 후속 작업을 승인
 
 ### 14.3 다음 제품 Engineering Gate
 
-- EG-6B: 구현·오프라인 검증·병합 완료; 실제 13개 Area 단일 회차와 PM PASS 대기
-- EG-7: 동일 패널 반복수집 파일럿; 실행 전 주기와 백업 방식 PM 승인 필요
-- EG-8: 반복 관측 결과를 이용한 Feature 유효성 분석
+- EG-6B: 구현·오프라인 검증·병합·경로 Probe 완료; Backup Worker 준비 후 실제 회차와 PM PASS 대기
+- EG-6B Quality Review: 첫 실제 Batch의 Raw·Metadata·Forecast·Manifest 품질과 실패를 검토
+- EG-7: 동일 패널 Area 반복수집 파일럿과 독립 S-DoT 관측 수집 가능성 검토
+- EG-8: Area Feature + 승인·확보된 경우 S-DoT Feature + Spot Candidate Evaluation
+- 후속: Recommendation MVP Workstream (`PLANNED`, Gate number `NOT_ASSIGNED`)
 - 121장소 확대는 위 MVP 검증 이후 후속 범위로 검토
 
 ---
@@ -734,11 +781,13 @@ main HEAD, 최근 PR과 Git 상태를 확인해줘.
 ## 15. 마지막 갱신 정보
 
 - 문서 버전: 1.17
+- 미병합 문서 정렬: Issue #58 작업 초안
 - 마지막 갱신일: 2026-07-22
-- 최근 완료 Issue: #53
+- 최근 완료 Issue: #55
 - 공식 기준 Branch: `main`
-- 기준 Commit: `6253cc502c9a3c4bc248cf6972f077a99e13f09d`
-- 공식 작업 Branch: 없음
+- 기준 Commit: `59176e2448cb035498bcd28e1272ee01b8945cfb`
+- EG-6B 기술 기준 Commit: `6253cc502c9a3c4bc248cf6972f077a99e13f09d`
+- 공식 작업 Branch: `docs/issue-58-google-drive-backup-roadmap`
 - 현재 Engineering Gate: EG-6B 구현·오프라인 검증·병합 완료 / 실제 회차·PM PASS 대기
 - 현재 단계: 실제 최대 13회 단일 회차 승인 전
 - 완료된 최근 작업:
@@ -764,6 +813,8 @@ main HEAD, 최근 PR과 Git 상태를 확인해줘.
   - Issue #51·PR #52로 EG-6A 13개 Area·Spot·S-DoT 참조 패널 main 반영
   - Issue #53·PR #54로 EG-6B 단일 순차수집·Batch Log·Manifest·SHA-256 파이프라인 main 반영
   - PR #54와 병합 후 main CI 성공, Target 19/19·Full 243/243·Guard 41 PASS
-- 다음 행동: 실제 EG-6B 최대 13회 단일 회차에 대한 별도 PM 승인
-- 다음 공식 단계: 실제 결과 검토와 PM EG-6B PASS 후 EG-7 진입 결정
+  - Issue #55·PR #56으로 PRD·TRD와 EG-6B 문서 기준선 main 반영, 기준 Commit `59176e2`
+  - Issue #57 env-file·output-root Probe PASS, 실제 API 호출·데이터 생성 0건
+- 다음 행동: Google Drive for Desktop Sync 논리 루트 확인과 즉시 Backup Worker·Fake Batch 검증
+- 다음 공식 단계: Backup Worker main 병합과 Live Preflight 재통과 후 실제 최대 13회 호출 승인
 - 실제 서울시 API 호출: EG-6B 13개 Area 회차 0회
