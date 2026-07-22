@@ -44,7 +44,9 @@ EG-1과 EG-2의 읽기 전용 사전검증에는 Project Guard가 필요하지 �
 
 ---
 
-## 3. 전체 순서와 상태 기준
+## 3. 전체 순서와 현재 상태
+
+### 현재 게이트 상태 기준
 
 ```text
 EG-0 문서 기준선
@@ -62,9 +64,9 @@ EG-0 문서 기준선
 ```
 
 현재 게이트와 완료·대기 상태는 `PROJECT_STATUS.md`에서만 관리한다. 완료 이력으로
-EG-4는 Issue #43, EG-6A는 PR #52, EG-6B 구현은 PR #54, 독립 Backup Worker는
-Issue #60·PR #61에서 각각 정리됐다. 이 이력은 실제 EG-6B Live 실행이나 다음 게이트
-승인을 자동으로 뜻하지 않는다.
+`EG-1 | 통과:` 공식 CSV 정비·검증, EG-4는 Issue #43, EG-6A는 PR #52,
+EG-6B 구현은 PR #54, 독립 Backup Worker는 Issue #60·PR #61에서 각각 정리됐다.
+이 완료 이력은 실제 EG-6B Live 실행이나 다음 게이트 승인을 자동으로 뜻하지 않는다.
 
 GitHub Actions Workflow는
 구현되어 Base Branch와 관계없이 모든 Pull Request와 `main` Push에서 Project Guard와
