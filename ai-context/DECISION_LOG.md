@@ -90,12 +90,14 @@ PM이 승인했거나 명시적으로 보류한 제품·운영 결정을 새 AI 
 ### D-010 — Google Drive 자동 백업 목표
 
 - Date: `2026-07-22`
-- Status: `PLANNED`
-- Decision: 검증된 로컬 Batch를 별도 1회 실행형 Backup Worker가 Batch 완료 직후 Google Drive for Desktop Sync 동기화 폴더로 복사하는 목표구조를 사용한다.
+- Status: `ACCEPTED`
+- Decision: 검증된 로컬 Batch를 별도 1회 실행형 Backup Worker가 Batch 완료 직후 Google Drive for Desktop Sync 동기화 폴더로 복사한다.
 - Constraints: Collector와 분리, 백업 실패 시 API 재호출 금지, Secret 제외, Manifest SHA-256 재검증.
 - Backup root: `FreshManager-Data/` 논리 구조만 정의한다.
 - Privacy: 실제 계정 이메일과 동기화 절대경로는 저장소·Receipt·로그에 기록하지 않는다.
-- Pending: Worker 구현·Fake Batch 검증과 PM 승인.
+- Implementation: Issue #60 Branch에 `--batch-id` 1회 실행형 Worker, 비동기화 Lock·append-only Receipt와 H-708을 구현했다.
+- State boundary: Worker는 `LOCAL_SYNC_COPY_VERIFIED`까지만 기록하며 원격 업로드 완료를 주장하지 않는다.
+- Pending: PM Diff·PR·CI·`main` 병합, 실제 Sync Root 확인, 실제 Batch·Restore와 원격 동기화 확인.
 
 ### D-011 — CSV는 Raw 파생자료
 

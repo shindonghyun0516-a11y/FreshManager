@@ -1936,12 +1936,60 @@ class Eg6bProjectGuardTests(unittest.TestCase):
         self.assertEqual(result.status, project_guard.Status.FAIL)
 
 
+class BackupProjectGuardTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.project = TemporaryProject()
+        module_path = self.project.root / "freshmanager/backup.py"
+        module_path.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(ROOT / "freshmanager/backup.py", module_path)
+
+    def tearDown(self) -> None:
+        self.project.close()
+
+    def check(self) -> project_guard.CheckResult:
+        return project_guard.check_h708(self.project.context())
+
+    def test_h708_backup_worker_contract_passes(self) -> None:
+        result = self.check()
+        self.assertEqual(result.status, project_guard.Status.PASS, result.evidence)
+
+    def test_h708_missing_backup_worker_module_fails(self) -> None:
+        (self.project.root / "freshmanager/backup.py").unlink()
+        result = self.check()
+        self.assertEqual(result.status, project_guard.Status.FAIL)
+
+    def test_h708_operational_failure_fails(self) -> None:
+        with mock.patch.object(
+            project_guard.backup_worker,
+            "backup_batch",
+            side_effect=RuntimeError("synthetic failure"),
+        ):
+            result = self.check()
+        self.assertEqual(result.status, project_guard.Status.FAIL)
+        self.assertNotIn("synthetic failure", result.evidence)
+
+    def test_h708_remote_completion_state_is_rejected(self) -> None:
+        unsafe_statuses = frozenset(
+            {
+                *project_guard.backup_worker.WORKER_EMITTABLE_STATUSES,
+                project_guard.backup_worker.BackupStatus.REMOTE_SYNC_CONFIRMED,
+            }
+        )
+        with mock.patch.object(
+            project_guard.backup_worker,
+            "WORKER_EMITTABLE_STATUSES",
+            unsafe_statuses,
+        ):
+            result = self.check()
+        self.assertEqual(result.status, project_guard.Status.FAIL)
+
+
 class RegistryAndExitCodeTests(unittest.TestCase):
-    def test_all_46_ids_are_unique_and_in_spec_order(self) -> None:
+    def test_all_47_ids_are_unique_and_in_spec_order(self) -> None:
         registry = [item.check_id for item in project_guard.CHECK_DEFINITIONS]
         spec = project_guard.ids_from_spec(ROOT / project_guard.SPEC_RELATIVE_PATH)
-        self.assertEqual(len(registry), 46)
-        self.assertEqual(len(set(registry)), 46)
+        self.assertEqual(len(registry), 47)
+        self.assertEqual(len(set(registry)), 47)
         self.assertEqual(registry, spec)
 
     def test_expected_current_counts(self) -> None:
@@ -1949,12 +1997,20 @@ class RegistryAndExitCodeTests(unittest.TestCase):
         counts = Counter(item.status for item in results)
         self.assertEqual(counts[project_guard.Status.FAIL], 0)
         self.assertEqual(counts[project_guard.Status.WARN], 0)
-        self.assertEqual(counts[project_guard.Status.PASS], 41)
+        self.assertEqual(counts[project_guard.Status.PASS], 42)
         self.assertEqual(counts[project_guard.Status.SKIP], 5)
-        self.assertEqual(len(results), 46)
-        self.assertEqual(sum(counts.values()), 46)
+        self.assertEqual(len(results), 47)
+        self.assertEqual(sum(counts.values()), 47)
         status_by_id = {item.check_id: item.status for item in results}
-        for check_id in ("H-206", "H-702", "H-703", "H-704", "H-705", "H-706"):
+        for check_id in (
+            "H-206",
+            "H-702",
+            "H-703",
+            "H-704",
+            "H-705",
+            "H-706",
+            "H-708",
+        ):
             self.assertEqual(status_by_id[check_id], project_guard.Status.PASS)
         self.assertEqual(status_by_id["H-707"], project_guard.Status.SKIP)
 

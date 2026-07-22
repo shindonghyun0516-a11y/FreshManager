@@ -137,7 +137,8 @@ EG-6A는 실제 수집 없이 13개 Area·Spot·S-DoT 참조 패널을 확정해
 SHA-256 무결성 파이프라인을 PR #54로 `main`에 반영했다. 실제 단일 회차와 결과
 검토는 아직 수행하지 않았으며 PM PASS 전에는 EG-6B를 통과로 표시하지 않는다.
 PM 확인용 CSV와 Google Drive Backup Worker는 Issue #53 구현 범위에 포함하지
-않았다. CSV는 첫 실제 Batch 품질 감사 후, Backup Worker는 EG-6B Live 전 각각 별도
+않았다. Backup Worker는 Issue #60 Branch에 독립 1회 실행형으로 구현돼 Fake Batch와
+H-708 검증을 통과했으며 `main` 병합 전이다. CSV는 첫 실제 Batch 품질 감사 후 별도
 Issue와 PM 승인으로 구현한다. EG-7은 같은 13개 Area 반복수집 파일럿과 독립
 S-DoT 관측 수집 가능성 검토로 제한한다. EG-8은 Area Feature와 승인·확보된 경우의
 S-DoT Feature를 이용한 Spot Candidate Evaluation을 수행한다. Recommendation MVP는
@@ -266,6 +267,12 @@ S-DoT 미지원 6개 Area도 Area 분석과 추천 후보에서 제외하지 않
 - `.env`, API Key, 인증 URL, Probe·partial 파일은 백업하지 않는다.
 - 백업 실패는 서울시 API 재호출 사유가 아니다.
 - 로컬 동기화 폴더 복사 검증과 Google Drive 원격 업로드 완료 확인을 구분한다.
+- Worker가 기록하는 로컬 성공 상태는 `LOCAL_SYNC_COPY_VERIFIED`이며
+  `REMOTE_SYNC_PENDING`, `REMOTE_SYNC_CONFIRMED`는 생성하지 않는다.
+- Worker CLI는 `--batch-id`만 받고 Source·Sync Root는 승인된 환경변수로 주입한다.
+  Worker는 `.env`나 홈·클라우드 경로를 자동 탐색하지 않는다.
+- Lock과 append-only Receipt는 원본 Batch와 Sync Root 밖의 비동기화 로컬 Ledger에
+  두며 실제 절대경로·계정·Secret을 기록하지 않는다.
 
 CSV는 Raw의 조회·정렬·필터·분석용 파생자료다. 첫 실제 Batch의 필드·결측·Forecast와
 Manifest 품질을 확인하기 전에는 Exporter를 구현하지 않는다. CSV 생성 실패 시 Raw에서
@@ -767,9 +774,9 @@ EG-5 대표 3장소와 EG-6B 승인 13개 Area 단일 회차는 `retry_count=0`�
 수집은 로컬 Python에 유지하고 Collector와 분리된 1회 실행형 Backup Worker를 Batch
 완료 직후 호출한다. 시간 간격 기반 백업 Scheduler는 두지 않는다.
 
-Issue #53·PR #54의 EG-6B 단일 수집 구현에는 Backup Worker와 CSV Exporter가 없다.
-Google Drive for Desktop Sync 논리 루트 확인, Fake Batch 백업 검증, Worker의 PR·CI·
-`main` 병합 및 Live Preflight 재통과 후에만 PM이 실제 최대 13회 호출을 승인한다.
+Issue #53·PR #54의 EG-6B Collector 자체에는 Backup Worker와 CSV Exporter가 없다.
+Issue #60 Branch의 독립 Worker·Fake Batch·H-708 검증을 PM이 승인하고 PR·CI·`main`
+병합 및 Live Preflight를 재통과한 뒤에만 PM이 실제 최대 13회 호출을 승인한다.
 EG-6C는 새로 만들지 않으며 `H-707`은 EG-7 전까지 `SKIP`한다.
 
 반복수집 파일럿에 들어가기 전에는 즉시 백업 운영 결과와 다음 항목을 확인한 뒤
@@ -938,6 +945,7 @@ EG-7 진입을 PM이 승인한다.
 
 | 버전 | 날짜 | 변경내용 | 작성자 | 승인상태 |
 |---|---|---|---|---|
+| v0.1.7 | 2026-07-22 | Issue #60 독립 Backup Worker·append-only Receipt·`LOCAL_SYNC_COPY_VERIFIED`·H-708 Branch 구현 상태 반영 | 신동현 | PM Diff 검토 전 |
 | v0.1.6 (Issue #58 보완) | 2026-07-22 | Google Drive 자동 백업과 Area·S-DoT·Spot Candidate·Recommendation 데이터 계층 경계 정렬 | 신동현 | PM Diff 검토 전 |
 | v0.1.6 | 2026-07-22 | PRD·TRD 공식 기준 연결, PR #54 병합 완료와 EG-6B 실제 단일 회차 대기 상태 정렬 | 신동현 | PM 승인 |
 | v0.1.5 | 2026-07-21 | Issue #53 EG-6B 13개 단일 회차의 단계 경로·Batch Log·Manifest·SHA-256·재시도 0회 계약 반영 | 신동현 | PM 구현 승인 |

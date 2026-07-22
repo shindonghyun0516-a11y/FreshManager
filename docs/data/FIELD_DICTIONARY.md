@@ -334,16 +334,16 @@ Collection Log·Manifest에 존재하는 필드로 해석하지 않는다.
 ```text
 PENDING
 IN_PROGRESS
-LOCAL_CLOUD_COPY_VERIFIED
+LOCAL_SYNC_COPY_VERIFIED
 REMOTE_SYNC_PENDING
 REMOTE_SYNC_CONFIRMED
 FAILED
 CONFLICT
 ```
 
-`LOCAL_CLOUD_COPY_VERIFIED`는 Google Drive 로컬 동기화 폴더에서 파일 수와 해시를
-검증했다는 뜻이다. `REMOTE_SYNC_CONFIRMED`는 별도의 승인된 방법으로 실제 Google
-Drive 원격 업로드 완료를 확인한 상태다. 두 상태를 같은 의미로 사용하지 않는다.
+`LOCAL_SYNC_COPY_VERIFIED`는 Google Drive for Desktop 동기화 폴더에 생성된 로컬
+복사본의 파일 수·크기·SHA-256 검증을 완료했다는 뜻이다. 원격 Google Drive 업로드
+완료를 의미하지 않으며 `REMOTE_SYNC_CONFIRMED`와 같은 상태로 사용하지 않는다.
 Backup Root는 `FreshManager-Data/` 논리 구조로만 표현한다. Receipt에는 실제 Google
 계정 이메일, 사용자 식별정보와 동기화 절대경로를 저장하지 않는다.
 
