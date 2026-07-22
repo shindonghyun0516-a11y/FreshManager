@@ -373,8 +373,10 @@ EG-4 통과 후 PM이 다음 구현 단계 전환을 승인하면 EG-5로 진행
 - missing·invalid·기존 Source·Sync·Receipt·Lock과 충돌하는 Batch ID는 API Key 사용,
   영속 쓰기와 네트워크 전에 종료한다.
 - 읽기 전용 충돌검사와 참조검증 뒤 정확한 Source Batch ID 디렉터리를 원자적으로
-  예약하며, 승자 하나만 API Key와 Transport에 접근한다. 불완전·중단 예약은 자동
-  삭제·재사용하지 않고 Collection Log·Manifest가 없으면 Backup 비적격으로 유지한다.
+  예약하며, 승자 하나만 API Key와 Transport에 접근한다. 예약 직후 장치·inode·열린
+  디렉터리 FD를 보존하고 설정과 모든 Batch 쓰기 전후 동일성을 검증한다. 경로 삭제·
+  교체·심볼릭 링크 시 재생성하거나 새 대상을 따라가지 않고 중단한다. 불완전·중단
+  예약은 자동 삭제·재사용하지 않고 Collection Log·Manifest가 없으면 Backup 비적격으로 유지한다.
 - abandoned 또는 stale 예약 복구는 자동화하지 않으며 별도 PM 검토 절차가 필요하다.
 - Google Drive for Desktop Sync 설치·로그인과 `FreshManager-Data/` 논리 루트 접근을 확인한다.
 - 실제 계정 이메일과 동기화 절대경로는 저장소·Receipt·로그에 기록하지 않는다.

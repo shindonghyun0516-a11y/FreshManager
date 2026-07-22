@@ -127,21 +127,28 @@ Candidate Evaluation은 후속 독립 책임이며, 그 실패는 Area 회차를
 6. 공식 121 CSV와 세 EG-6 참조 CSV의 구조·행·연결을 검증하고 SHA-256 스냅샷을 만든다.
 7. Source Batch의 정확한 batch_id 디렉터리를 `exist_ok=False` 의미의 단일 `mkdir`로
    원자적으로 예약한다. 이 연산에 성공한 실행만 소유권을 얻고 다음 단계로 진행한다.
-8. raw·metadata·예약 Batch 디렉터리에 숨김 Probe 파일을 생성·flush·삭제해 쓰기
-   가능성을 확인하고, 예약 소유권 객체로 FileStorage·BatchStorage를 조립한다.
-9. 명시된 .env에서 API Key를 읽는다. 키는 출력하지 않는다.
-10. 예약 승자만 Lazy HTTP Client·Collector를 조립한다.
-11. panel_order 1~13 순서로 참조파일 불변성을 재검사한 뒤 고유 request_id를 만들고 장소당 1회 요청한다.
-12. Collector는 원본을 먼저 저장하고 HTTP·파싱·필드·장소·인구 범위를 검증한 뒤 8필드 Metadata를 저장한다.
-13. Area 오류는 AreaOutcome으로 기록하고 다음 Area를 진행한다. 공통 오류나 참조 변경은 중단한다.
-14. 누락된 나머지 Area를 not_attempted로 채우고 종료코드 0·1·2를 계산한다.
-15. Collection Log payload와 Manifest를 만들고 Manifest를 먼저 저장한 뒤, 아직 저장 전인 Log payload를 포함해 전체 해시를 검증한다.
-16. 검증 성공 후 Collection Log를 배타적으로 저장하고 콘솔에 Area 결과와 회차 요약만 출력한다.
+8. 예약 직후 심볼릭 링크를 따르지 않고 정확한 디렉터리를 열어 디렉터리 FD와
+   `st_dev`·`st_ino`를 보존한다. 경로와 FD가 같은 실제 디렉터리를 가리키는지 확인한다.
+9. raw·metadata에는 일반 숨김 Probe를, 예약 Batch 디렉터리에는 열린 FD를 사용하는
+   기존-디렉터리 전용 Probe를 수행하고 예약 인식 FileStorage·BatchStorage를 조립한다.
+10. 명시된 .env에서 API Key를 읽는다. 키는 출력하지 않는다.
+11. 예약 승자만 Lazy HTTP Client·Collector를 조립한다.
+12. panel_order 1~13 순서로 참조파일 불변성과 예약 디렉터리 동일성을 재검사한 뒤
+    고유 request_id를 만들고 장소당 1회 요청한다.
+13. Collector는 원본을 먼저 저장하고 HTTP·파싱·필드·장소·인구 범위를 검증한 뒤 8필드 Metadata를 저장한다.
+14. Area 오류는 AreaOutcome으로 기록하고 다음 Area를 진행한다. 공통 오류나 참조 변경은 중단한다.
+15. 누락된 나머지 Area를 not_attempted로 채우고 종료코드 0·1·2를 계산한다.
+16. Collection Log payload와 Manifest를 만들고 Manifest를 먼저 저장한 뒤, 아직 저장 전인 Log payload를 포함해 전체 해시를 검증한다.
+17. Manifest·Log를 포함한 모든 Batch 쓰기는 열린 예약 디렉터리 FD 기준의 배타적
+    쓰기로 수행하며 쓰기 전후 동일성을 확인한다. 예약 루트는 다시 만들지 않는다.
+18. 검증 성공 후 Collection Log를 배타적으로 저장하고 콘솔에 Area 결과와 회차 요약만 출력한다.
 
 원자적 Source Batch 예약은 성공·부분실패·공통오류·예외·중단 뒤에도 자동 삭제하지
 않는다. 불완전 예약은 같은 ID의 재사용을 막지만 Collection Log·Manifest 증거가
 없으므로 Backup 대상이 아니다. abandoned 또는 stale 예약의 복구는 자동화하지 않고
-별도 PM 검토와 명시적 절차가 필요하다.
+별도 PM 검토와 명시적 절차가 필요하다. 예약 경로가 삭제·교체되거나 심볼릭 링크로
+바뀌면 이름만 같은 새 경로를 유효한 예약으로 인정하지 않고 `reservation_integrity_error`로
+중단한다. 런타임은 예약 루트를 재생성하거나 교체 대상을 따라가지 않는다.
 
 ## 6. CLI 계약
 
@@ -307,7 +314,9 @@ output-root 아래 단계별 경로를 자동 적용한다. 참조파일과 소�
 - Batch approval boundary: --execute-live에서는 PM 승인 --batch-id를 필수로 받고,
   missing·invalid·conflict는 API Key 사용·영속 쓰기·네트워크 전에 종료한다. 읽기 전용
   충돌검사 뒤 Source Batch 디렉터리를 원자적으로 예약한 단 하나의 실행만 API Key와
-  Transport에 접근하며, 중단된 예약을 런타임이 자동 삭제하거나 재사용하지 않는다.
+  Transport에 접근한다. 예약의 장치·inode·열린 디렉터리 FD를 이후 설정과 모든 Batch
+  쓰기의 동일성 기준으로 사용하며, 경로 삭제·교체·심볼릭 링크를 감지하면 중단한다.
+  중단된 예약을 런타임이 자동 삭제·재생성·재사용하지 않는다.
 - Privacy: 현재 개인 위치·고객정보·실제 판매데이터를 수집하지 않는다.
 
 ## 13. 시간 의미와 Point-in-time 계약

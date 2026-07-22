@@ -771,8 +771,8 @@ Score·가중치·임계값은 `OPEN_DECISION`이다. Recommendation MVP Workstr
 - 최근 완료 Issue: #60
 - 현재 구현 Issue: #63
 - 현재 Branch: `feature/issue-63-eg6b-collector-batch-id`
-- 구현 상태: Collector `--batch-id`·공통 validator·충돌 사전검사에 원자적 Source Batch 예약과 중단 후 재사용 방지를 보완 중
-- 로컬 검증: Project Guard PASS 42 / FAIL 0 / WARN 0 / SKIP 5, Unit Tests 293/293 PASS
+- 구현 상태: Collector `--batch-id`·공통 validator·원자적 Source Batch 예약에 장치·inode·디렉터리 FD 기반 동일성 검증과 중단 후 재사용 방지를 보완 중
+- 로컬 검증: Project Guard PASS 42 / FAIL 0 / WARN 0 / SKIP 5, Target Unit Tests 71/71 PASS, Full Unit Tests 299/299 PASS
 - 실제 API 호출: EG-6B 13개 Area 회차 0회
 - 실제 Live Batch Backup: 0건
 - Fake Backup Environment Preflight·Restore·PM 원격 확인: `PASS`
@@ -800,8 +800,8 @@ Score·가중치·임계값은 `OPEN_DECISION`이다. Recommendation MVP Workstr
 
 ## 15. 마지막 갱신 정보
 
-- 문서 버전: 1.20
-- 미병합 구현: Issue #63 Collector `--batch-id` 계약
+- 문서 버전: 1.21
+- 미병합 구현: Issue #63 Collector `--batch-id`와 예약 디렉터리 동일성 계약
 - 마지막 갱신일: 2026-07-23
 - 최근 완료 Issue: #60
 - 공식 기준 Branch: `main`
