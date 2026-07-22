@@ -7,14 +7,13 @@ import json
 import shutil
 import tempfile
 import unittest
-import uuid
 from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 from typing import Callable
 from unittest import mock
 from urllib.parse import unquote
 
-from freshmanager import eg6b
+from freshmanager import backup, eg6b
 from freshmanager.collector import CURRENT_POPULATION_FIELDS
 from freshmanager.storage import BatchStorage, FileStorage, StorageError
 
@@ -22,6 +21,8 @@ from freshmanager.storage import BatchStorage, FileStorage, StorageError
 ROOT = Path(__file__).resolve().parents[1]
 DUMMY_KEY = "dummy-eg6b-key-for-tests"
 ENV_NAME = "SEOUL_OPEN" + "_API_KEY"
+BATCH_ID = "11111111-1111-4111-8111-111111111111"
+LETTERED_BATCH_ID = "abcdefab-cdef-4abc-8def-abcdefabcdef"
 
 
 def official_names() -> dict[str, str]:
@@ -175,6 +176,7 @@ class Eg6bTests(unittest.TestCase):
     def invoke(argv: list[str], **kwargs: object) -> tuple[int, str]:
         output = io.StringIO()
         errors = io.StringIO()
+        kwargs.setdefault("environ", {})
         with redirect_stdout(output), redirect_stderr(errors):
             code = eg6b.run(argv, **kwargs)  # type: ignore[arg-type]
         return code, output.getvalue() + errors.getvalue()
@@ -183,6 +185,7 @@ class Eg6bTests(unittest.TestCase):
         self,
         root: Path,
         transport: FakeTransport,
+        batch_id: str = BATCH_ID,
         **kwargs: object,
     ) -> tuple[int, str, Path]:
         output_root = root / "output"
@@ -192,6 +195,8 @@ class Eg6bTests(unittest.TestCase):
                 str(self.write_env(root)),
                 "--output-root",
                 str(output_root),
+                "--batch-id",
+                batch_id,
                 "--execute-live",
             ],
             transport_factory=lambda: transport,
@@ -259,6 +264,7 @@ class Eg6bTests(unittest.TestCase):
             self.assertEqual(len(metadata_paths), 13)
             self.assertEqual(log["collector_version"], eg6b.COLLECTOR_VERSION)
             self.assertEqual(log["data_version"], eg6b.DATA_VERSION)
+            self.assertEqual(log["batch_id"], BATCH_ID)
             self.assertEqual(log["panel_version"], eg6b.PANEL_VERSION)
             self.assertEqual(log["expected_area_count"], 13)
             self.assertEqual(log["attempted_count"], 13)
@@ -269,6 +275,8 @@ class Eg6bTests(unittest.TestCase):
             self.assertGreaterEqual(log["elapsed_seconds"], 0)
             self.assertEqual(len(log["area_results"]), 13)
             self.assertEqual(manifest["hash_algorithm"], "sha256")
+            self.assertEqual(manifest["batch_id"], BATCH_ID)
+            self.assertEqual(log_path.parent.name, BATCH_ID)
             self.assertEqual(len(manifest["reference_files"]), 4)
             self.assertEqual(len(manifest["artifacts"]), 27)
             self.assertNotIn(manifest_path.name, [item["relative_path"] for item in manifest["artifacts"]])
@@ -278,6 +286,7 @@ class Eg6bTests(unittest.TestCase):
             )
             summary = parse_summary(output)
             self.assertEqual(summary["target_count"], "13")
+            self.assertEqual(summary["batch_id"], BATCH_ID)
             self.assertEqual(summary["attempted_count"], "13")
             self.assertEqual(summary["success_count"], "13")
             self.assertEqual(summary["failure_count"], "0")
@@ -315,6 +324,8 @@ class Eg6bTests(unittest.TestCase):
         self.assertEqual(log["failure_count"], 1)
         self.assertEqual(log["failed_area_codes"], [failed_code])
         self.assertEqual(log["retry_count"], 0)
+        self.assertEqual(log["batch_id"], BATCH_ID)
+        self.assertEqual(manifest["batch_id"], BATCH_ID)
         self.assertEqual(len(manifest["artifacts"]), 26)
         self.assertEqual(parse_summary(output)["exit_code"], "1")
 
@@ -368,7 +379,7 @@ class Eg6bTests(unittest.TestCase):
             arbitrary_code, _ = self.invoke(
                 [
                     "--env-file", str(env_path), "--output-root", str(output_root),
-                    "--area-code", "POI999", "--execute-live",
+                    "--batch-id", BATCH_ID, "--area-code", "POI999", "--execute-live",
                 ],
                 transport_factory=factory,
             )
@@ -376,6 +387,135 @@ class Eg6bTests(unittest.TestCase):
         self.assertEqual(arbitrary_code, 2)
         factory.assert_not_called()
         self.assertFalse(output_root.exists())
+
+    def test_cli_accepts_canonical_batch_id_and_documents_option(self) -> None:
+        parser = eg6b.build_parser()
+        arguments = parser.parse_args(
+            [
+                "--env-file", "dummy.env",
+                "--output-root", "output",
+                "--batch-id", BATCH_ID,
+                "--execute-live",
+            ]
+        )
+        self.assertEqual(arguments.batch_id, BATCH_ID)
+        self.assertIn("--batch-id", parser.format_help())
+
+    def test_runbook_hands_the_same_batch_id_to_collector_and_backup(self) -> None:
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        shared_argument = '--batch-id "$FM_LIVE_BATCH_ID"'
+        self.assertGreaterEqual(readme.count(shared_argument), 2)
+        self.assertIn("python3 -m freshmanager.eg6b", readme)
+        self.assertIn("python3 -m freshmanager.backup", readme)
+
+    def test_live_mode_without_batch_id_fails_before_credential_network_and_writes(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="freshmanager-eg6b-") as temporary:
+            root = Path(temporary)
+            output_root = root / "output"
+            factory = mock.Mock(return_value=FakeTransport())
+            with mock.patch.object(eg6b, "load_api_key") as load_key:
+                code, output = self.invoke(
+                    [
+                        "--env-file", str(root / "missing.env"),
+                        "--output-root", str(output_root),
+                        "--execute-live",
+                    ],
+                    transport_factory=factory,
+                )
+        self.assertEqual(code, 2)
+        self.assertIn("preflight_status=batch_id_required", output)
+        load_key.assert_not_called()
+        factory.assert_not_called()
+        self.assertFalse(output_root.exists())
+
+    def test_invalid_batch_ids_fail_before_credential_network_and_writes(self) -> None:
+        invalid_values = (
+            "",
+            "   ",
+            f" {BATCH_ID}",
+            LETTERED_BATCH_ID.upper(),
+            "../11111111-1111-4111-8111-111111111111",
+            "not-a-batch-id",
+        )
+        for value in invalid_values:
+            with self.subTest(value=value), tempfile.TemporaryDirectory(
+                prefix="freshmanager-eg6b-"
+            ) as temporary:
+                root = Path(temporary)
+                output_root = root / "output"
+                factory = mock.Mock(return_value=FakeTransport())
+                with mock.patch.object(eg6b, "load_api_key") as load_key:
+                    code, output = self.invoke(
+                        [
+                            "--env-file", str(root / "missing.env"),
+                            "--output-root", str(output_root),
+                            "--batch-id", value,
+                            "--execute-live",
+                        ],
+                        transport_factory=factory,
+                    )
+                self.assertEqual(code, 2)
+                self.assertIn("preflight_status=input_error", output)
+                load_key.assert_not_called()
+                factory.assert_not_called()
+                self.assertFalse(output_root.exists())
+
+    def test_source_sync_receipt_and_lock_collisions_fail_before_credential_network(self) -> None:
+        collision_types = ("source", "sync", "receipt", "lock")
+        for collision_type in collision_types:
+            with self.subTest(collision_type=collision_type), tempfile.TemporaryDirectory(
+                prefix="freshmanager-eg6b-"
+            ) as temporary:
+                root = Path(temporary)
+                output_root = root / "output"
+                sync_root = root / "sync"
+                if collision_type == "source":
+                    collision = output_root / eg6b.BATCH_OUTPUT_PATH / BATCH_ID
+                elif collision_type == "sync":
+                    collision = sync_root / backup.DESTINATION_RELATIVE_PATH / BATCH_ID
+                elif collision_type == "receipt":
+                    collision = (
+                        output_root / backup.LEDGER_RELATIVE_PATH / "receipts" / BATCH_ID
+                    )
+                else:
+                    collision = (
+                        output_root / backup.LEDGER_RELATIVE_PATH / "locks" / f"{BATCH_ID}.lock"
+                    )
+                if collision_type == "lock":
+                    collision.parent.mkdir(parents=True)
+                    collision.write_text("synthetic lock", encoding="utf-8")
+                else:
+                    collision.mkdir(parents=True)
+                    (collision / "marker.txt").write_text("immutable", encoding="utf-8")
+                before = {
+                    item.relative_to(root).as_posix(): sha256(item)
+                    for item in root.rglob("*")
+                    if item.is_file()
+                }
+                factory = mock.Mock(return_value=FakeTransport())
+                with mock.patch.object(eg6b, "load_api_key") as load_key:
+                    code, output = self.invoke(
+                        [
+                            "--env-file", str(root / "missing.env"),
+                            "--output-root", str(output_root),
+                            "--batch-id", BATCH_ID,
+                            "--execute-live",
+                        ],
+                        transport_factory=factory,
+                        environ={backup.SYNC_ROOT_ENV: str(sync_root)},
+                    )
+                after = {
+                    item.relative_to(root).as_posix(): sha256(item)
+                    for item in root.rglob("*")
+                    if item.is_file()
+                }
+                self.assertEqual(code, 2)
+                self.assertIn("preflight_status=batch_id_conflict", output)
+                self.assertEqual(after, before)
+                self.assertFalse((output_root / eg6b.RAW_OUTPUT_PATH).exists())
+                self.assertFalse((output_root / eg6b.METADATA_OUTPUT_PATH).exists())
+                load_key.assert_not_called()
+                factory.assert_not_called()
 
     def test_invalid_panel_fails_before_transport_and_output(self) -> None:
         with tempfile.TemporaryDirectory(prefix="freshmanager-eg6b-") as temporary:
@@ -389,6 +529,7 @@ class Eg6bTests(unittest.TestCase):
                 [
                     "--env-file", str(self.write_env(root)),
                     "--output-root", str(output_root),
+                    "--batch-id", BATCH_ID,
                     "--execute-live",
                 ],
                 transport_factory=factory,
@@ -531,6 +672,7 @@ class Eg6bTests(unittest.TestCase):
                 [
                     "--env-file", str(self.write_env(root)),
                     "--output-root", str(output_root),
+                    "--batch-id", BATCH_ID,
                     "--execute-live",
                 ],
                 transport_factory=factory,
@@ -549,24 +691,23 @@ class Eg6bTests(unittest.TestCase):
         self.assertEqual(partials, [])
 
     def test_batch_id_collision_never_overwrites_first_batch_evidence(self) -> None:
-        fixed_batch_id = uuid.UUID("11111111-1111-4111-8111-111111111111")
         with tempfile.TemporaryDirectory(prefix="freshmanager-eg6b-") as temporary:
             root = Path(temporary)
             first_code, _, output_root = self.run_fake(
                 root,
                 FakeTransport(),
-                batch_id_factory=lambda: fixed_batch_id,
             )
             first_log, _, first_manifest, _ = self.batch_documents(output_root)
             before = (sha256(first_log), sha256(first_manifest))
+            second_transport = FakeTransport()
             second_code, _, _ = self.run_fake(
                 root,
-                FakeTransport(),
-                batch_id_factory=lambda: fixed_batch_id,
+                second_transport,
             )
             after = (sha256(first_log), sha256(first_manifest))
         self.assertEqual(first_code, 0)
         self.assertEqual(second_code, 2)
+        self.assertEqual(second_transport.calls, [])
         self.assertEqual(after, before)
 
 

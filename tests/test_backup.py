@@ -18,6 +18,7 @@ from freshmanager import backup
 
 BATCH_ID = "11111111-1111-4111-8111-111111111111"
 SECOND_BATCH_ID = "22222222-2222-4222-8222-222222222222"
+LETTERED_BATCH_ID = "abcdefab-cdef-4abc-8def-abcdefabcdef"
 FAKE_PATH_MARKER = "/private/fake-source-root"
 TEST_AREA_CODES = (
     "POI019",
@@ -683,6 +684,23 @@ class BackupWorkerTests(unittest.TestCase):
                 backup.SYNC_ROOT_ENV: str(self.sync_root),
             }
             self.assertEqual(backup.run(["--batch-id", BATCH_ID], environ=conflict_environment), 5)
+
+    def test_cli_rejects_noncanonical_batch_id_without_normalizing(self) -> None:
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output), contextlib.redirect_stderr(output):
+            self.assertEqual(backup.run(["--batch-id", LETTERED_BATCH_ID.upper()], environ={}), 2)
+            self.assertEqual(backup.run(["--batch-id", f" {BATCH_ID}"], environ={}), 2)
+        self.assertNotIn(BATCH_ID, output.getvalue())
+        self.assertNotIn(LETTERED_BATCH_ID, output.getvalue().lower())
+
+    def test_backup_failure_does_not_invoke_collector(self) -> None:
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output), contextlib.redirect_stderr(output), mock.patch(
+            "freshmanager.eg6b.run"
+        ) as collector_run:
+            code = backup.run(["--batch-id", BATCH_ID], environ={})
+        self.assertEqual(code, 2)
+        collector_run.assert_not_called()
 
 
 if __name__ == "__main__":

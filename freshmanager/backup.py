@@ -23,6 +23,8 @@ from enum import Enum
 from pathlib import Path, PurePosixPath
 from typing import Mapping
 
+from .batch_id import BATCH_ID_PATTERN, BatchIdValidationError, canonical_batch_id
+
 
 WORKER_VERSION = "backup-worker-v1"
 RECEIPT_VERSION = "backup-receipt-v1"
@@ -66,7 +68,6 @@ METADATA_FIELDS = {
     "raw_file_path",
 }
 SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
-BATCH_ID_PATTERN = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$")
 
 
 class BackupStatus(str, Enum):
@@ -193,16 +194,10 @@ def _now() -> datetime:
 
 
 def _canonical_batch_id(value: str) -> str:
-    candidate = value.strip().lower()
-    if not BATCH_ID_PATTERN.fullmatch(candidate):
-        raise CliInputError("CLI_INPUT_ERROR")
     try:
-        parsed = uuid.UUID(candidate)
-    except ValueError as error:
+        return canonical_batch_id(value)
+    except BatchIdValidationError as error:
         raise CliInputError("CLI_INPUT_ERROR") from error
-    if str(parsed) != candidate:
-        raise CliInputError("CLI_INPUT_ERROR")
-    return candidate
 
 
 def build_parser() -> argparse.ArgumentParser:

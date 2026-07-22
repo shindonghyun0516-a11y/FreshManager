@@ -368,6 +368,10 @@ EG-4 통과 후 PM이 다음 구현 단계 전환을 승인하면 EG-5로 진행
 실제 EG-6B Live 재진입조건:
 
 - Issue #57의 env-file·output-root Probe PASS를 기준으로 하되 Live 직전 다시 확인한다.
+- `--execute-live`에는 PM 승인 canonical `--batch-id`를 필수로 사용하고 Collector·Source
+  Batch·Collection Log·Manifest·Backup Worker 입력의 ID가 일치하는지 확인한다.
+- missing·invalid·기존 Source·Sync·Receipt·Lock과 충돌하는 Batch ID는 API Key 사용,
+  영속 쓰기와 네트워크 전에 종료한다.
 - Google Drive for Desktop Sync 설치·로그인과 `FreshManager-Data/` 논리 루트 접근을 확인한다.
 - 실제 계정 이메일과 동기화 절대경로는 저장소·Receipt·로그에 기록하지 않는다.
 - 별도 1회 실행형 Backup Worker가 완료·부분 실패 Fake Batch를 Google Drive 로컬

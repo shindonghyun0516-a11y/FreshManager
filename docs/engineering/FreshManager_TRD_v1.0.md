@@ -119,17 +119,21 @@ Candidate Evaluation은 후속 독립 책임이며, 그 실패는 Area 회차를
 
 1. CLI 인자를 파싱한다. --env-file, --output-root는 필수이고 timeout 기본값은 10초다.
 2. --execute-live가 없으면 설정·Transport·Request·출력 저장 없이 preflight 실패 종료코드 2를 반환한다.
-3. output-root를 절대경로로 정규화하고 파일시스템 루트·파일·저장소 내부 경로를 거부한다.
-4. 공식 121 CSV와 세 EG-6 참조 CSV의 구조·행·연결을 검증하고 SHA-256 스냅샷을 만든다.
-5. 명시된 .env에서 API Key를 읽는다. 키는 출력하지 않는다.
-6. raw·metadata·batch root에 숨김 Probe 파일을 생성·flush·삭제해 쓰기 가능성을 확인한다.
-7. batch_id를 생성하고 FileStorage·BatchStorage·Lazy HTTP Client·Collector를 조립한다.
-8. panel_order 1~13 순서로 참조파일 불변성을 재검사한 뒤 고유 request_id를 만들고 장소당 1회 요청한다.
-9. Collector는 원본을 먼저 저장하고 HTTP·파싱·필드·장소·인구 범위를 검증한 뒤 8필드 Metadata를 저장한다.
-10. Area 오류는 AreaOutcome으로 기록하고 다음 Area를 진행한다. 공통 오류나 참조 변경은 중단한다.
-11. 누락된 나머지 Area를 not_attempted로 채우고 종료코드 0·1·2를 계산한다.
-12. Collection Log payload와 Manifest를 만들고 Manifest를 먼저 저장한 뒤, 아직 저장 전인 Log payload를 포함해 전체 해시를 검증한다.
-13. 검증 성공 후 Collection Log를 배타적으로 저장하고 콘솔에 Area 결과와 회차 요약만 출력한다.
+3. --execute-live에서는 PM이 승인한 --batch-id가 필수다. Collector와 Backup Worker가
+   같은 strict canonical UUID validator를 사용하며 입력을 정규화하거나 재생성하지 않는다.
+4. output-root를 절대경로로 정규화하고 파일시스템 루트·파일·저장소 내부 경로를 거부한다.
+5. Source Batch, 설정된 Sync Backup, 기존 Receipt와 Lock에 같은 batch_id가 없는지
+   읽기 전용으로 확인한다. 충돌 시 API Key 사용·Probe·Transport 생성 전에 중단한다.
+6. 공식 121 CSV와 세 EG-6 참조 CSV의 구조·행·연결을 검증하고 SHA-256 스냅샷을 만든다.
+7. 명시된 .env에서 API Key를 읽는다. 키는 출력하지 않는다.
+8. raw·metadata·batch root에 숨김 Probe 파일을 생성·flush·삭제해 쓰기 가능성을 확인한다.
+9. 승인 batch_id로 FileStorage·BatchStorage·Lazy HTTP Client·Collector를 조립한다.
+10. panel_order 1~13 순서로 참조파일 불변성을 재검사한 뒤 고유 request_id를 만들고 장소당 1회 요청한다.
+11. Collector는 원본을 먼저 저장하고 HTTP·파싱·필드·장소·인구 범위를 검증한 뒤 8필드 Metadata를 저장한다.
+12. Area 오류는 AreaOutcome으로 기록하고 다음 Area를 진행한다. 공통 오류나 참조 변경은 중단한다.
+13. 누락된 나머지 Area를 not_attempted로 채우고 종료코드 0·1·2를 계산한다.
+14. Collection Log payload와 Manifest를 만들고 Manifest를 먼저 저장한 뒤, 아직 저장 전인 Log payload를 포함해 전체 해시를 검증한다.
+15. 검증 성공 후 Collection Log를 배타적으로 저장하고 콘솔에 Area 결과와 회차 요약만 출력한다.
 
 ## 6. CLI 계약
 
@@ -137,16 +141,23 @@ Candidate Evaluation은 후속 독립 책임이며, 그 실패는 Area 회차를
 | --- | --- | --- |
 | --env-file | Path · 필수 | 명시적 .env 경로; 자동 탐색하지 않음 |
 | --output-root | Path · 필수 | 저장소 밖 안전한 디렉터리 |
+| --batch-id | canonical UUID · Live 필수 | PM 승인값을 변경 없이 Source·Log·Manifest·Backup에 사용 |
 | --timeout | float · 10초 | 0 < timeout ≤ 60, 유한값 |
 | --execute-live | flag · 기본 false | 실행 의사 확인; PM 승인을 대체하지 않음 |
 
 **승인 후 실행 형태:**
 
 ```bash
-python3 -m freshmanager.eg6b --env-file /approved/path/.env --output-root /approved/external/root --execute-live
+python3 -m freshmanager.eg6b --env-file .env --output-root "$FRESHMANAGER_EG6B_OUTPUT_ROOT" --batch-id "$FM_LIVE_BATCH_ID" --execute-live
 ```
 
-> **중요**  위 명령은 계약 예시이며 현재 실제 실행 승인이 아니다. env-file과 output-root는 PM이 정확한 경로를 승인한 뒤 사용한다.
+> **중요**  위 명령은 계약 예시이며 현재 실제 실행 승인이 아니다. Batch ID, env-file과
+> output-root는 PM이 승인한 값을 사용하고 실제 값이나 경로를 문서·로그에 기록하지 않는다.
+
+canonical Batch ID는 Backup Worker와 공유하는 validator가 허용하는 소문자 UUID다.
+공백·대문자·경로·상위경로 이동·형식 오류를 자동 보정하지 않고 거부한다. 요청별
+Metadata는 기존 정확한 8필드 계약을 유지하므로 batch_id를 추가하지 않으며,
+Collection Log와 Manifest가 request_id·상대경로를 통해 같은 회차에 연결한다.
 
 ## 7. 외부 API 계약
 
@@ -285,6 +296,8 @@ output-root 아래 단계별 경로를 자동 적용한다. 참조파일과 소�
 - Output boundary: EG-6B output-root는 저장소 내부·파일시스템 루트·파일을 거부한다.
 - Reference immutability: 네 참조파일을 읽기 전용으로 검증하고 실행 전후 해시를 비교한다.
 - Approval boundary: --execute-live는 PM 승인의 기술적 대체물이 아니다.
+- Batch approval boundary: --execute-live에서는 PM 승인 --batch-id를 필수로 받고,
+  missing·invalid·conflict는 API Key 사용·영속 쓰기·네트워크 전에 종료한다.
 - Privacy: 현재 개인 위치·고객정보·실제 판매데이터를 수집하지 않는다.
 
 ## 13. 시간 의미와 Point-in-time 계약
@@ -402,6 +415,8 @@ Area Collector는 Spot 추천 여부와 무관하게 공식 Area 관측을 계�
   최종 `batch_id` 경로로 원자적으로 게시한다.
 - 동일 `batch_id`의 파일 수·해시가 같으면 중복을 생략하고, 다르면 `CONFLICT`로
   중단한다. 기존 원본이나 복사본을 덮어쓰지 않는다.
+- Collector가 받은 승인 `batch_id`를 Worker CLI에도 그대로 전달한다. Backup 실패는
+  같은 ID의 Collector 또는 서울시 API를 재실행하는 사유가 아니다.
 - `LOCAL_SYNC_COPY_VERIFIED`와 `REMOTE_SYNC_CONFIRMED`를 구분한다. 로컬 폴더
   복사만으로 실제 Google Drive 원격 업로드 완료를 주장하지 않는다.
 - 백업 실패는 서울시 API 재호출 사유가 아니며 `.env`, Secret, 인증 URL과 임시
@@ -595,7 +610,7 @@ Project Guard 검사별 현재 PASS·SKIP, 전체 집계와 Live 실행 여부�
 | FR-11 | Collector statuses + eg6b exit 0/1/2 | H-704/H-705/H-706 |
 | FR-13 | 즉시 Backup Worker·Google Drive for Desktop Sync | H-708 계약; 실환경 상태는 PROJECT_STATUS 참조 |
 | FR-14 | 목표 S-DoT·Spot Candidate·Recommendation 계층 | 미구현; EG6 Panel·EG-8 Feature·현장검증 필요 |
-| FR-12 | --execute-live + AGENTS/Git workflow | Project Guard/CI/PM |
+| FR-12 | --execute-live + 승인 --batch-id + AGENTS/Git workflow | Project Guard/CI/PM |
 
 ## 근거 자료
 

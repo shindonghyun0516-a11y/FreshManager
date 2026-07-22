@@ -92,6 +92,7 @@ EG4_FIXED_TIME = datetime(2026, 7, 20, 9, 10, 11, tzinfo=ZoneInfo("Asia/Seoul"))
 EG4_DUMMY_KEY = "dummy-key-for-project-guard"
 EG5_DUMMY_KEY = "dummy-key-for-eg5-project-guard"
 EG6B_DUMMY_KEY = "dummy-key-for-eg6b-project-guard"
+EG6B_GUARD_BATCH_ID = "00000000-0000-4000-8000-000000000706"
 EG5_APPROVED_AREA_CODES = ("POI019", "POI013", "POI014")
 EG5_APPROVED_AREA_NAMES = {
     "POI019": "구로디지털단지역",
@@ -1322,10 +1323,13 @@ def run_eg6b_guard(
                     str(env_path),
                     "--output-root",
                     str(output_root),
+                    "--batch-id",
+                    EG6B_GUARD_BATCH_ID,
                     "--execute-live",
                 ],
                 transport_factory=lambda: transport,
                 reference_paths=reference_paths,
+                environ={},
             )
         raw_files = sorted((output_root / eg6b_cli.RAW_OUTPUT_PATH).rglob("*.json"))
         metadata_files = sorted(
@@ -2416,6 +2420,11 @@ def check_h706(context: ProjectGuardContext) -> CheckResult:
             return "collector_version 불일치"
         if log.get("data_version") != eg6b_cli.DATA_VERSION:
             return "data_version 불일치"
+        if (
+            log.get("batch_id") != EG6B_GUARD_BATCH_ID
+            or execution.manifest.get("batch_id") != EG6B_GUARD_BATCH_ID
+        ):
+            return "PM 승인 Batch ID 전파 불일치"
         metadata_codes = tuple(str(item.get("area_code")) for item in execution.metadata)
         if (
             len(execution.metadata) != len(expected_codes)
@@ -2465,7 +2474,8 @@ def check_h706(context: ProjectGuardContext) -> CheckResult:
         )
     return passed(
         "H-706",
-        "승인 13개 Area 정상·부분실패 회차의 순서·1회 시도·소요시간·집계·Manifest SHA-256 확인",
+        "승인 Batch ID와 13개 Area 정상·부분실패 회차의 순서·1회 시도·집계·Manifest SHA-256 확인",
+        "freshmanager/batch_id.py",
         "freshmanager/eg6b.py",
         str(EG6_AREA_PANEL_RELATIVE_PATH),
         "가짜 Transport",

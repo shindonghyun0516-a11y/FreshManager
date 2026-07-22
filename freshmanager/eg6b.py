@@ -7,6 +7,7 @@ import csv
 import hashlib
 import json
 import math
+import os
 import time
 import uuid
 from dataclasses import dataclass
@@ -14,6 +15,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Callable, Mapping
 
+from . import backup as backup_contract
+from .batch_id import BatchIdValidationError, canonical_batch_id
 from .collector import EXPECTED_HEADERS, Collector, HttpResponse, Place, now_seoul
 from .config import load_api_key
 from .http_adapter import SeoulPopulationHttpClient, Transport, UrllibTransport
@@ -108,6 +111,10 @@ class BatchIntegrityError(ValueError):
     """Raised when a stored batch artifact does not match its manifest."""
 
 
+class BatchIdConflictError(ValueError):
+    """Raised when an approved Batch ID already has collection or backup state."""
+
+
 class SafeArgumentParser(argparse.ArgumentParser):
     def error(self, message: str) -> None:
         del message
@@ -192,10 +199,22 @@ def _timeout_value(value: str) -> float:
     return timeout
 
 
+def _batch_id_value(value: str) -> str:
+    try:
+        return canonical_batch_id(value)
+    except BatchIdValidationError as error:
+        raise argparse.ArgumentTypeError("invalid batch id") from error
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = SafeArgumentParser(description="EG-6B 승인 13개 Area 단일 회차 수집")
     parser.add_argument("--env-file", type=Path, required=True)
     parser.add_argument("--output-root", type=Path, required=True)
+    parser.add_argument(
+        "--batch-id",
+        type=_batch_id_value,
+        help="PM이 승인한 canonical Batch ID (--execute-live에서 필수)",
+    )
     parser.add_argument("--timeout", type=_timeout_value, default=DEFAULT_TIMEOUT_SECONDS)
     parser.add_argument(
         "--execute-live",
@@ -213,7 +232,7 @@ def _is_within(path: Path, parent: Path) -> bool:
     return True
 
 
-def _validated_output_paths(value: Path) -> tuple[Path, Path, Path, Path]:
+def _validated_output_paths(value: Path) -> tuple[Path, Path, Path, Path, Path]:
     try:
         output_root = value.expanduser().resolve()
         project_root = PROJECT_ROOT.resolve()
@@ -233,7 +252,38 @@ def _validated_output_paths(value: Path) -> tuple[Path, Path, Path, Path]:
         or any(path.exists() and not path.is_dir() for path in candidates)
     ):
         raise CliInputError("input_error")
-    return stage_root, raw_root, metadata_root, batch_root
+    return output_root, stage_root, raw_root, metadata_root, batch_root
+
+
+def _path_present(path: Path) -> bool:
+    try:
+        return os.path.lexists(path)
+    except (OSError, ValueError):
+        return True
+
+
+def _ensure_batch_id_available(
+    *,
+    output_root: Path,
+    batch_root: Path,
+    batch_id: str,
+    environ: Mapping[str, str],
+) -> None:
+    ledger_root = output_root / backup_contract.LEDGER_RELATIVE_PATH
+    candidates = [
+        batch_root / batch_id,
+        ledger_root / "receipts" / batch_id,
+        ledger_root / "locks" / f"{batch_id}.lock",
+    ]
+    sync_value = environ.get(backup_contract.SYNC_ROOT_ENV)
+    if sync_value:
+        try:
+            sync_root = Path(sync_value).expanduser().resolve()
+        except (OSError, RuntimeError, ValueError) as error:
+            raise BatchIdConflictError("batch_id_conflict") from error
+        candidates.append(sync_root / backup_contract.DESTINATION_RELATIVE_PATH / batch_id)
+    if any(_path_present(path) for path in candidates):
+        raise BatchIdConflictError("batch_id_conflict")
 
 
 def _sha256_file(path: Path) -> str:
@@ -641,7 +691,8 @@ def _summary(
     )
 
 
-def _preflight_failure() -> int:
+def _preflight_failure(reason_code: str = "preflight_error") -> int:
+    print(f"preflight_status={reason_code}")
     outcomes = _complete_outcomes([])
     summary = _summary(
         batch_id="",
@@ -788,22 +839,32 @@ def _run(
     reference_paths: ReferencePaths,
     clock: Callable[[], datetime],
     monotonic_clock: Callable[[], float],
-    batch_id_factory: Callable[[], uuid.UUID],
     request_id_factory: Callable[[], uuid.UUID],
+    environ: Mapping[str, str],
 ) -> int:
     try:
         arguments = build_parser().parse_args(argv)
     except CliInputError:
-        return _preflight_failure()
+        return _preflight_failure("input_error")
     if not arguments.execute_live:
-        return _preflight_failure()
+        return _preflight_failure("execution_not_approved")
+    if arguments.batch_id is None:
+        return _preflight_failure("batch_id_required")
 
     try:
-        stage_root, raw_root, metadata_root, batch_root = _validated_output_paths(arguments.output_root)
+        output_root, stage_root, raw_root, metadata_root, batch_root = _validated_output_paths(
+            arguments.output_root
+        )
+        _ensure_batch_id_available(
+            output_root=output_root,
+            batch_root=batch_root,
+            batch_id=arguments.batch_id,
+            environ=environ,
+        )
         snapshot = _validate_references(reference_paths)
         api_key = load_api_key(arguments.env_file)
         _probe_storage_roots(raw_root, metadata_root, batch_root)
-        batch_id = str(batch_id_factory())
+        batch_id = arguments.batch_id
         storage = storage_factory(raw_root, metadata_root)
         batch_storage = batch_storage_factory(batch_root / batch_id)
         client = _LazyHttpClient(transport_factory if transport_factory is not None else UrllibTransport)
@@ -815,6 +876,8 @@ def _run(
             request_id_factory=request_id_factory,
             timeout_seconds=arguments.timeout,
         )
+    except BatchIdConflictError:
+        return _preflight_failure("batch_id_conflict")
     except Exception:
         return _preflight_failure()
 
@@ -839,9 +902,10 @@ def run(
     reference_paths: ReferencePaths = DEFAULT_REFERENCE_PATHS,
     clock: Callable[[], datetime] = now_seoul,
     monotonic_clock: Callable[[], float] = time.monotonic,
-    batch_id_factory: Callable[[], uuid.UUID] = uuid.uuid4,
     request_id_factory: Callable[[], uuid.UUID] = uuid.uuid4,
+    environ: Mapping[str, str] | None = None,
 ) -> int:
+    environment = os.environ if environ is None else environ
     try:
         return _run(
             argv,
@@ -851,8 +915,8 @@ def run(
             reference_paths=reference_paths,
             clock=clock,
             monotonic_clock=monotonic_clock,
-            batch_id_factory=batch_id_factory,
             request_id_factory=request_id_factory,
+            environ=environment,
         )
     except Exception:
         return _preflight_failure()
