@@ -82,7 +82,7 @@ Spot Candidate Evaluation·Recommendation 결과 구조는 유지한다.
 
 ## 4. 현행 시스템 아키텍처
 
-> **실행 흐름**  CLI → 입력·출력 경로 검증 → 참조파일 검증·해시 스냅샷 → API Key 로드 → 저장소 쓰기 Probe → Lazy HTTP Client → 13개 Area Collector → 불변 Raw·Metadata → Collection Log·Manifest → SHA-256 검증 → 요약·종료코드
+> **실행 흐름**  CLI·입력·출력 Root 검증 → Source·Sync·Receipt·Lock 읽기 전용 충돌 검사 → 참조파일 검증·해시 스냅샷 → Source Batch 원자적 예약 → 예약 디렉터리 동일성 검증과 예약 인식 Storage 조립 → API Key 로드 → Lazy HTTP Client → 13개 Area Collector → 예약 인식 불변 Raw·Metadata·Collection Log·Manifest 쓰기 → SHA-256 검증 → 요약·종료코드
 
 | **컴포넌트** | **책임** | **경계** |
 | --- | --- | --- |
