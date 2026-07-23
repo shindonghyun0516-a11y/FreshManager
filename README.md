@@ -578,16 +578,17 @@ SEOUL_OPEN_API_KEY=your_api_key_here
   Google Drive for Desktop Sync 로컬 동기화 폴더를 통해 검증된 복사본을 자동 백업한다.
 - Backup Root는 `FreshManager-Data/` 논리 구조만 정의한다. 실제 계정 이메일과
   동기화 절대경로는 저장소·Receipt·로그에 기록하지 않는다.
-- 백업은 Collector와 분리된 1회 실행형 Worker가 Batch 완료 직후 담당한다. 현재
-  Worker는 구현되지 않았고 Google Drive API·OAuth·SDK는 제외 범위다.
+- 백업은 Collector와 분리된 1회 실행형 Worker가 Batch 완료 직후 담당한다. Worker는
+  `main`에 구현돼 있으며 Google Drive API·OAuth·SDK는 제외 범위다.
 
 ---
 
 ## 18. 현재 실행방법
 
 Python 기반 Project Guard가 `scripts/project_guard_check.py`에 구현돼 있다.
-PR #54 기준 최신 검증은 `PASS 41`, `FAIL 0`, `WARN 0`, `SKIP 5`,
-`TOTAL 46`, 종료 코드 `0`이며 전체 Unit Tests는 243/243 PASS다.
+Issue #63 작업 Branch의 로컬 검증은 Project Guard `PASS 42`, `FAIL 0`, `WARN 0`,
+`SKIP 5`, `TOTAL 47`, 종료코드 `0`이며 대상 Unit Tests는 71/71 PASS,
+전체 Unit Tests는 299/299 PASS다.
 
 표준 Project Guard 실행 명령:
 
@@ -607,17 +608,34 @@ python3 -B -m unittest discover -s tests -p "test_*.py" -v
 사용한다. 현재 `main`의 EG-6B CLI는 승인 패널 13개를 `panel_order` 순서로 각각
 최대 한 번 처리하며 자동 재시도와 반복 실행은 없다.
 
-공식 EG-6B 실행 명령 형식은 다음과 같다. 아래 명령은 PM이 정확한 env-file,
-저장소 밖 output-root와 최대 13회 호출을 별도로 승인한 뒤에만 실행한다.
-`--execute-live` 자체는 PM 승인을 의미하지 않는다.
+공식 EG-6B 실행 명령 형식은 다음과 같다. PM이 승인한 canonical UUID 형식의
+`FM_LIVE_BATCH_ID`를 먼저 준비하고, 같은 값을 Collector와 Backup Worker에 전달한다.
+아래 명령은 PM이 env-file, 저장소 밖 output-root, Batch ID와 최대 13회 호출을 별도로
+승인한 뒤에만 실행한다. `--execute-live` 자체는 PM 승인을 의미하지 않는다.
 
 ```bash
 python3 -m freshmanager.eg6b \
-  --env-file /path/to/approved-local.env \
-  --output-root /path/to/approved-external-output-root \
+  --env-file .env \
+  --output-root "$FRESHMANAGER_EG6B_OUTPUT_ROOT" \
+  --batch-id "$FM_LIVE_BATCH_ID" \
   --timeout 10 \
   --execute-live
+
+python3 -m freshmanager.backup --batch-id "$FM_LIVE_BATCH_ID"
 ```
+
+`--execute-live`에는 `--batch-id`가 필수다. ID는 소문자 canonical UUID를 그대로
+사용하며 공백 제거·대소문자 변경·재생성을 하지 않는다. 누락·형식 오류 또는 기존
+Source Batch·Sync Backup·Receipt·Lock 충돌은 API Key 사용, 네트워크와 영속 파일
+쓰기 전에 종료코드 `2`로 중단한다. Backup 실패는 Collector 재실행 사유가 아니다.
+
+읽기 전용 충돌검사와 참조검증이 끝나면 Collector는 정확한 Source Batch ID 디렉터리를
+원자적으로 예약한다. 동시에 같은 ID를 사용한 실행 중 예약 승자 하나만 API Key와
+Transport에 접근한다. 예약 직후 디렉터리의 장치·inode와 열린 디렉터리 FD를 보존하고,
+설정과 모든 Batch 쓰기 전후에 같은 디렉터리인지 확인한다. 예약 경로가 삭제·교체되거나
+심볼릭 링크가 되면 디렉터리를 다시 만들거나 새 대상을 따라가지 않고 즉시 중단한다.
+불완전하거나 중단된 예약은 자동 삭제·재사용하지 않으며, Collection Log와 Manifest가
+없으므로 Backup 대상이 아니다. stale 예약 복구는 별도 PM 검토 절차가 필요하다.
 
 현재 EG-6B 실제 단일 회차는 미실행 상태다. 실행 후 Raw·Metadata·Collection Log·
 Manifest·SHA-256과 실패 목록을 검토하고 PM이 PASS 또는 보완을 판정해야 한다.

@@ -186,6 +186,22 @@ EG-6B는 승인된 `eg6_area_panel.csv`의 `panel_order`에 따라 고정된 13�
 각각 최대 1회 순차 처리한다. 사용자가 장소코드, 단계명, raw 경로 또는 metadata
 경로를 직접 지정하는 옵션은 제공하지 않는다. 자동 재시도와 반복수집은 포함하지 않는다.
 
+`--execute-live`에는 PM이 승인한 `--batch-id`가 필수다. Collector와 Backup Worker는
+같은 strict canonical UUID validator를 사용한다. 입력을 trim·소문자 변환·재생성하지
+않으며 missing·invalid ID는 API Key 사용, 영속 쓰기와 네트워크 전에 종료한다.
+동일 ID의 Source Batch, 설정된 Sync Backup, Receipt 또는 Lock이 있으면 충돌로 중단하고
+기존 증거를 변경·삭제·덮어쓰지 않는다.
+
+읽기 전용 충돌검사와 공식 참조검증을 마치면 API Key·Transport·Raw·Metadata 접근 전에
+정확한 Source Batch ID 디렉터리를 배타적 `mkdir` 한 번으로 원자적으로 예약한다. 오직
+예약에 성공한 실행만 수집을 시작한다. 예약 직후 실제 디렉터리의 장치·inode와 열린
+디렉터리 FD를 보존하고, 설정과 모든 Batch 쓰기 전후에 경로와 FD의 동일성을 검증한다.
+예약 경로 삭제·교체·심볼릭 링크가 확인되면 같은 이름의 디렉터리를 다시 만들거나 새
+대상을 따라가지 않고 중단한다. 예약은 성공·부분실패·공통오류·예외·중단 뒤에도 자동
+삭제하지 않으며, 불완전 예약 ID를 자동 재사용하지 않는다. Collection Log와 Manifest가
+없는 예약 증거만으로는 Backup 대상이 될 수 없다. abandoned 또는 stale 예약 복구는
+별도 PM 검토가 필요한 수동 절차이며 현재 런타임 범위가 아니다.
+
 고정 단계 경로:
 
 ```text
@@ -225,6 +241,9 @@ Manifest는 공식 장소 CSV, EG-6A 참조 CSV 3개와 생성된 raw·metadata�
 Area를 처리한다. 공통 오류에서는 추가 호출을 중단하되 이미 저장된 결과를 되돌리지 않는다.
 `--execute-live`는 실제 호출 PM 승인을 대체하지 않는다. Issue #53 구현과 일반 검증은
 Fake Transport와 임시 output root만 사용했고, 실제 최대 13회 단일 회차는 별도 승인 전이다.
+PM 승인 ID는 Source Batch 디렉터리·Collection Log·Manifest·회차 Summary와 Backup
+Worker 입력에 그대로 사용한다. Metadata는 기존 정확한 8필드를 유지하며 batch_id를
+추가하지 않고 Collection Log·Manifest의 request_id와 상대경로로 회차에 연결한다.
 
 EG-6B는 Area Observation 확보 단계다. `eg6_spot_master.csv`와
 `eg6_sdot_links.csv`는 승인된 정적 패널의 연결 무결성을 확인하는 참조 입력이며,
@@ -270,6 +289,8 @@ S-DoT 미지원 6개 Area도 Area 분석과 추천 후보에서 제외하지 않
   `REMOTE_SYNC_PENDING`, `REMOTE_SYNC_CONFIRMED`는 생성하지 않는다.
 - Worker CLI는 `--batch-id`만 받고 Source·Sync Root는 승인된 환경변수로 주입한다.
   Worker는 `.env`나 홈·클라우드 경로를 자동 탐색하지 않는다.
+- Worker에는 Collector 실행에 사용한 동일 `batch_id`를 정확히 한 번 전달한다.
+  Backup 실패 시 Collector나 서울시 API를 재실행하지 않는다.
 - Lock과 append-only Receipt는 원본 Batch와 Sync Root 밖의 비동기화 로컬 Ledger에
   두며 실제 절대경로·계정·Secret을 기록하지 않는다.
 

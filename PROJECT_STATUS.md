@@ -8,25 +8,27 @@
 ## 0. 30초 요약
 
 - 프로젝트: **프레시매니저 유동판매 추천 서비스 — 데이터 타당성 PoC**
-- 현재 목표: Google Drive for Desktop 환경에서 Fake Batch Backup·Restore를 검증한 뒤 EG-6B 실제 13개 Area 단일 회차 승인 직전까지 준비
+- 현재 목표: Issue #63에서 PM 승인 Batch ID를 원자적으로 예약한 단일 Collector만 인증정보·Transport에 접근하도록 보완
 - `main` 반영 완료: EG-0~EG-6A, EG-6B 단일 수집 파이프라인, Backup Worker, CI 보강과 보호 경로 Hardening
 - 최근 완료 Issue: #60
 - 공식 기준 Branch: `main`
-- 현재 Branch: `main`
+- 현재 Branch: `feature/issue-63-eg6b-collector-batch-id`
 - 문서 정렬 시작 기준 Commit: `62f30d42e6082910ae06f4bb9cb539145a426870`
 - EG-6B 기술 기준 Commit: `6253cc502c9a3c4bc248cf6972f077a99e13f09d`
-- 현재 작업: Issue #57 EG-6B Live 전 Google Drive 환경·Fake Backup·Restore Preflight
+- 현재 작업: Issue #63 EG-6B Collector 원자적 Batch ID 예약·중단 후 재사용 방지 보완과 독립 재검토 준비
+- Issue #63 상태: `OPEN` · `OPTION_A_APPROVED` · `NO_LIVE_API_CALL`
+- Issue #63 Pull Request: PR #64 `DRAFT` · 원자적 예약 보완 후 독립 재검토 필요 · PM 승인 전 Merge 금지
 - PR #61 상태: `MERGED`
 - Issue #60 상태: `CLOSED`
 - Backup Worker 상태: `IMPLEMENTED_ON_MAIN` · `VERIFIED_LOCALLY`
-- 실제 Google Drive 사용: `NOT_EXECUTED`
+- Fake Google Drive Sync 확인: `CONFIRMED_BY_PM`
 - 실제 Batch Backup: `NOT_EXECUTED`
-- Fake Backup Environment Preflight: `NOT_COMPLETED`
+- Fake Backup Environment Preflight: `PASS`
 - Issue #57 상태: `OPEN` · `EG-6B LIVE NOT_APPROVED`
 - 현재 Engineering Gate: EG-6B 구현·오프라인 검증·병합 완료 / 실제 단일 회차·PM PASS 대기
 - 공식 서비스 구조: 필수 Area Observation + 선택적 S-DoT Observation + 공간·현장 Context
 - 현재 Codex Engineering Harness 개편 상태: P1~P7 완료
-- 다음 공식 단계: **환경변수 확인 → Fake Backup·Restore → PM 원격 확인 → EG-6B Live Preflight → 최대 13회 별도 승인**
+- 다음 공식 단계: **Issue #63 PR·CI·PM Merge 승인 → 새 Batch ID 무호출 Live Preflight → 최대 13회 별도 승인**
 - 실제 서울시 API 호출: EG-4 POI072와 EG-5 대표 3장소 완료; EG-6B 13개 Area 회차는 0회
 - Issue #43: 완료, PM이 EG-4 PASS 확정
 - 절대 주의:
@@ -46,8 +48,11 @@ Batch Log·Manifest·SHA-256 파이프라인을 `main`에 반영했다. 실제 �
 Issue #57의 env-file·output-root Probe는 PASS했고, Issue #58·PR #59에서 Google Drive
 for Desktop Sync 기반 백업 로드맵과 AI Context 기준을 `main`에 반영했다. Issue #60과
 PR #61에서 독립 1회 실행형 Backup Worker·Fake Batch 테스트·H-708 검증을 `main`에
-반영했다. 실제 Google Drive 환경 접근, Fake Batch Backup·Restore, 실제 Batch Backup은
-아직 수행하지 않았다. CSV Exporter는 구현되지 않았다. Backup Root는
+반영했다. 실제 환경 Fake Batch Backup·Restore와 멱등 검증을 통과했고 PM이 원격
+동기화를 수동 확인했다. 실제 Live Batch와 실제 Batch Backup은 아직 수행하지 않았다.
+Issue #57 Live Preflight에서 PM 승인 Batch ID를 Collector CLI에 전달할 수 없는
+Hard Blocker를 확인해 PM이 별도 Issue #63의 Option A 구현을 승인했다. CSV Exporter는
+구현되지 않았다. Backup Root는
 `FreshManager-Data/` 논리 구조로만 정의하며
 실제 계정 이메일과 동기화 절대경로는 문서·로그·Receipt에 기록하지 않는다.
 
@@ -764,19 +769,21 @@ Score·가중치·임계값은 `OPEN_DECISION`이다. Recommendation MVP Workstr
 ### 14.1 공식 진행 상태
 
 - 최근 완료 Issue: #60
-- 현재 Branch: `main`
-- 구현 상태: EG-6B 단일 회차 파이프라인과 Backup Worker `main` 병합 완료
+- 현재 구현 Issue: #63
+- 현재 Branch: `feature/issue-63-eg6b-collector-batch-id`
+- 구현 상태: Collector `--batch-id`·공통 validator·원자적 Source Batch 예약에 장치·inode·디렉터리 FD 기반 동일성 검증과 중단 후 재사용 방지를 보완 중
+- 로컬 검증: Project Guard PASS 42 / FAIL 0 / WARN 0 / SKIP 5, Target Unit Tests 71/71 PASS, Full Unit Tests 299/299 PASS
 - 실제 API 호출: EG-6B 13개 Area 회차 0회
-- 실제 Google Drive 사용·실제 Batch Backup: 0건
-- Fake Backup Environment Preflight: `NOT_COMPLETED`
+- 실제 Live Batch Backup: 0건
+- Fake Backup Environment Preflight·Restore·PM 원격 확인: `PASS`
 
-### 14.2 다음 행동 — Google Drive Backup Readiness
+### 14.2 다음 행동 — Batch ID 계약과 Live 재진입
 
-1. Google Drive for Desktop 환경변수 설정 여부를 값 없이 확인
-2. Fake Batch Backup·Restore와 Receipt 보안을 검증
-3. PM이 Fake Batch 원격 동기화를 수동 확인
-4. Issue #57 EG-6B Live Preflight를 무호출로 재검증
-5. PM이 최대 13회 실제 호출을 별도로 승인
+1. Issue #63 Target·Full Unit Tests와 Project Guard를 통과
+2. PR #64 Draft Pull Request의 CI를 통과
+3. PM이 Issue #63 Pull Request를 검토하고 `main` Merge를 별도로 승인
+4. Merge 후 새 Live Batch ID를 제안해 Issue #57 무호출 Live Preflight를 재검증
+5. PM이 정확한 Batch ID·최대 13회·retry 0·즉시 Backup 조건으로 실제 호출을 별도 승인
 6. 승인된 첫 Batch 실행 후 로컬 원본·백업 복사본과 데이터 품질을 검토
 7. PM이 EG-6B PASS 또는 보완을 판정하고 CSV·EG-7 후속 작업을 승인
 
@@ -793,14 +800,14 @@ Score·가중치·임계값은 `OPEN_DECISION`이다. Recommendation MVP Workstr
 
 ## 15. 마지막 갱신 정보
 
-- 문서 버전: 1.19
-- 미병합 구현: 없음
-- 마지막 갱신일: 2026-07-22
+- 문서 버전: 1.21
+- 미병합 구현: Issue #63 Collector `--batch-id`와 예약 디렉터리 동일성 계약
+- 마지막 갱신일: 2026-07-23
 - 최근 완료 Issue: #60
 - 공식 기준 Branch: `main`
 - 문서 정렬 시작 기준 Commit: `62f30d42e6082910ae06f4bb9cb539145a426870`
 - EG-6B 기술 기준 Commit: `6253cc502c9a3c4bc248cf6972f077a99e13f09d`
-- 현재 Branch: `main`
+- 현재 Branch: `feature/issue-63-eg6b-collector-batch-id`
 - 현재 Engineering Gate: EG-6B 구현·오프라인 검증·병합 완료 / 실제 회차·PM PASS 대기
 - 현재 단계: 실제 최대 13회 단일 회차 승인 전
 - 완료된 최근 작업:
@@ -830,6 +837,8 @@ Score·가중치·임계값은 `OPEN_DECISION`이다. Recommendation MVP Workstr
   - Issue #57 env-file·output-root Probe PASS, 실제 API 호출·데이터 생성 0건
   - Issue #58·PR #59로 데이터·백업 로드맵과 AI Context 기준선 `main` 반영
   - Issue #60·PR #61로 독립 Backup Worker·33개 Target Test·H-708을 `main`에 반영, Squash Commit `62f30d4`
-- 다음 행동: Google Drive for Desktop 환경변수 확인과 Fake Batch Backup·Restore 검증
-- 다음 공식 단계: PM 원격 확인과 Live Preflight 재통과 후 실제 최대 13회 호출 승인
+  - Issue #57 실제 환경 Fake Backup·Restore·멱등 검증과 PM 수동 원격 확인 PASS
+  - Issue #63 PM Option A 승인으로 Collector canonical `--batch-id` 계약 구현 진행
+- 다음 행동: Issue #63 PR #64 Draft Pull Request·CI·PM Merge 검토
+- 다음 공식 단계: Issue #63 병합 후 새 Batch ID 무호출 Live Preflight와 실제 최대 13회 별도 승인
 - 실제 서울시 API 호출: EG-6B 13개 Area 회차 0회

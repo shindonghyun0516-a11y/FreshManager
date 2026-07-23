@@ -7,6 +7,7 @@ import csv
 import hashlib
 import json
 import math
+import os
 import time
 import uuid
 from dataclasses import dataclass
@@ -14,10 +15,20 @@ from datetime import datetime
 from pathlib import Path
 from typing import Callable, Mapping
 
+from . import backup as backup_contract
+from .batch_id import BatchIdValidationError, canonical_batch_id
 from .collector import EXPECTED_HEADERS, Collector, HttpResponse, Place, now_seoul
 from .config import load_api_key
 from .http_adapter import SeoulPopulationHttpClient, Transport, UrllibTransport
-from .storage import BatchStorage, FileStorage
+from .storage import (
+    BatchReservation,
+    BatchReservationConflict,
+    BatchReservationError,
+    BatchStorage,
+    FileStorage,
+    ReservationAwareFileStorage,
+    reserve_batch_directory,
+)
 
 
 EG6B_AREA_CODES = (
@@ -108,6 +119,14 @@ class BatchIntegrityError(ValueError):
     """Raised when a stored batch artifact does not match its manifest."""
 
 
+class BatchIdConflictError(ValueError):
+    """Raised when an approved Batch ID already has collection or backup state."""
+
+
+class TransportConstructionError(RuntimeError):
+    """Raised without implementation detail when the lazy Transport cannot be created."""
+
+
 class SafeArgumentParser(argparse.ArgumentParser):
     def error(self, message: str) -> None:
         del message
@@ -178,7 +197,11 @@ class _LazyHttpClient:
 
     def fetch_population(self, area_code: str, api_key: str, timeout_seconds: float) -> HttpResponse:
         if self._client is None:
-            self._client = SeoulPopulationHttpClient(self._transport_factory())
+            try:
+                transport = self._transport_factory()
+            except Exception as error:
+                raise TransportConstructionError("transport_construction_error") from error
+            self._client = SeoulPopulationHttpClient(transport)
         return self._client.fetch_population(area_code, api_key, timeout_seconds)
 
 
@@ -192,10 +215,22 @@ def _timeout_value(value: str) -> float:
     return timeout
 
 
+def _batch_id_value(value: str) -> str:
+    try:
+        return canonical_batch_id(value)
+    except BatchIdValidationError as error:
+        raise argparse.ArgumentTypeError("invalid batch id") from error
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = SafeArgumentParser(description="EG-6B 승인 13개 Area 단일 회차 수집")
     parser.add_argument("--env-file", type=Path, required=True)
     parser.add_argument("--output-root", type=Path, required=True)
+    parser.add_argument(
+        "--batch-id",
+        type=_batch_id_value,
+        help="PM이 승인한 canonical Batch ID (--execute-live에서 필수)",
+    )
     parser.add_argument("--timeout", type=_timeout_value, default=DEFAULT_TIMEOUT_SECONDS)
     parser.add_argument(
         "--execute-live",
@@ -213,7 +248,7 @@ def _is_within(path: Path, parent: Path) -> bool:
     return True
 
 
-def _validated_output_paths(value: Path) -> tuple[Path, Path, Path, Path]:
+def _validated_output_paths(value: Path) -> tuple[Path, Path, Path, Path, Path]:
     try:
         output_root = value.expanduser().resolve()
         project_root = PROJECT_ROOT.resolve()
@@ -233,7 +268,38 @@ def _validated_output_paths(value: Path) -> tuple[Path, Path, Path, Path]:
         or any(path.exists() and not path.is_dir() for path in candidates)
     ):
         raise CliInputError("input_error")
-    return stage_root, raw_root, metadata_root, batch_root
+    return output_root, stage_root, raw_root, metadata_root, batch_root
+
+
+def _path_present(path: Path) -> bool:
+    try:
+        return os.path.lexists(path)
+    except (OSError, ValueError):
+        return True
+
+
+def _ensure_batch_id_available(
+    *,
+    output_root: Path,
+    batch_root: Path,
+    batch_id: str,
+    environ: Mapping[str, str],
+) -> None:
+    ledger_root = output_root / backup_contract.LEDGER_RELATIVE_PATH
+    candidates = [
+        batch_root / batch_id,
+        ledger_root / "receipts" / batch_id,
+        ledger_root / "locks" / f"{batch_id}.lock",
+    ]
+    sync_value = environ.get(backup_contract.SYNC_ROOT_ENV)
+    if sync_value:
+        try:
+            sync_root = Path(sync_value).expanduser().resolve()
+        except (OSError, RuntimeError, ValueError) as error:
+            raise BatchIdConflictError("batch_id_conflict") from error
+        candidates.append(sync_root / backup_contract.DESTINATION_RELATIVE_PATH / batch_id)
+    if any(_path_present(path) for path in candidates):
+        raise BatchIdConflictError("batch_id_conflict")
 
 
 def _sha256_file(path: Path) -> str:
@@ -375,6 +441,10 @@ def _probe_storage_root(root: Path) -> None:
 def _probe_storage_roots(*roots: Path) -> None:
     for root in roots:
         _probe_storage_root(root)
+
+
+def _probe_reserved_batch_directory(reservation: BatchReservation) -> None:
+    reservation.probe_existing_directory(PROBE_FILE_PREFIX, PROBE_PAYLOAD)
 
 
 def _relative_path(path: Path, root: Path) -> str:
@@ -641,7 +711,8 @@ def _summary(
     )
 
 
-def _preflight_failure() -> int:
+def _preflight_failure(reason_code: str = "preflight_error") -> int:
+    print(f"preflight_status={reason_code}")
     outcomes = _complete_outcomes([])
     summary = _summary(
         batch_id="",
@@ -663,6 +734,7 @@ def _execute_batch(
     api_key: str,
     collector: Collector,
     batch_storage: BatchStorage,
+    reservation: BatchReservation,
     stage_root: Path,
     batch_id: str,
     clock: Callable[[], datetime],
@@ -673,10 +745,12 @@ def _execute_batch(
     outcomes: list[AreaOutcome] = []
     request_ids: set[str] = set()
     common_failure = False
+    publish_batch_evidence = True
 
     for panel_order, place in enumerate(snapshot.places, start=1):
         request_id: str | None = None
         try:
+            reservation.verify_identity()
             if not _references_unchanged(snapshot):
                 common_failure = True
                 break
@@ -697,6 +771,18 @@ def _execute_batch(
                 raw_path=Path(str(raw_value)) if raw_value else None,
                 metadata_path=result.metadata_path,
             )
+        except TransportConstructionError:
+            outcome = AreaOutcome(
+                panel_order=panel_order,
+                area_code=place.area_code,
+                request_id=request_id,
+                attempted=request_id is not None,
+                collection_status="internal_error",
+                raw_path=None,
+                metadata_path=None,
+            )
+            common_failure = True
+            publish_batch_evidence = False
         except Exception:
             outcome = AreaOutcome(
                 panel_order=panel_order,
@@ -728,42 +814,48 @@ def _execute_batch(
     manifest_saved = False
     hash_verification_passed = False
 
-    try:
-        log_document = _collection_log(
-            batch_id=batch_id,
-            panel_version=snapshot.panel_version,
-            started_at=started_at,
-            finished_at=finished_at,
-            elapsed_seconds=elapsed_seconds,
-            outcomes=completed,
-            stage_root=stage_root,
-            exit_code=exit_code,
-        )
-        collection_log_path = batch_storage.batch_directory / "collection_log.json"
-        collection_log_payload = BatchStorage.json_payload(log_document)
-        manifest_document = _manifest(
-            batch_id=batch_id,
-            created_at=finished_at,
-            snapshot=snapshot,
-            outcomes=completed,
-            collection_log_path=collection_log_path,
-            collection_log_payload=collection_log_payload,
-            stage_root=stage_root,
-        )
-        manifest_path = batch_storage.save_manifest(manifest_document)
-        manifest_saved = True
-        log_relative_path = _relative_path(collection_log_path, stage_root)
-        _verify_manifest(
-            manifest_path,
-            stage_root,
-            snapshot.paths.root,
-            pending_artifacts={log_relative_path: collection_log_payload},
-        )
-        batch_storage.save_collection_log(log_document)
-        collection_log_saved = True
-        hash_verification_passed = True
-    except Exception:
-        exit_code = 2
+    if publish_batch_evidence:
+        try:
+            reservation.verify_identity()
+            log_document = _collection_log(
+                batch_id=batch_id,
+                panel_version=snapshot.panel_version,
+                started_at=started_at,
+                finished_at=finished_at,
+                elapsed_seconds=elapsed_seconds,
+                outcomes=completed,
+                stage_root=stage_root,
+                exit_code=exit_code,
+            )
+            collection_log_path = batch_storage.batch_directory / "collection_log.json"
+            collection_log_payload = BatchStorage.json_payload(log_document)
+            manifest_document = _manifest(
+                batch_id=batch_id,
+                created_at=finished_at,
+                snapshot=snapshot,
+                outcomes=completed,
+                collection_log_path=collection_log_path,
+                collection_log_payload=collection_log_payload,
+                stage_root=stage_root,
+            )
+            reservation.verify_identity()
+            manifest_path = batch_storage.save_manifest(manifest_document)
+            manifest_saved = True
+            reservation.verify_identity()
+            log_relative_path = _relative_path(collection_log_path, stage_root)
+            _verify_manifest(
+                manifest_path,
+                stage_root,
+                snapshot.paths.root,
+                pending_artifacts={log_relative_path: collection_log_payload},
+            )
+            reservation.verify_identity()
+            batch_storage.save_collection_log(log_document)
+            collection_log_saved = True
+            reservation.verify_identity()
+            hash_verification_passed = True
+        except Exception:
+            exit_code = 2
 
     summary = _summary(
         batch_id=batch_id,
@@ -784,50 +876,78 @@ def _run(
     *,
     transport_factory: Callable[[], Transport] | None,
     storage_factory: Callable[[Path, Path], FileStorage],
-    batch_storage_factory: Callable[[Path], BatchStorage],
+    batch_storage_factory: Callable[[BatchReservation], BatchStorage],
     reference_paths: ReferencePaths,
     clock: Callable[[], datetime],
     monotonic_clock: Callable[[], float],
-    batch_id_factory: Callable[[], uuid.UUID],
     request_id_factory: Callable[[], uuid.UUID],
+    environ: Mapping[str, str],
 ) -> int:
     try:
         arguments = build_parser().parse_args(argv)
     except CliInputError:
-        return _preflight_failure()
+        return _preflight_failure("input_error")
     if not arguments.execute_live:
-        return _preflight_failure()
+        return _preflight_failure("execution_not_approved")
+    if arguments.batch_id is None:
+        return _preflight_failure("batch_id_required")
 
+    reservation: BatchReservation | None = None
     try:
-        stage_root, raw_root, metadata_root, batch_root = _validated_output_paths(arguments.output_root)
-        snapshot = _validate_references(reference_paths)
-        api_key = load_api_key(arguments.env_file)
-        _probe_storage_roots(raw_root, metadata_root, batch_root)
-        batch_id = str(batch_id_factory())
-        storage = storage_factory(raw_root, metadata_root)
-        batch_storage = batch_storage_factory(batch_root / batch_id)
-        client = _LazyHttpClient(transport_factory if transport_factory is not None else UrllibTransport)
-        collector = Collector(
-            reference_paths.official_csv,
-            client,
-            storage,
-            clock=clock,
-            request_id_factory=request_id_factory,
-            timeout_seconds=arguments.timeout,
-        )
-    except Exception:
-        return _preflight_failure()
+        try:
+            output_root, stage_root, raw_root, metadata_root, batch_root = _validated_output_paths(
+                arguments.output_root
+            )
+            _ensure_batch_id_available(
+                output_root=output_root,
+                batch_root=batch_root,
+                batch_id=arguments.batch_id,
+                environ=environ,
+            )
+            snapshot = _validate_references(reference_paths)
+            batch_id = arguments.batch_id
+            reservation = reserve_batch_directory(batch_root / batch_id)
+            _probe_storage_roots(raw_root, metadata_root)
+            _probe_reserved_batch_directory(reservation)
+            storage = ReservationAwareFileStorage(
+                storage_factory(raw_root, metadata_root),
+                reservation,
+            )
+            batch_storage = batch_storage_factory(reservation)
+            reservation.verify_identity()
+            api_key = load_api_key(arguments.env_file)
+            client = _LazyHttpClient(
+                transport_factory if transport_factory is not None else UrllibTransport
+            )
+            collector = Collector(
+                reference_paths.official_csv,
+                client,
+                storage,
+                clock=clock,
+                request_id_factory=request_id_factory,
+                timeout_seconds=arguments.timeout,
+            )
+        except (BatchIdConflictError, BatchReservationConflict):
+            return _preflight_failure("batch_id_conflict")
+        except BatchReservationError:
+            return _preflight_failure("reservation_integrity_error")
+        except Exception:
+            return _preflight_failure()
 
-    return _execute_batch(
-        snapshot=snapshot,
-        api_key=api_key,
-        collector=collector,
-        batch_storage=batch_storage,
-        stage_root=stage_root,
-        batch_id=batch_id,
-        clock=clock,
-        monotonic_clock=monotonic_clock,
-    )
+        return _execute_batch(
+            snapshot=snapshot,
+            api_key=api_key,
+            collector=collector,
+            batch_storage=batch_storage,
+            reservation=reservation,
+            stage_root=stage_root,
+            batch_id=batch_id,
+            clock=clock,
+            monotonic_clock=monotonic_clock,
+        )
+    finally:
+        if reservation is not None:
+            reservation.close()
 
 
 def run(
@@ -835,13 +955,14 @@ def run(
     *,
     transport_factory: Callable[[], Transport] | None = None,
     storage_factory: Callable[[Path, Path], FileStorage] = FileStorage,
-    batch_storage_factory: Callable[[Path], BatchStorage] = BatchStorage,
+    batch_storage_factory: Callable[[BatchReservation], BatchStorage] = BatchStorage,
     reference_paths: ReferencePaths = DEFAULT_REFERENCE_PATHS,
     clock: Callable[[], datetime] = now_seoul,
     monotonic_clock: Callable[[], float] = time.monotonic,
-    batch_id_factory: Callable[[], uuid.UUID] = uuid.uuid4,
     request_id_factory: Callable[[], uuid.UUID] = uuid.uuid4,
+    environ: Mapping[str, str] | None = None,
 ) -> int:
+    environment = os.environ if environ is None else environ
     try:
         return _run(
             argv,
@@ -851,8 +972,8 @@ def run(
             reference_paths=reference_paths,
             clock=clock,
             monotonic_clock=monotonic_clock,
-            batch_id_factory=batch_id_factory,
             request_id_factory=request_id_factory,
+            environ=environment,
         )
     except Exception:
         return _preflight_failure()
