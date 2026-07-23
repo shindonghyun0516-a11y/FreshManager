@@ -2,7 +2,7 @@
 
 # FreshManager 기술 요구사항 정의서
 
-> EG-6B 단일 수집·Backup과 EG-7 1시간 파일럿 Controller, EG-8 및 후속 Recommendation 목표 아키텍처
+> EG-6B 단일 수집·Backup과 EG-7 1시간 파일럿 Controller, EG-8(상위, EG-8A~8E) 및 후속 Recommendation 목표 아키텍처
 
 **문서 ID:** FM-TRD-001
 
@@ -56,7 +56,7 @@ Evaluation·Recommendation 결과 구조는 유지하되 동적 S-DoT는 EG-7에
 
 ## 1. 목적과 기술 범위
 
-이 TRD는 PRD의 제품 요구를 구현 계약으로 변환한다. 첫째, 현재 main에 병합된 EG-6B 단일 회차 수집기의 실제 동작·데이터·오류·보안·검증 계약을 정확히 기록한다. 둘째, EG-7 반복수집, EG-8 Feature 분석과 별도 Recommendation MVP Workstream으로 확장할 때 필요한 목표 구조와 승인 지점을 정의한다. Recommendation MVP는 공식 Gate가 아니라 별도 승인할 계획 Workstream이다.
+이 TRD는 PRD의 제품 요구를 구현 계약으로 변환한다. 첫째, 현재 main에 병합된 EG-6B 단일 회차 수집기의 실제 동작·데이터·오류·보안·검증 계약을 정확히 기록한다. 둘째, EG-7 반복수집, EG-8(상위, EG-8A~8E)과 별도 Recommendation MVP Workstream으로 확장할 때 필요한 목표 구조와 승인 지점을 정의한다. Recommendation MVP는 공식 Gate가 아니라 별도 승인할 계획 Workstream이다.
 
 본 문서는 코드보다 우선하지 않는다. EG-6B Collector와 Backup Worker의 기술 계약은
 병합된 구현과 검증 결과를 기준으로 한다. 현재 Branch·PR·Issue·실행 상태는
@@ -564,7 +564,7 @@ Scheduler와 영구 백그라운드 서비스는 없다.
 | 첫 Batch 품질 감사 | 최초 실제 EG-6B Batch | 저장·Manifest·필드·결측·지연·오류 감사와 PASS/보완 근거 |
 | Snapshot 비교 | 품질 감사 통과한 한 회차 | Area별 현재값·구성·Forecast 방향·상대순위 |
 | 초기 EDA | EG-7 평일 5영업일 | 시간대 요약·증감·피크 후보·결측·초기 1시간 오차 |
-| 공식 EG-8 | 4주 기준선+5주차 | Area Feature·선택적 S-DoT Feature·Spot Candidate Evaluation·1/3/6시간 오차·Feature 유효성 |
+| 공식 EG-8(EG-8B/EG-8D) | 4주 기준선+5주차 | Area Feature·선택적 S-DoT Feature·Spot Candidate Evaluation(EG-8D)·1/3/6시간 오차·Feature 유효성(EG-8B) |
 
 | **분석** | **방법** | **목적** |
 | --- | --- | --- |
@@ -670,7 +670,7 @@ Project Guard 검사별 현재 PASS·SKIP, 전체 집계와 Live 실행 여부�
 - T6 — 실제 구조 기반 CSV 계약·Exporter 별도 구현·누적·재생성 검증
 - T7 — EG-7 5분·1시간 Controller·파생 인덱스 오프라인 구현·독립 검토
 - T7-Live — 별도 PM 승인 운영 계획으로 동일 13개 Area 최대 156호출 파일럿
-- T8 — EG-8 Area·선택적 S-DoT Feature와 Spot Candidate Evaluation
+- T8 — EG-8(상위, EG-8A~8E); Area·선택적 S-DoT Feature와 Spot Candidate Evaluation은 EG-8D가 계승
 - T9 — Recommendation MVP Workstream(`PLANNED`, Gate number `NOT_ASSIGNED`)
 - T10 — 현장·인터뷰 결과로 121개 확대 또는 서비스 실증 여부 결정
 

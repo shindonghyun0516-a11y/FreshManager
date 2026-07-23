@@ -143,9 +143,10 @@ Issue #60과 PR #61, 첫 실제 Batch·백업·Closeout은 Issue #57과 PR #68�
 일반 Raw-to-CSV Exporter는 별도 Issue와 PM 승인으로 구현한다. EG-7은 같은
 13개 Area의 5분·1시간·12회차 반복수집 Controller와 canonical Batch 증거에서
 재생성하는 전용 Slot·Area 파생 인덱스로 제한한다. 동적 S-DoT 수집은 제외한다.
-EG-8은 Area Feature와 승인·확보된 경우의
-S-DoT Feature를 이용한 Spot Candidate Evaluation을 수행한다. Recommendation MVP는
-`PLANNED`, Gate number `NOT_ASSIGNED`이며 별도 PM 승인 전 공식 Gate가 아니다.
+EG-8D는 Area Feature와 승인·확보된 경우의
+S-DoT Feature를 이용한 Spot Candidate Evaluation을 수행한다(기존 EG-8 정의 계승;
+EG-8A~8E 전체 구조는 §3.6과 `docs/testing/QUALITY_GATES.md` §12 참조). Recommendation
+MVP는 `PLANNED`, Gate number `NOT_ASSIGNED`이며 별도 PM 승인 전 공식 Gate가 아니다.
 현재 MVP 분석 범위에는 실제 판매효과 분석을 포함하지 않는다.
 
 과거의 `시험용 10장소 → 121장소 1회 수집`은 이전 계획으로 보존하되 현재 승인된

@@ -171,7 +171,7 @@ UI는 Model Output을 직접 소비하지 않고 Recommendation Output만 소비
 
 ### 6.1 단계별 공간 범위
 
-> **공식 범위**  장기 후보군은 서울시 121개 Area다. 현재 MVP 수집·분석 패널은 EG-6A에서 확정한 13개 Area·Spot·S-DoT 연결이다. 121개 확대는 EG-7 반복수집, EG-8 Feature 분석과 별도 승인된 Recommendation MVP Workstream의 데이터 필요성을 확인한 뒤에만 검토한다.
+> **공식 범위**  장기 후보군은 서울시 121개 Area다. 현재 MVP 수집·분석 패널은 EG-6A에서 확정한 13개 Area·Spot·S-DoT 연결이다. 121개 확대는 EG-7 반복수집, EG-8(상위, EG-8A~8E)과 별도 승인된 Recommendation MVP Workstream의 데이터 필요성을 확인한 뒤에만 검토한다.
 
 | **계층** | **정의** | **현재 사용** | **금지되는 해석** |
 | --- | --- | --- | --- |
@@ -458,7 +458,7 @@ Spot Candidate는 Area 데이터와 S-DoT 근접성·공간 Context·현장검�
 | 첫 Batch 품질 감사 | 최초 실제 13개 Area 수집 직후 | 저장·Manifest·필드·결측·지연·오류와 EG-6B PASS/보완 |
 | 단일 Snapshot 비교 | 품질 감사 통과 직후 | Area별 규모·혼잡·구성·Forecast 방향·상대순위 |
 | 초기 EDA | EG-7에서 평일 5영업일 확보 후 | 시간대 평균·중앙값·증감·피크 후보·결측·초기 Forecast 오차 |
-| 공식 EG-8 분석 | 4주 기준선 후 5주차 | Area Feature·선택적 S-DoT Feature·Spot Candidate Evaluation과 Feature 유효성 |
+| 공식 EG-8 분석(EG-8B/EG-8D) | 4주 기준선 후 5주차 | Area Feature·선택적 S-DoT Feature·Spot Candidate Evaluation(EG-8D)과 Feature 유효성(EG-8B) |
 
 첫 Batch 또는 5영업일 데이터로 반복패턴·판매성과·SPOT 직접 유동인구를 확정하지 않는다.
 

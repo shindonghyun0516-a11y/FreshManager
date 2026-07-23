@@ -247,7 +247,7 @@ POI001부터 POI121까지 자동 생성
 - 실제 날짜·시각·할당량·운영 ID·계획 지문에 대한 별도 PM 결정
 - PM Live 승인 후에만 동일 13개 Area의 5분·1시간 파일럿 실행 검토
 - 첫 Batch 품질 감사 결과를 기준으로 Raw-to-CSV Exporter 별도 검토
-- EG-8에서 Area Feature·승인·확보된 경우의 S-DoT Feature·Spot Candidate Evaluation 검증
+- EG-8D에서 Area Feature·승인·확보된 경우의 S-DoT Feature·Spot Candidate Evaluation 검증(EG-8A~8E 상세는 `docs/testing/QUALITY_GATES.md` 참조)
 - 별도 PM 승인 후 Recommendation MVP Workstream 검토(`PLANNED`, Gate number `NOT_ASSIGNED`)
 
 ### 미진행
@@ -259,7 +259,7 @@ POI001부터 POI121까지 자동 생성
 - ML 학습
 - 24시간 Scheduler·영구 백그라운드 서비스·자동 재시도
 - CSV Exporter
-- EG-8 Area Feature·선택적 S-DoT Feature와 Spot Candidate Evaluation
+- EG-8D Area Feature·선택적 S-DoT Feature와 Spot Candidate Evaluation
 - Recommendation MVP Workstream(`PLANNED`, Gate number `NOT_ASSIGNED`)
 - 121장소 자동수집
 - 장기 데이터 누적
@@ -379,7 +379,7 @@ Issue #32 PM 결정에 따라 이전 최소 계약의 `parser_version` 대신
 | EG-6A | 13개 Area·Spot·S-DoT 패널 | 통과: Issue #51·PR #52로 13개 고유 공식 Area 패널 `main` 반영 |
 | EG-6B | 동일 13개 Area 단일 수집 | 통과: 첫 실제 Batch 13/13·품질·백업 무결성·원격 동기화 확인과 Closeout 완료 |
 | EG-7 | 동일 13개 Area 반복수집 파일럿 | 구현 중: Issue #69 승인 범위에 따라 Issue #70에서 오프라인 Controller·파생 인덱스 구현; Live 미승인 |
-| EG-8 | Area Feature·선택적 S-DoT Feature와 Spot Candidate Evaluation | 미진행: 반복 관측 데이터 필요 |
+| EG-8(상위) | 데이터 분석·예측·추천 준비 상위 Gate(EG-8A~8E); 기존 EG-8 정의는 EG-8D가 계승 | 미진행: 상세는 `docs/testing/QUALITY_GATES.md` 참조 |
 | Recommendation MVP Workstream | SPOT 우선·AREA fallback 추천 | `PLANNED`; Gate number `NOT_ASSIGNED`, 별도 PM 승인 필요 |
 
 EG-1과 EG-2는 Project Guard 구현 전의 읽기 전용 사전검증이다.
