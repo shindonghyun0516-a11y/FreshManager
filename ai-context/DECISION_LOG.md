@@ -149,6 +149,37 @@ PM이 승인했거나 명시적으로 보류한 제품·운영 결정을 새 AI 
   첫 1시간 이후 확대 시점.
 - Evidence: PM Decision Override, Issue #70·Draft PR #71.
 
+### D-014 — Apps Script를 PoC 상시 반복수집 Runtime으로 재채택
+
+- Date: `2026-07-24`
+- Status: `ACCEPTED`
+- Supersedes: TRD ADR-08("Google Sheets 수집 미채택")과 PRD R-09(과거 대응:
+  "현행 로컬 Python을 단일 운영 계약으로 지정")의 결정을 대체한다. 두 항목은
+  삭제하지 않고 각 문서에서 `SUPERSEDED`로 표시한다.
+- Decision: 승인된 13개 Area의 5분 상시 반복수집 Runtime은 Google Apps Script다.
+  로컬 EG-6B/EG-7(Python)은 상시 Scheduler가 아니라 기술검증·Pilot Runner로
+  유지한다. Python은 이후 정규화·분석·머신러닝을 담당한다.
+- Reason: 저장소를 읽기 전용으로 조사한 결과, 기존 ADR-08의 폐기 근거는
+  "현행 로컬 Python·원본 보존·승인 Gate와 충돌"이라는 순환적 서술이었고, 별도
+  기술 실패·API 한도·보안 사고 증거는 확인되지 않았다. 반면 로컬 EG-7은
+  `time.sleep` 기반 동기 실행 구조라 Codex·Claude Code 세션과 사용자 컴퓨터가
+  종료되면 반복수집이 중단된다는 것이 코드로 확인됐다. PM은 "Mac·Codex·Claude
+  Code가 꺼져도 5분마다 수집이 계속돼야 한다"는 요구사항을 우선해 기존에 보유한
+  Apps Script 자산을 외부에서 직접 복원·검증했다.
+- Evidence: PM이 Google 계정 화면에서 직접 확인 — 기존 Spreadsheet·Apps Script
+  프로젝트 존재, 공식 POI 코드 기반 13개 Area 호출로 개선, Script Properties에
+  `SEOUL_OPEN_API_KEY` 저장, `raw_log_v3`/`population_current_v3`/
+  `population_forecast_v3` 시트에 데이터 누적 확인. 이후 5분 시간 기반 Trigger가
+  `collectData`를 반복 실행하며 실행마다 서로 다른 `collection_run_id`로 Raw
+  13건·Current 13건·Forecast 156건이 계속 쌓이는 것을 추가로 확인 — 5분 자동수집
+  동작은 `ACTIVE`다.
+- Consequence: TRD·PRD·`etc/데이터수집 실행 가이드.md`·`docs/rules/DATA_COLLECTION_RULES.md`·
+  `PROJECT_STATUS.md`·`PROJECT_MEMORY.md`의 관련 표현을 정렬한다. 5분 자동수집
+  동작은 `ACTIVE`로 기록하되, Apps Script의 24시간 이상 장기 지속성, 소스 Git
+  버전관리, Python 파이프라인과의 데이터 통합은 각각 `NOT_COMPLETED`·`PLANNED`·
+  `PLANNED`로 별도 관리하며 이번 결정으로 완료 처리하지 않는다. `ACTIVE`(5분
+  자동수집)와 `NOT_COMPLETED`(24시간 이상 지속성)를 같은 의미로 표현하지 않는다.
+
 ## 4. 갱신 규칙
 
 새 PM 결정이 기존 결정을 대체하면 이전 항목을 삭제하지 않고 `SUPERSEDED`로 바꾸고

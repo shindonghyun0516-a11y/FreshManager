@@ -126,6 +126,33 @@ Decision Record, 기술 구조 결정 기록) 형식으로 보존한다. 현행 
 - Validation: plan v2 검증, `--cadence` 거부 테스트, 중복 보존 테스트, H-707.
 - Related decision: D-013.
 
+## ADR-010 — Apps Script를 PoC 상시 반복수집 Runtime으로 재채택
+
+- Status: `ACCEPTED`
+- Context: 로컬 EG-7 Controller는 `time.sleep` 기반 동기 실행이라 Codex·Claude
+  Code 세션과 사용자 컴퓨터가 켜져 있어야 5분 반복수집이 계속된다. PM은 "Mac과
+  Codex·Claude Code가 꺼져도 5분마다 수집이 계속돼야 한다"는 요구사항을 확정했다.
+  기존 ADR-08(TRD 내부 목록)의 Apps Script 폐기 근거는 재조사 결과 "현행 로컬
+  Python과 충돌"이라는 순환 서술이었고 별도 기술 실패 증거는 없었다.
+- Decision: 승인된 13개 Area의 5분 상시 반복수집 Runtime을 Google Apps Script로
+  채택한다. Apps Script는 POI 코드로 서울시 API를 호출하고 Script Properties의
+  `SEOUL_OPEN_API_KEY`로 Key를 관리하며, 로컬 EG-6B/EG-7은 상시 Scheduler가 아닌
+  기술검증·Pilot Runner로 유지한다.
+- Alternatives: 로컬 EG-7을 24시간 Scheduler로 확장, 독립 클라우드 Runtime(Cloud
+  Scheduler/Cloud Run) 신규 구축. 둘 다 검토했으나 PM이 이미 검증된 Apps Script
+  자산이 존재해 우선 채택했다.
+- Consequences: Apps Script의 24시간 이상 장기 지속성은 `PENDING_VALIDATION`이다.
+  Apps Script 소스의 Git 버전관리와 Python 정규화·ML 파이프라인과의 데이터 통합은
+  `PLANNED`이며 이번 결정에 포함하지 않는다. Python은 수집이 아니라 정제·분석·
+  머신러닝을 담당하는 독립적 관심사로 남는다.
+- Validation: PM이 Google 계정 화면에서 직접 확인(Spreadsheet·Apps Script 프로젝트
+  존재, POI 코드 호출, Script Properties Key, `raw_log_v3`/`population_current_v3`/
+  `population_forecast_v3` 데이터 누적). 추가로 5분 시간 기반 Trigger가 실제로
+  반복 실행되며(`collection_run_id`별 Raw 13·Current 13·Forecast 156건) 데이터가
+  계속 쌓이는 것을 확인 — 5분 자동수집은 `ACTIVE`, 24시간 이상 무중단 지속성은
+  `NOT_COMPLETED`로 구분한다. 이 저장소만으로는 재현·재검증할 수 없다.
+- Related decision: D-014, TRD ADR-15(ADR-08을 `SUPERSEDED`로 대체).
+
 ## 2. ADR 갱신 규칙
 
 결정이 바뀌면 기존 ADR을 삭제하지 않고 상태를 `SUPERSEDED`로 바꾸며 대체 ADR을

@@ -31,13 +31,38 @@
 - 운영 Plan·`pilot_run_id`·Batch ID·Plan fingerprint: `NOT_GENERATED`
 - S-DoT 동적 수집: `NOT_STARTED`
 - Spot 자동 추천: `NOT_STARTED`
-- 24시간 Scheduler: `NOT_IMPLEMENTED`
+- 24시간 Scheduler(로컬 EG-7 Live 파일럿 확대 기준): `NOT_IMPLEMENTED`
 - ML 학습: `NOT_STARTED`
+- PoC 상시 13개 Area 반복수집 Runtime: **Apps Script** `ACTIVE`(§2.1 참조)
 
 PM이 장기 기준으로 확정한 5분 주기의 EG-7 1시간 파일럿 Controller와 파생
 인덱스는 `main`에 구현됐다. 첫 Area-only 1시간 Live 수집은 시작하지 않았고,
 실제 날짜·시각·운영시간대·할당량·운영 Plan·운영 ID·계획 지문은 생성하거나
-확정하지 않았다.
+확정하지 않았다. 이 §2~§10의 EG-7 Live 파일럿 상태는 로컬 Python 기술검증
+경로에 대한 것이며, PoC의 실제 상시 반복수집 Runtime과는 별개다.
+
+## 2.1 PoC 상시 수집 Runtime — Apps Script
+
+- Runtime: Google Apps Script (5분 벽시계 트리거)
+- 상태: `ACTIVE`
+- 대상: 승인된 13개 Area, POI 코드 기준 호출(Area 이름 아님)
+- Key 관리: Apps Script Script Properties의 `SEOUL_OPEN_API_KEY`(`.env`와 별도, 자동 연결 안 됨)
+- 5분 Trigger 실행: `ACTIVE`(PM이 Apps Script 화면에서 직접 확인 — 시간 기반 Trigger가
+  `collectData`를 반복 실행 중)
+- 13개 Area 자동 반복수집: `ACTIVE`
+- 저장 위치: Google Spreadsheet `raw_log_v3` / `population_current_v3` / `population_forecast_v3`(`ACTIVE`, 현재 정본)
+- 이전 `v1`·`v2` 시트: 과거 또는 혼합 테스트 자산, 현재 정본 아님(스키마 혼합)
+- 실행 단위 식별자: 실행마다 서로 다른 `collection_run_id` 사용
+- 정상 실행 1회 기준 산출: Raw 13건 / Current 13건 / Forecast 156건
+- 중복 실행 방지: LockService 적용
+- 로컬 EG-6B/EG-7(Python): 상시 Scheduler 아님 — 기술검증·Pilot Runner로 유지(`VALIDATION_AND_PILOT_ONLY`)
+- 독립 장기 관찰(Codex·Claude Code·Mac 종료 상태 지속 여부): `IN_PROGRESS`
+- 24시간 이상 무중단 지속성 검증: `NOT_COMPLETED` — 5분 자동수집이 `ACTIVE`라는 사실과
+  혼동하지 않는다
+- Apps Script 소스 Git 버전관리: `PLANNED`
+- Apps Script 데이터 ↔ Python 정규화·ML 파이프라인 통합: `PLANNED`
+- 과거 "Apps Script 폐기" 결정(TRD ADR-08, PRD R-09): `SUPERSEDED` — 상세는
+  `ai-context/DECISION_LOG.md`와 TRD ADR-15 참조
 
 ## 3. Engineering Gate 상태
 
@@ -185,8 +210,8 @@ live_approval_status=NOT_APPROVED
 - S-DoT 동적 수집: `NOT_STARTED`
 - Spot 자동 추천: `NOT_STARTED`
 - ML 학습·성능평가: `NOT_STARTED`
-- production Scheduler: `NOT_IMPLEMENTED`
-- 자동 24시간 확대: `NOT_APPROVED`
+- production Scheduler(로컬 EG-7 기준): `NOT_IMPLEMENTED` — PoC 상시 Runtime은 Apps Script(§2.1)
+- 로컬 EG-7 Live 파일럿의 자동 24시간 확대: `NOT_APPROVED`
 - 자동 재시도: 금지
 - 일반 Raw-to-CSV Exporter: 첫 실제 파일럿 후 별도 검토
 - 121개 Area 확대: EG-8 결과와 별도 PM 승인 후 검토
