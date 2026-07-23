@@ -79,6 +79,7 @@ Evaluation·Recommendation 결과 구조는 유지하되 동적 S-DoT는 EG-7에
 | EG-7 1시간 Controller | 불변 계획·5분 경계·잠금·실패중단·사건로그 | freshmanager.eg7 |
 | EG-7 파생 인덱스 | 12행 Slot·최대 156행 Area·중복·Summary | freshmanager.eg7 |
 | Google Drive for Desktop Sync | 논리 Backup Root와 동기화 책임 분리 | `FreshManager-Data/`; 계정 이메일·절대경로 비기록 |
+| Apps Script 13개 Area 반복수집 | 5분 벽시계 트리거·POI 코드 호출·Script Properties Key·v3 시트 저장 | PoC 상시 Runtime; 저장소 밖 Apps Script 프로젝트, 소스 버전관리는 `PLANNED` |
 | Raw-to-CSV Exporter | 첫 실제 Batch 이후 확정할 파생자료 계약 | 별도 승인 대상 |
 | S-DoT 관측 데이터 계층 | Area Collector와 독립적인 보조 Feature 계층 | EG-7 제외·후속 별도 승인 |
 | Spot Candidate Evaluation | Area·선택적 S-DoT·공간 Context 결합 | EG-8; Score·가중치·임계값 OPEN_DECISION |
@@ -645,13 +646,14 @@ Project Guard 검사별 현재 PASS·SKIP, 전체 집계와 Live 실행 여부�
 | ADR-05 | 자동 재시도 0회 | 호출량·증거 명확성 | EG-7 전 재검토 가능 |
 | ADR-06 | Manifest·SHA-256 | 참조·산출물 무결성 | 유지 |
 | ADR-07 | output-root 저장소 밖 | 소스·기준데이터와 실데이터 분리 | 유지 |
-| ADR-08 | Google Sheets 수집 미채택 | 현행 로컬 Python·원본 보존·승인 Gate와 충돌 | 폐기 지침 |
+| ADR-08 | Google Sheets 수집 미채택 | 현행 로컬 Python·원본 보존·승인 Gate와 충돌 | `SUPERSEDED` — ADR-15로 대체 |
 | ADR-09 | Spot Master는 Candidate Anchor Point | 고정 판매 위치가 아니라 Area·S-DoT·공간·현장검증 기반 후보 생성의 입력 | 유지 |
 | ADR-10 | Google Drive for Desktop Sync 백업 | API·OAuth·SDK 없이 로컬 파일 계약과 원격 동기화 책임 분리 | 유지 |
 | ADR-11 | Batch 완료 직후 1회 실행형 Worker | 수집기·백업 책임 분리와 장애 격리 | 채택 |
 | ADR-12 | CSV는 첫 Batch 이후 | 실제 필드·결측·Forecast를 확인한 뒤 파생 계약 확정 | 목표 구조 |
 | ADR-13 | S-DoT는 독립·선택적 보조 데이터 계층 | Area를 대체하거나 필수 직렬 단계가 아니며 Spot Candidate 근거만 보조 | 목표 구조 |
 | ADR-14 | Recommendation MVP Workstream 분리 | EG-8 Feature 검증과 추천 제품 동작을 분리; Gate number NOT_ASSIGNED | 목표 구조 |
+| ADR-15 | Apps Script를 PoC 반복수집 Runtime으로 재채택 | ADR-08 폐기 근거(현행 로컬 Python과 충돌)가 이제 반대로 적용됨 — 로컬 Python·Codex·Claude Code 세션 종료와 무관하게 5분 반복수집이 계속돼야 한다는 요구를 로컬 EG-7(동기 실행, 세션 종속)은 충족할 수 없음. PM이 외부에서 기존 Apps Script 자산을 직접 복원·검증(POI 코드 호출·Script Properties Key·13개 Area v3 시트 누적) | `ACCEPTED` |
 
 ## 25. 미결정 기술사항
 
@@ -668,6 +670,8 @@ Project Guard 검사별 현재 PASS·SKIP, 전체 집계와 Live 실행 여부�
 - O-10 EG-7 재시도 도입 여부와 호출량·시간 정렬 영향
 - O-11 Live Preflight의 env-file·output-root·실행시각·최대 13회 호출 승인
 - O-12 실제 원격 동기화 확인과 운영자 확인 증거의 최소 계약
+- O-13 Apps Script Runtime의 24시간 이상 장기 지속성(`PENDING_VALIDATION`), 소스 Git
+  버전관리 방식(`PLANNED`), v3 시트 데이터와 Python 정규화 파이프라인의 통합 스키마(`PLANNED`)
 
 ## 26. PRD–구현 추적성
 

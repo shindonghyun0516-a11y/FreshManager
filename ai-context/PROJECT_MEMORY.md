@@ -87,8 +87,26 @@ EG-8   Area Feature + 선택적 S-DoT Feature + Spot Candidate Evaluation
 PM 승인으로 검토한다. 동일 13개 Area 반복수집은 `Asia/Seoul` 벽시계 5분이
 `PM_APPROVED_FIXED` 장기 기준이며 대안 주기와 중복 기반 변경은 허용하지 않는다.
 첫 1시간은 이 고정 기준의 구현·운영 안전성 검증이다. 일일 운영시간대, 24시간 또는
-선택 시간 운영, 할당량·용량, Live 실행과 확대 시점은 별도 OPEN이다. 자동 재시도,
-영구 Scheduler와 확대 수집은 기본값이 아니다.
+선택 시간 운영, 할당량·용량, Live 실행과 확대 시점은 별도 OPEN이다. 로컬 EG-7의
+자동 재시도, 영구 Scheduler와 확대 수집은 기본값이 아니다 — 이는 로컬 EG-7 Live
+파일럿 확대에 관한 원칙이며, PoC의 실제 상시 반복수집 Runtime 존재 여부와는 별개다.
+
+### 6.1 PoC 상시 수집 Runtime은 Apps Script다
+
+새 세션이 반복해서 다시 확인해야 하는 핵심 사실:
+
+- PoC의 13개 Area 5분 상시 반복수집은 Google Apps Script가 담당하며 `ACTIVE`다.
+  Codex·Claude Code 세션이나 사용자 로컬 컴퓨터의 종료 여부와 무관하게 동작한다.
+- 로컬 EG-6B/EG-7(Python)은 상시 Scheduler가 아니라 기술검증·Pilot Runner다.
+  새 세션이 "무인 상시수집이 필요하니 로컬 EG-7을 24시간으로 확대"하는 방향으로
+  다시 판단하지 않는다.
+- Apps Script는 Area 이름이 아니라 공식 POI 코드로 API를 호출하고, Key는 `.env`가
+  아니라 Apps Script Script Properties의 `SEOUL_OPEN_API_KEY`에 별도 저장한다.
+- 과거 "Apps Script 폐기"(TRD ADR-08, PRD R-09)는 근거 재검토 후 `SUPERSEDED`
+  됐다 — 삭제가 아니라 대체 결정(TRD ADR-15, DECISION_LOG 신규 항목)으로 기록한다.
+- Apps Script의 24시간 이상 장기 지속성은 `PENDING_VALIDATION`이다. Python ML은
+  수집 Runtime과 독립적인 관심사이며, "ML이 Python이므로 수집도 Python이어야
+  한다"는 추론을 다시 적용하지 않는다.
 
 ## 7. 새 세션 복원 순서
 

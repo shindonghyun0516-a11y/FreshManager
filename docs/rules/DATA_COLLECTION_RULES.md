@@ -824,8 +824,10 @@ API 할당량·용량, 운영 `pilot_run_id`·12개 운영 Batch ID·계획 지�
 미결정으로 해석하지 않는다.
 
 반복수집 전 백업 Gate는 Google Drive for Desktop Sync 기반 자동 백업으로 확정한다.
-수집은 로컬 Python에 유지하고 Collector와 분리된 1회 실행형 Backup Worker를 Batch
-완료 직후 호출한다. 시간 간격 기반 백업 Scheduler는 두지 않는다.
+EG-6B/EG-7 로컬 실행은 Python에 유지하고 Collector와 분리된 1회 실행형 Backup
+Worker를 Batch 완료 직후 호출한다. 시간 간격 기반 백업 Scheduler는 두지 않는다.
+PoC 상시 13개 Area 반복수집 Runtime은 Apps Script이며, 이 절의 Backup Gate는
+로컬 EG-6B/EG-7 기술검증 Batch에 적용된다.
 
 EG-6B Collector 자체에는 Backup Worker와 CSV Exporter가 없다. EG-7 Controller는
 기존 Collector와 Backup Worker를 중복 구현하지 않고 승인 Batch ID로 각각 최대

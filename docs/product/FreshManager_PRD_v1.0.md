@@ -473,7 +473,7 @@ Spot Candidate는 Area 데이터와 S-DoT 근접성·공간 Context·현장검�
 | R-06 | 중복 실행·호출량 초과 | 높음 | EG-7 잠금·고정 5분 계획·호출예산·Live 할당량 Gate |
 | R-07 | 날씨 미래정보 누수 | 높음 | 예보·관측 분리와 point-in-time join |
 | R-08 | 문서 상태가 코드보다 뒤처짐 | 중간 | 현재 Branch·PR·Issue·실행 상태를 PROJECT_STATUS 한 곳에서 갱신 |
-| R-09 | 과거 Google Sheets 실행 지침 또는 임의 주기 재사용 | 중간 | 현행 로컬 Python과 PM 확정 5분 장기 기준을 단일 운영 계약으로 지정 |
+| R-09 | Apps Script Runtime의 장기 지속성 미검증 상태를 24시간 상시운영 완료로 오인 | 중간 | PM 확정 5분 장기 기준은 유지하되 Apps Script의 연속 실행 상태는 `PENDING_VALIDATION`으로 명시하고, 로컬 EG-7은 상시 Scheduler가 아닌 기술검증·Pilot Runner로 구분 |
 | R-10 | 1인 운영 과부하 | 중간 | 최소 필드·표준 라이브러리·승인 단계별 확장 |
 
 ## 15. PM 결정 필요사항
