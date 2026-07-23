@@ -1,11 +1,11 @@
 # Analysis Plan
 
 - 문서 상태: Draft
-- 버전: v0.1.1
+- 버전: v0.1.3
 - 작성자: 신동현
 - 최종 승인자: 신동현
 - 최초 작성일: 2026-07-17
-- 최종 수정일: 2026-07-22
+- 최종 수정일: 2026-07-24
 - 적용 프로젝트: Freshmanager Data PoC
 - 관련 문서:
   - `AGENTS.md`
@@ -16,6 +16,8 @@
   - `docs/data/FIELD_DICTIONARY.md`
   - `docs/data/CLOUD_BACKUP_AND_CSV_MANAGEMENT_PLAN.md`
   - `docs/testing/QUALITY_GATES.md`
+  - `docs/data/ML_READY_DATASET_SPEC.md`(EG-8A/EG-8B ML-ready 데이터셋 정본)
+  - `docs/product/RECOMMENDATION_OUTPUT_CONTRACT.md`(EG-8E 추천 출력 정본)
 - 변경 시 PM 승인: 필요
 
 ---
@@ -193,6 +195,21 @@ S-DoT는 Area 내부 활성 위치 판단을 보조하는 독립·선택적 데�
 Spot Candidate Evaluation은 고정 판매 위치나 판매효과가 아니라 후속 추천 입력
 근거다. Score·가중치·임계값은 `PLANNED` 또는 `OPEN_DECISION`이다.
 
+### 6.5 EG-8B·EG-8C Gate 연결
+
+이 문서의 기존 EDA(§9.3)·Forecast 평가(§18~20)·Baseline(§18) 방법론은
+EG-8B(EDA·서울시 Forecast 평가·Baseline·Feature Dataset)에 대응한다. §6.4의
+Spot Candidate Evaluation은 EG-8D가 계승한 기존 EG-8 정의와 동일하다.
+
+미래 Area 인구 예측과 피크 발생 여부·예상 피크시각을 다루는 모델링은
+EG-8C(미래 Area 인구·피크 예측 모델)에 대응한다. EG-8C는 EG-8B가 만든 Baseline
+(B0/B1/B2/서울시 공식 예측) 대비 성능이 확인된 뒤에만 채택하며, 모델 알고리즘
+자체는 §29.1에서 `OPEN_DECISION`으로 남긴다.
+
+ML-ready 데이터셋의 상세 스키마·버전 계약은 `docs/data/ML_READY_DATASET_SPEC.md`
+가, Recommendation 결과 출력 계약은 `docs/product/RECOMMENDATION_OUTPUT_CONTRACT.md`가
+소유한다. 이 문서는 그 두 문서와 분석 방법론을 중복 정의하지 않는다.
+
 ---
 
 ## 7. 장소 분석 단위
@@ -290,14 +307,21 @@ EG-7에서 평일 5일 데이터가 확보되면 시간대 평균·중앙값, Ar
 갱신주기·결측·연결 가능성을 먼저 검토한다. 이는 초기 EDA이며 공식 서비스 성능·
 판매효과 판정이 아니다.
 
+데이터가 누적되면 다음도 함께 탐색한다(EG-8B 범위).
+
+- 평일·주말 비교(초기 5영업일에는 주말 데이터가 없으므로 후속 주차에서 확인)
+- 동일 관측값이 반복되는 비율(중복률)
+- Area 간 인구·혼잡 패턴의 상관관계
+
 ### 9.4 4주 기준선과 5주차 공식 분석
 
 1~4주 데이터로 요일·시간대 기준선과 Area 변동성·장소 순위 안정성을 만들고,
 5주차 데이터로 피크 사전탐지, Forecast 1·3·6시간 오차, S-DoT 보조가치,
-Area Feature·선택적 S-DoT Feature·Spot Candidate Evaluation, SPOT 추천 가능조건과 AREA fallback
-적정성을 평가한다. 이 시점을 EG-8 공식 Feature 분석과 PoC 데이터 타당성 판정
-시점으로 사용한다. Recommendation MVP Workstream은 `PLANNED`, Gate number
-`NOT_ASSIGNED`이며 이 결과와 별도 PM 승인 후 시작한다.
+Area Feature·선택적 S-DoT Feature·Spot Candidate Evaluation(EG-8D가 계승한 기존
+EG-8 정의), SPOT 추천 가능조건과 AREA fallback 적정성을 평가한다. 이 시점을
+EG-8(EG-8B/EG-8D) 공식 분석과 PoC 데이터 타당성 판정 시점으로 사용한다.
+Recommendation MVP Workstream은 `PLANNED`, Gate number `NOT_ASSIGNED`이며 이
+결과와 별도 PM 승인 후 시작한다.
 
 ---
 
@@ -327,6 +351,23 @@ Area Feature·선택적 S-DoT Feature·Spot Candidate Evaluation, SPOT 추천 �
 - B2
 - 피크 탐지
 - 패턴 재현성
+
+### 10.1 시계열 분할 원칙(EG-8C 모델 검토 전제)
+
+EG-8C에서 자체 예측 모델을 검토할 경우 다음 분할 원칙을 지킨다.
+
+- 무작위(random) 분할을 금지한다.
+- Train/Validation/Test는 반드시 시간순으로 분할한다.
+- 평가 기간 데이터를 학습 기간에 섞지 않는다(§26 미래정보 누수 금지와 동일 원칙).
+- 동일 `forecast_target_time`에 대한 중복 예측은 평가 시 이중 계산하지 않도록
+  관리한다(중복 처리 자체는 원본 삭제가 아니라 집계 시 플래그 기반 처리).
+- 학습기간과 평가기간을 분리하고, 평가기간 데이터로 만든 통계를 학습 입력에
+  역으로 사용하지 않는다.
+- Area별 평가와 전체 Area 평가를 분리해서 보고한다. 전체 평균이 양호해도 특정
+  Area의 성능 저하를 숨기지 않는다.
+
+이 원칙은 §10의 기존 기준선·평가 기간 분리 원칙을 EG-8C 모델 검토로 확장한
+것이며 새로운 상충 규칙을 만들지 않는다.
 
 ---
 
@@ -604,6 +645,20 @@ forecast_snapshot_time
 
 구체 임계값은 데이터 분포를 확인한 뒤 버전 업데이트로 승인한다.
 
+### 21.1 피크 탐지 성능 지표(EG-8C)
+
+위 피크 정의는 관측된 데이터에서 무엇을 피크로 볼지 정의한다. EG-8C가 미래
+피크를 예측하는 모델을 검토할 경우, 그 예측 성능은 다음 별도 지표로 평가한다.
+
+- 피크 발생 탐지: 실제 피크가 발생한 시점을 모델이 피크로 예측했는지 여부
+  (탐지율·오탐률)
+- 피크 시각 오차: 예측한 피크 시각과 실제 피크 시각의 차이
+- 조기 탐지 시간: 실제 피크 발생 전 얼마나 일찍 피크를 예측했는지(리드타임)
+
+이 지표들의 목표 수준(예: 허용 탐지율, 허용 시각 오차)은 아직 확정하지 않는다.
+
+**상태: `OPEN_DECISION`**
+
 ---
 
 ## 22. 출퇴근·점심 시간 구분
@@ -770,6 +825,26 @@ Gate A는 기술적 데이터 타당성을 평가한다.
 - FAIL
 
 구체 임계값은 EG-7 및 반복수집 시험 결과를 확인한 뒤 PM이 승인한다.
+
+### 29.1 EG-8C 모델 검토
+
+EG-8C(미래 Area 인구·피크 예측 모델)의 모델 알고리즘은 이 시점까지도 확정하지
+않는다.
+
+**상태: `OPEN_DECISION`**
+
+원칙:
+
+- 자체 모델은 §18의 Baseline 비교(B0 → B1 → B2 → 서울시 공식 예측)가 끝난 뒤
+  필요성이 확인된 경우에만 검토한다(§18 원칙 그대로 적용).
+- 모델 후보를 기록하더라도 이를 채택 결정으로 표현하지 않는다.
+- 모델이 Baseline을 유의미하게 능가하지 못하면 채택하지 않고 Baseline을 잠정
+  사용한다.
+- 시계열 분할은 §10.1 원칙을 따른다.
+- 피크 예측 성능은 §21.1 지표를 따른다.
+
+이 절은 `docs/testing/QUALITY_GATES.md` §12.3(EG-8C)의 통과기준과 동일한
+원칙을 분석 방법론 수준에서 반복한 것이며 새로운 기준을 만들지 않는다.
 
 ---
 
@@ -973,6 +1048,7 @@ ANALYSIS_PLAN은 다음 조건을 만족해야 Approved 상태로 전환할 수 
 
 | 버전 | 날짜 | 변경내용 | 작성자 | 승인상태 |
 |---|---|---|---|---|
+| v0.1.3 | 2026-07-24 | EG-8B·EG-8C Gate 연결(§6.5), 시계열 분할 원칙(§10.1), 피크 탐지 성능 지표(§21.1), EG-8C 모델 OPEN_DECISION(§29.1) 추가; 기존 EG-8 표현을 EG-8B/EG-8D로 정렬 | 신동현 | PM 결정 |
 | v0.1.2 | 2026-07-23 | 15분·30분·1시간 분석 집계·시차를 PM 확정 5분 수집주기 대안과 명확히 분리 | 신동현 | PM 최종 결정 |
 | v0.1.1 (Issue #58 보완) | 2026-07-22 | 첫 Batch·5영업일·4주/5주차 분석과 Area·선택적 S-DoT·Spot Candidate Evaluation·후속 Recommendation 경계 정렬 | 신동현 | PM Diff 검토 전 |
 | v0.1.0 | 2026-07-17 | 최초 분석계획 초안 작성 | 신동현 | Draft |
