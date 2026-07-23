@@ -147,7 +147,10 @@ Decision Record, 기술 구조 결정 기록) 형식으로 보존한다. 현행 
   머신러닝을 담당하는 독립적 관심사로 남는다.
 - Validation: PM이 Google 계정 화면에서 직접 확인(Spreadsheet·Apps Script 프로젝트
   존재, POI 코드 호출, Script Properties Key, `raw_log_v3`/`population_current_v3`/
-  `population_forecast_v3` 데이터 누적). 이 저장소만으로는 재현·재검증할 수 없다.
+  `population_forecast_v3` 데이터 누적). 추가로 5분 시간 기반 Trigger가 실제로
+  반복 실행되며(`collection_run_id`별 Raw 13·Current 13·Forecast 156건) 데이터가
+  계속 쌓이는 것을 확인 — 5분 자동수집은 `ACTIVE`, 24시간 이상 무중단 지속성은
+  `NOT_COMPLETED`로 구분한다. 이 저장소만으로는 재현·재검증할 수 없다.
 - Related decision: D-014, TRD ADR-15(ADR-08을 `SUPERSEDED`로 대체).
 
 ## 2. ADR 갱신 규칙

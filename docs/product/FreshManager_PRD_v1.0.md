@@ -473,7 +473,7 @@ Spot Candidate는 Area 데이터와 S-DoT 근접성·공간 Context·현장검�
 | R-06 | 중복 실행·호출량 초과 | 높음 | EG-7 잠금·고정 5분 계획·호출예산·Live 할당량 Gate |
 | R-07 | 날씨 미래정보 누수 | 높음 | 예보·관측 분리와 point-in-time join |
 | R-08 | 문서 상태가 코드보다 뒤처짐 | 중간 | 현재 Branch·PR·Issue·실행 상태를 PROJECT_STATUS 한 곳에서 갱신 |
-| R-09 | Apps Script Runtime의 장기 지속성 미검증 상태를 24시간 상시운영 완료로 오인 | 중간 | PM 확정 5분 장기 기준은 유지하되 Apps Script의 연속 실행 상태는 `PENDING_VALIDATION`으로 명시하고, 로컬 EG-7은 상시 Scheduler가 아닌 기술검증·Pilot Runner로 구분 |
+| R-09 | 5분 자동수집 `ACTIVE`와 24시간 이상 장기 지속성 검증 완료를 혼동 | 중간 | PM이 Apps Script 5분 Trigger의 반복 실행과 데이터 누적을 직접 확인해 5분 자동수집은 `ACTIVE`로 기록하되, 24시간 이상 무중단 지속성은 별도로 `NOT_COMPLETED`로 구분한다. 로컬 EG-7은 상시 Scheduler가 아닌 기술검증·Pilot Runner로 유지 |
 | R-10 | 1인 운영 과부하 | 중간 | 최소 필드·표준 라이브러리·승인 단계별 확장 |
 
 ## 15. PM 결정 필요사항

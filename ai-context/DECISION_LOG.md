@@ -169,12 +169,16 @@ PM이 승인했거나 명시적으로 보류한 제품·운영 결정을 새 AI 
 - Evidence: PM이 Google 계정 화면에서 직접 확인 — 기존 Spreadsheet·Apps Script
   프로젝트 존재, 공식 POI 코드 기반 13개 Area 호출로 개선, Script Properties에
   `SEOUL_OPEN_API_KEY` 저장, `raw_log_v3`/`population_current_v3`/
-  `population_forecast_v3` 시트에 데이터 누적 확인.
+  `population_forecast_v3` 시트에 데이터 누적 확인. 이후 5분 시간 기반 Trigger가
+  `collectData`를 반복 실행하며 실행마다 서로 다른 `collection_run_id`로 Raw
+  13건·Current 13건·Forecast 156건이 계속 쌓이는 것을 추가로 확인 — 5분 자동수집
+  동작은 `ACTIVE`다.
 - Consequence: TRD·PRD·`etc/데이터수집 실행 가이드.md`·`docs/rules/DATA_COLLECTION_RULES.md`·
-  `PROJECT_STATUS.md`·`PROJECT_MEMORY.md`의 관련 표현을 정렬한다. Apps Script의
-  24시간 이상 장기 지속성, 소스 Git 버전관리, Python 파이프라인과의 데이터 통합은
-  각각 `PENDING_VALIDATION`·`PLANNED`·`PLANNED`로 별도 관리하며 이번 결정으로
-  완료 처리하지 않는다.
+  `PROJECT_STATUS.md`·`PROJECT_MEMORY.md`의 관련 표현을 정렬한다. 5분 자동수집
+  동작은 `ACTIVE`로 기록하되, Apps Script의 24시간 이상 장기 지속성, 소스 Git
+  버전관리, Python 파이프라인과의 데이터 통합은 각각 `NOT_COMPLETED`·`PLANNED`·
+  `PLANNED`로 별도 관리하며 이번 결정으로 완료 처리하지 않는다. `ACTIVE`(5분
+  자동수집)와 `NOT_COMPLETED`(24시간 이상 지속성)를 같은 의미로 표현하지 않는다.
 
 ## 4. 갱신 규칙
 

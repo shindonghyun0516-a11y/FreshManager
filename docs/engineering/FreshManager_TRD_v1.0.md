@@ -79,7 +79,7 @@ Evaluation·Recommendation 결과 구조는 유지하되 동적 S-DoT는 EG-7에
 | EG-7 1시간 Controller | 불변 계획·5분 경계·잠금·실패중단·사건로그 | freshmanager.eg7 |
 | EG-7 파생 인덱스 | 12행 Slot·최대 156행 Area·중복·Summary | freshmanager.eg7 |
 | Google Drive for Desktop Sync | 논리 Backup Root와 동기화 책임 분리 | `FreshManager-Data/`; 계정 이메일·절대경로 비기록 |
-| Apps Script 13개 Area 반복수집 | 5분 벽시계 트리거·POI 코드 호출·Script Properties Key·v3 시트 저장 | PoC 상시 Runtime; 저장소 밖 Apps Script 프로젝트, 소스 버전관리는 `PLANNED` |
+| Apps Script 13개 Area 반복수집 | 5분 시간 기반 Trigger(`ACTIVE`)·POI 코드 호출·LockService 중복실행 방지·Script Properties Key·실행별 `collection_run_id`·v3 시트 저장(Raw 13·Current 13·Forecast 156건/회) | PoC 상시 Runtime; 저장소 밖 Apps Script 프로젝트, 소스 버전관리는 `PLANNED`, 24시간 이상 지속성은 `NOT_COMPLETED` |
 | Raw-to-CSV Exporter | 첫 실제 Batch 이후 확정할 파생자료 계약 | 별도 승인 대상 |
 | S-DoT 관측 데이터 계층 | Area Collector와 독립적인 보조 Feature 계층 | EG-7 제외·후속 별도 승인 |
 | Spot Candidate Evaluation | Area·선택적 S-DoT·공간 Context 결합 | EG-8; Score·가중치·임계값 OPEN_DECISION |
@@ -653,7 +653,7 @@ Project Guard 검사별 현재 PASS·SKIP, 전체 집계와 Live 실행 여부�
 | ADR-12 | CSV는 첫 Batch 이후 | 실제 필드·결측·Forecast를 확인한 뒤 파생 계약 확정 | 목표 구조 |
 | ADR-13 | S-DoT는 독립·선택적 보조 데이터 계층 | Area를 대체하거나 필수 직렬 단계가 아니며 Spot Candidate 근거만 보조 | 목표 구조 |
 | ADR-14 | Recommendation MVP Workstream 분리 | EG-8 Feature 검증과 추천 제품 동작을 분리; Gate number NOT_ASSIGNED | 목표 구조 |
-| ADR-15 | Apps Script를 PoC 반복수집 Runtime으로 재채택 | ADR-08 폐기 근거(현행 로컬 Python과 충돌)가 이제 반대로 적용됨 — 로컬 Python·Codex·Claude Code 세션 종료와 무관하게 5분 반복수집이 계속돼야 한다는 요구를 로컬 EG-7(동기 실행, 세션 종속)은 충족할 수 없음. PM이 외부에서 기존 Apps Script 자산을 직접 복원·검증(POI 코드 호출·Script Properties Key·13개 Area v3 시트 누적) | `ACCEPTED` |
+| ADR-15 | Apps Script를 PoC 반복수집 Runtime으로 재채택 | ADR-08 폐기 근거(현행 로컬 Python과 충돌)가 이제 반대로 적용됨 — 로컬 Python·Codex·Claude Code 세션 종료와 무관하게 5분 반복수집이 계속돼야 한다는 요구를 로컬 EG-7(동기 실행, 세션 종속)은 충족할 수 없음. PM이 외부에서 기존 Apps Script 자산을 직접 복원·검증(POI 코드 호출·Script Properties Key·13개 Area v3 시트 누적)했고, 이후 5분 시간 기반 Trigger가 실제로 반복 실행 중임을 재확인함 | `ACCEPTED`; 5분 자동수집 `ACTIVE`, 24시간 이상 지속성 `NOT_COMPLETED` |
 
 ## 25. 미결정 기술사항
 

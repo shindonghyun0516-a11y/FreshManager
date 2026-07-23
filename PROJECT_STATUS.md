@@ -47,10 +47,18 @@ PM이 장기 기준으로 확정한 5분 주기의 EG-7 1시간 파일럿 Contro
 - 상태: `ACTIVE`
 - 대상: 승인된 13개 Area, POI 코드 기준 호출(Area 이름 아님)
 - Key 관리: Apps Script Script Properties의 `SEOUL_OPEN_API_KEY`(`.env`와 별도, 자동 연결 안 됨)
-- 저장 위치: Google Spreadsheet `raw_log_v3` / `population_current_v3` / `population_forecast_v3`
-- 이전 `v2` 시트: 정본 아님(스키마 혼합)
-- 로컬 EG-6B/EG-7(Python): 상시 Scheduler 아님 — 기술검증·Pilot Runner로 유지
-- 24시간 이상 장기 지속성: `PENDING_VALIDATION`(1회 확인만 있음, 장기 관찰 필요)
+- 5분 Trigger 실행: `ACTIVE`(PM이 Apps Script 화면에서 직접 확인 — 시간 기반 Trigger가
+  `collectData`를 반복 실행 중)
+- 13개 Area 자동 반복수집: `ACTIVE`
+- 저장 위치: Google Spreadsheet `raw_log_v3` / `population_current_v3` / `population_forecast_v3`(`ACTIVE`, 현재 정본)
+- 이전 `v1`·`v2` 시트: 과거 또는 혼합 테스트 자산, 현재 정본 아님(스키마 혼합)
+- 실행 단위 식별자: 실행마다 서로 다른 `collection_run_id` 사용
+- 정상 실행 1회 기준 산출: Raw 13건 / Current 13건 / Forecast 156건
+- 중복 실행 방지: LockService 적용
+- 로컬 EG-6B/EG-7(Python): 상시 Scheduler 아님 — 기술검증·Pilot Runner로 유지(`VALIDATION_AND_PILOT_ONLY`)
+- 독립 장기 관찰(Codex·Claude Code·Mac 종료 상태 지속 여부): `IN_PROGRESS`
+- 24시간 이상 무중단 지속성 검증: `NOT_COMPLETED` — 5분 자동수집이 `ACTIVE`라는 사실과
+  혼동하지 않는다
 - Apps Script 소스 Git 버전관리: `PLANNED`
 - Apps Script 데이터 ↔ Python 정규화·ML 파이프라인 통합: `PLANNED`
 - 과거 "Apps Script 폐기" 결정(TRD ADR-08, PRD R-09): `SUPERSEDED` — 상세는

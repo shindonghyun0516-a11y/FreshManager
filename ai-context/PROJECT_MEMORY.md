@@ -95,7 +95,8 @@ PM 승인으로 검토한다. 동일 13개 Area 반복수집은 `Asia/Seoul` 벽
 
 새 세션이 반복해서 다시 확인해야 하는 핵심 사실:
 
-- PoC의 13개 Area 5분 상시 반복수집은 Google Apps Script가 담당하며 `ACTIVE`다.
+- PoC의 13개 Area 5분 상시 반복수집은 Google Apps Script가 담당하며 5분 Trigger
+  실행과 자동 반복수집 모두 `ACTIVE`다(PM이 Apps Script 화면에서 직접 확인).
   Codex·Claude Code 세션이나 사용자 로컬 컴퓨터의 종료 여부와 무관하게 동작한다.
 - 로컬 EG-6B/EG-7(Python)은 상시 Scheduler가 아니라 기술검증·Pilot Runner다.
   새 세션이 "무인 상시수집이 필요하니 로컬 EG-7을 24시간으로 확대"하는 방향으로
@@ -104,9 +105,14 @@ PM 승인으로 검토한다. 동일 13개 Area 반복수집은 `Asia/Seoul` 벽
   아니라 Apps Script Script Properties의 `SEOUL_OPEN_API_KEY`에 별도 저장한다.
 - 과거 "Apps Script 폐기"(TRD ADR-08, PRD R-09)는 근거 재검토 후 `SUPERSEDED`
   됐다 — 삭제가 아니라 대체 결정(TRD ADR-15, DECISION_LOG 신규 항목)으로 기록한다.
-- Apps Script의 24시간 이상 장기 지속성은 `PENDING_VALIDATION`이다. Python ML은
-  수집 Runtime과 독립적인 관심사이며, "ML이 Python이므로 수집도 Python이어야
-  한다"는 추론을 다시 적용하지 않는다.
+- 복원 경위: 기존 여의도 단일 Area Apps Script 자산 발견 → Script Properties 적용 →
+  공식 POI 코드 기반 13개 Area로 확장 → 이전 `v2` 시트의 스키마 혼합 문제 발견 →
+  신규 `v3` 시트로 정본 분리 → 수동 1회 실행 검증 → 5분 Trigger 활성화 → 반복
+  실행과 데이터 누적을 직접 확인.
+- **`ACTIVE`와 `NOT_COMPLETED`를 혼동하지 않는다.** 5분 자동수집 동작은 `ACTIVE`이지만,
+  24시간 이상 장기 무중단 지속성 검증은 `NOT_COMPLETED`다. 새 세션은 이 둘을 같은
+  의미로 표현하지 않는다. Python ML은 수집 Runtime과 독립적인 관심사이며, "ML이
+  Python이므로 수집도 Python이어야 한다"는 추론을 다시 적용하지 않는다.
 
 ## 7. 새 세션 복원 순서
 
