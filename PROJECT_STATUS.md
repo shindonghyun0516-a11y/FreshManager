@@ -13,9 +13,10 @@
 - 저장소: `shindonghyun0516-a11y/FreshManager`
 - 기준 `main` SHA: `be07b4bf37d5e0ad7c4ee65e7208f44c9b2b4ea3`
 - 현재 Branch: `feat/issue-70-eg7-one-hour-pilot`
+- 구현 Commit: `a648a2f18ce157957ddb9662b4e630479177ff00`
 - Planning Issue #69: `OPEN`
 - Implementation Issue #70: `OPEN`
-- Draft PR: `PENDING_FIRST_PUSH`
+- Draft PR #71: `OPEN · DRAFT`
 - Merge: `NOT_MERGED`
 - 현재 Engineering Gate: `EG-7 OFFLINE IMPLEMENTATION`
 - EG-7 Live: `NOT_APPROVED`
@@ -187,7 +188,8 @@ live_approval_status=NOT_APPROVED
 - 기존 운영 증거 변경: `0`
 - 기존 Fake 증거 변경: `0`
 
-GitHub CI는 Draft PR 생성 후 확인한다. H-707은 구현과 함께 `PASS`로 활성화됐지만
+GitHub CI: `IN_PROGRESS` — Draft PR #71의 최종 HEAD 결과를 확인한다.
+H-707은 구현과 함께 `PASS`로 활성화됐지만
 이는 합성 계약 검사이며 실제 할당량·
 운영 계획·PM Live 승인 완료를 의미하지 않는다.
 
@@ -196,7 +198,7 @@ GitHub CI는 Draft PR 생성 후 확인한다. H-707은 구현과 함께 `PASS`�
 - Issue #69: 승인 범위의 Planning Issue, 계속 `OPEN`
 - Issue #70: 구현 Issue, 계속 `OPEN`
 - Branch: `feat/issue-70-eg7-one-hour-pilot`
-- Draft PR: 첫 Push 후 생성
+- Draft PR #71: `OPEN · DRAFT`, target `main`
 - Ready 전환: 금지
 - Merge: 금지
 - 두 Issue Close: 금지
@@ -205,10 +207,9 @@ GitHub CI는 Draft PR 생성 후 확인한다. H-707은 구현과 함께 `PASS`�
 
 1. EG-7 Target Tests·전체 Unit Tests·Project Guard·H-706·H-707·H-708·
    `git diff --check`를 실행한다.
-2. 변경을 Commit·Push하고 `main` 대상 Draft PR 하나를 연다.
-3. Draft PR의 GitHub CI를 확인한다.
-4. Issue #69와 #70은 열린 상태로 두고 독립 검토를 요청한다.
-5. Ready 전환·Merge·Live 실행 없이 중단한다.
+2. Draft PR #71 최종 HEAD의 GitHub CI를 확인한다.
+3. Issue #69와 #70은 열린 상태로 두고 독립 검토를 요청한다.
+4. Ready 전환·Merge·Live 실행 없이 중단한다.
 
 ## 11. 새 세션 복원 메모
 
