@@ -158,8 +158,8 @@ Backup Worker는 Batch의 Collection Log·Manifest 게시와 무결성 검증이
 
 1. Google Drive for Desktop Sync에 연결된 논리 루트 `FreshManager-Data/01_raw-backup/eg6b-single-13/` 아래 같은 파일시스템의 임시 Batch 디렉터리를 만든다.
 2. Raw·Metadata·Collection Log·Manifest를 함께 복사한다.
-3. 원본과 복사본의 파일 수를 비교한다.
-4. Manifest 기준 크기·SHA-256을 복사본에서 재검증한다.
+3. Manifest가 선언한 정본 파일 수와 복사본의 정본 파일 수를 비교한다.
+4. Manifest 기준 상대경로·크기·SHA-256을 복사본에서 재검증한다.
 5. 검증이 통과한 경우에만 임시 디렉터리를 최종 `batch_id` 경로로 원자적으로 게시한다.
 6. 실패하면 최종 정상 경로를 만들지 않고 상태와 비민감 오류만 기록한다.
 
@@ -181,6 +181,27 @@ Backup Worker는 Batch의 Collection Log·Manifest 게시와 무결성 검증이
 - 실제 Raw 전문과 사용자 절대경로의 운영 로그 출력 금지
 
 백업 실패와 CSV 생성 실패는 모두 서울시 API 재호출 사유가 아니다.
+
+### 12.1 macOS `.DS_Store` 처리
+
+`.DS_Store`는 macOS Finder가 폴더 보기 정보를 저장하기 위해 만드는 플랫폼
+메타데이터다. FreshManager 수집 증거나 Manifest 정본 파일이 아니다.
+
+- Backup 검증은 전체 폴더의 단순 파일 수가 아니라 Manifest가 선언한 정본 파일의
+  상대경로·크기·SHA-256을 기준으로 한다.
+- 일반 파일이면서 basename이 정확히 `.DS_Store`인 항목만 정본 수·해시 판정에서
+  제외하고 `ignored_platform_metadata_count`로 별도 집계한다.
+- 모든 숨김파일·dotfile·운영체제 파일을 넓게 무시하지 않는다. 다른 추가 파일,
+  승인되지 않은 숨김파일과 예상 밖 심볼릭 링크는
+  `UNEXPECTED_NONCANONICAL_FILE`로 실패한다.
+- `.DS_Store`를 Manifest나 Receipt에 추가하지 않으며 자동 삭제·수정하지 않는다.
+- Source·Backup 정본과 기존 Receipt도 읽기 전용 검증 과정에서 변경하지 않는다.
+- 기존 EG-6B Live Batch는 이 보정 때문에 다시 수집하거나 Backup Worker를 다시
+  실행하지 않는다. 보정 코드 병합 후 읽기 전용으로 다시 검증하고, 그때까지
+  Issue #57을 열어 둔다.
+
+기존 Receipt는 실행 당시 상태를 남긴 역사적 증거다. 읽기 전용 재검증 결과를
+반영하려고 기존 Receipt를 다시 쓰거나 대체하지 않는다.
 
 ## 13. 백업 상태 모델
 
