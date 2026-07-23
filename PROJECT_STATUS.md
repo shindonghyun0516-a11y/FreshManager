@@ -11,9 +11,10 @@
 ## 2. 현재 요약
 
 - 저장소: `shindonghyun0516-a11y/FreshManager`
-- 기준 `main` SHA: `562f984d7f84203196b34f8d1d827310405d3cc3`
-- 공식 현재 Branch: `main`
-- 구현 기준: PR #71 Squash Merge SHA
+- 정본 Branch: `main`
+- 현재 `main` SHA: `VERIFY_AT_SESSION_START`
+- local·`origin/main` 일치: `MUST_BE_VERIFIED_AT_SESSION_START`
+- 마지막으로 검증된 EG-7 기능 구현 기준선: PR #71 Squash Merge SHA
   `562f984d7f84203196b34f8d1d827310405d3cc3`
 - Planning Issue #69: `OPEN`
 - Implementation Issue #70: `CLOSED`
@@ -57,7 +58,8 @@ PM이 장기 기준으로 확정한 5분 주기의 EG-7 1시간 파일럿 Contro
 EG-7 post-merge 상태:
 
 - PR #71: `MERGED`
-- Squash Merge SHA: `562f984d7f84203196b34f8d1d827310405d3cc3`
+- PR #71 Squash Merge SHA 이력:
+  `562f984d7f84203196b34f8d1d827310405d3cc3`
 - Issue #70: `CLOSED`
 - Issue #69: `OPEN`
 - EG-7 구현: `AVAILABLE_ON_MAIN`
@@ -219,7 +221,7 @@ mapping은 변경하지 않았고 Spot 후보는 계속 `field_verified=false`�
 
 ## 8. 검증 상태
 
-PR #71 병합 직후 exact-main
+PR #71 병합 직후 당시 exact-main
 `562f984d7f84203196b34f8d1d827310405d3cc3`에서 확인한 결과:
 
 - EG-7 Target Tests: `33/33 PASS`
@@ -247,10 +249,11 @@ H-707은 구현과 함께 `PASS`로 활성화됐지만 이는 합성 계약 검�
 
 ## 9. GitHub 상태
 
-- 공식 현재 Branch: `main`
-- local `main`: `562f984d7f84203196b34f8d1d827310405d3cc3`
-- `origin/main`: `562f984d7f84203196b34f8d1d827310405d3cc3`
-- local·origin `main` 일치: `YES`
+- 정본 Branch: `main`
+- 현재 `main` SHA: `VERIFY_AT_SESSION_START`
+- local·`origin/main` 일치: `MUST_BE_VERIFIED_AT_SESSION_START`
+- 확인 방법: 세션 시작 시 `local main`과 `origin/main`을 조회·비교
+- 주의: 문서에 기록된 과거 SHA를 현재 HEAD로 가정하지 않음
 - PR #71: `MERGED`
 - Issue #70: `CLOSED`
 - Issue #69: `OPEN`
@@ -299,10 +302,13 @@ H-707은 구현과 함께 `PASS`로 활성화됐지만 이는 합성 계약 검�
 Issue #69와 현재 Diff → 관련 Rule·Quality·Data 문서 → Decision Log·ADR 순서로
 읽는다.
 
-공식 현재 Branch는 `main`, 기준 SHA는
-`562f984d7f84203196b34f8d1d827310405d3cc3`다. PR #71은 병합됐고 Issue #70은
-종료됐으며 Issue #69는 열려 있다. EG-7 구현과 고정 5분 장기 주기는 `main`에
-있지만 Live 수집은 시작하지 않았다. API 할당량은 `UNCONFIRMED`, 운영 Plan·
-`pilot_run_id`·Batch ID·Plan fingerprint는 아직 존재하지 않는다. S-DoT 동적
-수집·ML 학습·Spot 실행도 시작하지 않았다. 다음 작업은 첫 Live 파일럿 preflight와
-정확한 Plan에 대한 한정된 PM 승인이다. EG-7 구현 Branch를 다시 만들지 않는다.
+정본 Branch는 `main`이다. 새 세션 시작 시 `origin`을 fetch하고 `local main`과
+`origin/main`을 조회·비교해 현재 HEAD를 확인한다. 문서에 저장된 SHA를 현재 HEAD로
+가정하지 않는다. PR #71은 병합됐고 Issue #70은 종료됐으며 Issue #69는 열려 있다.
+마지막으로 검증된 EG-7 고정주기 기능 구현 기준선은 PR #71 Squash Merge SHA
+`562f984d7f84203196b34f8d1d827310405d3cc3`다. EG-7 구현과 고정 5분 장기 주기는
+`main`에 있지만 Live 수집은 시작하지 않았다. API 할당량은 `UNCONFIRMED`, 운영
+Plan·`pilot_run_id`·Batch ID·Plan fingerprint는 아직 존재하지 않는다. S-DoT
+동적 수집·ML 학습·Spot 실행도 시작하지 않았다. 다음 작업은 첫 Live 파일럿
+preflight와 정확한 Plan에 대한 한정된 PM 승인이다. EG-7 구현 Branch를 다시
+만들지 않는다.
