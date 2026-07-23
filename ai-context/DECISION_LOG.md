@@ -108,6 +108,47 @@ PM이 승인했거나 명시적으로 보류한 제품·운영 결정을 새 AI 
 - Decision: CSV는 조회·정렬·분석용 파생자료이며 Raw JSON이 공식 원본이다.
 - Consequence: CSV는 첫 실제 Batch 품질 감사 후 별도 구현하고, 생성 실패 시 Raw에서 재생성하며 API를 재호출하지 않는다.
 
+### D-012 — EG-7 첫 파일럿은 5분·1시간 승인 계획
+
+- Date: `2026-07-23`
+- Status: `ACCEPTED`
+- Decision: 첫 EG-7 구현은 `Asia/Seoul` 벽시계 5분 경계, 1시간, 12회차,
+  고정 13 Area, 전체 최대 156호출, Area별 회차당 최대 1회, 재시도 0회로 제한한다.
+- Identity: 하나의 `pilot_run_id`와 회차별 시각·사전 생성 UUIDv4 Batch ID를 가진
+  불변 계획 Option C를 사용한다. 건너뛴 ID도 계획 이력에 남겨 재사용하지 않는다.
+- Scheduling: 늦은 회차는 `SKIPPED_MISSED`, 이전 Collector와 즉시 Backup이
+  끝나지 않은 회차는 `SKIPPED_OVERLAP`이며 지연 보충수집은 하지 않는다.
+- Failure: 개별 Area 실패는 기록 후 계속할 수 있지만 확정 공통·자격증명·스키마·
+  할당량·저장·Backup 실패는 남은 회차를 중단한다. Backup 실패로 재수집하지 않는다.
+- Data: Raw를 모두 보존하고 Area별 중복 관측시각·Raw SHA-256·Forecast 대상시각
+  집합을 canonical 증거 기반 Slot·Area 파생 인덱스와 Summary에 기록한다.
+- Excluded: 동적 S-DoT, Spot 평가, Recommendation, ML 학습, 24시간·영구 Scheduler.
+- Open Live decisions: 실제 날짜·시작시각·할당량 확인·운영 `pilot_run_id`·12개
+  Batch ID·계획 지문·PM Live 승인.
+- Evidence: Issue #69 승인 범위, Issue #70 구현.
+
+### D-013 — 5분은 고정 장기 반복수집 기준
+
+- Date: `2026-07-23`
+- Status: `ACCEPTED · PM_APPROVED_FIXED`
+- Supersedes: 5분을 파일럿 전용·비교 후보·OPEN 결정으로 표현한 모든 과거 문구.
+- Closed decision: `cadence_minutes=5`,
+  `cadence_decision_status=PM_APPROVED_FIXED`,
+  `long_term_baseline_status=ACTIVE`,
+  `cadence_scope=LONG_TERM_OPERATING_BASELINE`, `cadence_change_allowed=false`.
+- Scheduling: `Asia/Seoul` 벽시계 5분 정렬을 사용한다. 10분·15분 대안은 지원·평가하지
+  않으며 새 PM 명시 결정과 버전 계약·코드 검토 없이는 변경할 수 없다.
+- Duplicate policy: 모든 Raw를 보존하고 중복 플래그·건수·비율을 기록한다. 중복만으로
+  계획 호출을 생략하거나 주기를 바꾸지 않으며 제거·표본선택·가중치는 EG-8
+  데이터셋 구성에서 다룬다.
+- Pilot purpose: 첫 1시간은 12개 정렬 슬롯, Collector·Backup 완료, 무중첩·무보충,
+  최대 156호출, 시간·저장·중복·추적·실패처리와 장기 확대 전 구현·용량 문제를
+  검증한다. 주기 선택 실험이 아니다.
+- Open decisions: 실제 날짜·시작시각, 일일 운영시간대, 24시간 또는 선택 시간 운영,
+  API 할당량·용량 Gate, 운영 `pilot_run_id`·12개 Batch ID·계획 지문, PM Live 승인,
+  첫 1시간 이후 확대 시점.
+- Evidence: PM Decision Override, Issue #70·Draft PR #71.
+
 ## 4. 갱신 규칙
 
 새 PM 결정이 기존 결정을 대체하면 이전 항목을 삭제하지 않고 `SUPERSEDED`로 바꾸고

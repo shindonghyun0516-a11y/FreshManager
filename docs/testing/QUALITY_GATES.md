@@ -65,8 +65,9 @@ EG-0 문서 기준선
 
 현재 게이트와 완료·대기 상태는 `PROJECT_STATUS.md`에서만 관리한다. 완료 이력으로
 `EG-1 | 통과:` 공식 CSV 정비·검증, EG-4는 Issue #43, EG-6A는 PR #52,
-EG-6B 구현은 PR #54, 독립 Backup Worker는 Issue #60·PR #61에서 각각 정리됐다.
-이 완료 이력은 실제 EG-6B Live 실행이나 다음 게이트 승인을 자동으로 뜻하지 않는다.
+EG-6B 구현은 PR #54, 독립 Backup Worker는 Issue #60·PR #61, 첫 실제 Batch와
+최종 Closeout은 Issue #57·PR #68에서 각각 정리됐다. EG-7 구현 범위는 Issue #69에서
+승인됐고 Issue #70의 동일 PR에서 Controller와 파생 인덱스를 함께 구현한다.
 
 GitHub Actions Workflow는
 구현되어 Base Branch와 관계없이 모든 Pull Request와 `main` Push에서 Project Guard와
@@ -81,7 +82,10 @@ EG-6A의 13개 제안 지역 Area·Spot·센서 참조에서 삼성역은 강남
 
 EG-6A에서 기존 `H-703`을 13지역 참조데이터 무결성 검사로 활성화했고, EG-6B
 구현과 함께 `H-706`을, Backup Worker 계약에서 `H-708`을 로컬 복사 무결성
-검사로 정의했다. 검사별 현재 PASS·SKIP과 집계는 `PROJECT_STATUS.md`를 따른다.
+검사로 정의했다. EG-7 오프라인 구현에서는 기존 `H-707`을 PM 확정 5분 장기 기준,
+비 5분 계획 거부, 대안·중복 기반 변경 금지, 1시간·12회차·13 Area·최대 156호출·
+재시도 0회와 할당량 미확인 Live 차단을 확인하는 검사로 활성화한다. 검사별 현재
+PASS·SKIP과 집계는 `PROJECT_STATUS.md`를 따른다.
 
 ---
 
@@ -395,7 +399,8 @@ Gate가 아니다. 독립 Worker·H-708·실제 Sync Root·원격 동기화 확�
 `PROJECT_STATUS.md`에서 확인한다. CSV Exporter는 첫 실제 Batch 품질 감사 후 별도
 Issue에서 구현한다.
 
-EG-6B 단일 수집 결과와 별도 PM 승인을 받은 뒤 EG-7로 진행한다.
+EG-6B 단일 수집·백업·Closeout 결과와 별도 PM 범위 승인을 받아 EG-7 오프라인
+구현에 진입했다. 이는 실제 반복수집 Live 승인이 아니다.
 
 ---
 
@@ -403,21 +408,55 @@ EG-6B 단일 수집 결과와 별도 PM 승인을 받은 뒤 EG-7로 진행한�
 
 ### 진입조건
 
-- EG-6B 통과
-- PM의 반복수집 주기·호출량·운영시간 승인
+- EG-6B 통과와 첫 실제 Batch 품질·Backup Closeout 완료
+- PM의 5분 장기 기준과 첫 1시간·12회차·13 Area·최대 156호출·재시도 0회 구현 승인
 - Google Drive 자동 백업 Worker의 로컬 복사·무결성·원격 동기화 확인 계약 검증
-- 첫 실제 Batch 기반 CSV 계약과 누적·재생성 계약 검증
+- 실제 날짜·시각·API 할당량·운영 ID·계획 지문·PM Live 승인은 구현과 분리해 OPEN 유지
 
-### 통과조건
+### 구현 계약
 
-- EG-6B에서 확정한 동일 13개 Area만 승인 주기로 반복 관측한다.
-- Area 반복수집과 독립적으로 S-DoT 관측 데이터의 접근성·갱신주기·결측·Area 연결
-  가능성을 검토하며, 센서 수집 실패로 Area 수집을 중단하지 않는다.
-- 한 장소 실패가 다른 장소와 후속 회차의 정상 결과를 삭제하지 않는다.
-- 회차별 Batch 계약과 원본·메타데이터·예측 스냅샷을 보존한다.
-- 실제 호출량·성공률·실패율·갱신주기·저장공간 증가량을 보고한다.
-- 수집은 로컬 Python에서 유지하고 백업만 별도로 운영한다.
-- Backup Worker 실패와 CSV 생성 실패는 서울시 API 재호출 사유가 아니다.
+- 버전이 있는 불변 계획은 `cadence_minutes=5`,
+  `cadence_decision_status=PM_APPROVED_FIXED`,
+  `long_term_baseline_status=ACTIVE`,
+  `cadence_scope=LONG_TERM_OPERATING_BASELINE`, `cadence_change_allowed=false`,
+  `pilot_run_id`, 12개 벽시계 시각과 사전 생성 UUIDv4 Batch ID, Area 순서,
+  호출예산, 할당량·Live 승인 상태를 보존한다. 비 5분 계획과 런타임 주기 옵션은
+  거부한다.
+- `Asia/Seoul` 5분 경계 12개를 누적 오차 없이 계산한다. 늦은 회차와 이전
+  Collector·즉시 Backup이 끝나지 않은 회차는 각각 `SKIPPED_MISSED`,
+  `SKIPPED_OVERLAP`으로 종결하고 지연 보충수집을 하지 않는다.
+- 파일럿 전역 Lock은 원자적으로 한 실행만 허용하고 stale Lock을 자동 삭제하지 않는다.
+- 실행 회차는 기존 EG-6B Collector를 승인 Batch ID로 최대 한 번 호출하고,
+  증거가 완결된 Batch의 Backup Worker를 최대 한 번 호출한다.
+- 개별 Area 실패는 재시도 없이 기록하고 기존 Collector가 허용하는 범위에서 계속한다.
+  확정된 공통 API·자격증명·스키마·할당량·저장·Backup 실패는 남은 회차를 중단한다.
+- Backup 실패는 Source를 보존하고 Collector 재실행·대체 ID·재수집을 만들지 않는다.
+- 모든 계획 회차는 append-only 사건 로그와 고정 12행 Slot Index에 종결상태를 남긴다.
+- 실제 시도 Area만 최대 156행 Area Observation Index에 기록한다. 중복 관측시각,
+  Raw SHA-256과 Forecast 대상시각의 의미 정규화된 canonical 정렬 집합은 Area별
+  파생 플래그로 남긴다. Forecast signature는 같은 instant를 한 번만 남기고
+  `YYYY-MM-DDTHH:MM:SS+09:00` 오름차순 불변 tuple로 만들며 원본 배열 순서는
+  비교에 사용하지 않는다. Raw를 삭제·병합·수정하지 않고, 중복만으로 계획 호출을
+  생략하거나 주기를 바꾸지 않으며 제거·표본선택·가중치는 EG-8 데이터셋 구성으로
+  미룬다.
+- 파생 CSV·JSONL은 canonical Batch 증거로 재생성할 수 있고 기존 Manifest에 추가하지 않는다.
+- H-707은 합성 입력으로 위 계약과 `UNCONFIRMED` Live 차단을 검증한다. H-707 PASS는
+  실제 할당량 확인·운영 계획 생성·PM Live 승인을 뜻하지 않는다.
+- 첫 1시간은 5분 주기를 고르는 시험이 아니라 12개 정렬 슬롯, Collector·Backup,
+  무중첩·무보충, 호출상한, 시간·용량·중복·추적·실패 안전성을 검증한다.
+- 일일 운영시간대, 24시간 또는 선택 시간 운영, 첫 1시간 이후 확대 시점은 별도
+  OPEN이며 5분 주기는 `CLOSED · PM_APPROVED`다.
+- S-DoT 동적 수집, Spot 평가, Recommendation, ML 학습, 24시간 Scheduler와 영구
+  백그라운드 서비스는 제외한다.
+
+### 실제 파일럿 통과조건
+
+- PM이 실제 날짜·시작시각·API 할당량·운영 `pilot_run_id`·12개 Batch ID·계획
+  지문과 Live 실행을 별도로 승인한다.
+- 동일 13개 Area만 실행하고 최대 156호출·재시도 0회·무보충·중복 보존 계약을 지킨다.
+- 실제 호출량·성공률·실패율·중복률·갱신주기·Collector/Backup 소요시간·
+  저장공간 증가량을 보고한다.
+- 모든 적격 Batch가 `LOCAL_SYNC_COPY_VERIFIED`를 기록하고 PM이 원격 동기화를 확인한다.
 
 ### 다음 단계
 

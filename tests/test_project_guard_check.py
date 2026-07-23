@@ -1936,6 +1936,215 @@ class Eg6bProjectGuardTests(unittest.TestCase):
         self.assertEqual(result.status, project_guard.Status.FAIL)
 
 
+class Eg7ProjectGuardTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.project = TemporaryProject()
+        module_path = self.project.root / "freshmanager/eg7.py"
+        module_path.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(ROOT / "freshmanager/eg7.py", module_path)
+        for relative_path in project_guard.H707_CANONICAL_DOCUMENT_PATHS:
+            target = self.project.root / relative_path
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(ROOT / relative_path, target)
+
+    def tearDown(self) -> None:
+        self.project.close()
+
+    def check(self) -> project_guard.CheckResult:
+        return project_guard.check_h707(self.project.context())
+
+    def replace_document_text(
+        self,
+        relative_path: str,
+        old: str,
+        new: str,
+    ) -> None:
+        path = self.project.root / relative_path
+        text = path.read_text(encoding="utf-8")
+        self.assertIn(old, text)
+        path.write_text(text.replace(old, new, 1), encoding="utf-8")
+
+    def test_h707_one_hour_pilot_contract_passes(self) -> None:
+        result = self.check()
+        self.assertEqual(result.status, project_guard.Status.PASS, result.evidence)
+
+    def test_h707_missing_controller_module_fails(self) -> None:
+        (self.project.root / "freshmanager/eg7.py").unlink()
+        self.assertEqual(self.check().status, project_guard.Status.FAIL)
+
+    def test_h707_changed_cadence_fails(self) -> None:
+        with mock.patch.object(project_guard.eg7_cli, "CADENCE_MINUTES", 10):
+            result = self.check()
+        self.assertEqual(result.status, project_guard.Status.FAIL)
+
+    def test_h707_validator_accepting_cadence_15_fails(self) -> None:
+        original = project_guard.eg7_cli.validate_plan
+
+        def accepts_fifteen(document: object) -> object:
+            candidate = json.loads(json.dumps(document))
+            if candidate.get("cadence_minutes") == 15:
+                candidate["cadence_minutes"] = 5
+            return original(candidate)
+
+        with mock.patch.object(
+            project_guard.eg7_cli,
+            "validate_plan",
+            side_effect=accepts_fifteen,
+        ):
+            result = self.check()
+        self.assertEqual(result.status, project_guard.Status.FAIL)
+
+    def test_h707_validator_accepting_cadence_1_fails(self) -> None:
+        original = project_guard.eg7_cli.validate_plan
+
+        def accepts_one(document: object) -> object:
+            candidate = json.loads(json.dumps(document))
+            if candidate.get("cadence_minutes") == 1:
+                candidate["cadence_minutes"] = 5
+            return original(candidate)
+
+        with mock.patch.object(
+            project_guard.eg7_cli,
+            "validate_plan",
+            side_effect=accepts_one,
+        ):
+            result = self.check()
+        self.assertEqual(result.status, project_guard.Status.FAIL)
+
+    def test_h707_changed_permanent_cadence_decision_fails(self) -> None:
+        with mock.patch.object(
+            project_guard.eg7_cli,
+            "CADENCE_DECISION_STATUS",
+            "PILOT_ONLY",
+        ):
+            result = self.check()
+        self.assertEqual(result.status, project_guard.Status.FAIL)
+
+    def test_h707_missing_pm_approval_plan_field_fails(self) -> None:
+        fields = tuple(
+            field
+            for field in project_guard.eg7_cli.PLAN_FIELDS
+            if field != "cadence_decision_status"
+        )
+        with mock.patch.object(project_guard.eg7_cli, "PLAN_FIELDS", fields):
+            result = self.check()
+        self.assertEqual(result.status, project_guard.Status.FAIL)
+
+    def test_h707_changed_long_term_baseline_fails(self) -> None:
+        with mock.patch.object(
+            project_guard.eg7_cli,
+            "LONG_TERM_BASELINE_STATUS",
+            "PROVISIONAL",
+        ):
+            result = self.check()
+        self.assertEqual(result.status, project_guard.Status.FAIL)
+
+    def test_h707_missing_field_dictionary_fails(self) -> None:
+        (self.project.root / "docs/data/FIELD_DICTIONARY.md").unlink()
+        result = self.check()
+        self.assertEqual(result.status, project_guard.Status.FAIL)
+
+    def test_h707_field_dictionary_contradiction_fails(self) -> None:
+        self.replace_document_text(
+            "docs/data/FIELD_DICTIONARY.md",
+            "| `CADENCE_MINUTES` | `5` |",
+            "| `CADENCE_MINUTES` | `15` |",
+        )
+        result = self.check()
+        self.assertEqual(result.status, project_guard.Status.FAIL)
+
+    def test_h707_plan_schema_version_divergence_fails(self) -> None:
+        with mock.patch.object(
+            project_guard.eg7_cli,
+            "PLAN_SCHEMA_VERSION",
+            "eg7-pilot-plan-v3",
+        ):
+            result = self.check()
+        self.assertEqual(result.status, project_guard.Status.FAIL)
+
+    def test_h707_field_dictionary_schema_divergence_fails(self) -> None:
+        self.replace_document_text(
+            "docs/data/FIELD_DICTIONARY.md",
+            "| `PLAN_SCHEMA_VERSION` | `eg7-pilot-plan-v2` |",
+            "| `PLAN_SCHEMA_VERSION` | `eg7-pilot-plan-v3` |",
+        )
+        result = self.check()
+        self.assertEqual(result.status, project_guard.Status.FAIL)
+
+    def test_h707_required_plan_field_list_divergence_fails(self) -> None:
+        with mock.patch.object(
+            project_guard.eg7_cli,
+            "PLAN_FIELDS",
+            (*project_guard.eg7_cli.PLAN_FIELDS, "cadence_override"),
+        ):
+            result = self.check()
+        self.assertEqual(result.status, project_guard.Status.FAIL)
+
+    def test_h707_canonical_document_calling_five_minutes_provisional_fails(
+        self,
+    ) -> None:
+        self.replace_document_text(
+            "PROJECT_STATUS.md",
+            "| Five-minute Cadence Fixed | `YES` |",
+            "| Five-minute Cadence Fixed | `PROVISIONAL` |",
+        )
+        result = self.check()
+        self.assertEqual(result.status, project_guard.Status.FAIL)
+
+    def test_h707_duplicate_suppression_regression_fails(self) -> None:
+        original = project_guard.eg7_cli.run_scheduled_pilot
+
+        def suppress_second_slot(*args: object, **kwargs: object) -> object:
+            collector = kwargs["collector_runner"]
+
+            def suppressing_collector(slot: object) -> object:
+                if slot.slot_index == 1:
+                    current = kwargs["clock"]()
+                    return project_guard.eg7_cli.CollectorExecution(
+                        exit_code=0,
+                        started_at=current,
+                        ended_at=current,
+                        collection_log={
+                            "attempted_count": 13,
+                            "success_count": 13,
+                            "failure_count": 0,
+                            "area_results": [],
+                        },
+                    )
+                return collector(slot)
+
+            return original(
+                *args,
+                **{**kwargs, "collector_runner": suppressing_collector},
+            )
+
+        with mock.patch.object(
+            project_guard.eg7_cli,
+            "run_scheduled_pilot",
+            side_effect=suppress_second_slot,
+        ):
+            result = self.check()
+        self.assertEqual(result.status, project_guard.Status.FAIL)
+
+    def test_h707_forecast_duplicate_contract_divergence_fails(self) -> None:
+        with mock.patch.object(
+            project_guard.eg7_cli,
+            "canonical_forecast_target_signature",
+            side_effect=lambda values: tuple(str(value) for value in values),
+        ):
+            result = self.check()
+        self.assertEqual(result.status, project_guard.Status.FAIL)
+
+    def test_h707_unconfirmed_live_gate_bypass_fails(self) -> None:
+        with mock.patch.object(
+            project_guard.eg7_cli,
+            "validate_live_approval",
+            return_value=None,
+        ):
+            result = self.check()
+        self.assertEqual(result.status, project_guard.Status.FAIL)
+
+
 class BackupProjectGuardTests(unittest.TestCase):
     def setUp(self) -> None:
         self.project = TemporaryProject()
@@ -1997,8 +2206,8 @@ class RegistryAndExitCodeTests(unittest.TestCase):
         counts = Counter(item.status for item in results)
         self.assertEqual(counts[project_guard.Status.FAIL], 0)
         self.assertEqual(counts[project_guard.Status.WARN], 0)
-        self.assertEqual(counts[project_guard.Status.PASS], 42)
-        self.assertEqual(counts[project_guard.Status.SKIP], 5)
+        self.assertEqual(counts[project_guard.Status.PASS], 43)
+        self.assertEqual(counts[project_guard.Status.SKIP], 4)
         self.assertEqual(len(results), 47)
         self.assertEqual(sum(counts.values()), 47)
         status_by_id = {item.check_id: item.status for item in results}
@@ -2009,10 +2218,10 @@ class RegistryAndExitCodeTests(unittest.TestCase):
             "H-704",
             "H-705",
             "H-706",
+            "H-707",
             "H-708",
         ):
             self.assertEqual(status_by_id[check_id], project_guard.Status.PASS)
-        self.assertEqual(status_by_id["H-707"], project_guard.Status.SKIP)
 
     def test_exit_code_zero_for_success(self) -> None:
         result = project_guard.make_result("H-404", project_guard.Status.PASS, "success")

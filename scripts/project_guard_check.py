@@ -22,7 +22,7 @@ import tempfile
 import uuid
 from collections import Counter
 from dataclasses import dataclass, replace
-from datetime import datetime
+from datetime import datetime, timedelta
 from enum import Enum
 from pathlib import Path
 from typing import Callable, Iterable, Mapping, Sequence
@@ -38,6 +38,7 @@ from freshmanager.collector import Collector, HttpResponse  # noqa: E402
 from freshmanager.config import ConfigError, load_api_key, mask_secret  # noqa: E402
 from freshmanager import eg5 as eg5_cli  # noqa: E402
 from freshmanager import eg6b as eg6b_cli  # noqa: E402
+from freshmanager import eg7 as eg7_cli  # noqa: E402
 from freshmanager import backup as backup_worker  # noqa: E402
 from freshmanager.http_adapter import BASE_URL, SeoulPopulationHttpClient  # noqa: E402
 from freshmanager.offline import run as run_offline  # noqa: E402
@@ -140,6 +141,54 @@ DOCUMENT_PATHS = [
     Path("docs/testing/QUALITY_GATES.md"),
     Path("docs/testing/PROJECT_GUARD_REPORT_TEMPLATE.md"),
 ]
+H707_CANONICAL_DOCUMENT_PATHS = (
+    Path("PROJECT_STATUS.md"),
+    Path("docs/data/FIELD_DICTIONARY.md"),
+    Path("docs/engineering/FreshManager_TRD_v1.0.md"),
+    Path("docs/rules/DATA_COLLECTION_RULES.md"),
+    Path("docs/testing/QUALITY_GATES.md"),
+    Path("docs/testing/PROJECT_GUARD_SPEC.md"),
+    Path("ai-context/DECISION_LOG.md"),
+    Path("ai-context/ARCHITECTURE_DECISIONS.md"),
+)
+H707_PLAN_FIELDS = (
+    "schema_version",
+    "pilot_run_id",
+    "timezone",
+    "cadence_minutes",
+    "cadence_decision_status",
+    "long_term_baseline_status",
+    "cadence_scope",
+    "cadence_change_allowed",
+    "planned_start_at",
+    "planned_end_at",
+    "planned_slot_count",
+    "max_api_calls",
+    "retry_count",
+    "area_count",
+    "area_order_contract",
+    "quota_confirmation_status",
+    "live_approval_status",
+    "slots",
+)
+H707_FIELD_DICTIONARY_CONTRACT = {
+    "PLAN_SCHEMA_VERSION": "eg7-pilot-plan-v2",
+    "PLAN_FIELDS": ",".join(H707_PLAN_FIELDS),
+    "CADENCE_MINUTES": "5",
+    "CADENCE_DECISION_STATUS": "PM_APPROVED_FIXED",
+    "LONG_TERM_BASELINE_STATUS": "ACTIVE",
+    "CADENCE_SCOPE": "LONG_TERM_OPERATING_BASELINE",
+    "CADENCE_CHANGE_ALLOWED": "false",
+    "ALTERNATIVE_CADENCES_SUPPORTED": "false",
+    "DUPLICATE_TRIGGERED_CADENCE_CHANGE": "false",
+    "RUNTIME_CADENCE_OVERRIDE": "UNSUPPORTED",
+    "FIRST_ONE_HOUR_SELECTS_CADENCE": "false",
+    "FORECAST_DUPLICATE_SIGNATURE": (
+        "CANONICAL_SORTED_SET_OF_NORMALIZED_TARGET_INSTANTS"
+    ),
+    "LIVE_REQUIRES_SEPARATE_PM_APPROVAL": "true",
+    "OPERATING_WINDOW_STATUS": "OPEN_PM_DECISION",
+}
 STANDARD_PROJECT_GUARD_COMMAND = "python3 scripts/project_guard_check.py"
 EG3_STATUS_ROW = "| EG-3 | Project Guard 구현 및 자동 재검증 | 구현·로컬 검증 완료: PASS 28, SKIP 17 |"
 
@@ -299,6 +348,67 @@ def markdown_section(text: str, heading: str) -> str:
     next_heading = re.search(r"^##\s+", text[match.end():], flags=re.MULTILINE)
     end = match.end() + next_heading.start() if next_heading else len(text)
     return text[match.start():end]
+
+
+def markdown_heading_section(text: str, heading: str) -> str:
+    match = re.search(
+        rf"^(?P<marks>#{{1,6}})\s+{re.escape(heading)}\s*$",
+        text,
+        flags=re.MULTILINE,
+    )
+    if not match:
+        return ""
+    level = len(match.group("marks"))
+    next_heading = re.search(
+        rf"^#{{1,{level}}}\s+",
+        text[match.end():],
+        flags=re.MULTILINE,
+    )
+    end = match.end() + next_heading.start() if next_heading else len(text)
+    return text[match.start():end]
+
+
+def markdown_key_value_table(
+    section: str,
+    first_header: str,
+    second_header: str,
+) -> dict[str, str] | None:
+    lines = section.splitlines()
+    header_index = next(
+        (
+            index
+            for index, line in enumerate(lines)
+            if [cell.strip() for cell in line.strip().strip("|").split("|")]
+            == [first_header, second_header]
+        ),
+        None,
+    )
+    if header_index is None or header_index + 1 >= len(lines):
+        return None
+    separator = [
+        cell.strip()
+        for cell in lines[header_index + 1].strip().strip("|").split("|")
+    ]
+    if len(separator) != 2 or any(
+        not re.fullmatch(r":?-{3,}:?", cell) for cell in separator
+    ):
+        return None
+    result: dict[str, str] = {}
+    for line in lines[header_index + 2 :]:
+        stripped = line.strip()
+        if not stripped.startswith("|"):
+            if result:
+                break
+            continue
+        cells = [cell.strip() for cell in stripped.strip("|").split("|")]
+        if len(cells) != 2:
+            return None
+        key = cells[0].strip("`")
+        value = cells[1].strip("`")
+        if not key or key in result:
+            return None
+        result[key] = value
+    return result or None
 
 
 def current_gate_status_conflicts(text: str) -> list[str]:
@@ -2483,6 +2593,653 @@ def check_h706(context: ProjectGuardContext) -> CheckResult:
     )
 
 
+def _h707_canonical_document_issue(context: ProjectGuardContext) -> str | None:
+    missing = [
+        path.as_posix()
+        for path in H707_CANONICAL_DOCUMENT_PATHS
+        if not (context.root / path).is_file()
+    ]
+    if missing:
+        return f"필수 EG-7 정본 누락={missing}"
+
+    texts = {
+        path: read_text(context.root / path) for path in H707_CANONICAL_DOCUMENT_PATHS
+    }
+    field_path = Path("docs/data/FIELD_DICTIONARY.md")
+    field_section = markdown_heading_section(
+        texts[field_path],
+        "8.3 EG-7 파일럿 계획·사건·파생 인덱스 계약",
+    )
+    field_contract = markdown_key_value_table(
+        field_section,
+        "contract_key",
+        "required_value",
+    )
+    if field_contract != H707_FIELD_DICTIONARY_CONTRACT:
+        return "FIELD_DICTIONARY Plan v2 canonical 계약표 불일치"
+    normalized_field_section = re.sub(r"\s+", " ", field_section)
+    if any(
+        token not in normalized_field_section
+        for token in (
+            "YYYY-MM-DDTHH:MM:SS+09:00",
+            "plan_fingerprint",
+            "원본 Forecast 배열 순서는 비교에 사용하지",
+            "EG-8 데이터셋",
+        )
+    ):
+        return "FIELD_DICTIONARY 시각·Forecast·EG-8 계약 불일치"
+
+    status_path = Path("PROJECT_STATUS.md")
+    decision_section = markdown_heading_section(
+        texts[status_path],
+        "4.1 영구 주기 결정",
+    )
+    decision_table = markdown_key_value_table(
+        decision_section,
+        "Permanent Cadence Decision",
+        "상태",
+    )
+    expected_decisions = {
+        "Five-minute Cadence Fixed": "YES",
+        "PM Approval Status": "PM_APPROVED_FIXED",
+        "Long-term Baseline Status": "ACTIVE",
+        "Alternative Cadences Supported": "NO",
+        "Duplicate-triggered Cadence Change": "NO",
+        "Plan Validation for Non-five-minute Cadence": "REJECTED",
+        "Documentation Updated": "YES",
+        "Operating Window Status": "OPEN_PM_DECISION",
+    }
+    if decision_table != expected_decisions:
+        return "PROJECT_STATUS 영구 주기 결정표 불일치"
+    live_section = markdown_heading_section(texts[status_path], "5. Live 차단 상태")
+    if any(
+        token not in live_section
+        for token in (
+            "명시적 PM Live 승인",
+            "일일 운영시간대",
+            "CLOSED · PM_APPROVED",
+        )
+    ):
+        return "PROJECT_STATUS Live·운영시간 경계 불일치"
+
+    section_requirements: dict[Path, tuple[tuple[str, tuple[str, ...]], ...]] = {
+        Path("docs/engineering/FreshManager_TRD_v1.0.md"): (
+            (
+                "15.1 계획과 시간 계약",
+                (
+                    "cadence_minutes=5",
+                    "cadence_decision_status=PM_APPROVED_FIXED",
+                    "long_term_baseline_status=ACTIVE",
+                    "cadence_scope=LONG_TERM_OPERATING_BASELINE",
+                    "대안 주기는 지원하지",
+                    "10분·15분 대안을 비교하지 않는다",
+                    "YYYY-MM-DDTHH:MM:SS+09:00",
+                ),
+            ),
+            (
+                "15.3 파생 데이터와 중복 계약",
+                (
+                    "의미 정규화된 canonical 정렬 집합",
+                    "같은 instant를 집합 안에서 한 번만",
+                    "원본 Forecast 배열 순서는 비교에 사용하지",
+                    "계획 API 호출 생략이나 주기 변경 조건이 아니다",
+                    "EG-8에서 다룬다",
+                ),
+            ),
+            (
+                "15.4 승인 경계",
+                (
+                    "PM Live 승인이 모두 확인되기 전",
+                    "운영시간대",
+                    "OPEN",
+                ),
+            ),
+        ),
+        Path("docs/rules/DATA_COLLECTION_RULES.md"): (
+            (
+                "22. 고정 호출주기와 별도 운영시간 결정",
+                (
+                    "cadence_decision_status: PM_APPROVED_FIXED",
+                    "long_term_baseline_status: ACTIVE",
+                    "cadence_scope: LONG_TERM_OPERATING_BASELINE",
+                    "10분·15분 대안을",
+                    "5분 주기를 유지할지 결정하는 실험이 아니다",
+                    "의미 정규화",
+                    "원본 Forecast 배열",
+                    "다음 계획 API 호출을 생략하지 않는다",
+                    "EG-8 데이터셋",
+                    "PM Live 승인",
+                    "운영시간대",
+                ),
+            ),
+        ),
+        Path("docs/testing/QUALITY_GATES.md"): (
+            (
+                "11. EG-7 동일 13개 반복수집 파일럿",
+                (
+                    "cadence_minutes=5",
+                    "cadence_decision_status=PM_APPROVED_FIXED",
+                    "long_term_baseline_status=ACTIVE",
+                    "cadence_scope=LONG_TERM_OPERATING_BASELINE",
+                    "canonical 정렬 집합",
+                    "원본 배열 순서는",
+                    "중복만으로 계획 호출을 생략하거나 주기를 바꾸지",
+                    "EG-8 데이터셋",
+                    "첫 1시간은 5분 주기를 고르는 시험이 아니라",
+                    "PM Live 승인",
+                    "운영시간대",
+                ),
+            ),
+        ),
+        Path("docs/testing/PROJECT_GUARD_SPEC.md"): (
+            (
+                "4.8 단계별 수집과 배치",
+                (
+                    "FIELD_DICTIONARY.md",
+                    "PM_APPROVED_FIXED",
+                    "ACTIVE",
+                    "LONG_TERM_OPERATING_BASELINE",
+                    "1·10·15·누락·null·문자열·실수·boolean",
+                    "CLI·환경 override",
+                    "canonical 정렬 집합",
+                    "중복 기반 다음 호출 억제·주기 변경·증거 손실",
+                ),
+            ),
+        ),
+        Path("ai-context/DECISION_LOG.md"): (
+            (
+                "D-013 — 5분은 고정 장기 반복수집 기준",
+                (
+                    "ACCEPTED · PM_APPROVED_FIXED",
+                    "cadence_minutes=5",
+                    "long_term_baseline_status=ACTIVE",
+                    "cadence_scope=LONG_TERM_OPERATING_BASELINE",
+                    "10분·15분 대안은 지원·평가하지",
+                    "계획 호출을 생략하거나 주기를 바꾸지",
+                    "EG-8",
+                    "주기 선택 실험이 아니다",
+                    "PM Live 승인",
+                    "일일 운영시간대",
+                ),
+            ),
+        ),
+        Path("ai-context/ARCHITECTURE_DECISIONS.md"): (
+            (
+                "ADR-009 — 5분 장기 주기는 버전 계획의 불변 계약",
+                (
+                    "Status: `ACCEPTED`",
+                    "cadence_minutes=5",
+                    "cadence_decision_status=PM_APPROVED_FIXED",
+                    "long_term_baseline_status=ACTIVE",
+                    "cadence_scope=LONG_TERM_OPERATING_BASELINE",
+                    "runtime cadence 선택",
+                    "중복만으로 생략하지 않는다",
+                    "EG-8 데이터셋",
+                    "PM 결정으로 모두 제외",
+                    "Live 승인",
+                    "일일 운영시간대",
+                ),
+            ),
+        ),
+    }
+    inspected_sections = [field_section, decision_section, live_section]
+    for path, requirements in section_requirements.items():
+        text = texts[path]
+        for heading, required_tokens in requirements:
+            section = markdown_heading_section(text, heading)
+            if not section:
+                return f"{path.as_posix()} 정본 절 누락: {heading}"
+            normalized_section = re.sub(r"\s+", " ", section)
+            missing_tokens = [
+                token
+                for token in required_tokens
+                if re.sub(r"\s+", " ", token) not in normalized_section
+            ]
+            if missing_tokens:
+                return (
+                    f"{path.as_posix()} 정본 계약 누락="
+                    f"{missing_tokens}"
+                )
+            inspected_sections.append(section)
+
+    contradiction_patterns = (
+        r"(?:5분|five-minute)[^\n]{0,40}\b(?:provisional|configurable)\b",
+        r"cadence_minutes[^\n]{0,40}(?:configurable|설정할 수 있|변경할 수 있)",
+        r"(?:duplicate|중복)[^\n]{0,80}(?:can change cadence|주기를 변경할 수 있|주기 변경을 허용)",
+    )
+    joined = "\n".join(inspected_sections)
+    if any(re.search(pattern, joined, flags=re.IGNORECASE) for pattern in contradiction_patterns):
+        return "EG-7 정본에 provisional·runtime 변경·중복 기반 주기 변경 모순 존재"
+    return None
+
+
+def check_h707(context: ProjectGuardContext) -> CheckResult:
+    module_path = context.root / "freshmanager/eg7.py"
+    if not module_path.is_file():
+        return failed("H-707", "EG-7 Controller 모듈 누락", "freshmanager/eg7.py")
+    try:
+        document_issue = _h707_canonical_document_issue(context)
+    except (OSError, UnicodeDecodeError):
+        document_issue = "EG-7 정본 읽기 실패"
+    if document_issue:
+        return failed(
+            "H-707",
+            document_issue,
+            "freshmanager/eg7.py",
+            *[path.as_posix() for path in H707_CANONICAL_DOCUMENT_PATHS],
+        )
+    expected_contract = (
+        eg7_cli.PLAN_SCHEMA_VERSION == "eg7-pilot-plan-v2"
+        and tuple(eg7_cli.PLAN_FIELDS) == H707_PLAN_FIELDS
+        and eg7_cli.TIMEZONE_NAME == "Asia/Seoul"
+        and eg7_cli.CADENCE_MINUTES == 5
+        and eg7_cli.CADENCE_DECISION_STATUS == "PM_APPROVED_FIXED"
+        and eg7_cli.LONG_TERM_BASELINE_STATUS == "ACTIVE"
+        and eg7_cli.CADENCE_SCOPE == "LONG_TERM_OPERATING_BASELINE"
+        and eg7_cli.CADENCE_CHANGE_ALLOWED is False
+        and eg7_cli.ALTERNATIVE_CADENCES_SUPPORTED is False
+        and eg7_cli.DUPLICATE_TRIGGERED_CADENCE_CHANGE is False
+        and eg7_cli.PILOT_DURATION_MINUTES == 60
+        and eg7_cli.PLANNED_SLOT_COUNT == 12
+        and eg7_cli.AREA_COUNT == 13
+        and eg7_cli.MAX_API_CALLS == 156
+        and eg7_cli.RETRY_COUNT == 0
+        and eg7_cli.DEFAULT_QUOTA_CONFIRMATION_STATUS == "UNCONFIRMED"
+        and eg7_cli.DEFAULT_LIVE_APPROVAL_STATUS == "NOT_APPROVED"
+        and tuple(eg7_cli.eg6b.EG6B_AREA_CODES) == tuple(eg6b_cli.EG6B_AREA_CODES)
+    )
+    if not expected_contract:
+        return failed(
+            "H-707",
+            "Plan v2 필드·PM 고정 5분·ACTIVE 장기 기준·대안 미지원·1시간·12회차·13 Area·최대 156호출·재시도 0회 계약 불일치",
+            "freshmanager/eg7.py",
+        )
+
+    start = datetime(2026, 8, 1, 10, 0, tzinfo=ZoneInfo("Asia/Seoul"))
+
+    def document(quota: str, approval: str) -> dict[str, object]:
+        return {
+            "schema_version": eg7_cli.PLAN_SCHEMA_VERSION,
+            "pilot_run_id": "77777777-7777-4777-8777-777777777707",
+            "timezone": "Asia/Seoul",
+            "cadence_minutes": 5,
+            "cadence_decision_status": "PM_APPROVED_FIXED",
+            "long_term_baseline_status": "ACTIVE",
+            "cadence_scope": "LONG_TERM_OPERATING_BASELINE",
+            "cadence_change_allowed": False,
+            "planned_start_at": start.isoformat(),
+            "planned_end_at": (start + timedelta(minutes=60)).isoformat(),
+            "planned_slot_count": 12,
+            "max_api_calls": 156,
+            "retry_count": 0,
+            "area_count": 13,
+            "area_order_contract": list(eg6b_cli.EG6B_AREA_CODES),
+            "quota_confirmation_status": quota,
+            "live_approval_status": approval,
+            "slots": [
+                {
+                    "slot_index": index,
+                    "scheduled_at": (start + timedelta(minutes=5 * index)).isoformat(),
+                    "batch_id": f"00000000-0000-4000-8000-{index + 707:012d}",
+                    "planned_status": eg7_cli.PLANNED_STATUS,
+                }
+                for index in range(12)
+            ],
+        }
+
+    try:
+        base_document = document(
+            eg7_cli.QuotaConfirmationStatus.UNCONFIRMED.value,
+            eg7_cli.LiveApprovalStatus.NOT_APPROVED.value,
+        )
+        unconfirmed = eg7_cli.validate_plan(base_document)
+
+        cadence_mutations: tuple[tuple[str, object], ...] = (
+            ("one", 1),
+            ("ten", 10),
+            ("fifteen", 15),
+            ("null", None),
+            ("string", "5"),
+            ("float", 5.0),
+            ("true", True),
+            ("false", False),
+        )
+        for label, value in cadence_mutations:
+            candidate = json.loads(json.dumps(base_document))
+            candidate["cadence_minutes"] = value
+            try:
+                eg7_cli.validate_plan(candidate)
+            except eg7_cli.PilotPlanError:
+                pass
+            else:
+                return failed(
+                    "H-707",
+                    f"금지 cadence 입력이 승인됨: {label}",
+                    "freshmanager/eg7.py",
+                    "합성 계획",
+                )
+        cadence_omitted = json.loads(json.dumps(base_document))
+        del cadence_omitted["cadence_minutes"]
+        try:
+            eg7_cli.validate_plan(cadence_omitted)
+        except eg7_cli.PilotPlanError:
+            pass
+        else:
+            return failed(
+                "H-707",
+                "cadence_minutes 누락 계획이 승인됨",
+                "freshmanager/eg7.py",
+                "합성 계획",
+            )
+
+        permanent_mutations: tuple[tuple[str, str, object, bool], ...] = (
+            ("PM 승인 누락", "cadence_decision_status", None, True),
+            (
+                "PM 승인 상태 변경",
+                "cadence_decision_status",
+                "PILOT_ONLY",
+                False,
+            ),
+            ("장기 기준 상태 누락", "long_term_baseline_status", None, True),
+            (
+                "장기 기준 상태 변경",
+                "long_term_baseline_status",
+                "PROVISIONAL",
+                False,
+            ),
+            ("주기 범위 누락", "cadence_scope", None, True),
+            ("주기 범위 변경", "cadence_scope", "ONE_HOUR_PILOT_ONLY", False),
+            ("주기 변경 허용", "cadence_change_allowed", True, False),
+        )
+        for label, field_name, value, remove in permanent_mutations:
+            candidate = json.loads(json.dumps(base_document))
+            if remove:
+                del candidate[field_name]
+            else:
+                candidate[field_name] = value
+            try:
+                eg7_cli.validate_plan(candidate)
+            except eg7_cli.PilotPlanError:
+                pass
+            else:
+                return failed(
+                    "H-707",
+                    f"영구 주기 계약 위반이 승인됨: {label}",
+                    "freshmanager/eg7.py",
+                    "합성 계획",
+                )
+
+        arbitrary_config = json.loads(json.dumps(base_document))
+        arbitrary_config["cadence_override"] = 15
+        try:
+            eg7_cli.validate_plan(arbitrary_config)
+        except eg7_cli.PilotPlanError:
+            pass
+        else:
+            return failed(
+                "H-707",
+                "임의 cadence 설정 필드가 승인됨",
+                "freshmanager/eg7.py",
+                "합성 계획",
+            )
+
+        for option, value in (
+            ("--cadence", "10"),
+            ("--cadence", "15"),
+            ("--interval", "10"),
+        ):
+            try:
+                eg7_cli.build_parser().parse_args(
+                    [
+                        "--plan",
+                        "synthetic-plan.json",
+                        "--dry-run",
+                        option,
+                        value,
+                    ]
+                )
+            except eg7_cli.PilotPlanError:
+                pass
+            else:
+                return failed(
+                    "H-707",
+                    f"runtime cadence override가 지원됨: {option}",
+                    "freshmanager/eg7.py",
+                    "합성 CLI",
+                )
+
+        with tempfile.TemporaryDirectory(prefix="freshmanager-h707-") as temp:
+            plan_path = Path(temp) / "synthetic-plan.json"
+            plan_path.write_text(
+                json.dumps(base_document, ensure_ascii=False),
+                encoding="utf-8",
+            )
+            dry_run_output = io.StringIO()
+            with contextlib.redirect_stdout(dry_run_output):
+                dry_run_code = eg7_cli.run(
+                    ["--plan", str(plan_path), "--dry-run"],
+                    environ={"FRESHMANAGER_SYNTHETIC_CADENCE_OVERRIDE": "15"},
+                )
+            if (
+                dry_run_code != 0
+                or "cadence_minutes=5" not in dry_run_output.getvalue()
+                or "collector_executions=0" not in dry_run_output.getvalue()
+                or "backup_executions=0" not in dry_run_output.getvalue()
+            ):
+                return failed(
+                    "H-707",
+                    "합성 환경값이 고정 주기 또는 무호출 Dry-run 계약에 영향",
+                    "freshmanager/eg7.py",
+                    "합성 환경",
+                )
+
+        space_document = json.loads(json.dumps(base_document))
+        space_document["planned_start_at"] = str(
+            space_document["planned_start_at"]
+        ).replace("T", " ")
+        space_document["planned_end_at"] = str(
+            space_document["planned_end_at"]
+        ).replace("T", " ")
+        for slot in space_document["slots"]:
+            slot["scheduled_at"] = str(slot["scheduled_at"]).replace("T", " ")
+        if (
+            eg7_cli.plan_fingerprint(base_document)
+            != eg7_cli.plan_fingerprint(space_document)
+        ):
+            return failed(
+                "H-707",
+                "동일 의미 Plan 시각의 canonical 지문 불일치",
+                "freshmanager/eg7.py",
+                "합성 계획",
+            )
+
+        try:
+            eg7_cli.validate_live_approval(
+                unconfirmed,
+                unconfirmed.fingerprint,
+                start,
+            )
+        except eg7_cli.LiveGateError as error:
+            if error.reason_code != "QUOTA_UNCONFIRMED":
+                return failed(
+                    "H-707",
+                    "UNCONFIRMED 할당량의 Live 차단 사유 불일치",
+                    "freshmanager/eg7.py",
+                )
+        else:
+            return failed(
+                "H-707",
+                "UNCONFIRMED 할당량에서 Live 실행이 차단되지 않음",
+                "freshmanager/eg7.py",
+            )
+        if len(eg7_cli.dry_run_preview(unconfirmed)) != 12:
+            return failed(
+                "H-707",
+                "UNCONFIRMED 상태의 무호출 Dry-run 12회차 미생성",
+                "freshmanager/eg7.py",
+            )
+        source_a = [
+            "2026-08-01 11:00",
+            "2026-08-01 12:00",
+            "2026-08-01 13:00",
+        ]
+        source_b = [
+            "2026-08-01T13:00:00+09:00",
+            "2026-08-01T11:00:00+09:00",
+            "2026-08-01T12:00:00+09:00",
+        ]
+        source_repeated = [
+            "2026-08-01 11:00",
+            "2026-08-01 12:00",
+            "2026-08-01 12:00",
+            "2026-08-01 13:00",
+        ]
+        source_different = [
+            "2026-08-01 11:00",
+            "2026-08-01 12:00",
+            "2026-08-01 13:05",
+        ]
+        source_snapshots = tuple(map(tuple, (source_a, source_b, source_repeated)))
+        signature = eg7_cli.canonical_forecast_target_signature(source_a)
+        if (
+            signature
+            != eg7_cli.canonical_forecast_target_signature(source_b)
+            or signature
+            != eg7_cli.canonical_forecast_target_signature(source_repeated)
+            or signature
+            == eg7_cli.canonical_forecast_target_signature(source_different)
+            or eg7_cli.forecast_duplicate_key("POI019", source_a)
+            == eg7_cli.forecast_duplicate_key("POI013", source_b)
+            or source_snapshots
+            != tuple(map(tuple, (source_a, source_b, source_repeated)))
+        ):
+            return failed(
+                "H-707",
+                "Forecast canonical 정렬 집합·중복 제거·Area 범위·원본 보존 계약 불일치",
+                "freshmanager/eg7.py",
+                "합성 Forecast",
+            )
+
+        approved = eg7_cli.validate_plan(
+            document(
+                eg7_cli.QuotaConfirmationStatus.CONFIRMED.value,
+                eg7_cli.LiveApprovalStatus.PM_APPROVED.value,
+            )
+        )
+        eg7_cli.validate_live_approval(approved, approved.fingerprint, start)
+        current = [start]
+        collector_calls: list[int] = []
+        backup_calls: list[int] = []
+        events: list[dict[str, object]] = []
+
+        def clock() -> datetime:
+            return current[0]
+
+        def sleeper(seconds: float) -> None:
+            current[0] += timedelta(seconds=seconds)
+
+        def collector(slot: eg7_cli.PilotSlot) -> eg7_cli.CollectorExecution:
+            collector_calls.append(slot.slot_index)
+            started_at = current[0]
+            current[0] += timedelta(seconds=1)
+            return eg7_cli.CollectorExecution(
+                exit_code=0,
+                started_at=started_at,
+                ended_at=current[0],
+                collection_log={
+                    "attempted_count": 13,
+                    "success_count": 13,
+                    "failure_count": 0,
+                    "area_results": [
+                        {
+                            "synthetic_observation_time": "2026-08-01 10:00",
+                            "synthetic_raw_hash": "a" * 64,
+                            "synthetic_forecast_signature": list(signature),
+                        }
+                    ],
+                },
+            )
+
+        def backup_runner(slot: eg7_cli.PilotSlot) -> eg7_cli.BackupExecution:
+            backup_calls.append(slot.slot_index)
+            started_at = current[0]
+            current[0] += timedelta(seconds=1)
+            return eg7_cli.BackupExecution(
+                eligible=True,
+                execution_count=1,
+                status=eg7_cli.BackupIndexStatus.LOCAL_SYNC_COPY_VERIFIED,
+                started_at=started_at,
+                ended_at=current[0],
+                source_bytes=1,
+                backup_bytes=1,
+            )
+
+        result = eg7_cli.run_scheduled_pilot(
+            approved,
+            fingerprint=approved.fingerprint,
+            clock=clock,
+            sleeper=sleeper,
+            collector_runner=collector,
+            backup_runner=backup_runner,
+            event_sink=lambda event: events.append(dict(event)),
+        )
+        slot_rows = eg7_cli.build_slot_index(approved, result.records)
+        terminal_states = {status.value for status in eg7_cli.SlotStatus}
+        terminal_events = [
+            event for event in events if event.get("state_after") in terminal_states
+        ]
+        if (
+            collector_calls != list(range(12))
+            or backup_calls != list(range(12))
+            or len(result.records) != 12
+            or len(slot_rows) != 12
+            or result.total_budget_debit != 156
+            or result.fatal_failure is not None
+            or any(
+                record.collection_log is None
+                or record.collection_log.get("area_results")
+                != [
+                    {
+                        "synthetic_observation_time": "2026-08-01 10:00",
+                        "synthetic_raw_hash": "a" * 64,
+                        "synthetic_forecast_signature": list(signature),
+                    }
+                ]
+                for record in result.records
+            )
+            or any(
+                record.status != eg7_cli.SlotStatus.COMPLETED_SUCCESS
+                or record.collector_execution_count != 1
+                or record.actual_api_calls != 13
+                or record.backup_execution_count != 1
+                or record.backup_status
+                != eg7_cli.BackupIndexStatus.LOCAL_SYNC_COPY_VERIFIED
+                for record in result.records
+            )
+            or len(terminal_events) != 12
+        ):
+            return failed(
+                "H-707",
+                "합성 12회차의 단일 Collector·Backup·156호출 상한·종결상태 계약 불일치",
+                "freshmanager/eg7.py",
+                "합성 실행",
+            )
+    except Exception:
+        return failed(
+            "H-707",
+            "EG-7 승인주기 합성 검증 내부 실패(세부정보 비노출)",
+            "freshmanager/eg7.py",
+            "합성 실행",
+        )
+    return passed(
+        "H-707",
+        "Plan v2·Field Dictionary·8개 정본과 PM 고정 5분·ACTIVE 장기 기준·금지 cadence·runtime override·Forecast canonical 정렬 집합·중복 증거·다음 호출 보존·UNCONFIRMED Live 차단·12회차·156호출·회차별 Backup 계약 확인",
+        "freshmanager/eg7.py",
+        *[path.as_posix() for path in H707_CANONICAL_DOCUMENT_PATHS],
+        "합성 실행",
+    )
+
+
 def _h708_write_json(path: Path, document: Mapping[str, object]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(dict(document), ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
@@ -2753,7 +3510,7 @@ RUNNERS: dict[str, Callable[[ProjectGuardContext], CheckResult]] = {
         "H-204", "H-205", "H-206",
         "H-301", "H-302", "H-303", "H-304", "H-305",
         "H-401", "H-402", "H-403", "H-404",
-        "H-501", "H-502", "H-503", "H-506", "H-701", "H-702", "H-703", "H-704", "H-705", "H-706", "H-708",
+        "H-501", "H-502", "H-503", "H-506", "H-701", "H-702", "H-703", "H-704", "H-705", "H-706", "H-707", "H-708",
     ]
 }
 
@@ -2809,13 +3566,7 @@ CHECK_DEFINITIONS = [
     definition("H-704", "실패 격리·재시도 제한", "EG-5 이후"),
     definition("H-705", "회차 결과 요약", "EG-5 이후"),
     definition("H-706", "EG-6B 13지역 1회 완전성", "EG-6B 이후"),
-    definition(
-        "H-707",
-        "EG-7 반복주기 승인 준수",
-        "EG-7 이후",
-        False,
-        "반복수집 전 PM 주기 승인과 외장 저장장치 또는 승인된 클라우드 폴더 백업 Gate 필요",
-    ),
+    definition("H-707", "EG-7 반복주기 승인 준수", "EG-7 이후"),
     definition("H-708", "Backup Worker 로컬 복사 무결성", "Backup Readiness 이후"),
 ]
 DEFINITION_BY_ID = {item.check_id: item for item in CHECK_DEFINITIONS}
