@@ -11,23 +11,33 @@
 ## 2. 현재 요약
 
 - 저장소: `shindonghyun0516-a11y/FreshManager`
-- 기준 `main` SHA: `be07b4bf37d5e0ad7c4ee65e7208f44c9b2b4ea3`
-- 현재 Branch: `feat/issue-70-eg7-one-hour-pilot`
-- 구현 기준: Draft PR #71의 최신 HEAD
+- 정본 Branch: `main`
+- 현재 `main` SHA: `VERIFY_AT_SESSION_START`
+- local·`origin/main` 일치: `MUST_BE_VERIFIED_AT_SESSION_START`
+- 마지막으로 검증된 EG-7 기능 구현 기준선: PR #71 Squash Merge SHA
+  `562f984d7f84203196b34f8d1d827310405d3cc3`
 - Planning Issue #69: `OPEN`
-- Implementation Issue #70: `OPEN`
-- Draft PR #71: `OPEN · DRAFT`
-- Merge: `NOT_MERGED`
-- 현재 Engineering Gate: `EG-7 OFFLINE IMPLEMENTATION`
-- EG-7 Live: `NOT_APPROVED`
-- 실제 반복수집: `NOT_STARTED`
+- Implementation Issue #70: `CLOSED`
+- PR #71: `MERGED`
+- EG-7 구현: `AVAILABLE_ON_MAIN`
+- 영구 주기: `5분`
+- 주기 결정 상태: `PM_APPROVED_FIXED`
+- 장기 기준 상태: `ACTIVE`
+- 주기 범위: `LONG_TERM_OPERATING_BASELINE`
+- 첫 1시간 Live 수집: `NOT_STARTED`
+- PM Live 승인: `NOT_APPROVED`
+- API 할당량: `UNCONFIRMED`
+- 일일 운영시간대: `OPEN_PM_DECISION`
+- 운영 Plan·`pilot_run_id`·Batch ID·Plan fingerprint: `NOT_GENERATED`
+- S-DoT 동적 수집: `NOT_STARTED`
+- Spot 자동 추천: `NOT_STARTED`
 - 24시간 Scheduler: `NOT_IMPLEMENTED`
 - ML 학습: `NOT_STARTED`
 
-현재 작업은 PM이 장기 기준으로 확정한 5분 주기의 첫 통제 검증인 EG-7 1시간
-파일럿 Controller와 파생 인덱스를 Issue #70의 한 Branch·한 Draft PR로 구현하는
-것이다. 실제 날짜·시각·운영시간대·할당량·운영 ID와 계획 지문은 생성하거나
-확정하지 않는다.
+PM이 장기 기준으로 확정한 5분 주기의 EG-7 1시간 파일럿 Controller와 파생
+인덱스는 `main`에 구현됐다. 첫 Area-only 1시간 Live 수집은 시작하지 않았고,
+실제 날짜·시각·운영시간대·할당량·운영 Plan·운영 ID·계획 지문은 생성하거나
+확정하지 않았다.
 
 ## 3. Engineering Gate 상태
 
@@ -41,9 +51,20 @@
 | EG-5 | PASS | 대표 3 Area 실제 3/3 수집 |
 | EG-6A | PASS | PR #52, 13개 Area·Spot·S-DoT 정적 패널 |
 | EG-6B | PASS | 첫 실제 13 Area 13/13, 품질·백업·원격 동기화 확인과 Closeout |
-| EG-7 | IMPLEMENTATION_IN_REVIEW | Issue #69 범위 승인, Issue #70 오프라인 구현; Live 미승인 |
+| EG-7 | IMPLEMENTATION_AVAILABLE_ON_MAIN | PR #71 병합, Issue #70 종료; 첫 Live 미시작 |
 | EG-8 | NOT_STARTED | 반복 관측 결과와 별도 PM 승인 필요 |
 | Recommendation MVP | PLANNED | Gate number `NOT_ASSIGNED` |
+
+EG-7 post-merge 상태:
+
+- PR #71: `MERGED`
+- PR #71 Squash Merge SHA 이력:
+  `562f984d7f84203196b34f8d1d827310405d3cc3`
+- Issue #70: `CLOSED`
+- Issue #69: `OPEN`
+- EG-7 구현: `AVAILABLE_ON_MAIN`
+- 첫 Live 파일럿: `NOT_STARTED`
+- 다음 Gate: `FIRST_LIVE_PILOT_PREFLIGHT_AND_BOUNDED_PM_APPROVAL`
 
 EG-6B Closeout 이력:
 
@@ -155,24 +176,26 @@ live_approval_status=NOT_APPROVED
 둘 중 하나라도 기본 차단 상태이거나 승인 지문·현재 시간창·Area 계약·호출상한·
 환경·Lock·ID 충돌 검사가 맞지 않으면 Live를 거부한다.
 
-## 6. 명시적 제외 범위
+## 6. 현재 post-merge 상태와 첫 Live 범위 경계
 
-- 실제 서울시 API 호출
-- 실제 Collector 실행
-- 실제 Backup Worker 실행
-- Google Drive 접근
-- S-DoT 동적 수집
-- Spot 평가
-- Recommendation
-- ML 학습·성능평가
-- 24시간 Scheduler
-- cron·launchd·영구 백그라운드 서비스
-- 자동 재시도
-- 일반 Raw-to-CSV Exporter
-- 121개 Area 확대
+- EG-7 Live 서울시 API 호출: `0`
+- 운영 Collector 실행: `0`
+- 운영 Backup Worker 실행: `0`
+- Google Drive 접근: `0`
+- S-DoT 동적 수집: `NOT_STARTED`
+- Spot 자동 추천: `NOT_STARTED`
+- ML 학습·성능평가: `NOT_STARTED`
+- production Scheduler: `NOT_IMPLEMENTED`
+- 자동 24시간 확대: `NOT_APPROVED`
+- 자동 재시도: 금지
+- 일반 Raw-to-CSV Exporter: 첫 실제 파일럿 후 별도 검토
+- 121개 Area 확대: EG-8 결과와 별도 PM 승인 후 검토
 
-정적 S-DoT 연결은 기존 참조 Context로만 유지한다. Spot 후보는 계속
-`field_verified=false`이며 Area 데이터만으로 Spot 추천을 만들지 않는다.
+첫 Area-only 1시간 Live는 아직 시작하지 않았다. 별도 PM 승인 뒤 서울시 API,
+기존 Collector와 Backup Worker를 승인 Plan 범위에서 사용한다. 기존 정적 S-DoT
+mapping은 변경하지 않았고 Spot 후보는 계속 `field_verified=false`다. S-DoT
+동적 수집, ML, Spot Candidate·Recommendation은 계획된 별도 MVP Workstream이지만
+첫 Area-only 1시간 Live 실행에는 포함하지 않는다.
 
 ## 7. 구현 파일 범위
 
@@ -198,16 +221,19 @@ live_approval_status=NOT_APPROVED
 
 ## 8. 검증 상태
 
-현재 로컬 최종검증:
+PR #71 병합 직후 당시 exact-main
+`562f984d7f84203196b34f8d1d827310405d3cc3`에서 확인한 결과:
 
-- EG-7 Target Tests: `25/25 PASS`
-- Full Unit Tests: `347/347 PASS`
+- EG-7 Target Tests: `33/33 PASS`
+- Project Guard Tests: `136/136 PASS`
+- Full Unit Tests: `367/367 PASS`
 - Project Guard: `PASS 43 / FAIL 0 / WARN 0 / SKIP 4 / TOTAL 47`
 - H-706: `PASS`
 - H-707: `PASS`
 - H-708: `PASS`
-- Markdown 구조·코드 블록: `PASS`
+- Markdown 구조·코드 블록: `13/13 PASS`
 - `git diff --check`: `PASS`
+- exact-main GitHub CI: `SUCCESS`
 - 서울시 API 호출: `0`
 - S-DoT API 호출: `0`
 - 운영 Collector 실행: `0`
@@ -218,33 +244,71 @@ live_approval_status=NOT_APPROVED
 - 기존 운영 증거 변경: `0`
 - 기존 Fake 증거 변경: `0`
 
-GitHub CI는 Push마다 새 HEAD로 다시 실행되므로 고정 상태를 이 문서에 복제하지 않고
-Draft PR #71의 현재 Check를 읽기 전용으로 확인한다.
-H-707은 구현과 함께 `PASS`로 활성화됐지만
-이는 합성 계약 검사이며 실제 할당량·
-운영 계획·PM Live 승인 완료를 의미하지 않는다.
+H-707은 구현과 함께 `PASS`로 활성화됐지만 이는 합성 계약 검사다. 위 결과는 실제
+할당량 확인·운영 계획 생성·PM Live 승인 또는 첫 Live 수집 완료를 의미하지 않는다.
 
 ## 9. GitHub 상태
 
-- Issue #69: 승인 범위의 Planning Issue, 계속 `OPEN`
-- Issue #70: 구현 Issue, 계속 `OPEN`
-- Branch: `feat/issue-70-eg7-one-hour-pilot`
-- Draft PR #71: `OPEN · DRAFT`, target `main`
-- Ready 전환: 금지
-- Merge: 금지
-- 두 Issue Close: 금지
+- 정본 Branch: `main`
+- 현재 `main` SHA: `VERIFY_AT_SESSION_START`
+- local·`origin/main` 일치: `MUST_BE_VERIFIED_AT_SESSION_START`
+- 확인 방법: 세션 시작 시 `local main`과 `origin/main`을 조회·비교
+- 주의: 문서에 기록된 과거 SHA를 현재 HEAD로 가정하지 않음
+- PR #71: `MERGED`
+- Issue #70: `CLOSED`
+- Issue #69: `OPEN`
+- 병합된 feature Branch: local·remote `DELETED`
+- post-merge 검증 시 작업 트리: `CLEAN`
+- post-merge 검증 시 미추적 파일: `0`
 
 ## 10. 다음 행동
 
-1. Draft PR #71의 현재 HEAD와 CI를 확인하고 독립 검토를 요청한다.
-2. Issue #69와 #70은 열린 상태로 유지한다.
-3. Ready 전환·Merge·Live 실행 없이 중단한다.
+현재 OPEN 또는 미생성 결정:
+
+- First Live Date: `OPEN`
+- First Live Start Time: `OPEN`
+- Daily Operating Window: `OPEN`
+- 24-hour or Selected-hour Operation: `OPEN`
+- API Quota Confirmation: `UNCONFIRMED`
+- Operational `pilot_run_id`: `NOT_GENERATED`
+- Operational Batch IDs: `NOT_GENERATED`
+- Approved Plan Fingerprint: `NOT_GENERATED`
+- PM Live Approval: `NOT_APPROVED`
+- Expansion Timing: `OPEN`
+
+5분 장기 주기는 `CLOSED · PM_APPROVED_FIXED`이며 OPEN 결정이 아니다.
+
+다음 행동 순서:
+
+1. 이 `PROJECT_STATUS.md` 동기화 PR을 PM 승인으로 `main`에 병합한다.
+2. 공식 API 할당량과 rate-limit 호환성을 확인한다.
+3. 로컬 Source와 Drive sync-copy preflight를 확인한다.
+4. 범위가 고정된 운영 Plan v2 하나를 생성한다.
+5. `pilot_run_id` 하나와 Batch ID 정확히 12개를 생성한다.
+6. 결정적 Plan fingerprint를 생성·검증한다.
+7. 그 정확한 Plan에 대한 한정된 PM Live 승인을 기록한다.
+8. 첫 Area-only 1시간 Live 수집을 실행한다.
+9. 즉시 기술·데이터 품질 분석을 수행한다.
+10. 자동 확대 없이 중단한다.
+11. 다음 Area 수집 시간창을 결정한다.
+12. 별도 승인된 S-DoT·ML·Spot Workstream을 계속한다.
+
+2번 이후의 운영 단계는 각 단계에 필요한 확인과 별도 PM 승인을 전제로 하며,
+24시간 수집으로 자동 확대하지 않는다.
 
 ## 11. 새 세션 복원 메모
 
 새 세션은 `AGENTS.md` → 이 문서 → `ai-context/PROJECT_MEMORY.md` → PRD → TRD →
-Issue #69·#70과 Draft PR → 현재 Diff → 관련 Rule·Quality·Data 문서 → Decision
-Log·ADR 순서로 읽는다.
+Issue #69와 현재 Diff → 관련 Rule·Quality·Data 문서 → Decision Log·ADR 순서로
+읽는다.
 
-EG-7 H-707 PASS와 코드 구현을 실제 파일럿 성공으로 해석하지 않는다. 실제 운영
-계획을 생성하거나 서울시 API를 호출하려면 PM의 새로운 명시적 승인이 필요하다.
+정본 Branch는 `main`이다. 새 세션 시작 시 `origin`을 fetch하고 `local main`과
+`origin/main`을 조회·비교해 현재 HEAD를 확인한다. 문서에 저장된 SHA를 현재 HEAD로
+가정하지 않는다. PR #71은 병합됐고 Issue #70은 종료됐으며 Issue #69는 열려 있다.
+마지막으로 검증된 EG-7 고정주기 기능 구현 기준선은 PR #71 Squash Merge SHA
+`562f984d7f84203196b34f8d1d827310405d3cc3`다. EG-7 구현과 고정 5분 장기 주기는
+`main`에 있지만 Live 수집은 시작하지 않았다. API 할당량은 `UNCONFIRMED`, 운영
+Plan·`pilot_run_id`·Batch ID·Plan fingerprint는 아직 존재하지 않는다. S-DoT
+동적 수집·ML 학습·Spot 실행도 시작하지 않았다. 다음 작업은 첫 Live 파일럿
+preflight와 정확한 Plan에 대한 한정된 PM 승인이다. EG-7 구현 Branch를 다시
+만들지 않는다.
