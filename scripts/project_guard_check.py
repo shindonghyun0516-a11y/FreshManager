@@ -22,7 +22,7 @@ import tempfile
 import uuid
 from collections import Counter
 from dataclasses import dataclass, replace
-from datetime import datetime
+from datetime import datetime, timedelta
 from enum import Enum
 from pathlib import Path
 from typing import Callable, Iterable, Mapping, Sequence
@@ -38,6 +38,7 @@ from freshmanager.collector import Collector, HttpResponse  # noqa: E402
 from freshmanager.config import ConfigError, load_api_key, mask_secret  # noqa: E402
 from freshmanager import eg5 as eg5_cli  # noqa: E402
 from freshmanager import eg6b as eg6b_cli  # noqa: E402
+from freshmanager import eg7 as eg7_cli  # noqa: E402
 from freshmanager import backup as backup_worker  # noqa: E402
 from freshmanager.http_adapter import BASE_URL, SeoulPopulationHttpClient  # noqa: E402
 from freshmanager.offline import run as run_offline  # noqa: E402
@@ -2483,6 +2484,191 @@ def check_h706(context: ProjectGuardContext) -> CheckResult:
     )
 
 
+def check_h707(context: ProjectGuardContext) -> CheckResult:
+    module_path = context.root / "freshmanager/eg7.py"
+    if not module_path.is_file():
+        return failed("H-707", "EG-7 Controller 모듈 누락", "freshmanager/eg7.py")
+    expected_contract = (
+        eg7_cli.TIMEZONE_NAME == "Asia/Seoul"
+        and eg7_cli.CADENCE_MINUTES == 5
+        and eg7_cli.PILOT_DURATION_MINUTES == 60
+        and eg7_cli.PLANNED_SLOT_COUNT == 12
+        and eg7_cli.AREA_COUNT == 13
+        and eg7_cli.MAX_API_CALLS == 156
+        and eg7_cli.RETRY_COUNT == 0
+        and eg7_cli.DEFAULT_QUOTA_CONFIRMATION_STATUS == "UNCONFIRMED"
+        and eg7_cli.DEFAULT_LIVE_APPROVAL_STATUS == "NOT_APPROVED"
+        and tuple(eg7_cli.eg6b.EG6B_AREA_CODES) == tuple(eg6b_cli.EG6B_AREA_CODES)
+    )
+    if not expected_contract:
+        return failed(
+            "H-707",
+            "5분·1시간·12회차·13 Area·최대 156호출·재시도 0회 계약 불일치",
+            "freshmanager/eg7.py",
+        )
+
+    start = datetime(2026, 8, 1, 10, 0, tzinfo=ZoneInfo("Asia/Seoul"))
+
+    def document(quota: str, approval: str) -> dict[str, object]:
+        return {
+            "schema_version": eg7_cli.PLAN_SCHEMA_VERSION,
+            "pilot_run_id": "77777777-7777-4777-8777-777777777707",
+            "timezone": "Asia/Seoul",
+            "cadence_minutes": 5,
+            "planned_start_at": start.isoformat(),
+            "planned_end_at": (start + timedelta(minutes=60)).isoformat(),
+            "planned_slot_count": 12,
+            "max_api_calls": 156,
+            "retry_count": 0,
+            "area_count": 13,
+            "area_order_contract": list(eg6b_cli.EG6B_AREA_CODES),
+            "quota_confirmation_status": quota,
+            "live_approval_status": approval,
+            "slots": [
+                {
+                    "slot_index": index,
+                    "scheduled_at": (start + timedelta(minutes=5 * index)).isoformat(),
+                    "batch_id": f"00000000-0000-4000-8000-{index + 707:012d}",
+                    "planned_status": eg7_cli.PLANNED_STATUS,
+                }
+                for index in range(12)
+            ],
+        }
+
+    try:
+        unconfirmed = eg7_cli.validate_plan(
+            document(
+                eg7_cli.QuotaConfirmationStatus.UNCONFIRMED.value,
+                eg7_cli.LiveApprovalStatus.NOT_APPROVED.value,
+            )
+        )
+        try:
+            eg7_cli.validate_live_approval(
+                unconfirmed,
+                unconfirmed.fingerprint,
+                start,
+            )
+        except eg7_cli.LiveGateError as error:
+            if error.reason_code != "QUOTA_UNCONFIRMED":
+                return failed(
+                    "H-707",
+                    "UNCONFIRMED 할당량의 Live 차단 사유 불일치",
+                    "freshmanager/eg7.py",
+                )
+        else:
+            return failed(
+                "H-707",
+                "UNCONFIRMED 할당량에서 Live 실행이 차단되지 않음",
+                "freshmanager/eg7.py",
+            )
+        if len(eg7_cli.dry_run_preview(unconfirmed)) != 12:
+            return failed(
+                "H-707",
+                "UNCONFIRMED 상태의 무호출 Dry-run 12회차 미생성",
+                "freshmanager/eg7.py",
+            )
+
+        approved = eg7_cli.validate_plan(
+            document(
+                eg7_cli.QuotaConfirmationStatus.CONFIRMED.value,
+                eg7_cli.LiveApprovalStatus.PM_APPROVED.value,
+            )
+        )
+        eg7_cli.validate_live_approval(approved, approved.fingerprint, start)
+        current = [start]
+        collector_calls: list[int] = []
+        backup_calls: list[int] = []
+        events: list[dict[str, object]] = []
+
+        def clock() -> datetime:
+            return current[0]
+
+        def sleeper(seconds: float) -> None:
+            current[0] += timedelta(seconds=seconds)
+
+        def collector(slot: eg7_cli.PilotSlot) -> eg7_cli.CollectorExecution:
+            collector_calls.append(slot.slot_index)
+            started_at = current[0]
+            current[0] += timedelta(seconds=1)
+            return eg7_cli.CollectorExecution(
+                exit_code=0,
+                started_at=started_at,
+                ended_at=current[0],
+                collection_log={
+                    "attempted_count": 13,
+                    "success_count": 13,
+                    "failure_count": 0,
+                    "area_results": [],
+                },
+            )
+
+        def backup_runner(slot: eg7_cli.PilotSlot) -> eg7_cli.BackupExecution:
+            backup_calls.append(slot.slot_index)
+            started_at = current[0]
+            current[0] += timedelta(seconds=1)
+            return eg7_cli.BackupExecution(
+                eligible=True,
+                execution_count=1,
+                status=eg7_cli.BackupIndexStatus.LOCAL_SYNC_COPY_VERIFIED,
+                started_at=started_at,
+                ended_at=current[0],
+                source_bytes=1,
+                backup_bytes=1,
+            )
+
+        result = eg7_cli.run_scheduled_pilot(
+            approved,
+            fingerprint=approved.fingerprint,
+            clock=clock,
+            sleeper=sleeper,
+            collector_runner=collector,
+            backup_runner=backup_runner,
+            event_sink=lambda event: events.append(dict(event)),
+        )
+        slot_rows = eg7_cli.build_slot_index(approved, result.records)
+        terminal_states = {status.value for status in eg7_cli.SlotStatus}
+        terminal_events = [
+            event for event in events if event.get("state_after") in terminal_states
+        ]
+        if (
+            collector_calls != list(range(12))
+            or backup_calls != list(range(12))
+            or len(result.records) != 12
+            or len(slot_rows) != 12
+            or result.total_budget_debit != 156
+            or result.fatal_failure is not None
+            or any(
+                record.status != eg7_cli.SlotStatus.COMPLETED_SUCCESS
+                or record.collector_execution_count != 1
+                or record.actual_api_calls != 13
+                or record.backup_execution_count != 1
+                or record.backup_status
+                != eg7_cli.BackupIndexStatus.LOCAL_SYNC_COPY_VERIFIED
+                for record in result.records
+            )
+            or len(terminal_events) != 12
+        ):
+            return failed(
+                "H-707",
+                "합성 12회차의 단일 Collector·Backup·156호출 상한·종결상태 계약 불일치",
+                "freshmanager/eg7.py",
+                "합성 실행",
+            )
+    except Exception:
+        return failed(
+            "H-707",
+            "EG-7 승인주기 합성 검증 내부 실패(세부정보 비노출)",
+            "freshmanager/eg7.py",
+            "합성 실행",
+        )
+    return passed(
+        "H-707",
+        "UNCONFIRMED Live 차단과 5분·12회차·13 Area·최대 156호출·재시도 0회·회차별 Backup 검증 계약 확인",
+        "freshmanager/eg7.py",
+        "합성 실행",
+    )
+
+
 def _h708_write_json(path: Path, document: Mapping[str, object]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(dict(document), ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
@@ -2753,7 +2939,7 @@ RUNNERS: dict[str, Callable[[ProjectGuardContext], CheckResult]] = {
         "H-204", "H-205", "H-206",
         "H-301", "H-302", "H-303", "H-304", "H-305",
         "H-401", "H-402", "H-403", "H-404",
-        "H-501", "H-502", "H-503", "H-506", "H-701", "H-702", "H-703", "H-704", "H-705", "H-706", "H-708",
+        "H-501", "H-502", "H-503", "H-506", "H-701", "H-702", "H-703", "H-704", "H-705", "H-706", "H-707", "H-708",
     ]
 }
 
@@ -2809,13 +2995,7 @@ CHECK_DEFINITIONS = [
     definition("H-704", "실패 격리·재시도 제한", "EG-5 이후"),
     definition("H-705", "회차 결과 요약", "EG-5 이후"),
     definition("H-706", "EG-6B 13지역 1회 완전성", "EG-6B 이후"),
-    definition(
-        "H-707",
-        "EG-7 반복주기 승인 준수",
-        "EG-7 이후",
-        False,
-        "반복수집 전 PM 주기 승인과 외장 저장장치 또는 승인된 클라우드 폴더 백업 Gate 필요",
-    ),
+    definition("H-707", "EG-7 반복주기 승인 준수", "EG-7 이후"),
     definition("H-708", "Backup Worker 로컬 복사 무결성", "Backup Readiness 이후"),
 ]
 DEFINITION_BY_ID = {item.check_id: item for item in CHECK_DEFINITIONS}

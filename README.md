@@ -8,8 +8,9 @@
 현재 단계에서는 프레시매니저가 사용하는 모바일 앱이나 추천 화면을 개발하지 않는다.
 
 서울시 주요 121장소를 장기 공식 후보군으로 유지하되, 현재는 EG-6A에서 확정한
-13개 Area 패널의 수집·분석 가능성을 먼저 검증한다. EG-6B 단일 회차 파이프라인은
-`main`에 병합됐고, 실제 13개 Area 회차와 PM PASS 판정은 아직 남아 있다.
+13개 Area 패널의 수집·분석 가능성을 먼저 검증한다. EG-6B 첫 실제 단일 회차와
+백업 검증은 완료됐다. EG-7은 승인된 5분·1시간·12회차 Controller와 파생 인덱스를
+Issue #70에서 오프라인 구현 중이며, 실제 반복수집은 별도 PM Live 승인 전까지 금지한다.
 
 ### 공식 문서 안내
 
@@ -56,9 +57,11 @@
 - 대표 3개 Area: 실제 수집·분석 완료
 - EG-6A 13개 Area·Spot·S-DoT 패널: 확정·`main` 반영 완료
 - EG-6B 동일 13개 Area 단일 회차 파이프라인: 구현·오프라인 검증·`main` 병합 완료
-- 실제 EG-6B 13개 Area 단일 회차: 미실행, 별도 PM 승인 필요
-- Issue #57 env-file·output-root Probe: PASS
-- Google Drive 자동 백업: Google Drive for Desktop Sync·`FreshManager-Data/` 논리 루트 승인, 즉시 Backup Worker 미구현
+- 실제 EG-6B 13개 Area 단일 회차: 13/13 성공·품질 PASS·백업 무결성 PASS
+- Issue #57: EG-6B 최종 Closeout 완료 후 CLOSED
+- Google Drive 자동 백업: 독립 Backup Worker 구현·검증 완료, PM 원격 동기화 확인 완료
+- EG-7: Issue #69 범위 승인, Issue #70에서 5분·1시간 파일럿 Controller와
+  ML-ready 파생 인덱스를 오프라인 구현 중
 
 ### 현재 분석 범위
 
@@ -84,16 +87,18 @@ Area Feature + 선택적 S-DoT Feature + 추가 Context
 Anchor Point다. S-DoT는 Area 데이터를 대체하거나 모든 Area에 필수인 단계가 아니며,
 동적 센서 수집과 후보 근거 평가는 EG-6B Collector와 분리된 후속 책임이다. S-DoT
 미지원 6개 Area도 분석·추천 후보에서 제외하지 않는다.
+정적 연결의 `DIRECT_COVERAGE`, `NEARBY_SUPPORT`, `NO_NEARBY_SDOT`는 각각
+DIRECT·NEARBY·UNSUPPORTED 의미의 Context로만 유지하며 EG-7 관측값으로 만들지 않는다.
 
 ### 후속 범위
 
-실제 EG-6B 단일 회차와 EG-7 반복수집, EG-8 Feature 분석 및 후속 Recommendation
+EG-7 실제 반복수집, EG-8 Feature 분석 및 후속 Recommendation
 MVP Workstream의 데이터 필요성을 확인한 뒤 별도 PM 승인으로 121개 Area 확대를 검토한다.
 
 ```text
 장기 후보군: 서울시 주요 121장소
 현재 MVP: 1개 Area → 대표 3개 Area → 13개 Area 패널
-현재 Gate: EG-6B 구현·경로 Probe 완료 / Google Drive Backup Readiness와 실제 단일 회차·PM PASS 대기
+현재 Gate: EG-6B 완료 / EG-7 승인 범위의 오프라인 구현·독립 검토 준비
 후속 검토: EG-7·EG-8과 별도 승인된 Recommendation MVP Workstream 결과 후 필요 시 121개 확대
 ```
 
@@ -215,7 +220,11 @@ POI001부터 POI121까지 자동 생성
 - Issue #51·PR #52에서 서로 다른 공식 Area 13개와 Spot·S-DoT 참조 패널 `main` 반영
 - Issue #53·PR #54에서 13개 Area 단일 순차수집·Batch Log·Manifest·SHA-256 파이프라인 구현·오프라인 검증·`main` 병합
 - PR #54와 병합 후 `main` CI 성공
-- EG-6B Target Tests 19/19, Full Unit Tests 243/243, Project Guard PASS 41·SKIP 5·TOTAL 46
+- Issue #60·PR #61에서 독립 Backup Worker와 H-708 구현·병합
+- 첫 EG-6B 실제 Batch 13/13 성공, 품질 PASS, 로컬 복사 무결성과 PM 원격 동기화 확인 완료
+- Issue #67·PR #68에서 `.DS_Store` 검증 경계 보정·병합 후 EG-6B 최종 Closeout 완료
+- Issue #69에서 EG-7 5분·1시간·12회차 범위 승인
+- Issue #70에서 EG-7 Controller·파생 인덱스·H-707 오프라인 구현
 - `AGENTS.md` 생성
 - Codex의 `AGENTS.md` 인식 확인
 
@@ -224,25 +233,22 @@ POI001부터 POI121까지 자동 생성
 
 ### 진행 예정
 
-- Google Drive for Desktop Sync 설치·로그인과 논리 루트 접근 가능 여부 확인
-- Batch 완료 직후 1회 실행형 Backup Worker·Fake Batch 검증과 `main` 병합
-- Live Preflight 재통과와 별도 PM 승인 후 EG-6B 실제 최대 13회 단일 회차 실행
-- Raw·Metadata·Collection Log·Manifest·SHA-256 검토
-- Batch 완료 직후 Google Drive 자동 백업과 복사본 무결성 검증
-- 실제 호출량·성공률·실패율·소요시간 확인
-- PM의 EG-6B PASS 또는 보완 판정
-- 첫 Batch 품질 감사 후 Raw-to-CSV Exporter 별도 검토
-- EG-6B PASS와 백업 운영·주기 승인 후 EG-7 반복수집 파일럿 검토
-- EG-7에서 Area 반복수집과 분리해 S-DoT 관측 수집 가능성 검토
+- EG-7 Controller·계획 스키마·잠금·로그·파생 인덱스의 독립 검토와 CI
+- 실제 날짜·시각·할당량·운영 ID·계획 지문에 대한 별도 PM 결정
+- PM Live 승인 후에만 동일 13개 Area의 5분·1시간 파일럿 실행 검토
+- 첫 Batch 품질 감사 결과를 기준으로 Raw-to-CSV Exporter 별도 검토
 - EG-8에서 Area Feature·승인·확보된 경우의 S-DoT Feature·Spot Candidate Evaluation 검증
 - 별도 PM 승인 후 Recommendation MVP Workstream 검토(`PLANNED`, Gate number `NOT_ASSIGNED`)
 
 ### 미진행
 
-- EG-6B 실제 13개 Area 단일 회차
-- EG-6B 최종 PASS 판정
-- Google Drive Backup Worker·CSV Exporter
-- EG-7 반복수집·Scheduler·자동 재시도
+- EG-7 실제 5분·1시간 반복수집
+- 실제 운영 계획과 12개 운영 Batch ID 생성·승인
+- 동적 S-DoT 수집
+- Spot 평가·Recommendation
+- ML 학습
+- 24시간 Scheduler·영구 백그라운드 서비스·자동 재시도
+- CSV Exporter
 - EG-8 Area Feature·선택적 S-DoT Feature와 Spot Candidate Evaluation
 - Recommendation MVP Workstream(`PLANNED`, Gate number `NOT_ASSIGNED`)
 - 121장소 자동수집
@@ -361,8 +367,8 @@ Issue #32 PM 결정에 따라 이전 최소 계약의 `parser_version` 대신
 | EG-4 | 여의도 1장소 | 통과: Issue #43 실제 POI072 정상 JSON과 원본·메타데이터 저장 확인 |
 | EG-5 | 유형별 대표 3장소 | 통과: POI019·POI013·POI014 실제 수집 3/3, 재시도 0회와 구조 분석 완료 |
 | EG-6A | 13개 Area·Spot·S-DoT 패널 | 통과: Issue #51·PR #52로 13개 고유 공식 Area 패널 `main` 반영 |
-| EG-6B | 동일 13개 Area 단일 수집 | 진행: Issue #53·PR #54 구현·오프라인 검증·병합 완료, 실제 회차·PM PASS 대기 |
-| EG-7 | 동일 13개 Area 반복수집 파일럿 | 미진행: EG-6B PASS와 Google Drive 백업 운영·주기 승인 필요 |
+| EG-6B | 동일 13개 Area 단일 수집 | 통과: 첫 실제 Batch 13/13·품질·백업 무결성·원격 동기화 확인과 Closeout 완료 |
+| EG-7 | 동일 13개 Area 반복수집 파일럿 | 구현 중: Issue #69 승인 범위에 따라 Issue #70에서 오프라인 Controller·파생 인덱스 구현; Live 미승인 |
 | EG-8 | Area Feature·선택적 S-DoT Feature와 Spot Candidate Evaluation | 미진행: 반복 관측 데이터 필요 |
 | Recommendation MVP Workstream | SPOT 우선·AREA fallback 추천 | `PLANNED`; Gate number `NOT_ASSIGNED`, 별도 PM 승인 필요 |
 
@@ -386,23 +392,16 @@ Gate A·Gate B·Gate C는 별도의 데이터 PoC 판정 게이트이며,
 
 ## 10. 수집주기 원칙
 
-동일 13개 Area 반복수집 주기는 아직 확정하지 않았다.
+EG-7 첫 파일럿의 구현 계약은 `Asia/Seoul` 벽시계 기준 5분 간격, 1시간,
+정확히 12회차, 회차당 13 Area, 전체 최대 156호출, 재시도 0회다. 늦은 회차는
+`SKIPPED_MISSED`, 이전 Collector와 즉시 Backup이 끝나지 않은 회차는
+`SKIPPED_OVERLAP`으로 기록하고 지연 보충수집을 하지 않는다.
 
-다음 내용을 확인한 뒤 PM이 승인한다.
-
-- 서울시 API 일일 호출한도
-- 13개 Area 1회 수집 소요시간
-- 데이터 실제 갱신주기
-- 호출 성공률과 실패율
-- 재시도에 따른 추가 호출량
-- 운영 컴퓨터의 안정성
-- 분석에 필요한 시간해상도
-
-따라서 현재는 다음을 기본값으로 두지 않는다.
-
-```text
-5분마다 13개 Area 전체 호출
-```
+이는 오프라인 구현 범위 승인이다. 실제 날짜·시작시각·API 할당량 확인·운영
+`pilot_run_id`·12개 운영 Batch ID·계획 지문과 PM Live 승인은 아직 열려 있다.
+`quota_confirmation_status=UNCONFIRMED` 또는
+`live_approval_status=NOT_APPROVED`이면 실제 실행을 거부한다. 24시간 Scheduler,
+영구 백그라운드 서비스, S-DoT 수집, Spot 평가, Recommendation과 ML 학습은 포함하지 않는다.
 
 ---
 
@@ -586,9 +585,8 @@ SEOUL_OPEN_API_KEY=your_api_key_here
 ## 18. 현재 실행방법
 
 Python 기반 Project Guard가 `scripts/project_guard_check.py`에 구현돼 있다.
-Issue #63 작업 Branch의 로컬 검증은 Project Guard `PASS 42`, `FAIL 0`, `WARN 0`,
-`SKIP 5`, `TOTAL 47`, 종료코드 `0`이며 대상 Unit Tests는 71/71 PASS,
-전체 Unit Tests는 299/299 PASS다.
+EG-7 구현에서는 `H-707`이 승인된 반복주기 안전계약의 오프라인 검사로 활성화된다.
+이 PASS는 실제 할당량 확인이나 Live 승인을 뜻하지 않는다.
 
 표준 Project Guard 실행 명령:
 
@@ -608,7 +606,22 @@ python3 -B -m unittest discover -s tests -p "test_*.py" -v
 사용한다. 현재 `main`의 EG-6B CLI는 승인 패널 13개를 `panel_order` 순서로 각각
 최대 한 번 처리하며 자동 재시도와 반복 실행은 없다.
 
-공식 EG-6B 실행 명령 형식은 다음과 같다. PM이 승인한 canonical UUID 형식의
+EG-7 합성 계획의 엄격한 Dry-run은 다음처럼 실행한다. 이 명령은 계획과 12개
+벽시계 회차를 검증할 뿐 자격증명, Collector, Backup Worker, 운영 디렉터리와
+Google Drive에 접근하지 않는다.
+
+```bash
+python3 -m freshmanager.eg7 \
+  --plan "$EG7_SYNTHETIC_PLAN" \
+  --dry-run
+```
+
+`EG7_SYNTHETIC_PLAN`은 검토자가 준비한 합성 계획 파일만 가리켜야 하며 저장소는
+운영 계획을 제공하거나 자동 생성하지 않는다. 실제 Live 실행에는 별도 PM이 승인한
+날짜·시각·할당량·운영 ID·계획 지문이
+모두 필요하다. 이 저장소 문서는 운영 값을 제공하거나 생성하지 않는다.
+
+EG-6B 단일 회차 실행 명령 형식은 다음과 같다. PM이 승인한 canonical UUID 형식의
 `FM_LIVE_BATCH_ID`를 먼저 준비하고, 같은 값을 Collector와 Backup Worker에 전달한다.
 아래 명령은 PM이 env-file, 저장소 밖 output-root, Batch ID와 최대 13회 호출을 별도로
 승인한 뒤에만 실행한다. `--execute-live` 자체는 PM 승인을 의미하지 않는다.
@@ -637,8 +650,8 @@ Transport에 접근한다. 예약 직후 디렉터리의 장치·inode와 열린
 불완전하거나 중단된 예약은 자동 삭제·재사용하지 않으며, Collection Log와 Manifest가
 없으므로 Backup 대상이 아니다. stale 예약 복구는 별도 PM 검토 절차가 필요하다.
 
-현재 EG-6B 실제 단일 회차는 미실행 상태다. 실행 후 Raw·Metadata·Collection Log·
-Manifest·SHA-256과 실패 목록을 검토하고 PM이 PASS 또는 보완을 판정해야 한다.
+EG-6B 실제 단일 회차와 품질·백업 Closeout은 완료됐다. 이 명령은 완료 이력을
+재실행하라는 뜻이 아니며 새로운 실제 호출에는 다시 별도 PM 승인이 필요하다.
 
 ---
 

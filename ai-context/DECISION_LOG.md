@@ -108,6 +108,25 @@ PM이 승인했거나 명시적으로 보류한 제품·운영 결정을 새 AI 
 - Decision: CSV는 조회·정렬·분석용 파생자료이며 Raw JSON이 공식 원본이다.
 - Consequence: CSV는 첫 실제 Batch 품질 감사 후 별도 구현하고, 생성 실패 시 Raw에서 재생성하며 API를 재호출하지 않는다.
 
+### D-012 — EG-7 첫 파일럿은 5분·1시간 승인 계획
+
+- Date: `2026-07-23`
+- Status: `ACCEPTED`
+- Decision: 첫 EG-7 구현은 `Asia/Seoul` 벽시계 5분 경계, 1시간, 12회차,
+  고정 13 Area, 전체 최대 156호출, Area별 회차당 최대 1회, 재시도 0회로 제한한다.
+- Identity: 하나의 `pilot_run_id`와 회차별 시각·사전 생성 UUIDv4 Batch ID를 가진
+  불변 계획 Option C를 사용한다. 건너뛴 ID도 계획 이력에 남겨 재사용하지 않는다.
+- Scheduling: 늦은 회차는 `SKIPPED_MISSED`, 이전 Collector와 즉시 Backup이
+  끝나지 않은 회차는 `SKIPPED_OVERLAP`이며 지연 보충수집은 하지 않는다.
+- Failure: 개별 Area 실패는 기록 후 계속할 수 있지만 확정 공통·자격증명·스키마·
+  할당량·저장·Backup 실패는 남은 회차를 중단한다. Backup 실패로 재수집하지 않는다.
+- Data: Raw를 모두 보존하고 Area별 중복 관측시각·Raw SHA-256·Forecast 대상시각
+  집합을 canonical 증거 기반 Slot·Area 파생 인덱스와 Summary에 기록한다.
+- Excluded: 동적 S-DoT, Spot 평가, Recommendation, ML 학습, 24시간·영구 Scheduler.
+- Open Live decisions: 실제 날짜·시작시각·할당량 확인·운영 `pilot_run_id`·12개
+  Batch ID·계획 지문·PM Live 승인.
+- Evidence: Issue #69 승인 범위, Issue #70 구현.
+
 ## 4. 갱신 규칙
 
 새 PM 결정이 기존 결정을 대체하면 이전 항목을 삭제하지 않고 `SUPERSEDED`로 바꾸고

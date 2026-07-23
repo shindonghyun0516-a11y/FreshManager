@@ -1936,6 +1936,42 @@ class Eg6bProjectGuardTests(unittest.TestCase):
         self.assertEqual(result.status, project_guard.Status.FAIL)
 
 
+class Eg7ProjectGuardTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.project = TemporaryProject()
+        module_path = self.project.root / "freshmanager/eg7.py"
+        module_path.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(ROOT / "freshmanager/eg7.py", module_path)
+
+    def tearDown(self) -> None:
+        self.project.close()
+
+    def check(self) -> project_guard.CheckResult:
+        return project_guard.check_h707(self.project.context())
+
+    def test_h707_one_hour_pilot_contract_passes(self) -> None:
+        result = self.check()
+        self.assertEqual(result.status, project_guard.Status.PASS, result.evidence)
+
+    def test_h707_missing_controller_module_fails(self) -> None:
+        (self.project.root / "freshmanager/eg7.py").unlink()
+        self.assertEqual(self.check().status, project_guard.Status.FAIL)
+
+    def test_h707_changed_cadence_fails(self) -> None:
+        with mock.patch.object(project_guard.eg7_cli, "CADENCE_MINUTES", 10):
+            result = self.check()
+        self.assertEqual(result.status, project_guard.Status.FAIL)
+
+    def test_h707_unconfirmed_live_gate_bypass_fails(self) -> None:
+        with mock.patch.object(
+            project_guard.eg7_cli,
+            "validate_live_approval",
+            return_value=None,
+        ):
+            result = self.check()
+        self.assertEqual(result.status, project_guard.Status.FAIL)
+
+
 class BackupProjectGuardTests(unittest.TestCase):
     def setUp(self) -> None:
         self.project = TemporaryProject()
@@ -1997,8 +2033,8 @@ class RegistryAndExitCodeTests(unittest.TestCase):
         counts = Counter(item.status for item in results)
         self.assertEqual(counts[project_guard.Status.FAIL], 0)
         self.assertEqual(counts[project_guard.Status.WARN], 0)
-        self.assertEqual(counts[project_guard.Status.PASS], 42)
-        self.assertEqual(counts[project_guard.Status.SKIP], 5)
+        self.assertEqual(counts[project_guard.Status.PASS], 43)
+        self.assertEqual(counts[project_guard.Status.SKIP], 4)
         self.assertEqual(len(results), 47)
         self.assertEqual(sum(counts.values()), 47)
         status_by_id = {item.check_id: item.status for item in results}
@@ -2009,10 +2045,10 @@ class RegistryAndExitCodeTests(unittest.TestCase):
             "H-704",
             "H-705",
             "H-706",
+            "H-707",
             "H-708",
         ):
             self.assertEqual(status_by_id[check_id], project_guard.Status.PASS)
-        self.assertEqual(status_by_id["H-707"], project_guard.Status.SKIP)
 
     def test_exit_code_zero_for_success(self) -> None:
         result = project_guard.make_result("H-404", project_guard.Status.PASS, "success")

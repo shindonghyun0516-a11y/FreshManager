@@ -134,12 +134,14 @@ EG-5는 세 코드를 위 순서로 각각 최대 1회 처리하고 자동 재�
 
 완료 이력으로 EG-6A 참조 패널은 PR #52, EG-6B 단일 수집·Batch Log·Manifest·
 SHA-256 파이프라인은 PR #54, 독립 1회 실행형 Backup Worker·Fake Batch·H-708은
-Issue #60과 PR #61에서 각각 정리됐다. 현재 Branch·PR·Issue·실행·검증 상태는
+Issue #60과 PR #61, 첫 실제 Batch·백업·Closeout은 Issue #57과 PR #68에서 각각
+정리됐다. 현재 Branch·PR·Issue·실행·검증 상태는
 [`PROJECT_STATUS.md`](../../PROJECT_STATUS.md)를 단일 기준으로 사용한다.
 
-CSV는 첫 실제 Batch 품질 감사 후 별도 Issue와 PM 승인으로 구현한다. EG-7은 같은
-13개 Area 반복수집 파일럿과 독립
-S-DoT 관측 수집 가능성 검토로 제한한다. EG-8은 Area Feature와 승인·확보된 경우의
+일반 Raw-to-CSV Exporter는 별도 Issue와 PM 승인으로 구현한다. EG-7은 같은
+13개 Area의 5분·1시간·12회차 반복수집 Controller와 canonical Batch 증거에서
+재생성하는 전용 Slot·Area 파생 인덱스로 제한한다. 동적 S-DoT 수집은 제외한다.
+EG-8은 Area Feature와 승인·확보된 경우의
 S-DoT Feature를 이용한 Spot Candidate Evaluation을 수행한다. Recommendation MVP는
 `PLANNED`, Gate number `NOT_ASSIGNED`이며 별도 PM 승인 전 공식 Gate가 아니다.
 현재 MVP 분석 범위에는 실제 판매효과 분석을 포함하지 않는다.
@@ -788,43 +790,49 @@ EG-5 대표 3장소와 EG-6B 승인 13개 Area 단일 회차는 `retry_count=0`�
 
 ## 22. 호출주기 결정
 
-반복수집 주기를 미리 확정하지 않는다.
+EG-7 첫 구현 파일럿의 주기는 PM이 다음과 같이 승인했다.
+
+```text
+Timezone: Asia/Seoul
+벽시계 경계: 5분
+파일럿 길이: 1시간
+계획 회차: 12
+회차당 Area: 13
+파일럿 최대 호출: 156
+Area별 회차당 최대 호출: 1
+재시도: 0
+지연 보충수집: 금지
+이전 Collector·즉시 Backup 중첩: 해당 회차 건너뜀
+```
+
+이 승인은 Controller와 파생 인덱스의 오프라인 구현 범위다. 실제 파일럿 날짜·
+시작시각·API 할당량·운영 `pilot_run_id`·12개 운영 Batch ID·계획 지문과 PM Live
+승인은 별도 OPEN 결정이다. `UNCONFIRMED` 할당량 또는 `NOT_APPROVED` Live 상태에서는
+실제 실행을 차단한다. 첫 파일럿 이후의 장기 주기와 24시간 확대는 확정하지 않는다.
 
 반복수집 전 백업 Gate는 Google Drive for Desktop Sync 기반 자동 백업으로 확정한다.
 수집은 로컬 Python에 유지하고 Collector와 분리된 1회 실행형 Backup Worker를 Batch
 완료 직후 호출한다. 시간 간격 기반 백업 Scheduler는 두지 않는다.
 
-EG-6B Collector 자체에는 Backup Worker와 CSV Exporter가 없다. 독립 Worker의
-구현·오프라인 검증·병합과 Live Preflight를 모두 확인한 뒤에만 PM이 실제 최대
-13회 호출을 승인한다. 현재 승인 지점과 실행 상태는 `PROJECT_STATUS.md`를 따른다.
-EG-6C는 새로 만들지 않으며 `H-707`은 EG-7 전까지 `SKIP`한다.
+EG-6B Collector 자체에는 Backup Worker와 CSV Exporter가 없다. EG-7 Controller는
+기존 Collector와 Backup Worker를 중복 구현하지 않고 승인 Batch ID로 각각 최대
+한 번 조립한다. 적격 Backup의 `LOCAL_SYNC_COPY_VERIFIED` 전에는 회차 성공으로
+종결하지 않는다. Backup 실패는 Source를 보존하고 Collector를 다시 호출하지 않으며
+남은 회차를 중단한다. EG-6C는 만들지 않는다. H-707은 EG-7 구현에서 활성화하되
+실제 할당량 확인이나 Live 승인을 판정하지 않는다.
 
-반복수집 파일럿에 들어가기 전에는 즉시 백업 운영 결과와 다음 항목을 확인한 뒤
-EG-7 진입을 PM이 승인한다.
+회차가 이미 늦으면 `SKIPPED_MISSED`, 이전 Collector와 즉시 Backup이 다음 경계까지
+끝나지 않으면 `SKIPPED_OVERLAP`으로 기록한다. 두 상태는 API 호출 0회이고 지연
+보충수집, 대체 Batch ID 생성과 건너뛴 ID 재사용을 금지한다. 파일럿 계획은 Live
+시작 전에 12개 UUIDv4 Batch ID를 포함하며, 건너뛴 ID도 불변 계획 이력에 남는다.
 
-- API 호출한도
-- 13개 Area 1회 처리시간
-- 실제 데이터 갱신주기
-- 성공률과 실패율
-- 재시도 호출량
-- 저장공간 증가량
-- 운영 컴퓨터 안정성
-- 분석에 필요한 시간해상도
-- Google Drive 로컬 복사·원격 동기화 성공률과 지연
-- 백업 충돌·복원시험·보존기간 정책
+실제 응답이 같은 관측 기준시각·Raw SHA-256·정렬된 Forecast 대상시각 집합을
+반복하더라도 모든 Raw를 보존한다. 중복 여부는 `area_code` 범위의 파생 인덱스에
+기록하고 수집 중 삭제·병합·덮어쓰기를 하지 않는다. 중복 건수와 비율은 파일럿
+결과이지 자동 실패 사유가 아니다.
 
-다음 주기는 후보일 뿐 기본값이 아니다.
-
-```text
-5분
-10분
-15분
-30분
-특정 운영시간
-```
-
-이 목록은 Area 수집주기 후보이며 Backup Worker 주기가 아니다. Backup Worker는
-각 Batch 완료 직후 한 번 실행한다.
+24시간 Scheduler, 영구 백그라운드 서비스, 자동 재시도, 동적 S-DoT 수집, Spot
+평가, Recommendation과 ML 학습은 이 계약에 포함하지 않는다.
 
 ---
 
@@ -965,6 +973,7 @@ EG-7 진입을 PM이 승인한다.
 
 | 버전 | 날짜 | 변경내용 | 작성자 | 승인상태 |
 |---|---|---|---|---|
+| v0.1.8 | 2026-07-23 | Issue #69 승인 EG-7 5분·1시간·12회차·최대 156호출·재시도 0회·무보충·중복 보존·Live 차단 계약 반영 | 신동현 | PM 구현 범위 승인 |
 | v0.1.7 | 2026-07-22 | Issue #60·PR #61 독립 Backup Worker·append-only Receipt·`LOCAL_SYNC_COPY_VERIFIED`·H-708 완료 이력 반영 | 신동현 | 완료 이력 |
 | v0.1.6 (Issue #58 보완) | 2026-07-22 | Google Drive 자동 백업과 Area·S-DoT·Spot Candidate·Recommendation 데이터 계층 경계 정렬 | 신동현 | PM Diff 검토 전 |
 | v0.1.6 | 2026-07-22 | PRD·TRD 공식 기준 연결, PR #54 병합 완료와 EG-6B 실제 단일 회차 대기 상태 정렬 | 신동현 | PM 승인 |

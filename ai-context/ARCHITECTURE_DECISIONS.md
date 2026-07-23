@@ -24,7 +24,7 @@ Decision Record, 기술 구조 결정 기록) 형식으로 보존한다. 현행 
 - Decision: S-DoT 접근성·스키마·품질 검증과 향후 Collector는 독립 Issue·실행·저장·테스트 경계로 관리한다.
 - Alternatives: EG-6B Area Collector에 S-DoT 요청을 결합.
 - Consequences: S-DoT 실패는 Area Batch를 실패시키거나 서울시 Area API 재호출을 유발하지 않는다.
-- Validation: EG-7에서 접근성·스키마·품질 계약을 먼저 검증한다.
+- Validation: 동적 S-DoT는 첫 EG-7 1시간 파일럿에서 제외하고 후속 별도 승인 작업에서 접근성·스키마·품질 계약을 검증한다.
 - Related decision: D-005.
 
 ## ADR-003 — Area와 S-DoT를 병렬·독립 입력으로 결합
@@ -82,6 +82,29 @@ Decision Record, 기술 구조 결정 기록) 형식으로 보존한다. 현행 
 - Consequences: CSV는 Raw에서 재생성하며 실패해도 API를 재호출하지 않는다. Area 관측과 Spot Context를 같은 측정값으로 합치지 않는다.
 - Validation: 파일 수·키·시간 의미·결측·재생성 일치성을 별도 테스트한다.
 - Related decision: D-011.
+
+## ADR-008 — EG-7은 승인 계획 기반 1시간 Controller와 재생성 가능한 인덱스를 사용
+
+- Status: `ACCEPTED`
+- Context: 첫 반복수집은 정확한 5분 비교 가능성, 중첩 방지, 호출 상한, Backup
+  무재수집과 PM 승인 추적을 함께 만족해야 하지만 영구 Scheduler나 ML 플랫폼은 필요 없다.
+- Decision: 하나의 불변 계획에 `pilot_run_id`, 12개 벽시계 시각과 UUIDv4 Batch ID,
+  Area 순서, 최대 156호출, 할당량·Live 승인 상태를 넣는다. 파일럿 전역 Lock 아래
+  기존 EG-6B Collector와 Backup Worker를 회차별 최대 한 번 조립하고 append-only
+  사건 로그를 남긴다. canonical Batch 증거에서 12행 Slot Index, 최대 156행 Area
+  Observation Index와 Summary를 CSV·JSONL·JSON으로 파생한다.
+- Alternatives: 이전 실행 종료 후 5분 대기, runtime Batch ID 생성, cron·launchd,
+  Collector 내부 Backup, 별도 Controller/Index PR, 수집 중 중복 제거.
+- Consequences: 늦거나 중첩된 회차는 호출 0회로 건너뛰고 보충하지 않는다. 건너뛴
+  ID도 재사용하지 않는다. Backup 실패는 Source를 보존하고 남은 회차를 중단하며
+  Collector를 다시 호출하지 않는다. 파생 중복 플래그는 Raw를 수정하지 않는다.
+- Safety boundary: `UNCONFIRMED`·`NOT_APPROVED`가 기본이며 실제 날짜·할당량·운영
+  ID·계획 지문·PM Live 승인 전 실행을 거부한다. Dry-run은 자격증명·Transport·
+  Collector·Backup·운영 디렉터리·Google Drive에 접근하지 않는다.
+- Scope boundary: 동적 S-DoT, Spot 평가, Recommendation, ML 학습, 24시간·영구
+  Scheduler는 제외한다.
+- Validation: `freshmanager/eg7.py`, `tests/test_eg7.py`, H-707.
+- Related decision: D-003, D-005, D-010, D-012.
 
 ## 2. ADR 갱신 규칙
 

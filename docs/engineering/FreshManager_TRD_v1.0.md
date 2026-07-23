@@ -2,31 +2,34 @@
 
 # FreshManager 기술 요구사항 정의서
 
-> EG-6B 현행 단일 수집 파이프라인과 EG-7·EG-8 및 후속 Recommendation 목표 아키텍처
+> EG-6B 단일 수집·Backup과 EG-7 1시간 파일럿 Controller, EG-8 및 후속 Recommendation 목표 아키텍처
 
 **문서 ID:** FM-TRD-001
 
 **버전 / 상태:** v1.0 · 공식 기술 기준
 
-**기준일:** 2026-07-22 (Asia/Seoul)
+**기준일:** 2026-07-23 (Asia/Seoul)
 
-**기술 기준:** EG-6B Area Collector와 독립 Backup Worker의 기술 계약
+**기술 기준:** EG-6B Area Collector·독립 Backup Worker·EG-7 오프라인 Controller와 파생 인덱스 계약
 
 **현재 상태 기준:** Branch·PR·Issue·실행·검증 상태는
 [`PROJECT_STATUS.md`](../../PROJECT_STATUS.md)를 단일 기준으로 사용한다.
 
-**적용 범위:** 현재 EG-6B + 승인 후 EG-7 반복수집·EG-8 Feature 분석 + `PLANNED`
+**적용 범위:** EG-6B 완료 + 승인된 EG-7 오프라인 구현·EG-8 Feature 분석 + `PLANNED`
 Recommendation MVP Workstream(Gate number `NOT_ASSIGNED`) 목표 구조
 
-**2026-07-22 완료 이력:** Issue #60에서 Google Drive for Desktop Sync와 분리된
+**2026-07-22~23 완료·진행 이력:** Issue #60에서 Google Drive for Desktop Sync와 분리된
 1회 실행형 Backup Worker·append-only Receipt·H-708을 구현했고 PR #61로 `main`에
-병합했다. Issue #58의 Area Core Observation·선택적 S-DoT Supporting Observation·
-Spot Candidate Evaluation·Recommendation 결과 구조는 유지한다.
+병합했다. 첫 EG-6B 실제 Batch 13/13, 품질·백업 Closeout 후 Issue #69가 EG-7
+5분·1시간·12회차 Controller와 파생 인덱스 범위를 승인했고 Issue #70에서 구현한다.
+Issue #58의 Area Core Observation·선택적 S-DoT Supporting Observation·Spot Candidate
+Evaluation·Recommendation 결과 구조는 유지하되 동적 S-DoT는 EG-7에서 수집하지 않는다.
 파일 버전은 PM의 별도 결정 전 `v1.0`을 유지한다.
 
-> **설계 기준**  구현 계약과 목표 구조를 섞지 않는다. EG-6B는 13개 Area 단일
-> 회차의 원본·메타데이터·Batch Log·Manifest를 제공하고, 독립 Backup Worker는
-> 완료 Batch의 검증·복사·Receipt를 담당한다. CSV Exporter, 정규화 영속화,
+> **설계 기준**  구현 계약과 목표 구조를 섞지 않는다. EG-6B는 13개 Area 회차의
+> 원본·메타데이터·Batch Log·Manifest를 제공하고, 독립 Backup Worker는 완료 Batch의
+> 검증·복사·Receipt를 담당한다. EG-7은 이 둘을 승인 슬롯마다 한 번씩 조립하고
+> canonical 증거 기반 Slot·Area Index와 Summary를 파생한다. 일반 CSV Exporter,
 > 날씨·상권과 분석 파이프라인의 현재 상태는 `PROJECT_STATUS.md`에서 확인한다.
 
 ## 문서 구성
@@ -57,9 +60,9 @@ Spot Candidate Evaluation·Recommendation 결과 구조는 유지한다.
 - 실패 격리: Area 오류는 기록 후 계속하고, 공통 무결성·설정·저장 오류는 안전 중단한다.
 - 시간 의미 보존: 요청·수신·관측·예측 스냅샷·예측 대상·후속 관측 시각을 분리한다.
 - 증거 기반 Gate: 코드·테스트·CI·실제 실행 증거와 PM 승인을 모두 거쳐 다음 단계로 간다.
-- 경계 최소화: 현재 필요하지 않은 수집 Scheduler·DB·Google Drive API/OAuth/SDK·ML
+- 경계 최소화: 1시간 Controller 외 영구 Scheduler·DB·Google Drive API/OAuth/SDK·ML
   의존성을 추가하지 않는다. Backup Worker는 Batch 완료 직후 한 번 호출하고 원격
-  동기화는 Google Drive for Desktop Sync에 위임하는 목표구조다.
+  동기화는 Google Drive for Desktop Sync에 위임한다.
 
 ## 3. 기술 구성과 상태 기준
 
@@ -71,9 +74,11 @@ Spot Candidate Evaluation·Recommendation 결과 구조는 유지한다.
 | 13개 Area 참조 패널 | Area·Spot Proxy·S-DoT 정적 연결 계약 | eg6_*.csv |
 | 13개 단일 회차 | 순차 수집·Batch Log·Manifest·SHA-256 계약 | eg6b.py |
 | Google Drive Backup Worker | 완료 Batch 검증·복사·잠금·Receipt 계약 | freshmanager.backup |
+| EG-7 1시간 Controller | 불변 계획·5분 경계·잠금·실패중단·사건로그 | freshmanager.eg7 |
+| EG-7 파생 인덱스 | 12행 Slot·최대 156행 Area·중복·Summary | freshmanager.eg7 |
 | Google Drive for Desktop Sync | 논리 Backup Root와 동기화 책임 분리 | `FreshManager-Data/`; 계정 이메일·절대경로 비기록 |
 | Raw-to-CSV Exporter | 첫 실제 Batch 이후 확정할 파생자료 계약 | 별도 승인 대상 |
-| S-DoT 관측 데이터 계층 | Area Collector와 독립적인 보조 Feature 계층 | EG-7 검토 대상 |
+| S-DoT 관측 데이터 계층 | Area Collector와 독립적인 보조 Feature 계층 | EG-7 제외·후속 별도 승인 |
 | Spot Candidate Evaluation | Area·선택적 S-DoT·공간 Context 결합 | EG-8; Score·가중치·임계값 OPEN_DECISION |
 | Recommendation MVP | 별도 계획 Workstream | Gate number `NOT_ASSIGNED` |
 
@@ -94,6 +99,7 @@ Spot Candidate Evaluation·Recommendation 결과 구조는 유지한다.
 | data/reference/* | 121개 장소와 13개 Area·Spot·S-DoT 기준 | immutable inputs |
 | scripts/project_guard_check.py | 문서·데이터·보안·수집 계약 검사 | offline guard |
 | freshmanager.backup | 완료 Batch 검증·로컬 Sync 복사·Lock·Receipt | 네트워크 없음 |
+| freshmanager.eg7 | 1시간 계획·벽시계 회차·전역 Lock·EG-6B/Backup 조립·파생 출력 | 영구 Scheduler 아님 |
 | tests/* | Fake Transport·임시 파일 기반 단위·통합 계약 | offline tests |
 | .github/workflows/ci.yml | PR·main Push에서 Guard와 전체 테스트 | CI |
 
@@ -388,37 +394,62 @@ Area Collector는 Spot 추천 여부와 무관하게 공식 Area 관측을 계�
 - 후보 Score·가중치·임계값은 `PLANNED` 또는 `OPEN_DECISION`이며 필수 데이터
   계약이 아니다.
 
-## 15. EG-7 목표 아키텍처
+## 15. EG-7 구현 아키텍처
 
-> **목표 흐름**  승인 Runner → 단일 실행 Lock → EG-6B Batch Core → 불변 Raw·Metadata·Batch → 정규화 Observation·Forecast → 품질 집계 → 별도 Google Drive Backup Worker → 상태 보고
+> **구현 흐름**  불변 승인 계획 검증 → 계획 SHA-256 지문·Live Gate → 기존 계획·
+> Batch ID 충돌 검사 → 파일럿 전역 Lock → 5분 벽시계 슬롯 → 기존 EG-6B Collector
+> 최대 1회 → 적격성 평가 → 기존 Backup Worker 최대 1회 → append-only 사건 →
+> canonical Batch 증거 기반 Slot·Area Index와 Summary
 
 | **컴포넌트** | **책임** | **상태** |
 | --- | --- | --- |
-| Run Policy | 승인된 주기·운영시간·호출예산·대상 패널 | PM 승인 필요 |
-| Single-instance Lock | 동일 output-root·패널의 중복 실행 차단 | 필수 |
-| Batch Core | 현 EG-6B 로직 재사용; 장소별 1회·실패 격리 | 재사용 |
-| Normalizer | 관측·예측 스냅샷 영속화 | 신규 |
-| Quality Aggregator | 지연·결측·스키마·성공률·용량 | 신규 |
-| S-DoT Feasibility Probe | 센서 데이터 접근성·갱신주기·키·결측·Area 연결 가능성 확인 | EG-7 별도 검토 |
-| Backup Worker | 완료 Batch의 Google Drive 로컬 동기화 폴더 복사·SHA-256·Receipt | 독립 1회 실행 계약 |
-| Post-Batch Trigger | Batch 완료 판정 직후 1회 실행형 Worker 호출 | 신규 |
-| Run Registry | 예정 슬롯·실행·누락·중복·종료 상태 | 결정 필요 |
-| Context Registry | 패널·Spot·S-DoT 버전 연결 | 결정 필요 |
+| Pilot Plan | 1개 `pilot_run_id`, 12개 시각·UUIDv4 Batch ID, 호출예산·승인상태 | 구현·합성 검증 |
+| Plan Fingerprint | 정렬 canonical JSON의 결정적 SHA-256; 추적용 | 구현 |
+| Live Gate | `CONFIRMED` 할당량·`PM_APPROVED`·지문·시간창·환경·충돌 | 구현; 운영 값 OPEN |
+| Pilot Lock | 원자적 단일 실행, stale 자동삭제·정상 force-unlock 없음 | 구현 |
+| Wall-clock Scheduler | `Asia/Seoul` 5분 경계 12개, 무보충·무드리프트 | 구현 |
+| Batch Core | 현 EG-6B 로직 재사용; Area별 최대 1회·재시도 0 | 재사용 |
+| Backup Trigger | 적격 Batch의 기존 Worker 1회, 로컬 복사 검증 필수 | 구현 조립 |
+| Event Log | 상태 전환을 JSONL append-only로 보존 | 구현 |
+| Slot Index | 계획 회차를 항상 12행 CSV·JSONL로 기록 | 구현 |
+| Area Observation Index | 실제 시도 Area만 최대 156행, 관측·Forecast·해시·중복 | 구현 |
+| Pilot Summary | 호출·실패·중복·시간·용량·Backup·무재수집 집계 | 구현 |
+| S-DoT·Spot·ML | 동적 수집·평가·추천·학습 | EG-7 제외 |
 
-### 15.1 반복 실행 상태기계
+### 15.1 계획과 시간 계약
 
-- SCHEDULED: 승인된 슬롯이 생성됐으나 아직 실행되지 않음
-- RUNNING: Lock 획득 후 Batch 시작
-- COMPLETED: 종료코드 0, 증거·백업 정책 충족
-- COMPLETED_WITH_AREA_FAILURES: 종료코드 1, 부분실패 증거 보존
-- FAILED_COMMON: 종료코드 2, 공통 오류로 중단
-- MISSED: 승인 슬롯에 실행 기록이 없음
-- BLOCKED_DUPLICATE: Lock 충돌로 중복 실행 차단
-- BACKUP_PENDING / BACKUP_FAILED: 수집 성공과 백업 상태를 분리
+- 시간대는 `Asia/Seoul`, 주기는 벽시계 5분, 길이는 1시간, 계획 회차는 12다.
+- 회차당 13 Area, 전체 최대 156호출, Area별 회차당 최대 1회, 재시도는 0회다.
+- 이미 늦은 회차는 `SKIPPED_MISSED`, 이전 Collector와 즉시 Backup이 다음 경계를
+  넘으면 `SKIPPED_OVERLAP`이다. 둘 다 호출 0회이고 지연 보충수집을 하지 않는다.
+- 건너뛴 Batch ID도 불변 계획에 남겨 다른 파일럿에서 재사용하지 않는다.
+- 실제 날짜·시작시각·운영 ID·계획 지문은 구현에서 생성하지 않는다.
 
-### 15.2 재시도 정책
+### 15.2 상태와 실패 계약
 
-현 EG-6B는 retry_count=0이며 이를 유지한다. EG-7에서 자동 재시도가 필요하다면 다음을 별도 승인해야 한다: 재시도 대상 상태, 최대 횟수, backoff, 호출예산, 동일 request_id 재사용 여부, 원본·메타데이터 연결, 재시도로 인한 패널 내 시간차와 분석 영향. 승인 전에는 실패 Area를 자동 재호출하지 않는다.
+종결 상태는 `COMPLETED_SUCCESS`, `COMPLETED_PARTIAL`, `SKIPPED_MISSED`,
+`SKIPPED_OVERLAP`, `STOPPED_FATAL`, `NOT_RUN_AFTER_FATAL_STOP`이다.
+개별 Area 오류는 기존 Collector 계약에 따라 기록 후 계속한다. 확정된 공통 API,
+자격증명, 스키마, 할당량, Backup 또는 저장 오류는 남은 회차를 중단한다.
+Backup 실패는 Source를 보존하고 Collector·서울시 API·대체 Batch ID를 다시
+실행하지 않는다. 모든 회차가 하나의 종결상태를 가진다.
+
+### 15.3 파생 데이터와 중복 계약
+
+Slot Index는 정확히 12행이고 알 수 없는 값을 0으로 추정하지 않는다. Area Index는
+실제 시도한 Area만 최대 156행이며 `area_code`를 후속 Area–Spot/S-DoT 결합키로
+유지하고 `spot_id`를 추가하지 않는다. 수집시각, API 관측시각, Raw SHA-256,
+순서가 보존된 Forecast 대상시각 집합을 Area별로 구분해 중복 플래그를 만든다.
+Raw·Metadata·Collection Log·Manifest는 수정·병합·삭제하지 않으며 파생 출력은
+기존 Batch Manifest에 추가하지 않는다.
+
+### 15.4 승인 경계
+
+할당량 기본은 `UNCONFIRMED`, Live 승인 기본은 `NOT_APPROVED`다. Dry-run·테스트·
+계획 검증만 허용하며 실제 할당량, 파일럿 날짜·시작시각, 운영 `pilot_run_id`,
+12개 운영 Batch ID, 승인 계획 지문과 PM Live 승인이 모두 확인되기 전 실제
+실행을 거부한다. H-707 PASS는 이 차단과 합성 orchestration 계약을 검증할 뿐
+실제 Live 승인을 뜻하지 않는다. 24시간 Scheduler와 영구 백그라운드 서비스는 없다.
 
 ## 16. 백업과 복구
 
@@ -530,9 +561,9 @@ MVP다. 상태는 `PLANNED`, Gate number는 `NOT_ASSIGNED`이며 EG-8 분석 결
 | --- | --- | --- |
 | Area 결과 | area_code, request_id, status, raw_saved, metadata_saved | 요청 직후 |
 | Batch 요약 | target/attempt/success/failure, elapsed, files, hash, exit | 회차 종료 |
-| 품질 요약 | staleness, schema, forecast count, duplicate, missing | 목표 EG-7 |
-| 백업 요약 | batch_id, destination class, verify, status | 목표 EG-7 |
-| 운영 경보 | 연속 실패·저장 부족·Manifest 실패·missed slot | 목표 EG-7 |
+| 품질 요약 | forecast count, duplicate timestamp/hash/targets, duration, storage | EG-7 파생 Summary |
+| 백업 요약 | batch_id, eligible, verify, status | EG-7 Slot·Area Index |
+| 운영 상태 | missed·overlap·fatal·remaining not-run | EG-7 사건·Slot Index |
 
 ## 21. 검증 전략
 
@@ -542,7 +573,8 @@ MVP다. 상태는 `PLANNED`, Gate number는 `NOT_ASSIGNED`이며 EG-8 분석 결
 | Adapter | 정상·HTTP 오류·Timeout·Redirect·5 MiB | 주입 Transport |
 | Collector | 6개 오류·원본·8필드 Metadata | Fake Client |
 | EG-6B Target | 13개 순서·실패 격리·Manifest·경로 | 전용 오프라인 Target Tests |
-| Project Guard | 문서·데이터·보안·오프라인·H-708 | PROJECT_GUARD_SPEC의 상태·집계 계약 |
+| EG-7 Target | 계획·시간·잠금·실패·무재수집·인덱스·Dry-run | 합성 계획·Clock·Batch 증거 |
+| Project Guard | 문서·데이터·보안·오프라인·H-707·H-708 | PROJECT_GUARD_SPEC의 상태·집계 계약 |
 | Full | 저장소 전체 unittest | 전체 Unit Test 실행 |
 | CI | 모든 PR·main Push | CI Validation Workflow |
 | Live smoke | 실제 API·외부 output-root | 별도 PM 승인 실행 |
@@ -562,7 +594,8 @@ Project Guard 검사별 현재 PASS·SKIP, 전체 집계와 Live 실행 여부�
 - T4 — Live Preflight 재통과와 최대 13회 실제 호출 별도 승인
 - T5 — 첫 Batch 원본·Manifest·백업·품질 감사와 EG-6B PASS/보완
 - T6 — 실제 구조 기반 CSV 계약·Exporter 별도 구현·누적·재생성 검증
-- T7 — EG-7 제한 기간 동일 13개 Area 반복과 S-DoT 수집 가능성 검토
+- T7 — EG-7 5분·1시간 Controller·파생 인덱스 오프라인 구현·독립 검토
+- T7-Live — 별도 PM 승인 운영 계획으로 동일 13개 Area 최대 156호출 파일럿
 - T8 — EG-8 Area·선택적 S-DoT Feature와 Spot Candidate Evaluation
 - T9 — Recommendation MVP Workstream(`PLANNED`, Gate number `NOT_ASSIGNED`)
 - T10 — 현장·인터뷰 결과로 121개 확대 또는 서비스 실증 여부 결정
@@ -642,11 +675,13 @@ Project Guard 검사별 현재 PASS·SKIP, 전체 집계와 Live 실행 여부�
 | freshmanager/http_adapter.py | 서울시 요청·Redirect·Timeout·응답 상한 |
 | freshmanager/storage.py | 배타적 비덮어쓰기 파일 저장 |
 | freshmanager/backup.py | Issue #60 완료 Batch 검증·로컬 Sync 복사·Lock·Receipt |
+| freshmanager/eg7.py | Issue #70 계획·벽시계 회차·Pilot Lock·Collector/Backup 조립·파생 출력 |
 | tests/test_eg6b.py | EG-6B Target 계약 검증 |
-| scripts/project_guard_check.py | 47개 Project Guard 등록·실행; H-708 활성 |
+| tests/test_eg7.py | EG-7 계획·Scheduling·Lock·실패·인덱스·Dry-run 합성 검증 |
+| scripts/project_guard_check.py | 47개 Project Guard 등록·실행; H-707·H-708 활성 |
 | docs/rules/DATA_COLLECTION_RULES.md | 단계별 저장·시간·원본·실패·배치 규칙 |
 | docs/testing/PROJECT_GUARD_SPEC.md | 검사 ID·판정·종료코드 기준 |
-| PR #54 완료 기록 | 19/19 Target, 243/243 Full, PASS=41/SKIP=5/TOTAL=46, CI 성공 |
+| Issue #69·#70 | EG-7 승인 범위와 구현 작업 추적 |
 
 ## 부록 A. 운영 Preflight 체크리스트
 

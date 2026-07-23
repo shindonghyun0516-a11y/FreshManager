@@ -53,6 +53,7 @@
 |---|---|
 | `Confirmed` | 실제 API 응답 또는 공식 기준파일에서 확인 |
 | `Documented` | 공식 문서나 승인된 프로젝트 문서에 정의됐으나 실응답 또는 구현 확인 전 |
+| `Implemented` | 코드와 합성 오프라인 검증이 존재하나 실제 운영 데이터 확인 전 |
 | `Unverified` | 아직 공식 문서나 실응답에서 확정하지 못함 |
 | `Derived` | 원본 필드로 계산한 파생필드 |
 | `Deprecated` | 더 이상 사용하지 않음 |
@@ -69,13 +70,18 @@
 | 데이터셋 | 역할 | 현재 상태 |
 |---|---|---|
 | `places` | 공식 121장소 기준정보 | 공식 CSV 정비·main 반영 완료, 정확한 5개 컬럼·유효 장소 121개, EG-1 PASS |
-| `population_observations` | 현재 인구값 | 여의도 공식 샘플과 EG-4·EG-5 실제 응답 확인; EG-6B 13개 회차 미실행 |
-| `population_forecasts` | 미래 인구예측 | 여의도 공식 샘플과 EG-4·EG-5 실제 응답 확인; EG-6B 13개 회차 미실행 |
+| `population_observations` | 현재 인구값 | 여의도·EG-5와 첫 EG-6B 실제 13개 Area 응답 확인 |
+| `population_forecasts` | 미래 인구예측 | 여의도·EG-5와 첫 EG-6B 실제 13개 Area 응답 확인 |
 | `commerce_observations` | 카드소비 기반 상권현황 | 실응답 확인 필요 |
 | `weather_observations` | 날씨 관측 | 실응답 확인 필요 |
 | `weather_forecasts` | 날씨 예보 | 실응답 확인 필요 |
-| `collection_logs` | 수집 성공·실패 기록 | EG-6B Batch Log·Manifest 계약 구현·오프라인 검증, 실제 13개 회차 미실행 |
-| `backup_receipts` | Batch별 Google Drive 백업·검증·원격 동기화 상태 | FUTURE_CONTRACT / NOT_IMPLEMENTED |
+| `collection_logs` | 수집 성공·실패 기록 | EG-6B Batch Log·Manifest 구현·첫 실제 13개 Area 회차 확인 |
+| `backup_receipts` | Batch별 로컬 Sync 복사·검증 상태 | 구현·Fake/실제 Batch 검증 완료; Worker는 원격 완료 상태를 생성하지 않음 |
+| `eg7_pilot_plans` | 12회차 불변 계획과 Live Gate 상태 | 구현·합성 검증 완료; 운영 계획은 생성하지 않음 |
+| `eg7_execution_events` | 파일럿 상태전이 append-only 로그 | 구현·합성 검증 완료; 실제 실행 기록 없음 |
+| `eg7_slot_index` | 계획 12회차의 종결·호출·Backup 파생 인덱스 | CSV·JSONL 구현·합성 검증 완료 |
+| `eg7_area_observation_index` | 실제 시도 Area의 관측·Forecast·무결성·중복 파생 인덱스 | 최대 156행 CSV·JSONL 구현·합성 검증 완료 |
+| `eg7_pilot_summary` | 호출·중복·시간·용량·Backup 파생 요약 | JSON 구현·합성 검증 완료 |
 | `batches_csv` | 조회용 Batch 파생 CSV | 첫 실제 Batch 품질 감사 후 PLANNED |
 | `area_observations_csv` | 조회용 Area 현재 관측 파생 CSV | 첫 실제 Batch 품질 감사 후 PLANNED |
 | `area_forecasts_csv` | 조회용 예측 스냅샷 파생 CSV | 첫 실제 Batch 품질 감사 후 PLANNED |
@@ -312,22 +318,27 @@ config_error
 security_error
 ```
 
-### 8.1 `backup_receipts` 미래 계약
+### 8.1 `backup_receipts` 구현 계약
 
-아래 필드와 상태는 모두 `FUTURE_CONTRACT / NOT_IMPLEMENTED`다. 현재 EG-6B
-Collection Log·Manifest에 존재하는 필드로 해석하지 않는다.
+Backup Receipt는 Sync Root 밖 Ledger의 append-only 사건 파일로 구현됐다. 현재
+EG-6B Collection Log·Manifest에 포함되는 필드로 해석하지 않는다.
 
 | 필드 | 의미 | 형식 | 상태 |
 |---|---|---|---|
-| `backup_attempt_id` | Backup Worker 실행별 식별자 | string | FUTURE_CONTRACT |
-| `batch_id` | 백업 대상 Batch | string | FUTURE_CONTRACT |
-| `backup_status` | 복사·검증·원격 동기화 단계 | categorical | FUTURE_CONTRACT |
-| `started_at` | 백업 시작시각 | datetime | FUTURE_CONTRACT |
-| `finished_at` | 백업 종료시각 | datetime | FUTURE_CONTRACT |
-| `source_file_count` | Manifest 기준 대상 파일 수 | integer | FUTURE_CONTRACT |
-| `verified_file_count` | 복사 후 검증 통과 파일 수 | integer | FUTURE_CONTRACT |
-| `manifest_verification_passed` | 파일 수·크기·SHA-256 검증 결과 | boolean | FUTURE_CONTRACT |
-| `remote_sync_checked_at` | 원격 업로드 완료 확인시각 | datetime | FUTURE_CONTRACT |
+| `backup_attempt_id` | Backup Worker 실행별 UUIDv4 | string | Implemented |
+| `batch_id` | 백업 대상 canonical UUID | string | Implemented |
+| `backup_status` | Worker가 기록할 수 있는 복사·검증 상태 | categorical | Implemented |
+| `started_at` | 백업 시작시각 | ISO 8601 datetime | Implemented |
+| `completed_at` | 사건 종료시각; 진행 중이면 null | ISO 8601 datetime / null | Implemented |
+| `source_file_count` | Manifest 기준 대상 파일 수 | integer | Implemented |
+| `copied_file_count` | 복사한 파일 수 | integer | Implemented |
+| `verified_file_count` | 복사 후 검증 통과 파일 수 | integer | Implemented |
+| `source_manifest_sha256` | Source Manifest SHA-256 | string / null | Implemented |
+| `logical_destination` | 비민감 논리 Backup Root | string | Implemented |
+| `failure_code` | 비민감 실패 코드 | string / null | Implemented |
+| `conflict_detected` | 기존 복사본 충돌 여부 | boolean | Implemented |
+| `restore_test_status` | Worker 실행에서 Restore 수행 여부 | categorical | Implemented |
+| `capability_warnings` | 파일시스템 능력 경고 | list[string] | Implemented |
 
 계획 상태값:
 
@@ -335,15 +346,14 @@ Collection Log·Manifest에 존재하는 필드로 해석하지 않는다.
 PENDING
 IN_PROGRESS
 LOCAL_SYNC_COPY_VERIFIED
-REMOTE_SYNC_PENDING
-REMOTE_SYNC_CONFIRMED
 FAILED
 CONFLICT
 ```
 
 `LOCAL_SYNC_COPY_VERIFIED`는 Google Drive for Desktop 동기화 폴더에 생성된 로컬
 복사본의 파일 수·크기·SHA-256 검증을 완료했다는 뜻이다. 원격 Google Drive 업로드
-완료를 의미하지 않으며 `REMOTE_SYNC_CONFIRMED`와 같은 상태로 사용하지 않는다.
+완료를 의미하지 않는다. Worker는 `REMOTE_SYNC_PENDING`이나
+`REMOTE_SYNC_CONFIRMED`를 Receipt에 생성하지 않는다.
 Backup Root는 `FreshManager-Data/` 논리 구조로만 표현한다. Receipt에는 실제 Google
 계정 이메일, 사용자 식별정보와 동기화 절대경로를 저장하지 않는다.
 
@@ -385,6 +395,94 @@ Context·현장검증·운영 제약으로 신뢰 가능하고 운영 가능한 
 부족하면 `target_level=AREA`와 `fallback_reason`을 사용한다. 현재 Spot Master의
 `STATION_CENTER_PROXY`는 Candidate Anchor Point이며 검증된 판매 Spot이 아니다.
 S-DoT 미지원 Area도 Area 분석과 추천 후보에서 제외하지 않는다.
+
+---
+
+### 8.3 EG-7 파일럿 계획·사건·파생 인덱스 계약
+
+`freshmanager.eg7`의 모든 스키마는 버전 문자열을 포함한다. 운영 계획은 아직
+생성하지 않았고 아래 구현 상태는 합성 임시 증거의 오프라인 검증을 뜻한다.
+
+공통 표현:
+
+- 인코딩: UTF-8
+- 시각: timezone offset을 포함한 ISO 8601; 운영 시간대는 `Asia/Seoul`
+- JSON·JSONL null/boolean: JSON native `null`, `true`, `false`
+- CSV null/boolean: 빈 문자열, 소문자 `true`, `false`
+- Enum: 문서에 정의된 대문자 문자열
+- 경로: Source 단계 기준 상대경로만 허용; 절대경로 금지
+
+`eg7_pilot_plans` 필드:
+
+```text
+schema_version, pilot_run_id, timezone, cadence_minutes,
+planned_start_at, planned_end_at, planned_slot_count, max_api_calls,
+retry_count, area_count, area_order_contract, quota_confirmation_status,
+live_approval_status, slots
+```
+
+각 `slots` 항목은 `slot_index`, `scheduled_at`, `batch_id`,
+`planned_status`를 가진다. `quota_confirmation_status`는 기본
+`UNCONFIRMED`, `live_approval_status`는 기본 `NOT_APPROVED`로 운영 계획을
+작성해야 하며 두 상태를 충족하지 않으면 Live를 거부한다. 계획 지문은 정렬된
+canonical JSON의 SHA-256이고 추적용이지 인증값이 아니다.
+
+`eg7_execution_events` 필드:
+
+```text
+schema_version, pilot_run_id, plan_fingerprint, slot_index, scheduled_at,
+batch_id, state_before, state_after, event_at, reason,
+collector_execution_count, actual_api_call_count, backup_execution_count,
+backup_status
+```
+
+Slot 종결 Enum:
+
+```text
+COMPLETED_SUCCESS
+COMPLETED_PARTIAL
+SKIPPED_MISSED
+SKIPPED_OVERLAP
+STOPPED_FATAL
+NOT_RUN_AFTER_FATAL_STOP
+```
+
+`eg7_slot_index` 필드:
+
+```text
+schema_version, pilot_run_id, slot_index, scheduled_at, batch_id,
+slot_status, collection_started_at, collection_ended_at,
+collection_duration_ms, attempted_area_count, successful_area_count,
+failed_area_count, actual_api_calls, backup_eligible, backup_status,
+failure_reason
+```
+
+항상 12행이며 실행하지 않은 회차의 알 수 없는 값은 `0`으로 추정하지 않고 null로
+둔다. 건너뛴 회차의 확인된 API 호출 수만 `0`이다.
+
+`eg7_area_observation_index` 필드:
+
+```text
+schema_version, pilot_run_id, slot_index, scheduled_at, slot_status,
+batch_id, request_id, panel_order, area_code, area_status, failure_reason,
+requested_at, received_at, collection_started_at, collection_ended_at,
+collection_duration_ms, api_observation_at, population_min, population_max,
+congestion_level, forecast_record_count, forecast_first_target_at,
+forecast_last_target_at, raw_relative_path, metadata_relative_path,
+raw_sha256, manifest_sha256, duplicate_collection_time,
+duplicate_observation_time, duplicate_raw_hash, duplicate_forecast_targets,
+backup_eligible, backup_status
+```
+
+실제 시도한 Area만 최대 156행으로 기록한다. 중복 비교는 `area_code` 범위에서
+수집시각, API 관측시각, Raw SHA-256, 순서가 보존된 Forecast 대상시각 집합을
+각각 구분한다. `spot_id`는 포함하지 않고 `area_code`를 후속 결합키로 유지한다.
+이 인덱스와 Summary는 canonical Raw·Metadata·Collection Log·Manifest를
+대체하거나 수정하지 않는다.
+
+`eg7_pilot_summary`는 계획·실행·건너뜀·치명중단·Area 성공실패·실제 호출·중복
+건수와 비율·Forecast 구조 일관성·Collector/Backup 소요시간·Source/Backup 용량
+증가·Backup 적격/검증 수·무재수집 확인을 기록한다. ML 성능은 평가하지 않는다.
 
 ---
 
@@ -615,6 +713,7 @@ Field Dictionary v0.1은 다음 조건을 만족해야 한다.
 
 | 버전 | 날짜 | 변경내용 | 작성자 | 승인상태 |
 |---|---|---|---|---|
+| v0.1.3 | 2026-07-23 | EG-6B·Backup 현재 상태와 EG-7 계획·사건·Slot/Area Index·Summary 필드·표현·중복 계약 반영 | 신동현 | PM 구현 범위 승인 |
 | v0.1.2 (Issue #58 보완) | 2026-07-22 | 백업·CSV와 Area·S-DoT·Spot Candidate·Recommendation 미래 데이터 계약 분리 | 신동현 | PM Diff 검토 전 |
 | v0.1.1 | 2026-07-20 | collection_logs를 공식 8개 메타데이터 계약으로 정렬하고 parser_version을 향후 정규화·분석 추적 필드로 분리 | 신동현 | PM 검토 전 |
 | v0.1.0 | 2026-07-17 | 장소·인구·예측·로그 필드 초안 | 신동현 | Draft |
