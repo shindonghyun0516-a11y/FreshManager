@@ -46,6 +46,11 @@ ELIGIBLE_PARTIAL_FAILURE = "PARTIAL_FAILURE"
 RESTORE_NOT_RUN = "NOT_RUN"
 DIRECTORY_FSYNC_UNSUPPORTED = "DIRECTORY_FSYNC_UNSUPPORTED"
 FILE_FSYNC_UNSUPPORTED = "FILE_FSYNC_UNSUPPORTED"
+IGNORED_PLATFORM_METADATA_BASENAME = ".DS_Store"
+SYMLINK_BATCH_ROOT_REJECTED = "SYMLINK_BATCH_ROOT_REJECTED"
+CANONICAL_VERIFIED_WITH_IGNORED_PLATFORM_METADATA = (
+    "CANONICAL_BACKUP_VERIFIED_WITH_IGNORED_PLATFORM_METADATA"
+)
 
 SUCCESS_STATUSES = {"success"}
 AREA_FAILURE_STATUSES = {"api_error", "timeout", "parse_error", "validation_error"}
@@ -141,6 +146,25 @@ class VerificationResult:
     manifest_sha256: str | None
     expected_file_count: int
     verified_file_count: int
+    total_tree_file_count: int = 0
+    canonical_backup_file_count: int = 0
+    ignored_platform_metadata_count: int = 0
+    unknown_additional_file_count: int = 0
+    unexpected_directory_count: int = 0
+
+    @property
+    def canonical_source_file_count(self) -> int:
+        return self.expected_file_count
+
+    @property
+    def canonical_count_match(self) -> bool:
+        return self.expected_file_count == self.canonical_backup_file_count
+
+    @property
+    def ignored_platform_metadata_type(self) -> str | None:
+        if self.ignored_platform_metadata_count:
+            return IGNORED_PLATFORM_METADATA_BASENAME
+        return None
 
 
 @dataclass(frozen=True)
@@ -181,6 +205,15 @@ class _BatchPlan:
 class _LockHandle:
     path: Path
     attempt_id: str
+
+
+@dataclass(frozen=True)
+class _TreeInventory:
+    total_file_count: int
+    canonical_file_count: int
+    ignored_platform_metadata_count: int
+    unknown_additional_file_count: int
+    unexpected_directory_count: int
 
 
 class SafeArgumentParser(argparse.ArgumentParser):
@@ -241,7 +274,8 @@ def _forbidden_path(path: PurePosixPath) -> bool:
     for part in path.parts:
         lowered = part.casefold()
         if (
-            lowered == ".env"
+            part == IGNORED_PLATFORM_METADATA_BASENAME
+            or lowered == ".env"
             or lowered.startswith(".env.")
             or "probe" in lowered
             or "partial" in lowered
@@ -261,6 +295,67 @@ def _regular_file(path: Path, *, missing_reason: str = "ARTIFACT_MISSING") -> os
     if stat.S_ISLNK(information.st_mode) or not stat.S_ISREG(information.st_mode):
         raise EligibilityError("ARTIFACT_NOT_REGULAR")
     return information
+
+
+def _same_file_identity(left: os.stat_result, right: os.stat_result) -> bool:
+    return (left.st_dev, left.st_ino) == (right.st_dev, right.st_ino)
+
+
+def _resolve_real_batch_root(path: Path) -> Path:
+    """Resolve one real directory without losing final-component symlink evidence."""
+
+    try:
+        original_information = path.lstat()
+    except (FileNotFoundError, NotADirectoryError) as error:
+        raise EligibilityError("SOURCE_BATCH_NOT_FOUND", retryable=True) from error
+    except OSError as error:
+        raise EligibilityError("SOURCE_BATCH_NOT_FOUND", retryable=True) from error
+    if stat.S_ISLNK(original_information.st_mode):
+        raise EligibilityError(SYMLINK_BATCH_ROOT_REJECTED)
+    if not stat.S_ISDIR(original_information.st_mode):
+        raise EligibilityError("SOURCE_BATCH_NOT_FOUND", retryable=True)
+
+    flags = os.O_RDONLY
+    flags |= getattr(os, "O_DIRECTORY", 0)
+    flags |= getattr(os, "O_NOFOLLOW", 0)
+    try:
+        descriptor = os.open(path, flags)
+    except OSError as error:
+        try:
+            current_information = path.lstat()
+        except OSError:
+            current_information = None
+        if current_information is not None and stat.S_ISLNK(current_information.st_mode):
+            raise EligibilityError(SYMLINK_BATCH_ROOT_REJECTED) from error
+        raise EligibilityError("SOURCE_BATCH_NOT_FOUND", retryable=True) from error
+
+    try:
+        opened_information = os.fstat(descriptor)
+        current_information = path.lstat()
+        if stat.S_ISLNK(current_information.st_mode):
+            raise EligibilityError(SYMLINK_BATCH_ROOT_REJECTED)
+        if (
+            not stat.S_ISDIR(opened_information.st_mode)
+            or not stat.S_ISDIR(current_information.st_mode)
+            or not _same_file_identity(original_information, opened_information)
+            or not _same_file_identity(current_information, opened_information)
+        ):
+            raise EligibilityError("SOURCE_BATCH_NOT_FOUND", retryable=True)
+        try:
+            resolved = path.resolve(strict=True)
+            resolved_information = resolved.stat()
+        except (OSError, RuntimeError) as error:
+            raise EligibilityError("SOURCE_BATCH_NOT_FOUND", retryable=True) from error
+        if (
+            not stat.S_ISDIR(resolved_information.st_mode)
+            or not _same_file_identity(opened_information, resolved_information)
+        ):
+            raise EligibilityError("SOURCE_BATCH_NOT_FOUND", retryable=True)
+        return resolved
+    except OSError as error:
+        raise EligibilityError("SOURCE_BATCH_NOT_FOUND", retryable=True) from error
+    finally:
+        os.close(descriptor)
 
 
 def _load_json_object(path: Path, *, missing_reason: str) -> dict[str, object]:
@@ -533,17 +628,31 @@ def _validate_collection_log(
     return ELIGIBLE_SUCCESS if exit_code == 0 else ELIGIBLE_PARTIAL_FAILURE
 
 
-def _inspect_batch(stage_root: Path, batch_id: str) -> _BatchPlan:
+def _is_ignored_platform_metadata(
+    path: Path,
+    information: os.stat_result | None = None,
+) -> bool:
+    if path.name != IGNORED_PLATFORM_METADATA_BASENAME:
+        return False
+    if information is None:
+        try:
+            information = path.lstat()
+        except OSError:
+            return False
+    return stat.S_ISREG(information.st_mode)
+
+
+def _inspect_batch(
+    stage_root: Path,
+    batch_id: str,
+    *,
+    allow_noncanonical_entries: bool = False,
+) -> _BatchPlan:
     try:
         batch_id = _canonical_batch_id(batch_id)
     except CliInputError as error:
         raise EligibilityError("BATCH_ID_INVALID") from error
-    try:
-        stage_root = stage_root.resolve()
-    except (OSError, RuntimeError) as error:
-        raise EligibilityError("SOURCE_BATCH_NOT_FOUND", retryable=True) from error
-    if not stage_root.is_dir() or stage_root.is_symlink():
-        raise EligibilityError("SOURCE_BATCH_NOT_FOUND", retryable=True)
+    stage_root = _resolve_real_batch_root(stage_root)
     batch_relative = BATCHES_RELATIVE_PATH / batch_id
     batch_directory = stage_root / batch_relative
     if not batch_directory.exists():
@@ -563,10 +672,15 @@ def _inspect_batch(stage_root: Path, batch_id: str) -> _BatchPlan:
         raise EligibilityError("SOURCE_BATCH_NOT_FOUND", retryable=True) from error
     expected_names = {"manifest.json", "collection_log.json"}
     actual_names = {item.name for item in batch_entries}
-    if actual_names != expected_names:
-        if any(_forbidden_path(PurePosixPath(item.name)) for item in batch_entries):
-            raise EligibilityError("FORBIDDEN_ARTIFACT")
+    if not expected_names.issubset(actual_names):
         raise EligibilityError("FILE_COUNT_MISMATCH")
+    unexpected_entries = [item for item in batch_entries if item.name not in expected_names]
+    if not allow_noncanonical_entries:
+        unknown_entries = [
+            item for item in unexpected_entries if not _is_ignored_platform_metadata(item)
+        ]
+        if unknown_entries:
+            raise EligibilityError("UNEXPECTED_NONCANONICAL_FILE")
 
     _validate_reference_evidence(manifest)
     artifacts = _manifest_artifacts(manifest)
@@ -586,6 +700,40 @@ def _inspect_batch(stage_root: Path, batch_id: str) -> _BatchPlan:
         manifest_sha256=manifest_sha256,
         artifacts=artifacts,
         eligible_batch_type=eligible_type,
+    )
+
+
+def _manifest_verification_plan(stage_root: Path, batch_id: str) -> _BatchPlan:
+    """Load the canonical path contract before inspecting copied file contents."""
+
+    try:
+        batch_id = _canonical_batch_id(batch_id)
+    except CliInputError as error:
+        raise EligibilityError("BATCH_ID_INVALID") from error
+    stage_root = _resolve_real_batch_root(stage_root)
+    manifest_relative = (
+        BATCHES_RELATIVE_PATH / batch_id / "manifest.json"
+    ).as_posix()
+    manifest_path = stage_root / manifest_relative
+    manifest = _load_json_object(manifest_path, missing_reason="MANIFEST_MISSING")
+    if manifest.get("batch_id") != batch_id or manifest.get("hash_algorithm") != "sha256":
+        raise EligibilityError("MANIFEST_INVALID")
+    _validate_reference_evidence(manifest)
+    artifacts = _manifest_artifacts(manifest)
+    manifest_information = _regular_file(manifest_path, missing_reason="MANIFEST_MISSING")
+    if manifest_information.st_size <= 0:
+        raise EligibilityError("MANIFEST_INVALID")
+    try:
+        manifest_sha256 = _sha256_file(manifest_path)
+    except OSError as error:
+        raise EligibilityError("MANIFEST_INVALID") from error
+    return _BatchPlan(
+        stage_root=stage_root,
+        batch_id=batch_id,
+        manifest_relative_path=manifest_relative,
+        manifest_sha256=manifest_sha256,
+        artifacts=artifacts,
+        eligible_batch_type=ELIGIBLE_SUCCESS,
     )
 
 
@@ -716,35 +864,146 @@ def _expected_relative_paths(plan: _BatchPlan) -> tuple[str, ...]:
     return tuple(item.relative_path for item in plan.artifacts) + (plan.manifest_relative_path,)
 
 
-def _verify_tree(plan: _BatchPlan, root: Path) -> VerificationResult:
+def _expected_relative_directories(plan: _BatchPlan) -> frozenset[str]:
+    expected: set[str] = set()
+    for relative in _expected_relative_paths(plan):
+        parent = PurePosixPath(relative).parent
+        while parent != PurePosixPath("."):
+            expected.add(parent.as_posix())
+            parent = parent.parent
+    return frozenset(expected)
+
+
+def _tree_inventory(plan: _BatchPlan, root: Path) -> _TreeInventory:
     expected = set(_expected_relative_paths(plan))
+    expected_directories = _expected_relative_directories(plan)
+    total_count = 0
+    canonical_count = 0
+    ignored_count = 0
+    unknown_count = 0
+    unexpected_directory_count = 0
     try:
-        actual_files = [item for item in root.rglob("*") if item.is_file() or item.is_symlink()]
-        actual = {item.relative_to(root).as_posix() for item in actual_files}
+        pending = [root]
+        while pending:
+            directory = pending.pop()
+            with os.scandir(directory) as entries:
+                for entry in entries:
+                    item = Path(entry.path)
+                    information = entry.stat(follow_symlinks=False)
+                    relative = item.relative_to(root).as_posix()
+                    if stat.S_ISDIR(information.st_mode):
+                        if relative not in expected_directories:
+                            unexpected_directory_count += 1
+                        pending.append(item)
+                    else:
+                        total_count += 1
+                        if relative in expected and stat.S_ISREG(information.st_mode):
+                            canonical_count += 1
+                        elif _is_ignored_platform_metadata(item, information):
+                            ignored_count += 1
+                        else:
+                            unknown_count += 1
     except (OSError, ValueError) as error:
         raise BackupOperationalError("VERIFY_FAILED") from error
-    if actual != expected:
-        return VerificationResult(False, "FILE_COUNT_MISMATCH", plan.batch_id, None, len(expected), 0)
+    return _TreeInventory(
+        total_file_count=total_count,
+        canonical_file_count=canonical_count,
+        ignored_platform_metadata_count=ignored_count,
+        unknown_additional_file_count=unknown_count,
+        unexpected_directory_count=unexpected_directory_count,
+    )
+
+
+def _verification_result(
+    *,
+    verified: bool,
+    reason_code: str,
+    plan: _BatchPlan,
+    manifest_sha256: str | None,
+    verified_file_count: int,
+    inventory: _TreeInventory,
+) -> VerificationResult:
+    return VerificationResult(
+        verified=verified,
+        reason_code=reason_code,
+        batch_id=plan.batch_id,
+        manifest_sha256=manifest_sha256,
+        expected_file_count=plan.source_file_count,
+        verified_file_count=verified_file_count,
+        total_tree_file_count=inventory.total_file_count,
+        canonical_backup_file_count=inventory.canonical_file_count,
+        ignored_platform_metadata_count=inventory.ignored_platform_metadata_count,
+        unknown_additional_file_count=inventory.unknown_additional_file_count,
+        unexpected_directory_count=inventory.unexpected_directory_count,
+    )
+
+
+def _verify_tree(plan: _BatchPlan, root: Path) -> VerificationResult:
     try:
-        inspected = _inspect_batch(root, plan.batch_id)
+        root = _resolve_real_batch_root(root)
     except EligibilityError as error:
-        return VerificationResult(False, error.reason_code, plan.batch_id, None, len(expected), 0)
-    if inspected.manifest_sha256 != plan.manifest_sha256 or inspected.source_file_count != plan.source_file_count:
         return VerificationResult(
             False,
-            "SHA256_MISMATCH",
+            error.reason_code,
             plan.batch_id,
-            inspected.manifest_sha256,
+            None,
             plan.source_file_count,
             0,
         )
-    return VerificationResult(
-        True,
-        "VERIFIED",
-        plan.batch_id,
-        inspected.manifest_sha256,
-        plan.source_file_count,
-        plan.source_file_count,
+    inventory = _tree_inventory(plan, root)
+    if (
+        inventory.unknown_additional_file_count
+        or inventory.unexpected_directory_count
+    ):
+        return _verification_result(
+            verified=False,
+            reason_code="UNEXPECTED_NONCANONICAL_FILE",
+            plan=plan,
+            manifest_sha256=None,
+            verified_file_count=0,
+            inventory=inventory,
+        )
+    if not inventory.canonical_file_count == plan.source_file_count:
+        return _verification_result(
+            verified=False,
+            reason_code="FILE_COUNT_MISMATCH",
+            plan=plan,
+            manifest_sha256=None,
+            verified_file_count=0,
+            inventory=inventory,
+        )
+    try:
+        inspected = _inspect_batch(root, plan.batch_id, allow_noncanonical_entries=True)
+    except EligibilityError as error:
+        return _verification_result(
+            verified=False,
+            reason_code=error.reason_code,
+            plan=plan,
+            manifest_sha256=None,
+            verified_file_count=0,
+            inventory=inventory,
+        )
+    if inspected.manifest_sha256 != plan.manifest_sha256 or inspected.source_file_count != plan.source_file_count:
+        return _verification_result(
+            verified=False,
+            reason_code="SHA256_MISMATCH",
+            plan=plan,
+            manifest_sha256=inspected.manifest_sha256,
+            verified_file_count=0,
+            inventory=inventory,
+        )
+    reason_code = (
+        CANONICAL_VERIFIED_WITH_IGNORED_PLATFORM_METADATA
+        if inventory.ignored_platform_metadata_count
+        else "VERIFIED"
+    )
+    return _verification_result(
+        verified=True,
+        reason_code=reason_code,
+        plan=plan,
+        manifest_sha256=inspected.manifest_sha256,
+        verified_file_count=plan.source_file_count,
+        inventory=inventory,
     )
 
 
@@ -753,7 +1012,7 @@ def verify_backup_copy(backup_batch_root: Path) -> VerificationResult:
 
     batch_id = backup_batch_root.name
     try:
-        plan = _inspect_batch(backup_batch_root, batch_id)
+        plan = _manifest_verification_plan(backup_batch_root, batch_id)
         return _verify_tree(plan, backup_batch_root)
     except EligibilityError as error:
         return VerificationResult(False, error.reason_code, batch_id, None, 0, 0)
@@ -1069,7 +1328,7 @@ def backup_batch(
     try:
         destination_parent = _ensure_safe_directory_tree(resolved_sync, DESTINATION_RELATIVE_PATH)
         destination = destination_parent / plan.batch_id
-        if destination.exists():
+        if destination.exists() or destination.is_symlink():
             existing = _verify_tree(plan, destination)
             if existing.verified:
                 final_status = BackupStatus.LOCAL_SYNC_COPY_VERIFIED
@@ -1077,7 +1336,11 @@ def backup_batch(
                 verified_count = existing.verified_file_count
             else:
                 final_status = BackupStatus.CONFLICT
-                reason_code = "CONFLICT"
+                reason_code = (
+                    existing.reason_code
+                    if existing.reason_code == SYMLINK_BATCH_ROOT_REJECTED
+                    else "CONFLICT"
+                )
                 conflict = True
         else:
             if _available_bytes(destination_parent) < _required_free_bytes(plan.source_file_bytes):
@@ -1189,6 +1452,8 @@ def _exit_code(result: BackupResult) -> int:
         "FORBIDDEN_ARTIFACT",
         "ARTIFACT_MISSING",
         "ARTIFACT_NOT_REGULAR",
+        SYMLINK_BATCH_ROOT_REJECTED,
+        "UNEXPECTED_NONCANONICAL_FILE",
         "FILE_COUNT_MISMATCH",
         "SIZE_MISMATCH",
         "SHA256_MISMATCH",
