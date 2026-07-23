@@ -134,6 +134,7 @@ PM이 승인했거나 명시적으로 보류한 제품·운영 결정을 새 AI 
 - Supersedes: 5분을 파일럿 전용·비교 후보·OPEN 결정으로 표현한 모든 과거 문구.
 - Closed decision: `cadence_minutes=5`,
   `cadence_decision_status=PM_APPROVED_FIXED`,
+  `long_term_baseline_status=ACTIVE`,
   `cadence_scope=LONG_TERM_OPERATING_BASELINE`, `cadence_change_allowed=false`.
 - Scheduling: `Asia/Seoul` 벽시계 5분 정렬을 사용한다. 10분·15분 대안은 지원·평가하지
   않으며 새 PM 명시 결정과 버전 계약·코드 검토 없이는 변경할 수 없다.

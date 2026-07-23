@@ -37,6 +37,7 @@ TIMEZONE_NAME = "Asia/Seoul"
 SEOUL_TIMEZONE = ZoneInfo(TIMEZONE_NAME)
 CADENCE_MINUTES = 5
 CADENCE_DECISION_STATUS = "PM_APPROVED_FIXED"
+LONG_TERM_BASELINE_STATUS = "ACTIVE"
 CADENCE_SCOPE = "LONG_TERM_OPERATING_BASELINE"
 CADENCE_CHANGE_ALLOWED = False
 ALTERNATIVE_CADENCES_SUPPORTED = False
@@ -60,6 +61,7 @@ PLAN_FIELDS = (
     "timezone",
     "cadence_minutes",
     "cadence_decision_status",
+    "long_term_baseline_status",
     "cadence_scope",
     "cadence_change_allowed",
     "planned_start_at",
@@ -408,6 +410,46 @@ def _timestamp(value: object, reason: str) -> datetime:
     return normalized
 
 
+def _canonical_plan_timestamp(value: object, reason: str) -> str:
+    return _timestamp(value, reason).isoformat(timespec="seconds")
+
+
+def canonical_forecast_target_signature(
+    values: Iterable[object],
+) -> tuple[str, ...]:
+    """Return the canonical duplicate-comparison signature for Forecast targets."""
+
+    canonical: set[str] = set()
+    for value in values:
+        if (
+            not isinstance(value, str)
+            or len(value) < 16
+            or value[10] not in {"T", " "}
+        ):
+            raise RuntimeError("CANONICAL_EVIDENCE_INVALID")
+        try:
+            parsed = datetime.fromisoformat(value)
+        except ValueError as error:
+            raise RuntimeError("CANONICAL_EVIDENCE_INVALID") from error
+        if parsed.tzinfo is None:
+            normalized = parsed.replace(tzinfo=SEOUL_TIMEZONE)
+        else:
+            normalized = parsed.astimezone(SEOUL_TIMEZONE)
+        if normalized.second or normalized.microsecond:
+            raise RuntimeError("CANONICAL_EVIDENCE_INVALID")
+        canonical.add(normalized.isoformat(timespec="seconds"))
+    return tuple(sorted(canonical))
+
+
+def forecast_duplicate_key(
+    area_code: object,
+    values: Iterable[object],
+) -> tuple[str, tuple[str, ...]]:
+    if not isinstance(area_code, str) or not area_code:
+        raise RuntimeError("CANONICAL_EVIDENCE_INVALID")
+    return area_code, canonical_forecast_target_signature(values)
+
+
 def validate_plan(document: Mapping[str, object]) -> PilotPlan:
     """Validate the complete immutable one-hour plan without side effects."""
 
@@ -422,6 +464,8 @@ def validate_plan(document: Mapping[str, object]) -> PilotPlan:
         raise PilotPlanError("CADENCE_INVALID")
     if document.get("cadence_decision_status") != CADENCE_DECISION_STATUS:
         raise PilotPlanError("CADENCE_DECISION_STATUS_INVALID")
+    if document.get("long_term_baseline_status") != LONG_TERM_BASELINE_STATUS:
+        raise PilotPlanError("LONG_TERM_BASELINE_STATUS_INVALID")
     if document.get("cadence_scope") != CADENCE_SCOPE:
         raise PilotPlanError("CADENCE_SCOPE_INVALID")
     if document.get("cadence_change_allowed") is not CADENCE_CHANGE_ALLOWED:
@@ -507,8 +551,31 @@ def load_plan(path: Path) -> PilotPlan:
 
 def canonical_plan_bytes(document: Mapping[str, object]) -> bytes:
     validate_plan(document)
+    canonical_document = dict(document)
+    canonical_document["planned_start_at"] = _canonical_plan_timestamp(
+        document.get("planned_start_at"),
+        "PLAN_TIME_INVALID",
+    )
+    canonical_document["planned_end_at"] = _canonical_plan_timestamp(
+        document.get("planned_end_at"),
+        "PLAN_TIME_INVALID",
+    )
+    raw_slots = document.get("slots")
+    if not isinstance(raw_slots, list):
+        raise PilotPlanError("SLOT_COUNT_INVALID")
+    canonical_slots: list[dict[str, object]] = []
+    for raw_slot in raw_slots:
+        if not isinstance(raw_slot, dict):
+            raise PilotPlanError("SLOT_FIELDS_INVALID")
+        canonical_slot = dict(raw_slot)
+        canonical_slot["scheduled_at"] = _canonical_plan_timestamp(
+            raw_slot.get("scheduled_at"),
+            "SLOT_TIME_INVALID",
+        )
+        canonical_slots.append(canonical_slot)
+    canonical_document["slots"] = canonical_slots
     return json.dumps(
-        dict(document),
+        canonical_document,
         ensure_ascii=False,
         sort_keys=True,
         separators=(",", ":"),
@@ -1237,11 +1304,15 @@ def build_area_observation_index(
                     forecasts = population.get("forecasts")
                     if not isinstance(forecasts, list):
                         raise RuntimeError("CANONICAL_EVIDENCE_INVALID")
+                    if any(
+                        not isinstance(forecast, dict)
+                        or not isinstance(forecast.get("forecast_target_time"), str)
+                        for forecast in forecasts
+                    ):
+                        raise RuntimeError("CANONICAL_EVIDENCE_INVALID")
                     forecast_targets = tuple(
                         str(forecast["forecast_target_time"])
                         for forecast in forecasts
-                        if isinstance(forecast, dict)
-                        and isinstance(forecast.get("forecast_target_time"), str)
                     )
 
             observation_at = (
@@ -1262,7 +1333,9 @@ def build_area_observation_index(
                 (str(area_code), raw_sha256) if raw_sha256 is not None else None
             )
             forecast_key = (
-                (str(area_code), forecast_targets) if forecast_targets else None
+                forecast_duplicate_key(area_code, forecast_targets)
+                if forecast_targets
+                else None
             )
             row = {
                 "schema_version": AREA_INDEX_SCHEMA_VERSION,
@@ -1409,6 +1482,7 @@ def build_pilot_summary(
         "plan_fingerprint": plan.fingerprint,
         "cadence_minutes": CADENCE_MINUTES,
         "cadence_decision_status": CADENCE_DECISION_STATUS,
+        "long_term_baseline_status": LONG_TERM_BASELINE_STATUS,
         "cadence_scope": CADENCE_SCOPE,
         "cadence_change_allowed": CADENCE_CHANGE_ALLOWED,
         "alternative_cadences_supported": ALTERNATIVE_CADENCES_SUPPORTED,
@@ -1773,6 +1847,7 @@ def _report_dry_run(plan: PilotPlan) -> None:
     print(f"plan_fingerprint={plan.fingerprint}")
     print(f"cadence_minutes={CADENCE_MINUTES}")
     print(f"cadence_decision_status={CADENCE_DECISION_STATUS}")
+    print(f"long_term_baseline_status={LONG_TERM_BASELINE_STATUS}")
     print(f"cadence_scope={CADENCE_SCOPE}")
     print(f"cadence_change_allowed={str(CADENCE_CHANGE_ALLOWED).lower()}")
     print(

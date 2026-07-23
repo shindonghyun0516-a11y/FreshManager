@@ -113,6 +113,7 @@ Decision Record, 기술 구조 결정 기록) 형식으로 보존한다. 현행 
   운영시간·24시간 확대·할당량이 OPEN인 사실과 주기 결정을 분리해야 한다.
 - Decision: 계획 schema v2는 `cadence_minutes=5`,
   `cadence_decision_status=PM_APPROVED_FIXED`,
+  `long_term_baseline_status=ACTIVE`,
   `cadence_scope=LONG_TERM_OPERATING_BASELINE`, `cadence_change_allowed=false`를
   정확히 요구한다. CLI에 임의 주기 옵션을 두지 않고 비 5분 계획을 거부한다.
 - Alternatives: 10분·15분 비교, runtime cadence 선택, 중복률 기반 자동 변경.

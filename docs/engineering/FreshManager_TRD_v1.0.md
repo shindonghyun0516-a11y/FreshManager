@@ -405,8 +405,8 @@ Area Collector는 Spot 추천 여부와 무관하게 공식 Area 관측을 계�
 
 | **컴포넌트** | **책임** | **상태** |
 | --- | --- | --- |
-| Pilot Plan | v2; 고정 5분 결정·1개 `pilot_run_id`·12개 시각·UUIDv4 Batch ID·호출예산·승인상태 | 구현·합성 검증 |
-| Plan Fingerprint | 정렬 canonical JSON의 결정적 SHA-256; 추적용 | 구현 |
+| Pilot Plan | v2; 고정 5분·`long_term_baseline_status=ACTIVE`·1개 `pilot_run_id`·12개 시각·UUIDv4 Batch ID·호출예산·승인상태 | 구현·합성 검증 |
+| Plan Fingerprint | 승인된 Plan 시각을 `YYYY-MM-DDTHH:MM:SS+09:00`으로 의미 정규화한 정렬 canonical JSON의 결정적 SHA-256; 추적용 | 구현 |
 | Live Gate | `CONFIRMED` 할당량·`PM_APPROVED`·지문·시간창·환경·충돌 | 구현; 운영 값 OPEN |
 | Pilot Lock | 원자적 단일 실행, stale 자동삭제·정상 force-unlock 없음 | 구현 |
 | Wall-clock Scheduler | `Asia/Seoul` 5분 경계 12개, 무보충·무드리프트 | 구현 |
@@ -423,8 +423,15 @@ Area Collector는 Spot 추천 여부와 무관하게 공식 Area 관측을 계�
 - 시간대는 `Asia/Seoul`, 장기 주기는 벽시계 5분으로
   `PM_APPROVED_FIXED`·`LONG_TERM_OPERATING_BASELINE`이다.
 - 계획 v2는 `cadence_minutes=5`, `cadence_decision_status=PM_APPROVED_FIXED`,
+  `long_term_baseline_status=ACTIVE`,
   `cadence_scope=LONG_TERM_OPERATING_BASELINE`, `cadence_change_allowed=false`를
-  모두 강제하고 비 5분 계획과 런타임 주기 옵션을 거부한다.
+  모두 강제하고 비 5분 계획과 런타임 주기 옵션을 거부한다. 대안 주기는 지원하지
+  않는다.
+- 계획 지문은 검증된 `planned_start_at`, `planned_end_at`과 모든
+  `slots[].scheduled_at`을 `YYYY-MM-DDTHH:MM:SS+09:00`으로 정규화한 뒤 계산한다.
+  허용된 `T`·공백 구분자와 JSON 키 순서 차이는 같은 지문을 만들며, 다른 시각·
+  Batch ID·승인 상태는 다른 지문을 만든다. `plan_fingerprint` 자체, 환경값,
+  Secret과 절대경로는 입력에서 제외하고 이 SHA-256을 인증값으로 표현하지 않는다.
 - 첫 통제 검증 길이는 1시간이고 계획 회차는 12다. 이 결과로 5분 유지 여부를
   평가하거나 10분·15분 대안을 비교하지 않는다.
 - 회차당 13 Area, 전체 최대 156호출, Area별 회차당 최대 1회, 재시도는 0회다.
@@ -447,7 +454,11 @@ Backup 실패는 Source를 보존하고 Collector·서울시 API·대체 Batch I
 Slot Index는 정확히 12행이고 알 수 없는 값을 0으로 추정하지 않는다. Area Index는
 실제 시도한 Area만 최대 156행이며 `area_code`를 후속 Area–Spot/S-DoT 결합키로
 유지하고 `spot_id`를 추가하지 않는다. 수집시각, API 관측시각, Raw SHA-256,
-순서가 보존된 Forecast 대상시각 집합을 Area별로 구분해 중복 플래그를 만든다.
+Forecast 대상시각의 의미 정규화된 canonical 정렬 집합을 Area별로 구분해 중복
+플래그를 만든다. Forecast 비교 signature는 각 대상 instant를
+`YYYY-MM-DDTHH:MM:SS+09:00`으로 정규화하고, 같은 instant를 집합 안에서 한 번만
+남긴 뒤 오름차순 불변 tuple로 만든다. 원본 Forecast 배열 순서는 비교에 사용하지
+않고 Raw에서 그대로 보존한다.
 Raw·Metadata·Collection Log·Manifest는 수정·병합·삭제하지 않으며 파생 출력은
 기존 Batch Manifest에 추가하지 않는다. 중복 건수·비율은 저장·EG-8 데이터셋 구성
 근거이며 계획 API 호출 생략이나 주기 변경 조건이 아니다. 중복 제거·선별·가중치는

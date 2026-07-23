@@ -416,23 +416,48 @@ S-DoT 미지원 Area도 Area 분석과 추천 후보에서 제외하지 않는�
 
 ```text
 schema_version, pilot_run_id, timezone, cadence_minutes,
-cadence_decision_status, cadence_scope, cadence_change_allowed,
-planned_start_at, planned_end_at, planned_slot_count, max_api_calls,
-retry_count, area_count, area_order_contract, quota_confirmation_status,
-live_approval_status, slots
+cadence_decision_status, long_term_baseline_status, cadence_scope,
+cadence_change_allowed, planned_start_at, planned_end_at,
+planned_slot_count, max_api_calls, retry_count, area_count,
+area_order_contract, quota_confirmation_status, live_approval_status, slots
 ```
 
 계획 schema는 `eg7-pilot-plan-v2`다. `cadence_minutes=5`,
 `cadence_decision_status=PM_APPROVED_FIXED`,
+`long_term_baseline_status=ACTIVE`,
 `cadence_scope=LONG_TERM_OPERATING_BASELINE`,
 `cadence_change_allowed=false`를 정확히 요구한다. 비 5분 계획은 거부하고 임의
 주기 선택 필드는 두지 않는다.
+
+H-707이 코드와 직접 비교하는 Plan v2 canonical 계약:
+
+| contract_key | required_value |
+|---|---|
+| `PLAN_SCHEMA_VERSION` | `eg7-pilot-plan-v2` |
+| `PLAN_FIELDS` | `schema_version,pilot_run_id,timezone,cadence_minutes,cadence_decision_status,long_term_baseline_status,cadence_scope,cadence_change_allowed,planned_start_at,planned_end_at,planned_slot_count,max_api_calls,retry_count,area_count,area_order_contract,quota_confirmation_status,live_approval_status,slots` |
+| `CADENCE_MINUTES` | `5` |
+| `CADENCE_DECISION_STATUS` | `PM_APPROVED_FIXED` |
+| `LONG_TERM_BASELINE_STATUS` | `ACTIVE` |
+| `CADENCE_SCOPE` | `LONG_TERM_OPERATING_BASELINE` |
+| `CADENCE_CHANGE_ALLOWED` | `false` |
+| `ALTERNATIVE_CADENCES_SUPPORTED` | `false` |
+| `DUPLICATE_TRIGGERED_CADENCE_CHANGE` | `false` |
+| `RUNTIME_CADENCE_OVERRIDE` | `UNSUPPORTED` |
+| `FIRST_ONE_HOUR_SELECTS_CADENCE` | `false` |
+| `FORECAST_DUPLICATE_SIGNATURE` | `CANONICAL_SORTED_SET_OF_NORMALIZED_TARGET_INSTANTS` |
+| `LIVE_REQUIRES_SEPARATE_PM_APPROVAL` | `true` |
+| `OPERATING_WINDOW_STATUS` | `OPEN_PM_DECISION` |
 
 각 `slots` 항목은 `slot_index`, `scheduled_at`, `batch_id`,
 `planned_status`를 가진다. `quota_confirmation_status`는 기본
 `UNCONFIRMED`, `live_approval_status`는 기본 `NOT_APPROVED`로 운영 계획을
 작성해야 하며 두 상태를 충족하지 않으면 Live를 거부한다. 계획 지문은 정렬된
-canonical JSON의 SHA-256이고 추적용이지 인증값이 아니다.
+canonical JSON의 SHA-256이고 추적용이지 인증값이 아니다. 지문 입력의
+`planned_start_at`, `planned_end_at`, 모든 `slots[].scheduled_at`은 기존 검증을
+통과한 뒤 `YYYY-MM-DDTHH:MM:SS+09:00`으로 의미 정규화한다. 입력 JSON의 키 순서와
+허용된 `T`·공백 구분자 차이는 지문을 바꾸지 않으며, 유효하지 않은 시각은
+정규화로 보정하지 않고 거부한다. `plan_fingerprint` 자체, 환경값, Secret과
+절대경로는 지문 입력이 아니다.
 
 `eg7_execution_events` 필드:
 
@@ -482,8 +507,12 @@ backup_eligible, backup_status
 ```
 
 실제 시도한 Area만 최대 156행으로 기록한다. 중복 비교는 `area_code` 범위에서
-수집시각, API 관측시각, Raw SHA-256, 순서가 보존된 Forecast 대상시각 집합을
-각각 구분한다. `spot_id`는 포함하지 않고 `area_code`를 후속 결합키로 유지한다.
+수집시각, API 관측시각, Raw SHA-256, Forecast 대상시각의 의미 정규화된 canonical
+정렬 집합을 각각 구분한다. Forecast signature는 각 대상시각을
+`YYYY-MM-DDTHH:MM:SS+09:00`으로 정규화하고, 같은 instant를 집합 안에서 한 번만
+남긴 뒤 오름차순 불변 tuple로 비교한다. 원본 Forecast 배열 순서는 비교에 사용하지
+않고 Raw에서 그대로 보존한다. `spot_id`는 포함하지 않고 `area_code`를 후속
+결합키로 유지한다.
 이 인덱스와 Summary는 canonical Raw·Metadata·Collection Log·Manifest를
 대체하거나 수정하지 않는다. 중복 플래그는 계획 호출 생략이나 5분 주기 변경
 신호가 아니며 EG-8 데이터셋 제거·선별·가중치 판단에 사용한다.
@@ -492,7 +521,8 @@ backup_eligible, backup_status
 건수와 비율·Forecast 구조 일관성·Collector/Backup 소요시간·Source/Backup 용량
 증가·Backup 적격/검증 수·무재수집 확인을 기록한다. schema는
 `eg7-pilot-summary-v2`이고 `cadence_minutes`,
-`cadence_decision_status`, `cadence_scope`, `cadence_change_allowed`,
+`cadence_decision_status`, `long_term_baseline_status`, `cadence_scope`,
+`cadence_change_allowed`,
 `alternative_cadences_supported`, `duplicate_triggered_cadence_change`를 함께
 기록한다. 마지막 두 값은 모두 `false`다. ML 성능은 평가하지 않는다.
 
@@ -725,6 +755,7 @@ Field Dictionary v0.1은 다음 조건을 만족해야 한다.
 
 | 버전 | 날짜 | 변경내용 | 작성자 | 승인상태 |
 |---|---|---|---|---|
+| v0.1.5 | 2026-07-23 | Plan 시각 의미 정규화·ACTIVE 장기 기준 필드·Forecast canonical 정렬 집합 계약과 H-707 비교표 반영 | 신동현 | PR #71 변경요청 보완 |
 | v0.1.4 | 2026-07-23 | EG-7 plan·summary v2의 고정 5분 결정 필드와 중복 기반 주기 변경 금지 반영 | 신동현 | PM 최종 결정 |
 | v0.1.3 | 2026-07-23 | EG-6B·Backup 현재 상태와 EG-7 계획·사건·Slot/Area Index·Summary 필드·표현·중복 계약 반영 | 신동현 | PM 구현 범위 승인 |
 | v0.1.2 (Issue #58 보완) | 2026-07-22 | 백업·CSV와 Area·S-DoT·Spot Candidate·Recommendation 미래 데이터 계약 분리 | 신동현 | PM Diff 검토 전 |

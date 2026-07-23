@@ -796,6 +796,7 @@ PM은 동일 13개 Area 반복수집의 장기 주기를 다음과 같이 최종
 Timezone: Asia/Seoul
 벽시계 경계: 5분
 cadence_decision_status: PM_APPROVED_FIXED
+long_term_baseline_status: ACTIVE
 cadence_scope: LONG_TERM_OPERATING_BASELINE
 cadence_change_allowed: false
 파일럿 길이: 1시간
@@ -838,12 +839,15 @@ EG-6B Collector 자체에는 Backup Worker와 CSV Exporter가 없다. EG-7 Contr
 보충수집, 대체 Batch ID 생성과 건너뛴 ID 재사용을 금지한다. 파일럿 계획은 Live
 시작 전에 12개 UUIDv4 Batch ID를 포함하며, 건너뛴 ID도 불변 계획 이력에 남는다.
 
-실제 응답이 같은 관측 기준시각·Raw SHA-256·정렬된 Forecast 대상시각 집합을
-반복하더라도 모든 Raw를 보존한다. 중복 여부는 `area_code` 범위의 파생 인덱스에
-기록하고 수집 중 삭제·병합·덮어쓰기를 하지 않는다. 중복 건수와 비율은 파일럿
-결과이지 자동 실패 사유나 주기 변경 조건이 아니다. 직전 결과가 중복이라는 이유만으로
-다음 계획 API 호출을 생략하지 않는다. 제거·표본선택·가중치는 EG-8 데이터셋
-구성에서 검토한다.
+실제 응답이 같은 관측 기준시각·Raw SHA-256·Forecast 대상시각 signature를
+반복하더라도 모든 Raw를 보존한다. Forecast signature는 대상시각을
+`YYYY-MM-DDTHH:MM:SS+09:00` canonical instant로 의미 정규화하고, 같은 instant를
+집합 안에서 한 번만 남긴 뒤 오름차순 불변 tuple로 만든다. 원본 Forecast 배열
+순서는 비교에 사용하지 않고 Raw에서 그대로 보존한다. 중복 여부는 `area_code`
+범위의 파생 인덱스에 기록하고 수집 중 삭제·병합·덮어쓰기를 하지 않는다. 중복
+건수와 비율은 파일럿 결과이지 자동 실패 사유나 주기 변경 조건이 아니다. 직전
+결과가 중복이라는 이유만으로 다음 계획 API 호출을 생략하지 않는다. 제거·
+표본선택·가중치는 EG-8 데이터셋 구성에서 검토한다.
 
 24시간 Scheduler, 영구 백그라운드 서비스, 자동 재시도, 동적 S-DoT 수집, Spot
 평가, Recommendation과 ML 학습은 이 계약에 포함하지 않는다.
@@ -987,6 +991,7 @@ EG-6B Collector 자체에는 Backup Worker와 CSV Exporter가 없다. EG-7 Contr
 
 | 버전 | 날짜 | 변경내용 | 작성자 | 승인상태 |
 |---|---|---|---|---|
+| v0.1.10 | 2026-07-23 | ACTIVE 장기 기준 필드와 Forecast canonical 정렬 집합·Raw 원본 순서 보존 계약 명확화 | 신동현 | PR #71 변경요청 보완 |
 | v0.1.9 | 2026-07-23 | 5분을 `PM_APPROVED_FIXED` 장기 기준으로 확정하고 대안·중복 기반 변경 금지, 운영시간·Live 확대 OPEN 경계 반영 | 신동현 | PM 최종 결정 |
 | v0.1.8 | 2026-07-23 | Issue #69 승인 EG-7 5분·1시간·12회차·최대 156호출·재시도 0회·무보충·중복 보존·Live 차단 계약 반영 | 신동현 | PM 구현 범위 승인 |
 | v0.1.7 | 2026-07-22 | Issue #60·PR #61 독립 Backup Worker·append-only Receipt·`LOCAL_SYNC_COPY_VERIFIED`·H-708 완료 이력 반영 | 신동현 | 완료 이력 |

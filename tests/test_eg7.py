@@ -10,6 +10,7 @@ from contextlib import redirect_stdout
 from copy import deepcopy
 from datetime import datetime, timedelta
 from pathlib import Path
+from typing import Mapping
 from unittest import mock
 
 from freshmanager import eg6b, eg7
@@ -39,6 +40,7 @@ def plan_document(
         "timezone": eg7.TIMEZONE_NAME,
         "cadence_minutes": eg7.CADENCE_MINUTES,
         "cadence_decision_status": eg7.CADENCE_DECISION_STATUS,
+        "long_term_baseline_status": eg7.LONG_TERM_BASELINE_STATUS,
         "cadence_scope": eg7.CADENCE_SCOPE,
         "cadence_change_allowed": eg7.CADENCE_CHANGE_ALLOWED,
         "planned_start_at": start.isoformat(),
@@ -169,7 +171,12 @@ def official_names() -> dict[str, str]:
 AREA_NAMES = official_names()
 
 
-def synthetic_population(area_code: str) -> bytes:
+def synthetic_population(
+    area_code: str,
+    *,
+    forecast_targets: list[str] | None = None,
+) -> bytes:
+    targets = forecast_targets or ["2026-08-01 11:00"]
     current = {field: "1" for field in CURRENT_POPULATION_FIELDS}
     current.update(
         {
@@ -183,11 +190,12 @@ def synthetic_population(area_code: str) -> bytes:
             "FCST_YN": "Y",
             "FCST_PPLTN": [
                 {
-                    "FCST_TIME": "2026-08-01 11:00",
+                    "FCST_TIME": target,
                     "FCST_CONGEST_LVL": "보통",
                     "FCST_PPLTN_MIN": "1100",
                     "FCST_PPLTN_MAX": "1300",
                 }
+                for target in targets
             ],
         }
     )
@@ -210,6 +218,7 @@ def write_batch_evidence(
     *,
     failure_panel: int | None = None,
     common_request_time: bool = False,
+    forecast_targets: list[str] | None = None,
 ) -> None:
     artifacts: list[dict[str, object]] = []
     area_results: list[dict[str, object]] = []
@@ -245,7 +254,10 @@ def write_batch_evidence(
             raw_relative = f"data/raw/population/{record.slot.batch_id}/{area_code}.json"
             raw_path = stage_root / raw_relative
             raw_path.parent.mkdir(parents=True, exist_ok=True)
-            payload = synthetic_population(area_code)
+            payload = synthetic_population(
+                area_code,
+                forecast_targets=forecast_targets,
+            )
             raw_path.write_bytes(payload)
             artifacts.append(
                 {
@@ -331,23 +343,148 @@ class Eg7PlanTests(unittest.TestCase):
     def test_json_field_order_does_not_change_plan_contract_or_fingerprint(self) -> None:
         document = plan_document()
         reordered = dict(reversed(list(document.items())))
+        reordered["slots"] = [
+            dict(reversed(list(slot.items())))
+            for slot in reordered["slots"]  # type: ignore[union-attr]
+        ]
         self.assertEqual(
             eg7.validate_plan(document).fingerprint,
             eg7.validate_plan(reordered).fingerprint,
         )
 
-    def test_runtime_cadence_override_is_not_supported(self) -> None:
-        with self.assertRaises(eg7.PilotPlanError) as raised:
-            eg7.build_parser().parse_args(
-                [
-                    "--plan",
-                    "synthetic-plan.json",
-                    "--dry-run",
-                    "--cadence",
-                    "10",
-                ]
+    def test_semantically_equivalent_timestamp_format_has_same_fingerprint(self) -> None:
+        canonical = plan_document()
+        space_separated = deepcopy(canonical)
+        space_separated["planned_start_at"] = str(
+            space_separated["planned_start_at"]
+        ).replace("T", " ")
+        space_separated["planned_end_at"] = str(
+            space_separated["planned_end_at"]
+        ).replace("T", " ")
+        for slot in space_separated["slots"]:  # type: ignore[union-attr]
+            slot["scheduled_at"] = str(slot["scheduled_at"]).replace("T", " ")
+
+        self.assertEqual(
+            eg7.plan_fingerprint(canonical),
+            eg7.plan_fingerprint(space_separated),
+        )
+        canonical_document = json.loads(
+            eg7.canonical_plan_bytes(space_separated).decode("utf-8")
+        )
+        self.assertEqual(
+            canonical_document["planned_start_at"],
+            "2026-08-01T10:00:00+09:00",
+        )
+        self.assertTrue(
+            all(
+                "T" in slot["scheduled_at"]
+                and slot["scheduled_at"].endswith("+09:00")
+                for slot in canonical_document["slots"]
             )
-        self.assertEqual(str(raised.exception), "CLI_INPUT_ERROR")
+        )
+
+    def test_contract_changes_change_fingerprint(self) -> None:
+        original = plan_document()
+        shifted = plan_document(start=START + timedelta(minutes=5))
+        changed_batch = deepcopy(original)
+        changed_batch["slots"][0]["batch_id"] = (  # type: ignore[index]
+            "99999999-9999-4999-8999-999999999999"
+        )
+        changed_live_approval = deepcopy(original)
+        changed_live_approval["live_approval_status"] = (
+            eg7.LiveApprovalStatus.PM_APPROVED.value
+        )
+
+        original_fingerprint = eg7.plan_fingerprint(original)
+        for changed in (shifted, changed_batch, changed_live_approval):
+            with self.subTest(changed=changed):
+                self.assertNotEqual(
+                    original_fingerprint,
+                    eg7.plan_fingerprint(changed),
+                )
+
+    def test_invalid_timestamp_and_self_fingerprint_field_are_rejected(self) -> None:
+        invalid_timestamp = plan_document()
+        invalid_timestamp["planned_start_at"] = "2026-08-01T10:00:00"
+        with self.assertRaisesRegex(eg7.PilotPlanError, "PLAN_TIME_INVALID"):
+            eg7.plan_fingerprint(invalid_timestamp)
+
+        self_referential = plan_document()
+        self_referential["plan_fingerprint"] = "0" * 64
+        with self.assertRaisesRegex(eg7.PilotPlanError, "PLAN_FIELDS_INVALID"):
+            eg7.plan_fingerprint(self_referential)
+        self.assertNotIn(
+            b"plan_fingerprint",
+            eg7.canonical_plan_bytes(plan_document()),
+        )
+
+    def test_runtime_cadence_override_is_not_supported(self) -> None:
+        for option, value in (
+            ("--cadence", "10"),
+            ("--cadence", "15"),
+            ("--interval", "10"),
+        ):
+            with self.subTest(option=option, value=value):
+                with self.assertRaises(eg7.PilotPlanError) as raised:
+                    eg7.build_parser().parse_args(
+                        [
+                            "--plan",
+                            "synthetic-plan.json",
+                            "--dry-run",
+                            option,
+                            value,
+                        ]
+                    )
+                self.assertEqual(str(raised.exception), "CLI_INPUT_ERROR")
+
+    def test_plan_v1_and_prohibited_cadence_value_matrix_are_rejected(self) -> None:
+        prohibited: tuple[object, ...] = (1, 10, 15, None, "5", 5.0, True, False)
+        for value in prohibited:
+            document = plan_document()
+            document["cadence_minutes"] = value
+            with self.subTest(value=value):
+                with self.assertRaises(eg7.PilotPlanError):
+                    eg7.validate_plan(document)
+
+        omitted = plan_document()
+        del omitted["cadence_minutes"]
+        with self.assertRaisesRegex(eg7.PilotPlanError, "PLAN_FIELDS_INVALID"):
+            eg7.validate_plan(omitted)
+
+        version_one = plan_document()
+        version_one["schema_version"] = "eg7-pilot-plan-v1"
+        with self.assertRaisesRegex(eg7.PilotPlanError, "PLAN_SCHEMA_INVALID"):
+            eg7.validate_plan(version_one)
+        self.assertEqual(version_one["schema_version"], "eg7-pilot-plan-v1")
+
+    def test_permanent_decision_fields_are_required_and_fixed(self) -> None:
+        mutations: list[dict[str, object]] = []
+        for field in (
+            "cadence_decision_status",
+            "long_term_baseline_status",
+            "cadence_scope",
+        ):
+            missing = plan_document()
+            del missing[field]
+            mutations.append(missing)
+
+        wrong_approval = plan_document()
+        wrong_approval["cadence_decision_status"] = "PILOT_ONLY"
+        mutations.append(wrong_approval)
+        wrong_baseline = plan_document()
+        wrong_baseline["long_term_baseline_status"] = "PROVISIONAL"
+        mutations.append(wrong_baseline)
+        wrong_scope = plan_document()
+        wrong_scope["cadence_scope"] = "ONE_HOUR_PILOT_ONLY"
+        mutations.append(wrong_scope)
+        change_allowed = plan_document()
+        change_allowed["cadence_change_allowed"] = True
+        mutations.append(change_allowed)
+
+        for mutation in mutations:
+            with self.subTest(mutation=mutation):
+                with self.assertRaises(eg7.PilotPlanError):
+                    eg7.validate_plan(mutation)
 
     def test_invalid_plan_variants_are_rejected(self) -> None:
         mutations = []
@@ -363,6 +500,10 @@ class Eg7PlanTests(unittest.TestCase):
         wrong_decision = plan_document()
         wrong_decision["cadence_decision_status"] = "PILOT_ONLY"
         mutations.append(wrong_decision)
+
+        wrong_baseline = plan_document()
+        wrong_baseline["long_term_baseline_status"] = "PROVISIONAL"
+        mutations.append(wrong_baseline)
 
         wrong_scope = plan_document()
         wrong_scope["cadence_scope"] = "ONE_HOUR_PILOT_ONLY"
@@ -463,6 +604,65 @@ class Eg7SchedulingTests(unittest.TestCase):
         self.assertTrue(
             all(record.collector_execution_count == 1 for record in result.records)
         )
+
+    def test_duplicate_results_do_not_suppress_following_planned_calls(self) -> None:
+        plan = eg7.validate_plan(plan_document())
+        clock = FakeClock()
+        collector_calls: list[int] = []
+        preserved_logs: list[Mapping[str, object]] = []
+
+        def collector(slot: eg7.PilotSlot) -> eg7.CollectorExecution:
+            collector_calls.append(slot.slot_index)
+            started_at = clock()
+            clock.advance(1)
+            duplicate_evidence = {
+                "attempted_count": eg7.AREA_COUNT,
+                "success_count": eg7.AREA_COUNT,
+                "failure_count": 0,
+                "area_results": [
+                    {
+                        "synthetic_observation_time": "2026-08-01 10:00",
+                        "synthetic_raw_hash": "a" * 64,
+                        "synthetic_forecast_signature": [
+                            "2026-08-01T11:00:00+09:00"
+                        ],
+                    }
+                ],
+            }
+            preserved_logs.append(duplicate_evidence)
+            return eg7.CollectorExecution(
+                exit_code=0,
+                started_at=started_at,
+                ended_at=clock(),
+                collection_log=duplicate_evidence,
+            )
+
+        backup_calls: list[int] = []
+
+        def backup_runner(slot: eg7.PilotSlot) -> eg7.BackupExecution:
+            backup_calls.append(slot.slot_index)
+            started_at = clock()
+            clock.advance(1)
+            return eg7.BackupExecution(
+                eligible=True,
+                execution_count=1,
+                status=eg7.BackupIndexStatus.LOCAL_SYNC_COPY_VERIFIED,
+                started_at=started_at,
+                ended_at=clock(),
+                source_bytes=1,
+                backup_bytes=1,
+            )
+
+        result, _ = execute_with_fakes(plan, clock, collector, backup_runner)
+
+        self.assertEqual(collector_calls, list(range(12)))
+        self.assertEqual(backup_calls, list(range(12)))
+        self.assertEqual(
+            [record.collection_log for record in result.records],
+            preserved_logs,
+        )
+        self.assertEqual(eg7.CADENCE_MINUTES, 5)
+        self.assertFalse(eg7.DUPLICATE_TRIGGERED_CADENCE_CHANGE)
 
     def test_missed_slot_is_not_caught_up(self) -> None:
         plan = eg7.validate_plan(plan_document())
@@ -845,6 +1045,116 @@ class Eg7IndexTests(unittest.TestCase):
         self.assertTrue(all(not str(row["raw_relative_path"]).startswith("/") for row in rows))
         self.assertTrue(all("FreshManager-Data" not in str(row) for row in rows))
 
+    def test_forecast_duplicate_signature_is_normalized_sorted_set_and_area_scoped(
+        self,
+    ) -> None:
+        plan = eg7.validate_plan(plan_document())
+        records = completed_records(plan)
+        first = [
+            "2026-08-01 11:00",
+            "2026-08-01 12:00",
+            "2026-08-01 13:00",
+        ]
+        permuted_and_formatted = [
+            "2026-08-01T13:00:00+09:00",
+            "2026-08-01T11:00:00+09:00",
+            "2026-08-01T12:00:00+09:00",
+        ]
+        repeated = [
+            "2026-08-01 11:00",
+            "2026-08-01 12:00",
+            "2026-08-01 12:00",
+            "2026-08-01 13:00",
+        ]
+        different = [
+            "2026-08-01 11:00",
+            "2026-08-01 12:00",
+            "2026-08-01 13:05",
+        ]
+
+        expected_signature = (
+            "2026-08-01T11:00:00+09:00",
+            "2026-08-01T12:00:00+09:00",
+            "2026-08-01T13:00:00+09:00",
+        )
+        self.assertEqual(
+            eg7.canonical_forecast_target_signature(first),
+            expected_signature,
+        )
+        self.assertEqual(
+            eg7.canonical_forecast_target_signature(permuted_and_formatted),
+            expected_signature,
+        )
+        self.assertEqual(
+            eg7.canonical_forecast_target_signature(repeated),
+            expected_signature,
+        )
+        self.assertNotEqual(
+            eg7.canonical_forecast_target_signature(different),
+            expected_signature,
+        )
+
+        with tempfile.TemporaryDirectory() as temp:
+            stage_root = Path(temp) / "stages/eg6b"
+            for record, targets in zip(
+                records[:4],
+                (first, permuted_and_formatted, repeated, different),
+            ):
+                write_batch_evidence(
+                    stage_root,
+                    record,
+                    forecast_targets=targets,
+                )
+            first_raw_path = (
+                stage_root
+                / "data/raw/population"
+                / records[0].slot.batch_id
+                / f"{eg6b.EG6B_AREA_CODES[0]}.json"
+            )
+            second_raw_path = (
+                stage_root
+                / "data/raw/population"
+                / records[1].slot.batch_id
+                / f"{eg6b.EG6B_AREA_CODES[0]}.json"
+            )
+            raw_before = {
+                first_raw_path: first_raw_path.read_bytes(),
+                second_raw_path: second_raw_path.read_bytes(),
+            }
+            rows = eg7.build_area_observation_index(
+                plan,
+                records[:4],
+                stage_root=stage_root,
+                official_csv=ROOT / "data/reference/seoul_121_places.csv",
+            )
+            raw_after = {path: path.read_bytes() for path in raw_before}
+
+        self.assertFalse(rows[0]["duplicate_forecast_targets"])
+        self.assertFalse(rows[1]["duplicate_forecast_targets"])
+        self.assertTrue(rows[13]["duplicate_forecast_targets"])
+        self.assertTrue(rows[26]["duplicate_forecast_targets"])
+        self.assertFalse(rows[39]["duplicate_forecast_targets"])
+        self.assertEqual(rows[26]["forecast_record_count"], 4)
+        self.assertEqual(raw_before, raw_after)
+        raw_forecasts = json.loads(raw_before[second_raw_path])[
+            "SeoulRtd.citydata_ppltn"
+        ][0]["FCST_PPLTN"]
+        self.assertEqual(
+            [item["FCST_TIME"] for item in raw_forecasts],
+            permuted_and_formatted,
+        )
+
+    def test_invalid_forecast_target_timestamp_is_not_repaired(self) -> None:
+        for invalid in ("not-a-timestamp", "2026-08-01"):
+            with self.subTest(invalid=invalid):
+                with self.assertRaisesRegex(
+                    RuntimeError,
+                    "CANONICAL_EVIDENCE_INVALID",
+                ):
+                    eg7.canonical_forecast_target_signature(
+                        ["2026-08-01 11:00", invalid]
+                    )
+
     def test_failed_area_row_uses_native_nulls(self) -> None:
         plan = eg7.validate_plan(plan_document())
         records = completed_records(plan)
@@ -946,6 +1256,7 @@ class Eg7IndexTests(unittest.TestCase):
         summary = eg7.build_pilot_summary(plan, slot_rows, [], records)
         self.assertEqual(summary["planned_slot_count"], 12)
         self.assertEqual(summary["cadence_decision_status"], "PM_APPROVED_FIXED")
+        self.assertEqual(summary["long_term_baseline_status"], "ACTIVE")
         self.assertEqual(summary["cadence_scope"], "LONG_TERM_OPERATING_BASELINE")
         self.assertFalse(summary["alternative_cadences_supported"])
         self.assertFalse(summary["duplicate_triggered_cadence_change"])

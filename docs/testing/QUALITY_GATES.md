@@ -417,6 +417,7 @@ EG-6B 단일 수집·백업·Closeout 결과와 별도 PM 범위 승인을 받�
 
 - 버전이 있는 불변 계획은 `cadence_minutes=5`,
   `cadence_decision_status=PM_APPROVED_FIXED`,
+  `long_term_baseline_status=ACTIVE`,
   `cadence_scope=LONG_TERM_OPERATING_BASELINE`, `cadence_change_allowed=false`,
   `pilot_run_id`, 12개 벽시계 시각과 사전 생성 UUIDv4 Batch ID, Area 순서,
   호출예산, 할당량·Live 승인 상태를 보존한다. 비 5분 계획과 런타임 주기 옵션은
@@ -432,9 +433,12 @@ EG-6B 단일 수집·백업·Closeout 결과와 별도 PM 범위 승인을 받�
 - Backup 실패는 Source를 보존하고 Collector 재실행·대체 ID·재수집을 만들지 않는다.
 - 모든 계획 회차는 append-only 사건 로그와 고정 12행 Slot Index에 종결상태를 남긴다.
 - 실제 시도 Area만 최대 156행 Area Observation Index에 기록한다. 중복 관측시각,
-  Raw SHA-256과 정렬된 Forecast 대상시각 집합은 Area별 파생 플래그로 남기며 Raw를
-  삭제·병합·수정하지 않는다. 중복만으로 계획 호출을 생략하거나 주기를 바꾸지 않고
-  제거·표본선택·가중치는 EG-8 데이터셋 구성으로 미룬다.
+  Raw SHA-256과 Forecast 대상시각의 의미 정규화된 canonical 정렬 집합은 Area별
+  파생 플래그로 남긴다. Forecast signature는 같은 instant를 한 번만 남기고
+  `YYYY-MM-DDTHH:MM:SS+09:00` 오름차순 불변 tuple로 만들며 원본 배열 순서는
+  비교에 사용하지 않는다. Raw를 삭제·병합·수정하지 않고, 중복만으로 계획 호출을
+  생략하거나 주기를 바꾸지 않으며 제거·표본선택·가중치는 EG-8 데이터셋 구성으로
+  미룬다.
 - 파생 CSV·JSONL은 canonical Batch 증거로 재생성할 수 있고 기존 Manifest에 추가하지 않는다.
 - H-707은 합성 입력으로 위 계약과 `UNCONFIRMED` Live 차단을 검증한다. H-707 PASS는
   실제 할당량 확인·운영 계획 생성·PM Live 승인을 뜻하지 않는다.
