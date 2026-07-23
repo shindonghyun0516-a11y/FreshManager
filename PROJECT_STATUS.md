@@ -188,7 +188,8 @@ live_approval_status=NOT_APPROVED
 - 기존 운영 증거 변경: `0`
 - 기존 Fake 증거 변경: `0`
 
-GitHub CI: `IN_PROGRESS` — Draft PR #71의 최종 HEAD 결과를 확인한다.
+GitHub CI는 Push마다 새 HEAD로 다시 실행되므로 고정 상태를 이 문서에 복제하지 않고
+Draft PR #71의 현재 Check를 읽기 전용으로 확인한다.
 H-707은 구현과 함께 `PASS`로 활성화됐지만
 이는 합성 계약 검사이며 실제 할당량·
 운영 계획·PM Live 승인 완료를 의미하지 않는다.
@@ -205,11 +206,9 @@ H-707은 구현과 함께 `PASS`로 활성화됐지만
 
 ## 10. 다음 행동
 
-1. EG-7 Target Tests·전체 Unit Tests·Project Guard·H-706·H-707·H-708·
-   `git diff --check`를 실행한다.
-2. Draft PR #71 최종 HEAD의 GitHub CI를 확인한다.
-3. Issue #69와 #70은 열린 상태로 두고 독립 검토를 요청한다.
-4. Ready 전환·Merge·Live 실행 없이 중단한다.
+1. Draft PR #71의 현재 HEAD와 CI를 확인하고 독립 검토를 요청한다.
+2. Issue #69와 #70은 열린 상태로 유지한다.
+3. Ready 전환·Merge·Live 실행 없이 중단한다.
 
 ## 11. 새 세션 복원 메모
 
