@@ -36,6 +36,7 @@ SUMMARY_SCHEMA_VERSION = "eg7-pilot-summary-v2"
 TIMEZONE_NAME = "Asia/Seoul"
 SEOUL_TIMEZONE = ZoneInfo(TIMEZONE_NAME)
 CADENCE_MINUTES = 5
+SLOT_DISPATCH_GRACE_MS = 2000
 CADENCE_DECISION_STATUS = "PM_APPROVED_FIXED"
 LONG_TERM_BASELINE_STATUS = "ACTIVE"
 CADENCE_SCOPE = "LONG_TERM_OPERATING_BASELINE"
@@ -897,12 +898,13 @@ def run_scheduled_pilot(
             continue
 
         current = clock().astimezone(SEOUL_TIMEZONE)
-        waited = current < slot.scheduled_at
-        if waited:
+        if current < slot.scheduled_at:
             sleeper(max(0.0, (slot.scheduled_at - current).total_seconds()))
             current = clock().astimezone(SEOUL_TIMEZONE)
-        slot_end = slot.scheduled_at + timedelta(minutes=CADENCE_MINUTES)
-        missed = (not waited and current > slot.scheduled_at) or current >= slot_end
+        dispatch_deadline = slot.scheduled_at + timedelta(
+            milliseconds=SLOT_DISPATCH_GRACE_MS
+        )
+        missed = current > dispatch_deadline
         if missed:
             record = SlotRecord(
                 slot=slot,

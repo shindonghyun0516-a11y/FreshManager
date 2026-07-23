@@ -577,6 +577,60 @@ class Eg7PlanTests(unittest.TestCase):
 
 
 class Eg7SchedulingTests(unittest.TestCase):
+    def assert_first_slot_executes_at_delay(
+        self,
+        delay: timedelta,
+        *,
+        start: datetime = START,
+    ) -> None:
+        plan = eg7.validate_plan(plan_document(start=start))
+        clock = FakeClock(start + delay)
+        collectors, backups, collector, backup_runner = success_runners(clock)
+        result, _ = execute_with_fakes(plan, clock, collector, backup_runner)
+
+        self.assertEqual(result.records[0].status, eg7.SlotStatus.COMPLETED_SUCCESS)
+        self.assertEqual(collectors.count(0), 1)
+        self.assertEqual(backups.count(0), 1)
+        self.assertEqual(collectors, list(range(eg7.PLANNED_SLOT_COUNT)))
+        self.assertEqual(backups, list(range(eg7.PLANNED_SLOT_COUNT)))
+
+    def test_evaluation_before_boundary_waits_then_executes(self) -> None:
+        plan = eg7.validate_plan(plan_document())
+        clock = FakeClock(START - timedelta(seconds=1))
+        collectors, backups, collector, backup_runner = success_runners(clock)
+        result, _ = execute_with_fakes(plan, clock, collector, backup_runner)
+
+        self.assertEqual(clock.sleeps[0], 1.0)
+        self.assertEqual(result.records[0].status, eg7.SlotStatus.COMPLETED_SUCCESS)
+        self.assertEqual(collectors, list(range(eg7.PLANNED_SLOT_COUNT)))
+        self.assertEqual(backups, list(range(eg7.PLANNED_SLOT_COUNT)))
+
+    def test_exact_boundary_executes(self) -> None:
+        self.assert_first_slot_executes_at_delay(timedelta(0))
+
+    def test_one_millisecond_dispatch_delay_executes(self) -> None:
+        self.assert_first_slot_executes_at_delay(timedelta(milliseconds=1))
+
+    def test_live_pilot_114_786_millisecond_delay_executes(self) -> None:
+        pilot_start = datetime(
+            2026,
+            7,
+            23,
+            18,
+            5,
+            tzinfo=eg7.SEOUL_TIMEZONE,
+        )
+        self.assert_first_slot_executes_at_delay(
+            timedelta(microseconds=114_786),
+            start=pilot_start,
+        )
+
+    def test_1999_millisecond_dispatch_delay_executes(self) -> None:
+        self.assert_first_slot_executes_at_delay(timedelta(milliseconds=1999))
+
+    def test_2000_millisecond_dispatch_delay_executes_inclusively(self) -> None:
+        self.assert_first_slot_executes_at_delay(timedelta(milliseconds=2000))
+
     def test_success_runs_one_collector_and_one_backup_per_slot(self) -> None:
         plan = eg7.validate_plan(plan_document())
         clock = FakeClock()
@@ -664,9 +718,9 @@ class Eg7SchedulingTests(unittest.TestCase):
         self.assertEqual(eg7.CADENCE_MINUTES, 5)
         self.assertFalse(eg7.DUPLICATE_TRIGGERED_CADENCE_CHANGE)
 
-    def test_missed_slot_is_not_caught_up(self) -> None:
+    def test_2001_millisecond_dispatch_delay_is_missed_and_not_caught_up(self) -> None:
         plan = eg7.validate_plan(plan_document())
-        clock = FakeClock(START + timedelta(seconds=1))
+        clock = FakeClock(START + timedelta(milliseconds=2001))
         collectors, backups, collector, backup_runner = success_runners(clock)
         result, _ = execute_with_fakes(plan, clock, collector, backup_runner)
 
@@ -674,6 +728,36 @@ class Eg7SchedulingTests(unittest.TestCase):
         self.assertEqual(result.records[0].actual_api_calls, 0)
         self.assertEqual(collectors, list(range(1, 12)))
         self.assertEqual(backups, list(range(1, 12)))
+        self.assertEqual(
+            result.records[1].slot.scheduled_at,
+            START + timedelta(minutes=eg7.CADENCE_MINUTES),
+        )
+
+    def test_dispatch_grace_never_executes_a_slot_twice(self) -> None:
+        plan = eg7.validate_plan(plan_document())
+        clock = FakeClock(START + timedelta(microseconds=114_786))
+        collectors, backups, collector, backup_runner = success_runners(clock)
+        result, _ = execute_with_fakes(plan, clock, collector, backup_runner)
+
+        self.assertEqual(len(result.records), eg7.PLANNED_SLOT_COUNT)
+        self.assertEqual(len(collectors), len(set(collectors)))
+        self.assertEqual(len(backups), len(set(backups)))
+        self.assertEqual(collectors, list(range(eg7.PLANNED_SLOT_COUNT)))
+        self.assertEqual(backups, list(range(eg7.PLANNED_SLOT_COUNT)))
+
+    def test_dispatch_grace_preserves_plan_shape_and_call_budget(self) -> None:
+        plan = eg7.validate_plan(plan_document())
+
+        self.assertEqual(eg7.SLOT_DISPATCH_GRACE_MS, 2000)
+        self.assertEqual(eg7.CADENCE_MINUTES, 5)
+        self.assertEqual(eg7.RETRY_COUNT, 0)
+        self.assertEqual(eg7.PLANNED_SLOT_COUNT, 12)
+        self.assertEqual(plan.max_api_calls, 156)
+        self.assertEqual(len(plan.slots), 12)
+        self.assertEqual(
+            [slot.scheduled_at for slot in plan.slots],
+            [START + timedelta(minutes=5 * index) for index in range(12)],
+        )
 
     def test_overlapping_slot_is_skipped_without_catch_up(self) -> None:
         plan = eg7.validate_plan(plan_document())
