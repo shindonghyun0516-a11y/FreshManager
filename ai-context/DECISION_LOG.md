@@ -79,8 +79,6 @@ PM이 승인했거나 명시적으로 보류한 제품·운영 결정을 새 AI 
 - Decision: Recommendation MVP를 EG-9로 확정하지 않는다.
 - Current expression: `PLANNED Recommendation MVP Workstream`, Gate number `NOT_ASSIGNED`.
 - Consequence: EG-8 증거와 별도 PM 승인 전 공식 Gate 또는 구현 완료 상태로 표현하지 않는다.
-- Related: [[D-015]] — EG-8 상위 Gate·EG-8A~8E 세분화(D-015는 이 결정을 대체하지
-  않으며, EG-8E는 Recommendation MVP의 구현 Gate가 아니다).
 
 ### D-009 — Spot 정량 점수는 미확정
 

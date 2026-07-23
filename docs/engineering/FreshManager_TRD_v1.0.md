@@ -23,9 +23,11 @@
 품질)~EG-8E(Recommendation Output Contract·UI/UX Readiness)로 세분화했다. 기존
 EG-8 정의(Area Feature+선택적 S-DoT Feature+Spot Candidate Evaluation)는 EG-8D로
 계승했다. Raw(v3 source sheets) → Normalized → Feature → Model Output →
-Recommendation Output → UI Presentation 계층 분리 원칙을 추가했다. 파일명은 참조
-안정성을 위해 `FreshManager_TRD_v1.0.md`로 유지한다. §15(EG-7 구현 아키텍처)와
-연결된 H-707 정본 문자열은 변경하지 않았다.
+Recommendation Output → UI Presentation 계층 분리 원칙을 추가했다. **문서 내용
+버전은 v1.1**이며, **정본 파일 경로는 기존 링크와 Project Guard 자동검사
+호환성을 위해 그대로 유지**한다. 파일명의 `_v1.0`은 현재 내부 문서 버전을
+의미하지 않는 **Legacy Stable Path**다. §15(EG-7 구현 아키텍처)와 연결된 H-707
+정본 문자열은 변경하지 않았다.
 
 **2026-07-22~23 완료·진행 이력:** Issue #60에서 Google Drive for Desktop Sync와 분리된
 1회 실행형 Backup Worker·append-only Receipt·H-708을 구현했고 PR #61로 `main`에
@@ -93,7 +95,7 @@ Evaluation·Recommendation 결과 구조는 유지하되 동적 S-DoT는 EG-7에
 | EG-8A Python Loader | v3 source sheets 읽기 전용 파싱·정규화·데이터 품질 리포트 | `PLANNED`; 상세 계약은 `docs/data/ML_READY_DATASET_SPEC.md`(PR2 예정) |
 | EG-8B Forecast 평가·Baseline·Feature Dataset | B0/B1/B2 기준선·리드타임별 오차·Feature Dataset 구성 | `PLANNED`; 상세 계약은 `docs/analysis/ANALYSIS_PLAN.md` 확장(PR2 예정) |
 | EG-8C 예측 모델 | 미래 Area 인구·피크 여부·피크시각 예측, Baseline 대비 성능 확인 후 채택 | `PLANNED` |
-| Spot Candidate Evaluation | Area·선택적 S-DoT·공간 Context 결합 | EG-8D(기존 EG-8 정의 계승); Score·가중치·임계값 OPEN_DECISION |
+| EG-8D Area Ranking·Spot Candidate Evaluation | Area·선택적 S-DoT·공간 Context 결합(기존 EG-8 정의 계승) | Score·가중치·임계값 OPEN_DECISION |
 | EG-8E Recommendation Output Contract | Recommendation 출력 계약·UI/UX Readiness 판정 | `PLANNED`; 상세 계약은 `docs/product/RECOMMENDATION_OUTPUT_CONTRACT.md`(PR2 예정); Recommendation MVP 구현 Gate 아님 |
 | Recommendation MVP | 별도 계획 Workstream | Gate number `NOT_ASSIGNED` |
 
@@ -700,7 +702,7 @@ Project Guard 검사별 현재 PASS·SKIP, 전체 집계와 Live 실행 여부�
 | ADR-11 | Batch 완료 직후 1회 실행형 Worker | 수집기·백업 책임 분리와 장애 격리 | 채택 |
 | ADR-12 | CSV는 첫 Batch 이후 | 실제 필드·결측·Forecast를 확인한 뒤 파생 계약 확정 | 목표 구조 |
 | ADR-13 | S-DoT는 독립·선택적 보조 데이터 계층 | Area를 대체하거나 필수 직렬 단계가 아니며 Spot Candidate 근거만 보조 | 목표 구조 |
-| ADR-14 | Recommendation MVP Workstream 분리 | EG-8 Feature 검증과 추천 제품 동작을 분리; Gate number NOT_ASSIGNED | 목표 구조; ADR-16이 보완(대체 아님) — EG-8E는 이 Workstream의 계약·설계 준비 Gate일 뿐 구현 Gate가 아님 |
+| ADR-14 | Recommendation MVP Workstream 분리 | EG-8 Feature 검증과 추천 제품 동작을 분리; Gate number NOT_ASSIGNED | 목표 구조 |
 | ADR-15 | Apps Script를 PoC 반복수집 Runtime으로 재채택 | ADR-08 폐기 근거(현행 로컬 Python과 충돌)가 이제 반대로 적용됨 — 로컬 Python·Codex·Claude Code 세션 종료와 무관하게 5분 반복수집이 계속돼야 한다는 요구를 로컬 EG-7(동기 실행, 세션 종속)은 충족할 수 없음. PM이 외부에서 기존 Apps Script 자산을 직접 복원·검증(POI 코드 호출·Script Properties Key·13개 Area v3 시트 누적)했고, 이후 5분 시간 기반 Trigger가 실제로 반복 실행 중임을 재확인함 | `ACCEPTED`; 5분 자동수집 `ACTIVE`, 24시간 이상 지속성 `NOT_COMPLETED` |
 | ADR-16 | EG-8을 상위 Gate로 세분화(EG-8A~8E)하고 Model Output/Recommendation Output/UI 계층을 분리 | 수집기 구축 단계에서 데이터 분석·ML·추천·UI 준비 단계로 전환이 필요하나, 기존 EG-8 정의("Area Feature + 선택적 S-DoT Feature + Spot Candidate Evaluation")를 다른 의미로 재사용하면 9개+ 문서·67회 참조와 충돌함. EG-8을 상위 Gate로 유지하고 EG-8A(Loader)~EG-8E(Recommendation Contract·UI Readiness)로 세분화해 기존 정의를 EG-8D로 무손실 계승함. UI가 Model Output을 직접 소비하면 모델 변경이 UI를 직접 깨뜨리는 결합도 위험이 생겨 계층을 분리함 | `ACCEPTED`; D-008·ADR-14 대체 아님, Recommendation MVP Gate 번호 `NOT_ASSIGNED` 유지 |
 

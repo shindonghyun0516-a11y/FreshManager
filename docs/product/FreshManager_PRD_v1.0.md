@@ -18,7 +18,9 @@ Branch·Pull Request·Issue·실행 상태는 `PROJECT_STATUS.md`를 단일 기�
 **2026-07-24 변경이력:** EG-8을 상위 Gate로 유지하고 EG-8A~EG-8E로 세분화했다.
 PoC 범위에 미래 Area 인구·피크 예측, Area/Spot Ranking, Recommendation Output
 Contract, UI/UX 설계·와이어프레임·프로토타입을 포함했다. 상세는 §39 변경 이력을
-따른다. 파일명은 참조 안정성을 위해 `FreshManager_PRD_v1.0.md`로 유지한다.
+따른다. **문서 내용 버전은 v1.1**이며, **정본 파일 경로는 기존 링크와
+Project Guard 자동검사 호환성을 위해 그대로 유지**한다. 파일명의 `_v1.0`은
+현재 내부 문서 버전을 의미하지 않는 **Legacy Stable Path**다.
 
 **2026-07-22 변경이력:** Issue #58 초안에서 Google Drive 자동 백업,
 첫 Batch 이후 CSV와 Area·선택적 S-DoT·Spot Candidate Evaluation·Recommendation
