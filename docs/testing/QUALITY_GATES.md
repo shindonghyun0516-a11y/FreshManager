@@ -58,7 +58,12 @@ EG-0 문서 기준선
 → EG-6A 13개 Area·Spot 패널
 → EG-6B 동일 13개 Area 단일 수집
 → EG-7 동일 13개 반복수집 파일럿
-→ EG-8 Area Feature + 승인·확보된 경우 S-DoT Feature + Spot Candidate Evaluation
+→ EG-8 데이터 분석·예측·추천 준비 상위 Gate
+   → EG-8A Python Loader·정규화·데이터 품질
+   → EG-8B EDA·서울시 Forecast 평가·Baseline·Feature Dataset
+   → EG-8C 미래 Area 인구·피크 예측 모델
+   → EG-8D Area Ranking·선택적 S-DoT·Spot Candidate Evaluation(기존 EG-8 정의 계승)
+   → EG-8E Recommendation Output Contract·UI/UX Readiness(Recommendation MVP 구현 아님)
 → 후속 Recommendation MVP Workstream(PLANNED, Gate number NOT_ASSIGNED)
 → 121장소 확대 후속 검토
 ```
@@ -464,46 +469,136 @@ EG-6B 단일 수집·백업·Closeout 결과와 별도 PM 범위 승인을 받�
 
 ---
 
-## 12. EG-8 Area Feature·선택적 S-DoT Feature와 Spot Candidate Evaluation
+## 12. EG-8 상위 Gate: 데이터 분석·예측·추천 준비
 
-### 목표
+EG-8은 EG-8A~EG-8E 하위 Gate를 포괄하는 상위 Gate다. 각 하위 Gate는 이전 하위
+Gate 통과 후 순차 진입한다(§4 UI/UX 착수 순서와 동일). EG-8(상위) 완료는 EG-8A~8E
+전체 통과를 의미한다. 기존 "EG-8 = Area Feature + 선택적 S-DoT Feature + Spot
+Candidate Evaluation" 정의는 삭제되지 않고 **EG-8D**로 계승됐다.
 
-동일 13개 지역의 반복 관측으로 Area Feature의 재현성을 검증한다. S-DoT는 지원·
-접근·수집·품질조건을 만족하는 경우에만 독립 보조 Feature로 사용한다. Area Feature,
-선택적 S-DoT Feature, 공간 Context, 현장검증과 운영 제약을 결합한 Spot Candidate
-Evaluation의 분석 타당성을 평가한다.
+### 12.1 EG-8A — Python Loader·정규화·데이터 품질
 
-### 통과조건
+- **진입조건**: EG-7 파일럿에서 최소 1회 이상 v3 source sheets에 Apps Script
+  자동수집 데이터가 누적됨. PM의 EG-8A 구현 착수 승인.
+- **포함 범위**: v3 source sheets(`raw_log_v3`/`population_current_v3`/
+  `population_forecast_v3`) 읽기 전용 반출, 정규화 스키마 변환, 결측·중복·오류
+  행 분리, 데이터 품질 리포트.
+- **제외 범위**: Spreadsheet 쓰기, Apps Script·Trigger 수정, 실제 서울시 API
+  호출, Feature 생성, 모델 학습.
+- **필수 산출물**: 정규화 데이터셋, 품질 리포트(성공률·결측률·중복률·스키마
+  이상 탐지), `docs/data/ML_READY_DATASET_SPEC.md` 스키마 계약.
+- **통과기준**: v3 source sheets를 읽기 전용으로만 접근했음을 확인, 정규화
+  데이터셋이 Raw에서 재생성 가능함을 확인, 품질 리포트에 결측·중복·오류가
+  숨겨지지 않음.
+- **실패 또는 보류 조건**: v3 source sheets 구조가 문서화된 스키마와 다름,
+  데이터 품질이 EG-8B 진행에 부적합한 수준(구체 임계값은 실제 데이터 확인 후
+  PM 승인).
+- **다음 Gate 전환조건**: PM이 정규화 데이터셋 품질을 검토하고 EG-8B 착수를
+  승인.
 
-- 시간대 기준선·변화율·변동성·피크 지속시간과 예측오차를 평가한다.
-- S-DoT 지원·미지원 지역의 차이를 Area 대체값이 아닌 보조 근거로만 비교한다.
-- 현재 Spot Master를 Candidate Anchor Point로 사용하고 고정 판매 위치로 표현하지 않는다.
-- 후보 평가에 사용한 Area·선택적 S-DoT·공간·현장검증 Feature와 버전을 추적한다.
-- S-DoT 미지원 6개 Area도 Area 분석과 추천 후보에서 제외하지 않는다.
-- Score·가중치·임계값은 `PLANNED` 또는 `OPEN_DECISION`이며 현 단계 필수 계약이 아니다.
-- 카드소비 기반 소비활동을 실제 판매량으로 표현하지 않는다.
-- 판매결과나 현장 피드백이 없으면 추천 성능·판매효과를 확정하지 않는다.
-- Gate A·B·C 판정과 Engineering Gate를 구분한다.
+### 12.2 EG-8B — EDA·서울시 Forecast 평가·Baseline·Feature Dataset
 
-### 다음 단계
+- **진입조건**: EG-8A 통과.
+- **포함 범위**: 시간대·요일 패턴 EDA(`docs/analysis/ANALYSIS_PLAN.md` §9.3/
+  §18~21 방법론), B0/B1/B2 기준선 성능 평가, 서울시 공식 Forecast의 리드타임별
+  오차, 피크 정의 후보 검증, Feature Dataset 구성.
+- **제외 범위**: 모델 학습·채택, Ranking·추천 로직.
+- **필수 산출물**: 예측 평가표, 기준선 성능표, 버전 계약을 포함한 Feature
+  Dataset.
+- **통과기준**: 서울시 공식 예측이 B0/B1/B2 대비 실제로 비교됨(비교 없이
+  다음 단계로 넘어가지 않는다 — 기존 `ANALYSIS_PLAN.md` §18 원칙 유지). Feature
+  Dataset이 시계열 누수 방지 규칙(§10/§26)을 만족.
+- **실패 또는 보류 조건**: 기준선 구축에 데이터 기간이 부족(최소 기간은
+  `OPEN_DECISION`), Forecast 평가가 불가능한 수준의 결측.
+- **다음 Gate 전환조건**: PM이 Baseline 성능표와 Feature Dataset을 검토하고
+  EG-8C 착수를 승인.
 
-Feature와 Spot Candidate Evaluation의 유효성 및 제한을 PM이 확인한다. 후속
-Recommendation MVP Workstream은 Gate number `NOT_ASSIGNED`이며 별도 PM 승인이
-있을 때만 시작한다.
+### 12.3 EG-8C — 미래 Area 인구·피크 예측 모델
+
+- **진입조건**: EG-8B 통과, Baseline 성능표 확보.
+- **포함 범위**: Area 인구 예측 모델, 피크 발생 여부·예상 피크시각 예측.
+  Baseline(B0/B1/B2/서울시 공식 예측) 대비 성능 비교.
+- **제외 범위**: 매출·판매량·판매 성공확률·수요·재고 예측, 상용 서빙.
+- **필수 산출물**: 학습된 모델(또는 채택 보류 판단), Baseline 대비 성능
+  비교표.
+- **통과기준**: Baseline 비교 없이 모델을 채택하지 않는다(`ANALYSIS_PLAN.md`
+  §18 원칙 그대로 적용). 모델이 Baseline을 유의미하게 능가하지 못하면 채택하지
+  않는다.
+- **실패 또는 보류 조건**: 모델이 Baseline 대비 개선이 없음 — 이 경우 EG-8D는
+  Baseline 예측값으로 진행하거나 PM이 별도 판단한다.
+- **다음 Gate 전환조건**: PM이 모델 채택 여부(또는 Baseline 잠정 사용)를 승인.
+
+### 12.4 EG-8D — Area Ranking·선택적 S-DoT·Spot Candidate Evaluation
+
+기존 EG-8 정의(Area Feature·선택적 S-DoT Feature와 Spot Candidate Evaluation)를
+그대로 계승한다.
+
+- **진입조건**: EG-8C 통과(또는 Baseline 잠정 사용 승인).
+- **포함 범위**: Area Feature와 EG-8C 예측 결과 기반 Area Ranking, 지원·접근·
+  수집·품질조건을 만족하는 경우의 S-DoT Feature 결합, 공간 Context·현장검증·
+  운영 제약을 결합한 Spot Candidate Evaluation의 분석 타당성 평가.
+- **제외 범위**: S-DoT 동적 실시간 수집 자체(별도 후속 Workstream), Recommendation
+  최종 출력.
+- **필수 산출물**: Area 순위, Spot Candidate 순위, Candidate Evidence
+  Assessment.
+- **통과기준**:
+  - 시간대 기준선·변화율·변동성·피크 지속시간과 예측오차를 평가한다.
+  - S-DoT 지원·미지원 지역의 차이를 Area 대체값이 아닌 보조 근거로만 비교한다.
+  - 현재 Spot Master를 Candidate Anchor Point로 사용하고 고정 판매 위치로
+    표현하지 않는다.
+  - 후보 평가에 사용한 Area·선택적 S-DoT·공간·현장검증 Feature와 버전을
+    추적한다.
+  - S-DoT 미지원 6개 Area도 Area 분석과 추천 후보에서 제외하지 않는다.
+  - Score·가중치·임계값은 `PLANNED` 또는 `OPEN_DECISION`이며 현 단계 필수
+    계약이 아니다.
+  - 카드소비 기반 소비활동을 실제 판매량으로 표현하지 않는다.
+  - 판매결과나 현장 피드백이 없으면 추천 성능·판매효과를 확정하지 않는다.
+  - Gate A·B·C 판정과 Engineering Gate를 구분한다.
+- **실패 또는 보류 조건**: Spot Candidate Evaluation 근거가 부족해 전 Area가
+  AREA fallback인 경우도 실패가 아니라 정상 결과다(D-006 원칙).
+- **다음 Gate 전환조건**: PM이 Ranking·Evaluation 결과를 확인하고 EG-8E 착수를
+  승인.
+
+### 12.5 EG-8E — Recommendation Output Contract·UI/UX Readiness
+
+EG-8E는 **Recommendation MVP의 구현 Gate가 아니다.** Recommendation MVP
+Workstream의 공식 Gate 번호는 계속 `NOT_ASSIGNED`다.
+
+- **진입조건**: EG-8D 통과.
+- **포함 범위**: Recommendation Output Contract(`recommendation_type`/`spot_id`/
+  `fallback_reason` 등 스키마), UI 정보구조, 상태 설계, 와이어프레임, 프로토타입
+  준비, UI/UX 상세 설계 진입 판정.
+- **제외 범위**: Recommendation MVP 구현, 상용 앱·웹 서비스 구현 및 출시,
+  실시간 모델 서빙.
+- **필수 산출물**: `docs/product/RECOMMENDATION_OUTPUT_CONTRACT.md`, UI
+  정보구조·와이어프레임(비상용 설계 산출물), UI/UX 상세 설계 진입 판정 보고.
+- **통과기준**: Recommendation Output Contract가 SPOT/AREA 스키마 원칙(SPOT은
+  `spot_id` 필수·`fallback_reason` 없음, AREA는 `spot_id=null`·`fallback_reason`
+  필수)을 만족한다. UI 설계 산출물이 Model Output을 직접 참조하지 않고
+  Recommendation Output만 소비한다.
+- **실패 또는 보류 조건**: Recommendation Output Contract 없이 UI 설계에
+  착수하지 않는다(§4 UI/UX 착수 순서 위반).
+- **다음 Gate 전환조건**: EG-8E 통과는 UI/UX **상세** 설계·프로토타입 진행을
+  승인하는 판정이며, Recommendation MVP의 공식 Gate 번호 배정이나 구현 착수는
+  별도 PM 승인 사항으로 남는다.
 
 ---
 
 ## 13. 후속 Recommendation MVP Workstream — 공식 Gate 아님
 
+EG-8E(Recommendation Output Contract·UI/UX Readiness)는 이 Workstream의 계약·
+설계 준비 단계이며, 이 Workstream 자체의 구현 Gate가 아니다.
+
 ### 목표
 
-EG-8에서 검증된 Area Feature와, 승인·확보된 경우의 S-DoT Feature 및 Candidate
+EG-8D에서 검증된 Area Feature와, 승인·확보된 경우의 S-DoT Feature 및 Candidate
 Evidence Assessment를 사용해 추천 단위와 근거를 제시하는 최소 Workstream을
 검토한다. 상태는 `PLANNED`, Gate number는 `NOT_ASSIGNED`다.
 
 ### 진입조건
 
-- EG-8 통과와 Feature·후보 평가 증거 계약 확인
+- EG-8(전체, 특히 EG-8D 후보 평가·EG-8E Recommendation Output Contract) 통과와
+  Feature·후보 평가 증거 계약 확인
 - SPOT 판단 근거와 AREA fallback 사유 Enum에 대한 PM 승인
 - 실제 판매효과와 추천 산출물을 구분하는 표시 계약 승인
 

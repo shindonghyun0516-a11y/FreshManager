@@ -110,7 +110,9 @@ EG-4 여의도 1장소
 → EG-6A 13개 Area·Spot·S-DoT 패널 확정
 → EG-6B 13개 Area 단일 수집·Batch Log·Manifest·SHA-256 검증
 → EG-7 동일 13개 Area 반복수집 파일럿
-→ EG-8 Area Feature·승인·확보된 경우 S-DoT Feature·Spot Candidate Evaluation
+→ EG-8 데이터 분석·예측·추천 준비 상위 Gate
+   (EG-8A Loader·정규화 → EG-8B EDA·Forecast평가·Baseline → EG-8C 예측모델
+    → EG-8D Ranking·Spot Candidate Evaluation → EG-8E Recommendation Contract·UI/UX Readiness)
 → 후속 Recommendation MVP Workstream(PLANNED, Gate number NOT_ASSIGNED)
 → 후속 검토에서 필요 시 121개 Area 확대
 ```
@@ -141,9 +143,10 @@ Issue #60과 PR #61, 첫 실제 Batch·백업·Closeout은 Issue #57과 PR #68�
 일반 Raw-to-CSV Exporter는 별도 Issue와 PM 승인으로 구현한다. EG-7은 같은
 13개 Area의 5분·1시간·12회차 반복수집 Controller와 canonical Batch 증거에서
 재생성하는 전용 Slot·Area 파생 인덱스로 제한한다. 동적 S-DoT 수집은 제외한다.
-EG-8은 Area Feature와 승인·확보된 경우의
-S-DoT Feature를 이용한 Spot Candidate Evaluation을 수행한다. Recommendation MVP는
-`PLANNED`, Gate number `NOT_ASSIGNED`이며 별도 PM 승인 전 공식 Gate가 아니다.
+EG-8D는 Area Feature와 승인·확보된 경우의
+S-DoT Feature를 이용한 Spot Candidate Evaluation을 수행한다(기존 EG-8 정의 계승;
+EG-8A~8E 전체 구조는 §3.6과 `docs/testing/QUALITY_GATES.md` §12 참조). Recommendation
+MVP는 `PLANNED`, Gate number `NOT_ASSIGNED`이며 별도 PM 승인 전 공식 Gate가 아니다.
 현재 MVP 분석 범위에는 실제 판매효과 분석을 포함하지 않는다.
 
 과거의 `시험용 10장소 → 121장소 1회 수집`은 이전 계획으로 보존하되 현재 승인된
@@ -301,6 +304,21 @@ Manifest 품질을 확인하기 전에는 Exporter를 구현하지 않는다. CS
 재생성하고 API를 재호출하지 않는다. Area 관측값과 S-DoT 관측·Spot Candidate Context를 같은 측정값으로
 혼합하지 않으며 시스템 CSV와 PM 메모 시트를 분리한다. 상세 목표 계약은
 `docs/data/CLOUD_BACKUP_AND_CSV_MANAGEMENT_PLAN.md`를 따른다.
+
+### 3.6 v3 source sheets와 Python Loader 원칙
+
+Apps Script가 쓰는 `raw_log_v3`/`population_current_v3`/`population_forecast_v3`
+(`v3 source sheets`)는 PoC 상시 수집 Runtime의 공식 원본이다. EG-8A Python
+Loader는 이 시트에 **읽기 전용**으로만 접근하며, 셀 값을 수정·삭제·재정렬하지
+않는다. 정규화·분석 작업은 원본 행을 변경하지 않고 별도 데이터셋으로 파생한다.
+
+중복 관측이 발견돼도 `v3 source sheets` 원본에서 삭제하지 않고, 후속 정규화
+데이터셋에서 별도 플래그로 표시한다. 이는 로컬 EG-7 Raw JSON의 기존 중복 보존
+원칙(§22)을 Apps Script 원본에도 동일하게 적용한 것이다. 5분 수집 주기 변경
+금지 원칙은 §22를 그대로 따르며 이 절에서 다시 정의하지 않는다.
+
+Loader의 Spreadsheet 접근 방식(API·CSV 반출 등)과 정규화 스키마는
+`docs/data/ML_READY_DATASET_SPEC.md`가 소유한다(`PLANNED`, PR2에서 생성 예정).
 
 ---
 
@@ -993,6 +1011,7 @@ EG-6B Collector 자체에는 Backup Worker와 CSV Exporter가 없다. EG-7 Contr
 
 | 버전 | 날짜 | 변경내용 | 작성자 | 승인상태 |
 |---|---|---|---|---|
+| v0.1.11 | 2026-07-24 | EG-8 상위 Gate·EG-8A~8E 로드맵 반영, v3 source sheets 읽기 전용 원칙(§3.6) 추가 | 신동현 | PM 결정 |
 | v0.1.10 | 2026-07-23 | ACTIVE 장기 기준 필드와 Forecast canonical 정렬 집합·Raw 원본 순서 보존 계약 명확화 | 신동현 | PR #71 변경요청 보완 |
 | v0.1.9 | 2026-07-23 | 5분을 `PM_APPROVED_FIXED` 장기 기준으로 확정하고 대안·중복 기반 변경 금지, 운영시간·Live 확대 OPEN 경계 반영 | 신동현 | PM 최종 결정 |
 | v0.1.8 | 2026-07-23 | Issue #69 승인 EG-7 5분·1시간·12회차·최대 156호출·재시도 0회·무보충·중복 보존·Live 차단 계약 반영 | 신동현 | PM 구현 범위 승인 |

@@ -64,6 +64,34 @@ PM이 장기 기준으로 확정한 5분 주기의 EG-7 1시간 파일럿 Contro
 - 과거 "Apps Script 폐기" 결정(TRD ADR-08, PRD R-09): `SUPERSEDED` — 상세는
   `ai-context/DECISION_LOG.md`와 TRD ADR-15 참조
 
+## 2.2 EG-8A~EG-8E 데이터 분석·ML·추천·UI 준비 상태
+
+- EG-8(상위): `NOT_STARTED` — 데이터 분석·예측·추천 준비 상위 Gate, EG-8A~8E로 세분화
+- EG-8A(Python Loader·정규화·데이터 품질): `NEXT`
+- EG-8B(EDA·서울시 Forecast 평가·Baseline·Feature Dataset): `PLANNED`
+- EG-8C(미래 Area 인구·피크 예측 모델): `PLANNED`
+- EG-8D(Area Ranking·선택적 S-DoT·Spot Candidate Evaluation): `PLANNED` — 기존
+  EG-8 정의(Area Feature+선택적 S-DoT Feature+Spot Candidate Evaluation)를 그대로 계승
+- EG-8E(Recommendation Output Contract·UI/UX Readiness): `PLANNED` — Recommendation
+  MVP 구현 Gate가 아니며, Recommendation MVP Workstream의 공식 Gate 번호는 계속
+  `NOT_ASSIGNED`다
+
+구현 상태:
+
+- Python Loader: `NOT_IMPLEMENTED`
+- ML-ready Dataset: `NOT_IMPLEMENTED`
+- EDA: `NOT_STARTED`
+- Forecast Evaluation: `NOT_STARTED`
+- ML Model: `NOT_STARTED`
+- Area Ranking: `NOT_STARTED`
+- Spot Ranking: `NOT_STARTED`
+- Recommendation Contract: `NOT_STARTED`
+- UI/UX Detailed Design: `NOT_STARTED`
+
+이 절은 §2.1의 Apps Script 상시 수집 Runtime과 독립적이다. 5분 자동수집 `ACTIVE`
+상태는 이 절과 무관하게 유지된다. v3 source sheets 자체는 ML-ready Dataset이
+아니며, EG-8A Python Loader를 거쳐야 정규화 데이터셋이 된다.
+
 ## 3. Engineering Gate 상태
 
 | Gate | 상태 | 근거 |
@@ -77,7 +105,12 @@ PM이 장기 기준으로 확정한 5분 주기의 EG-7 1시간 파일럿 Contro
 | EG-6A | PASS | PR #52, 13개 Area·Spot·S-DoT 정적 패널 |
 | EG-6B | PASS | 첫 실제 13 Area 13/13, 품질·백업·원격 동기화 확인과 Closeout |
 | EG-7 | IMPLEMENTATION_AVAILABLE_ON_MAIN | PR #71 병합, Issue #70 종료; 첫 Live 미시작 |
-| EG-8 | NOT_STARTED | 반복 관측 결과와 별도 PM 승인 필요 |
+| EG-8(상위) | NOT_STARTED | 데이터 분석·예측·추천 준비 상위 Gate; EG-8A~8E로 세분화(§2.2) |
+| EG-8A | `NEXT` | Python Loader·정규화·데이터 품질 |
+| EG-8B | `PLANNED` | EDA·Forecast 평가·Baseline·Feature Dataset |
+| EG-8C | `PLANNED` | 미래 Area 인구·피크 예측 모델 |
+| EG-8D | `PLANNED` | Area Ranking·선택적 S-DoT·Spot Candidate Evaluation(기존 EG-8 정의 계승) |
+| EG-8E | `PLANNED` | Recommendation Output Contract·UI/UX Readiness(Recommendation MVP 구현 Gate 아님) |
 | Recommendation MVP | PLANNED | Gate number `NOT_ASSIGNED` |
 
 EG-7 post-merge 상태:

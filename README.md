@@ -93,7 +93,7 @@ DIRECT·NEARBY·UNSUPPORTED 의미의 Context로만 유지하며 EG-7 관측값�
 
 ### 후속 범위
 
-EG-7 실제 반복수집, EG-8 Feature 분석 및 후속 Recommendation
+EG-7 실제 반복수집, EG-8(상위, EG-8A~8E) 결과 및 후속 Recommendation
 MVP Workstream의 데이터 필요성을 확인한 뒤 별도 PM 승인으로 121개 Area 확대를 검토한다.
 
 ```text
@@ -103,18 +103,27 @@ MVP Workstream의 데이터 필요성을 확인한 뒤 별도 PM 승인으로 12
 후속 검토: EG-7·EG-8과 별도 승인된 Recommendation MVP Workstream 결과 후 필요 시 121개 확대
 ```
 
+### 현재 PoC 범위에 포함하는 항목 (EG-8A~EG-8E)
+
+- 미래 Area 인구 예측, 피크 발생 여부와 예상 피크시각
+- Area Ranking, Spot Candidate Ranking, 선택적 S-DoT 보조정보
+- Recommendation Output Contract
+- UI/UX 정보구조·와이어프레임·프로토타입(비상용 설계 산출물)
+
+상세 Gate 계약은 `docs/testing/QUALITY_GATES.md`를 따른다.
+
 ### 현재 제외 범위
 
-- 모바일 앱
-- 웹 서비스 화면
-- 지도 UI
+- 판매량 예측, 매출 예측, 판매 성공확률, 제품별 수요예측, 재고 최적화
+- 판매성과 인과효과 검증
+- 상용 모바일 앱·웹 서비스 구현 및 출시
+- 상용 지도 서비스 개발·배포
+- 실시간 모델 서빙, 완성형 MLOps
 - 프레시매니저 위치 추적
 - 실제 판매량 수집
 - 고객 개인정보 수집
 - 개별 건물 또는 지하철 출구 추천
 - 이동경로 최적화
-- 자체 AI 예측 모델
-- 머신러닝 학습
 - 유료 데이터
 - hy 내부 데이터 연동
 - 대중교통·문화행사 데이터의 필수 연동
@@ -238,7 +247,7 @@ POI001부터 POI121까지 자동 생성
 - 실제 날짜·시각·할당량·운영 ID·계획 지문에 대한 별도 PM 결정
 - PM Live 승인 후에만 동일 13개 Area의 5분·1시간 파일럿 실행 검토
 - 첫 Batch 품질 감사 결과를 기준으로 Raw-to-CSV Exporter 별도 검토
-- EG-8에서 Area Feature·승인·확보된 경우의 S-DoT Feature·Spot Candidate Evaluation 검증
+- EG-8D에서 Area Feature·승인·확보된 경우의 S-DoT Feature·Spot Candidate Evaluation 검증(EG-8A~8E 상세는 `docs/testing/QUALITY_GATES.md` 참조)
 - 별도 PM 승인 후 Recommendation MVP Workstream 검토(`PLANNED`, Gate number `NOT_ASSIGNED`)
 
 ### 미진행
@@ -250,7 +259,7 @@ POI001부터 POI121까지 자동 생성
 - ML 학습
 - 24시간 Scheduler·영구 백그라운드 서비스·자동 재시도
 - CSV Exporter
-- EG-8 Area Feature·선택적 S-DoT Feature와 Spot Candidate Evaluation
+- EG-8D Area Feature·선택적 S-DoT Feature와 Spot Candidate Evaluation
 - Recommendation MVP Workstream(`PLANNED`, Gate number `NOT_ASSIGNED`)
 - 121장소 자동수집
 - 장기 데이터 누적
@@ -370,7 +379,7 @@ Issue #32 PM 결정에 따라 이전 최소 계약의 `parser_version` 대신
 | EG-6A | 13개 Area·Spot·S-DoT 패널 | 통과: Issue #51·PR #52로 13개 고유 공식 Area 패널 `main` 반영 |
 | EG-6B | 동일 13개 Area 단일 수집 | 통과: 첫 실제 Batch 13/13·품질·백업 무결성·원격 동기화 확인과 Closeout 완료 |
 | EG-7 | 동일 13개 Area 반복수집 파일럿 | 구현 중: Issue #69 승인 범위에 따라 Issue #70에서 오프라인 Controller·파생 인덱스 구현; Live 미승인 |
-| EG-8 | Area Feature·선택적 S-DoT Feature와 Spot Candidate Evaluation | 미진행: 반복 관측 데이터 필요 |
+| EG-8(상위) | 데이터 분석·예측·추천 준비 상위 Gate(EG-8A~8E); 기존 EG-8 정의는 EG-8D가 계승 | 미진행: 상세는 `docs/testing/QUALITY_GATES.md` 참조 |
 | Recommendation MVP Workstream | SPOT 우선·AREA fallback 추천 | `PLANNED`; Gate number `NOT_ASSIGNED`, 별도 PM 승인 필요 |
 
 EG-1과 EG-2는 Project Guard 구현 전의 읽기 전용 사전검증이다.

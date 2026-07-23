@@ -221,17 +221,29 @@ POI072
 
 ## 8. 현재 제외 범위
 
-- 모바일 앱
-- 웹 서비스 화면
-- 지도 UI
+### 8.1 EG-8A~EG-8E로 PoC 범위에 포함하는 항목
+
+- 미래 Area 인구 예측, 피크 발생 여부와 예상 피크시각
+- Area Ranking, Spot Candidate Ranking
+- 지원·접근·수집·품질조건을 만족하는 경우의 선택적 S-DoT 보조정보
+- Recommendation Output Contract
+- UI/UX 정보구조·와이어프레임·프로토타입(비상용 설계 산출물)
+
+상세 진입·통과조건은 `docs/testing/QUALITY_GATES.md`의 EG-8A~EG-8E가 소유한다.
+
+### 8.2 현재도 계속 제외하는 항목
+
+- 판매량 예측, 매출 예측, 판매 성공확률, 제품별 수요예측, 재고 최적화
+- 판매성과 인과효과 검증
+- 상용 모바일 앱·웹 서비스 구현 및 출시(설계·와이어프레임·프로토타입은 8.1에서 허용)
+- 상용 지도 서비스 개발·배포(UI/UX 설계 산출물은 8.1에서 허용)
+- 실시간 모델 서빙, 완성형 MLOps
 - 프레시매니저 위치 추적
 - 실제 판매량 수집
 - 실제 판매효과 분석
 - 고객 개인정보 수집
 - 개별 건물 또는 지하철 출구 추천
 - 이동경로 최적화
-- 자체 AI 예측 모델
-- 머신러닝 학습
 - 유료 데이터
 - hy 내부 데이터 연동
 - 대중교통·문화행사 데이터의 필수 연동
@@ -256,7 +268,12 @@ EG-0 문서 기준선
 → EG-6B 13개 Area 단일 수집·Batch Log·Manifest·SHA-256 검증
 → Google Drive for Desktop Sync·즉시 Backup Worker·Fake Batch 검증과 EG-6B Live
 → EG-7 동일 13개 Area 반복수집 파일럿
-→ EG-8 Area Feature + 승인·확보된 경우 S-DoT Feature + Spot Candidate Evaluation
+→ EG-8 데이터 분석·예측·추천 준비 상위 Gate
+   → EG-8A Python Loader·정규화·데이터 품질
+   → EG-8B EDA·서울시 Forecast 평가·Baseline·Feature Dataset
+   → EG-8C 미래 Area 인구·피크 예측 모델
+   → EG-8D Area Ranking·선택적 S-DoT·Spot Candidate Evaluation
+   → EG-8E Recommendation Output Contract·UI/UX Readiness
 → 후속 Recommendation MVP Workstream (Gate number: NOT_ASSIGNED)
 → 후속 검토에서 필요 시 121개 Area 확대
 ```
@@ -295,13 +312,17 @@ EG-0 문서 기준선
   별도 Issue에서 구현한다. CSV 실패로 서울시 API를 재호출하지 않는다.
 - EG-7은 같은 13개 Area의 반복수집 파일럿으로 제한하며, S-DoT 관측 수집 가능성은
   Area 수집과 분리된 후속 데이터 계층으로 검토한다.
-- EG-8은 Area Feature와 승인·확보된 경우의 S-DoT Feature를 이용해 Spot Candidate
-  Evaluation을 수행하며 실제 판매효과를 분석하지 않는다. Candidate Score·가중치·
-  임계값은 확정 계약이 아니다.
-- Recommendation MVP는 `PLANNED` Workstream이고 Gate 번호는 `NOT_ASSIGNED`다.
-  별도 PM 승인 전 공식 Engineering Gate로 취급하거나 구현하지 않는다.
-- 121개 Area 확대는 EG-8 결과와 Recommendation MVP의 데이터 필요성을 확인한 뒤 별도 PM
-  승인을 받아 검토한다.
+- EG-8은 EG-8A~EG-8E를 포괄하는 데이터 분석·예측·추천 준비 상위 Gate다. 각 하위
+  Gate의 진입·통과조건은 `docs/testing/QUALITY_GATES.md`가 소유한다.
+- EG-8D는 Area Feature와 승인·확보된 경우의 S-DoT Feature를 이용해 Spot Candidate
+  Evaluation을 수행하며(기존 EG-8 정의를 그대로 계승) 실제 판매효과를 분석하지
+  않는다. Candidate Score·가중치·임계값은 확정 계약이 아니다.
+- EG-8E는 Recommendation Output Contract와 UI/UX Readiness를 다루지만 Recommendation
+  MVP의 구현 Gate가 아니다. Recommendation MVP는 `PLANNED` Workstream이고 Gate
+  번호는 `NOT_ASSIGNED`다. 별도 PM 승인 전 공식 Engineering Gate로 취급하거나
+  구현하지 않는다.
+- 121개 Area 확대는 EG-8(전체) 결과와 Recommendation MVP의 데이터 필요성을 확인한
+  뒤 별도 PM 승인을 받아 검토한다.
 
 Gate A·Gate B·Gate C는 데이터 PoC 판정 게이트다.
 구현 준비도와 엔지니어링 품질을 판정하는 EG-0~EG-8과 혼용하지 않는다.
