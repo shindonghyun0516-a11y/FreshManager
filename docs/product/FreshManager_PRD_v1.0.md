@@ -6,19 +6,23 @@
 
 **문서 ID:** FM-PRD-001
 
-**버전 / 상태:** v1.0 · 공식 제품 기준
+**버전 / 상태:** v1.1 · 공식 제품 기준
 
-**기준일:** 2026-07-22 (Asia/Seoul)
+**기준일:** 2026-07-24 (Asia/Seoul)
 
 **제품 책임자:** PM/PO 신동현
 
 **기술 기준:** 구현 계약은 `docs/engineering/FreshManager_TRD_v1.0.md`, 현재
 Branch·Pull Request·Issue·실행 상태는 `PROJECT_STATUS.md`를 단일 기준으로 사용
 
+**2026-07-24 변경이력:** EG-8을 상위 Gate로 유지하고 EG-8A~EG-8E로 세분화했다.
+PoC 범위에 미래 Area 인구·피크 예측, Area/Spot Ranking, Recommendation Output
+Contract, UI/UX 설계·와이어프레임·프로토타입을 포함했다. 상세는 §39 변경 이력을
+따른다. 파일명은 참조 안정성을 위해 `FreshManager_PRD_v1.0.md`로 유지한다.
+
 **2026-07-22 변경이력:** Issue #58 초안에서 Google Drive 자동 백업,
 첫 Batch 이후 CSV와 Area·선택적 S-DoT·Spot Candidate Evaluation·Recommendation
 Workstream 결정을 반영했다.
-파일 버전은 PM의 별도 버전 변경 결정 전 `v1.0`을 유지한다.
 
 > **핵심 결론**  현재 제품은 추천 앱이 아니라, 추천 서비스가 성립할 데이터
 > 전제조건을 검증하는 1인 운영 PoC다. 장기 후보군은 서울시 121개 Area지만 승인
@@ -119,13 +123,44 @@ Google Drive에는 검증된 복사본을 자동 백업하며 백업 실패는 A
 - G5. Gate A·B 판정과 Gate C 인터뷰로 넘어갈지 결정할 수 있는 정량 리포트를 만든다.
 - G6. 비개발자 PM이 실행 결과, 실패 이유, 다음 승인사항을 이해할 수 있게 한다.
 
-### 5.2 현재 명시적 비목표
+### 5.2 현재 PoC 범위에 포함하는 항목 (EG-8A~EG-8E)
 
-- 모바일 앱, 웹 서비스, 지도 UI 또는 알림 UX
+- 미래 Area 인구 예측, 피크 발생 여부와 예상 피크시각(EG-8C)
+- Area Ranking, Spot Candidate Ranking, 지원·접근·수집·품질조건을 만족하는
+  선택적 S-DoT 보조정보(EG-8D)
+- Recommendation Output Contract 설계(EG-8E) — 점수·가중치·임계값의 최종 확정은
+  포함하지 않는다(D-009 `OPEN_DECISION` 유지)
+- UI/UX 정보구조·와이어프레임·프로토타입(비상용 설계 산출물, EG-8E)
+
+상세 진입·통과조건은 `docs/testing/QUALITY_GATES.md`가 소유한다.
+
+### 5.3 데이터 수집에서 이동 판단 지원까지의 사용자 가치 흐름
+
+```text
+승인 13개 Area 5분 자동수집(Apps Script Runtime, ACTIVE)
+→ EG-8A Python Loader·정규화·데이터 품질
+→ EG-8B EDA·서울시 Forecast 평가·Baseline·Feature Dataset
+→ EG-8C 미래 Area 인구·피크 예측 모델
+→ EG-8D Area Ranking·선택적 S-DoT·Spot Candidate Evaluation
+→ EG-8E Recommendation Output Contract·UI/UX Readiness
+→ (별도 PM 승인 후) UI/UX 상세 설계·프로토타입
+→ (Recommendation MVP Workstream, Gate number `NOT_ASSIGNED`) 이동 판단 지원
+```
+
+이 흐름은 목표 설계이며 각 단계는 이전 단계 통과와 별도 PM 승인 후 진행한다.
+UI는 Model Output을 직접 소비하지 않고 Recommendation Output만 소비한다.
+실제 판매효과·구매전환은 이 흐름만으로 입증되지 않는다.
+
+### 5.4 현재 명시적 비목표
+
+- 판매량 예측, 매출 예측, 판매 성공확률, 제품별 수요예측, 재고 최적화
+- 판매성과 인과효과 검증
+- 상용 모바일 앱·웹 서비스 구현 및 출시, 상용 지도 서비스 개발·배포, 알림 UX 확정
+- 실시간 모델 서빙, 완성형 MLOps
 - 프레시매니저 위치 추적, 고객 개인정보 수집 또는 개인별 프로파일링
-- 실제 판매량 수집·판매효과·구매전환율 검증
+- 실제 판매량 수집·구매전환율 검증
 - 개별 건물·출구의 정밀 추천과 이동경로 최적화
-- 자체 AI 예측모델, 머신러닝 학습 또는 추천 점수 모델
+- 추천 점수 모델·가중치·임계값의 최종 확정(D-009 `OPEN_DECISION` 유지)
 - hy 내부 데이터, 유료 데이터 또는 프로덕션 대규모 인프라 연동
 - 호출한도 확인 전 121개 Area 고빈도 자동수집
 - 별도 PM Live 승인 없는 실제 5분 반복수집·자동 재시도·클라우드 실행
@@ -384,7 +419,12 @@ Spot Candidate는 Area 데이터와 S-DoT 근접성·공간 Context·현장검�
 | EG-6B | 13개 Area 단일 회차 구현·실행·품질 판정 |
 | Backup Readiness | EG-6B Live 전 Desktop Sync·Worker·복구 검증 묶음; 새 EG 번호가 아님 |
 | EG-7 | 승인된 주기의 동일 13개 Area 반복수집 파일럿 |
-| EG-8 | Area·선택적 S-DoT Feature와 Spot Candidate Evaluation |
+| EG-8(상위) | 데이터 분석·예측·추천 준비 상위 Gate |
+| EG-8A | Python Loader·정규화·데이터 품질 |
+| EG-8B | EDA·서울시 Forecast 평가·Baseline·Feature Dataset |
+| EG-8C | 미래 Area 인구·피크 예측 모델 |
+| EG-8D | Area Ranking·선택적 S-DoT·Spot Candidate Evaluation(기존 EG-8 정의 계승) |
+| EG-8E | Recommendation Output Contract·UI/UX Readiness(Recommendation MVP 구현 Gate 아님) |
 | Recommendation MVP Workstream | Gate number `NOT_ASSIGNED`; 검증 Feature와 별도 PM 승인 필요 |
 
 > **상태 해석**  코드 병합과 Gate 통과는 별개다. 현재 구현·실행 증거와 PM 판정은
@@ -444,7 +484,14 @@ Spot Candidate는 Area 데이터와 S-DoT 근접성·공간 Context·현장검�
 5. R4 — EG-6B Live Preflight 재통과, 최대 13회 승인, 첫 Batch·자동 백업·품질 감사
 6. R5 — 첫 Batch 구조를 기준으로 CSV 계약·Exporter를 별도 구현하고 누적·재생성을 검증
 7. R6 EG-7 — 동일 13개 Area 반복수집 파일럿과 독립 S-DoT 관측 수집 가능성 검토
-8. R7 EG-8 — 4주 기준선·5주차 Area Feature·선택적 S-DoT Feature·Spot Candidate Evaluation과 Gate A/B 판정
+8. R7 EG-8(상위) — 데이터 분석·예측·추천 준비, 4주 기준선·5주차 Gate A/B 판정을 포함
+   - R7A EG-8A: Python Loader·정규화·데이터 품질
+   - R7B EG-8B: EDA·서울시 Forecast 평가·Baseline·Feature Dataset
+   - R7C EG-8C: 미래 Area 인구·피크 예측 모델
+   - R7D EG-8D: Area Ranking·선택적 S-DoT Feature·Spot Candidate Evaluation(기존
+     R7 EG-8 정의 계승)
+   - R7E EG-8E: Recommendation Output Contract·UI/UX Readiness(Recommendation MVP
+     구현이 아님)
 9. R8 후속 — Recommendation MVP Workstream(`PLANNED`, Gate number `NOT_ASSIGNED`, 별도 PM 승인)
 10. R9 후속 — Gate C 인터뷰, 현장 Spot 검증, 필요 시 121개 확대·Gate D 설계
 
@@ -540,7 +587,16 @@ Spot Candidate는 Area 데이터와 S-DoT 근접성·공간 Context·현장검�
 | S-DoT | Area 내부 활성 위치 판단을 보조하는 독립 센서 계층; Area 대체값이나 판매량이 아님 |
 | 예측 스냅샷 | 한 수집시점에 확보한 미래 예측 묶음 |
 | 후속 관측값 | 예측 대상시각이 지난 뒤 API로 다시 받은 서울시 추정 인구 |
-| Engineering Gate | 구현 준비도·품질 단계 EG-0~EG-8 |
-| Recommendation MVP Workstream | `PLANNED`, Gate number `NOT_ASSIGNED`; 별도 PM 승인 전 공식 Gate가 아닌 후속 작업축 |
+| Engineering Gate | 구현 준비도·품질 단계 EG-0~EG-8; EG-8은 EG-8A~EG-8E 하위 Gate로 세분화된 상위 Gate |
+| Model Output | EG-8C 예측 모델의 원시 산출값; UI가 직접 참조하지 않음 |
+| Recommendation Output | EG-8E Recommendation Output Contract가 정의하는 추천 결과 스키마; Model Output과 UI Presentation 사이의 계층 |
+| Recommendation MVP Workstream | `PLANNED`, Gate number `NOT_ASSIGNED`; 별도 PM 승인 전 공식 Gate가 아닌 후속 작업축(EG-8E는 이 Workstream의 구현 Gate가 아니라 계약·설계 준비 Gate) |
 | Gate A~D | 데이터·사용자·현장 타당성의 제품 판정 게이트 |
 | Project Guard | 문서·데이터·보안·수집 계약의 오프라인 자동검사 |
+
+## 변경 이력
+
+| 버전 | 날짜 | 변경내용 | 승인상태 |
+|---|---|---|---|
+| v1.1 | 2026-07-24 | EG-8을 상위 Gate로 유지하고 EG-8A~EG-8E로 세분화. PoC 범위에 미래 Area 인구·피크 예측, Area/Spot Ranking, Recommendation Output Contract, UI/UX 설계·와이어프레임·프로토타입을 포함. 판매량·매출 예측, 상용 앱·웹 출시, 실시간 서빙·MLOps는 계속 비목표. §5.2~5.4, §10.1, §12, 부록A 갱신 | PM 결정 |
+| v1.0 | 2026-07-22 | 최초 공식 제품 기준 확정 | PM 승인 |

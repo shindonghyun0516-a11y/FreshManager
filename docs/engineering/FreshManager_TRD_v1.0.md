@@ -6,17 +6,26 @@
 
 **문서 ID:** FM-TRD-001
 
-**버전 / 상태:** v1.0 · 공식 기술 기준
+**버전 / 상태:** v1.1 · 공식 기술 기준
 
-**기준일:** 2026-07-23 (Asia/Seoul)
+**기준일:** 2026-07-24 (Asia/Seoul)
 
-**기술 기준:** EG-6B Area Collector·독립 Backup Worker·EG-7 오프라인 Controller와 파생 인덱스 계약
+**기술 기준:** EG-6B Area Collector·독립 Backup Worker·EG-7 오프라인 Controller와 파생 인덱스 계약, EG-8A~EG-8E 데이터 분석·예측·추천 준비 목표 아키텍처
 
 **현재 상태 기준:** Branch·PR·Issue·실행·검증 상태는
 [`PROJECT_STATUS.md`](../../PROJECT_STATUS.md)를 단일 기준으로 사용한다.
 
-**적용 범위:** EG-6B 완료 + 승인된 EG-7 오프라인 구현·EG-8 Feature 분석 + `PLANNED`
-Recommendation MVP Workstream(Gate number `NOT_ASSIGNED`) 목표 구조
+**적용 범위:** EG-6B 완료 + 승인된 EG-7 오프라인 구현·EG-8(상위, EG-8A~8E) 데이터
+분석·예측·추천 준비 + `PLANNED` Recommendation MVP Workstream(Gate number
+`NOT_ASSIGNED`) 목표 구조
+
+**2026-07-24 변경이력:** EG-8을 상위 Gate로 유지하고 EG-8A(Python Loader·정규화·
+품질)~EG-8E(Recommendation Output Contract·UI/UX Readiness)로 세분화했다. 기존
+EG-8 정의(Area Feature+선택적 S-DoT Feature+Spot Candidate Evaluation)는 EG-8D로
+계승했다. Raw(v3 source sheets) → Normalized → Feature → Model Output →
+Recommendation Output → UI Presentation 계층 분리 원칙을 추가했다. 파일명은 참조
+안정성을 위해 `FreshManager_TRD_v1.0.md`로 유지한다. §15(EG-7 구현 아키텍처)와
+연결된 H-707 정본 문자열은 변경하지 않았다.
 
 **2026-07-22~23 완료·진행 이력:** Issue #60에서 Google Drive for Desktop Sync와 분리된
 1회 실행형 Backup Worker·append-only Receipt·H-708을 구현했고 PR #61로 `main`에
@@ -26,7 +35,6 @@ Recommendation MVP Workstream(Gate number `NOT_ASSIGNED`) 목표 구조
 첫 구현·운영 안전성 검증이다.
 Issue #58의 Area Core Observation·선택적 S-DoT Supporting Observation·Spot Candidate
 Evaluation·Recommendation 결과 구조는 유지하되 동적 S-DoT는 EG-7에서 수집하지 않는다.
-파일 버전은 PM의 별도 결정 전 `v1.0`을 유지한다.
 
 > **설계 기준**  구현 계약과 목표 구조를 섞지 않는다. EG-6B는 13개 Area 회차의
 > 원본·메타데이터·Batch Log·Manifest를 제공하고, 독립 Backup Worker는 완료 Batch의
@@ -82,7 +90,11 @@ Evaluation·Recommendation 결과 구조는 유지하되 동적 S-DoT는 EG-7에
 | Apps Script 13개 Area 반복수집 | 5분 시간 기반 Trigger(`ACTIVE`)·POI 코드 호출·LockService 중복실행 방지·Script Properties Key·실행별 `collection_run_id`·v3 시트 저장(Raw 13·Current 13·Forecast 156건/회) | PoC 상시 Runtime; 저장소 밖 Apps Script 프로젝트, 소스 버전관리는 `PLANNED`, 24시간 이상 지속성은 `NOT_COMPLETED` |
 | Raw-to-CSV Exporter | 첫 실제 Batch 이후 확정할 파생자료 계약 | 별도 승인 대상 |
 | S-DoT 관측 데이터 계층 | Area Collector와 독립적인 보조 Feature 계층 | EG-7 제외·후속 별도 승인 |
-| Spot Candidate Evaluation | Area·선택적 S-DoT·공간 Context 결합 | EG-8; Score·가중치·임계값 OPEN_DECISION |
+| EG-8A Python Loader | v3 source sheets 읽기 전용 파싱·정규화·데이터 품질 리포트 | `PLANNED`; 상세 계약은 `docs/data/ML_READY_DATASET_SPEC.md`(PR2 예정) |
+| EG-8B Forecast 평가·Baseline·Feature Dataset | B0/B1/B2 기준선·리드타임별 오차·Feature Dataset 구성 | `PLANNED`; 상세 계약은 `docs/analysis/ANALYSIS_PLAN.md` 확장(PR2 예정) |
+| EG-8C 예측 모델 | 미래 Area 인구·피크 여부·피크시각 예측, Baseline 대비 성능 확인 후 채택 | `PLANNED` |
+| Spot Candidate Evaluation | Area·선택적 S-DoT·공간 Context 결합 | EG-8D(기존 EG-8 정의 계승); Score·가중치·임계값 OPEN_DECISION |
+| EG-8E Recommendation Output Contract | Recommendation 출력 계약·UI/UX Readiness 판정 | `PLANNED`; 상세 계약은 `docs/product/RECOMMENDATION_OUTPUT_CONTRACT.md`(PR2 예정); Recommendation MVP 구현 Gate 아님 |
 | Recommendation MVP | 별도 계획 Workstream | Gate number `NOT_ASSIGNED` |
 
 > **상태 정렬**  위 표는 기술 책임을 정의하며 완료·미완료 상태표가 아니다. 현재
@@ -363,6 +375,10 @@ PM 승인으로 결정한다.
 | spot_candidate_evaluations | evaluation_version + candidate_id + decision_time | Area Feature·선택적 S-DoT Feature·Context 기반 후보 근거 평가 |
 | recommendations | recommendation_id | target_level·target_id·fallback_reason·사용 Feature 버전 |
 
+> **정본 예정**  이 표는 목표 구조 요약이다. 상세 스키마·중복/결측 처리·품질 기준·
+> 버전 계약은 EG-8A/EG-8B 정본인 `docs/data/ML_READY_DATASET_SPEC.md`(`PLANNED`,
+> PR2에서 생성 예정)가 담당할 예정이며, 생성 전까지는 이 표가 유일한 요약이다.
+
 ### 14.1 버전 계약
 
 - collector_version: 수집 실행 의미가 바뀔 때 증가한다.
@@ -530,9 +546,14 @@ Scheduler와 영구 백그라운드 서비스는 없다.
 - 백업 용량 = 원본 보관 용량 × 복제본 수 + Manifest/운영 여유
 - 병렬 호출은 현재 금지한다. 향후 검토 시 API 제한·시각 정렬·실패 격리 영향을 다시 설계한다.
 
-## 19. EG-8 Feature 분석 기술 구조
+## 19. EG-8 상위 Gate: 데이터 분석·예측·추천 준비 기술 구조
 
-> **분석 흐름**  검증된 Batch → Point-in-time 정규화 → Area Feature + 승인·확보된 경우의 독립 S-DoT Feature + 공간·현장·운영 Context → Spot Candidate Evaluation → 기준선·예측 비교 → Gate A/B 리포트
+> **분석 흐름**  Spreadsheet v3 source sheets → EG-8A Python Loader·정규화·품질 →
+> EG-8B EDA·서울시 Forecast 평가·Baseline·Feature Dataset → EG-8C 미래 Area 인구·
+> 피크 예측 모델 → EG-8D Area Ranking·선택적 S-DoT·Spot Candidate Evaluation
+> (Point-in-time 정규화 → Area Feature + 승인·확보된 경우의 독립 S-DoT Feature +
+> 공간·현장·운영 Context → Spot Candidate Evaluation, 기존 EG-8 정의 계승) →
+> EG-8E Recommendation Output Contract·UI/UX Readiness → Gate A/B 리포트
 
 분석은 단계별 증거 수준을 구분한다.
 
@@ -576,6 +597,33 @@ MVP다. 상태는 `PLANNED`, Gate number는 `NOT_ASSIGNED`이며 EG-8 분석 결
 - 추천 근거에는 사용한 Feature·Evaluation·Context 버전을 남긴다.
 - 추천 실패가 원본 Area Observation을 변경하거나 API 재호출을 유발하지 않는다.
 - 실제 판매효과와 추천 적중은 Recommendation MVP 구현만으로 입증됐다고 표현하지 않는다.
+
+### 19.3 EG-8A~EG-8E 목표 파이프라인과 계층 분리
+
+```text
+Apps Script(수집 Runtime, ACTIVE)
+→ Spreadsheet v3 source sheets(raw_log_v3/population_current_v3/population_forecast_v3)
+→ EG-8A Python Loader → Normalized Dataset
+→ EG-8B Feature Dataset(Baseline·Forecast 평가 포함)
+→ EG-8C Model Output(미래 Area 인구·피크 예측)
+→ EG-8D Area Ranker·Spot Ranker(선택적 S-DoT·Spot Candidate Evaluation 포함)
+→ EG-8E Recommendation Output(Recommendation Output Contract)
+→ UI Presentation(별도 PM 승인 후 상세 설계·프로토타입)
+```
+
+데이터 계층은 Raw(v3 source sheets) / Normalized Dataset / Feature Dataset /
+Model Output / Recommendation Output / UI Presentation으로 분리한다. **UI
+Presentation은 Model Output을 직접 참조하지 않고 Recommendation Output만
+소비한다.** 이는 모델 변경이 UI를 직접 깨뜨리는 결합도 위험을 방지하기 위한
+목표 구조다.
+
+v3 source sheets는 PoC 상시 수집 Runtime(Apps Script)의 공식 원본이다. EG-8A
+Python Loader는 이 시트에 읽기 전용으로만 접근하며, 정규화·분석 작업이 원본 행을
+수정·삭제·재정렬하지 않는다(상세는 `docs/rules/DATA_COLLECTION_RULES.md` §3.6).
+기존 EG-8 정의(Area Feature + 선택적 S-DoT Feature + Spot Candidate Evaluation)는
+삭제되지 않고 EG-8D로 계승됐다. 이 절의 목표 구조는 계획 단계이며, 실제 Loader·
+Feature·모델·Ranking·Recommendation Output Contract 구현은 각각 별도 Issue와
+PM 승인 후 진행한다.
 
 ## 20. 관측성·운영 보고
 
@@ -652,8 +700,9 @@ Project Guard 검사별 현재 PASS·SKIP, 전체 집계와 Live 실행 여부�
 | ADR-11 | Batch 완료 직후 1회 실행형 Worker | 수집기·백업 책임 분리와 장애 격리 | 채택 |
 | ADR-12 | CSV는 첫 Batch 이후 | 실제 필드·결측·Forecast를 확인한 뒤 파생 계약 확정 | 목표 구조 |
 | ADR-13 | S-DoT는 독립·선택적 보조 데이터 계층 | Area를 대체하거나 필수 직렬 단계가 아니며 Spot Candidate 근거만 보조 | 목표 구조 |
-| ADR-14 | Recommendation MVP Workstream 분리 | EG-8 Feature 검증과 추천 제품 동작을 분리; Gate number NOT_ASSIGNED | 목표 구조 |
+| ADR-14 | Recommendation MVP Workstream 분리 | EG-8 Feature 검증과 추천 제품 동작을 분리; Gate number NOT_ASSIGNED | 목표 구조; ADR-16이 보완(대체 아님) — EG-8E는 이 Workstream의 계약·설계 준비 Gate일 뿐 구현 Gate가 아님 |
 | ADR-15 | Apps Script를 PoC 반복수집 Runtime으로 재채택 | ADR-08 폐기 근거(현행 로컬 Python과 충돌)가 이제 반대로 적용됨 — 로컬 Python·Codex·Claude Code 세션 종료와 무관하게 5분 반복수집이 계속돼야 한다는 요구를 로컬 EG-7(동기 실행, 세션 종속)은 충족할 수 없음. PM이 외부에서 기존 Apps Script 자산을 직접 복원·검증(POI 코드 호출·Script Properties Key·13개 Area v3 시트 누적)했고, 이후 5분 시간 기반 Trigger가 실제로 반복 실행 중임을 재확인함 | `ACCEPTED`; 5분 자동수집 `ACTIVE`, 24시간 이상 지속성 `NOT_COMPLETED` |
+| ADR-16 | EG-8을 상위 Gate로 세분화(EG-8A~8E)하고 Model Output/Recommendation Output/UI 계층을 분리 | 수집기 구축 단계에서 데이터 분석·ML·추천·UI 준비 단계로 전환이 필요하나, 기존 EG-8 정의("Area Feature + 선택적 S-DoT Feature + Spot Candidate Evaluation")를 다른 의미로 재사용하면 9개+ 문서·67회 참조와 충돌함. EG-8을 상위 Gate로 유지하고 EG-8A(Loader)~EG-8E(Recommendation Contract·UI Readiness)로 세분화해 기존 정의를 EG-8D로 무손실 계승함. UI가 Model Output을 직접 소비하면 모델 변경이 UI를 직접 깨뜨리는 결합도 위험이 생겨 계층을 분리함 | `ACCEPTED`; D-008·ADR-14 대체 아님, Recommendation MVP Gate 번호 `NOT_ASSIGNED` 유지 |
 
 ## 25. 미결정 기술사항
 
@@ -672,6 +721,10 @@ Project Guard 검사별 현재 PASS·SKIP, 전체 집계와 Live 실행 여부�
 - O-12 실제 원격 동기화 확인과 운영자 확인 증거의 최소 계약
 - O-13 Apps Script Runtime의 24시간 이상 장기 지속성(`PENDING_VALIDATION`), 소스 Git
   버전관리 방식(`PLANNED`), v3 시트 데이터와 Python 정규화 파이프라인의 통합 스키마(`PLANNED`)
+- O-14 EG-8A~8E 모델 알고리즘, Area/Spot Ranking 가중치, 추천 신뢰도 기준, 최소
+  학습 기간과 예측 Horizon 최종값, 피크 정의 임계값(ANALYSIS_PLAN 후보값 존재,
+  최종 확정은 OPEN); `docs/data/ML_READY_DATASET_SPEC.md`·
+  `docs/product/RECOMMENDATION_OUTPUT_CONTRACT.md` 상세 스펙은 PR2에서 생성 예정
 
 ## 26. PRD–구현 추적성
 
@@ -739,3 +792,13 @@ Project Guard 검사별 현재 PASS·SKIP, 전체 집계와 Live 실행 여부�
 | Spot Candidate | Area·S-DoT·공간 Context·현장검증을 결합해 생성하는 판매 후보 위치 |
 | Candidate Anchor Point | Spot 후보 생성의 기준점; 현재 역 중심 대리좌표이며 고정 판매 위치가 아님 |
 | Recommendation 결과 | 후보 근거에 따라 SPOT 또는 AREA+fallback_reason을 결정하는 후속 Workstream 결과 |
+| v3 source sheets | Apps Script Runtime이 쓰는 원본 Spreadsheet 탭(`raw_log_v3`/`population_current_v3`/`population_forecast_v3`); EG-8A Python Loader가 읽기 전용으로만 접근 |
+| Model Output | EG-8C 예측 모델의 원시 산출값; UI Presentation이 직접 참조하지 않음 |
+| Recommendation Output | EG-8E Recommendation Output Contract가 정의하는 추천 결과 스키마; Model Output과 UI Presentation 사이의 계층 |
+
+## 변경 이력
+
+| 버전 | 날짜 | 변경내용 | 승인상태 |
+|---|---|---|---|
+| v1.1 | 2026-07-24 | EG-8을 상위 Gate로 유지하고 EG-8A~EG-8E로 세분화(기존 EG-8 정의는 EG-8D로 계승). Raw/Normalized/Feature/Model Output/Recommendation Output/UI Presentation 계층 분리 원칙과 ADR-16 추가. §3, §14, §19, ADR표, 부록B 갱신. §15(EG-7)는 변경하지 않음 | PM 결정 |
+| v1.0 | 2026-07-23 | 최초 공식 기술 기준 확정 | PM 승인 |

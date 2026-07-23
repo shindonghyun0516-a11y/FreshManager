@@ -153,6 +153,37 @@ Decision Record, 기술 구조 결정 기록) 형식으로 보존한다. 현행 
   `NOT_COMPLETED`로 구분한다. 이 저장소만으로는 재현·재검증할 수 없다.
 - Related decision: D-014, TRD ADR-15(ADR-08을 `SUPERSEDED`로 대체).
 
+## ADR-011 — EG-8 상위 Gate와 EG-8A~8E 세분화, Model Output/Recommendation Output/UI 계층 분리
+
+- Status: `ACCEPTED`
+- Context: 데이터 분석·ML·추천·UI 전환 단계에서 수집 Runtime(Apps Script)과
+  분석·ML Runtime(Python)의 역할이 이미 분리돼 있다(ADR-010, `PROJECT_MEMORY.md`
+  §6.1). 이 분리를 데이터 처리 계층에도 명시적으로 적용해 UI가 Model Output을
+  직접 소비하는 구조를 방지해야 한다. 기존 EG-8 정의를 다른 의미로 재사용하면
+  9개+ 문서·67회 참조와 D-008의 "EG-9 미확정" 결정 모두와 충돌한다.
+- Decision: 기존 EG-8 정의(Area Feature + 선택적 S-DoT Feature + Spot Candidate
+  Evaluation)를 EG-8D로 흡수하고, EG-8을 상위 Gate로 삼아 EG-8A(Python Loader·
+  정규화·품질)~EG-8E(Recommendation Output Contract·UI/UX Readiness)로
+  세분화한다. 데이터 계층을 Raw(v3 source sheets) → Normalized Dataset →
+  Feature Dataset → Model Output → Recommendation Output → UI Presentation
+  순으로 분리한다. UI Presentation은 Model Output을 직접 참조하지 않고
+  Recommendation Output만 소비한다.
+- Alternatives: (a) EG-8을 새 의미로 재사용 — 기존 참조·완료 이력과 직접
+  충돌해 기각. (b) EG-9 이후 번호를 새로 배정 — D-008이 이미 "EG-9 미확정"을
+  결정해 재검토가 필요하므로, 상위/하위 세분화로 D-008과 충돌 없이 처리하는
+  이번 방식을 선택. (c) UI가 Model Output을 직접 소비 — 모델 변경이 UI를
+  직접 깨뜨리는 결합도 위험으로 기각.
+- Consequences: 기존 EG-8 참조는 EG-8D를 가리키는 것으로 재해석한다. ML-ready
+  데이터셋·Recommendation 출력 계약의 상세 정본은 각각
+  `docs/data/ML_READY_DATASET_SPEC.md`, `docs/product/RECOMMENDATION_OUTPUT_CONTRACT.md`
+  (둘 다 `PLANNED`, PR2에서 생성 예정)가 담당한다. D-008과 이 문서의 ADR-14는
+  대체되지 않는다 — Recommendation MVP의 공식 Gate 번호는 계속 `NOT_ASSIGNED`며,
+  EG-8E는 그 구현 Gate가 아니라 계약·설계 준비 Gate다.
+- Validation: 문서 정합성(Project Guard H-003)과 EG-7 정본 무변경(H-707)을 PR1
+  에서 확인한다. 실제 Loader·모델·Ranking 구현 검증은 후속 Issue의 범위다.
+- Related decision: D-015, TRD ADR-14(대체 아님 — EG-8E는 Recommendation MVP의
+  구현 Gate가 아니라 계약·설계 준비 Gate), TRD ADR-16.
+
 ## 2. ADR 갱신 규칙
 
 결정이 바뀌면 기존 ADR을 삭제하지 않고 상태를 `SUPERSEDED`로 바꾸며 대체 ADR을

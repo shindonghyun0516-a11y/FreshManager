@@ -79,6 +79,8 @@ PM이 승인했거나 명시적으로 보류한 제품·운영 결정을 새 AI 
 - Decision: Recommendation MVP를 EG-9로 확정하지 않는다.
 - Current expression: `PLANNED Recommendation MVP Workstream`, Gate number `NOT_ASSIGNED`.
 - Consequence: EG-8 증거와 별도 PM 승인 전 공식 Gate 또는 구현 완료 상태로 표현하지 않는다.
+- Related: [[D-015]] — EG-8 상위 Gate·EG-8A~8E 세분화(D-015는 이 결정을 대체하지
+  않으며, EG-8E는 Recommendation MVP의 구현 Gate가 아니다).
 
 ### D-009 — Spot 정량 점수는 미확정
 
@@ -179,6 +181,34 @@ PM이 승인했거나 명시적으로 보류한 제품·운영 결정을 새 AI 
   버전관리, Python 파이프라인과의 데이터 통합은 각각 `NOT_COMPLETED`·`PLANNED`·
   `PLANNED`로 별도 관리하며 이번 결정으로 완료 처리하지 않는다. `ACTIVE`(5분
   자동수집)와 `NOT_COMPLETED`(24시간 이상 지속성)를 같은 의미로 표현하지 않는다.
+
+### D-015 — EG-8을 상위 Gate로 세분화하고 데이터 분석·ML·추천·UI 설계를 PoC 범위에 포함
+
+- Date: `2026-07-24`
+- Status: `ACCEPTED`
+- Decision: 기존 EG-8("Area Feature + 선택적 S-DoT Feature + Spot Candidate
+  Evaluation")을 삭제하지 않고 EG-8D로 흡수한다. EG-8을 데이터 분석·예측·추천
+  준비의 상위 Gate로 재정의하고 EG-8A(Python Loader·정규화·데이터 품질),
+  EG-8B(EDA·서울시 Forecast 평가·Baseline·Feature Dataset), EG-8C(미래 Area
+  인구·피크 예측 모델), EG-8D(Area Ranking·선택적 S-DoT·Spot Candidate
+  Evaluation), EG-8E(Recommendation Output Contract·UI/UX Readiness)로
+  세분화한다. PoC 범위에 미래 Area 인구·피크 예측, Area/Spot Ranking,
+  Recommendation Output Contract, UI/UX 정보구조·와이어프레임·프로토타입을
+  포함한다. 매출·판매량·판매 성공확률·수요·재고 예측, 판매성과 인과효과
+  검증, 상용 앱·웹 서비스 구현·출시, 실시간 모델 서빙, 완성형 MLOps는 계속
+  제외한다.
+- Reason: 수집기 구축 단계에서 데이터 분석·ML·추천·UI 준비 단계로 전환이
+  필요하나, 수집 데이터가 존재한다는 사실만으로 ML이나 추천 UI를 구현해서는
+  안 된다. Baseline 비교 선행과 시계열 누수 방지 원칙을 EG-8 세분화로 명시적
+  단계에 귀속시킨다.
+- Evidence: PM 결정(EG-8 하위 Gate 구조 확정 및 문서 정합성 PR 1 진행 지시),
+  `docs/testing/QUALITY_GATES.md` §12.1~12.5, Issue #77.
+- Consequence: 기존 EG-8 참조는 EG-8D를 가리키는 것으로 재해석한다. 이 결정은
+  D-008을 대체하지 않는다 — D-008이 결정한 "Recommendation MVP Gate 번호
+  `NOT_ASSIGNED`"를 그대로 유지하며, EG-8E는 Recommendation MVP의 구현 Gate가
+  아니라 계약·설계 준비(Contract·UI/UX Readiness) Gate다.
+- Related: [[D-008]](양립, 미대체), TRD ADR-16, `ARCHITECTURE_DECISIONS.md`
+  ADR-011.
 
 ## 4. 갱신 규칙
 

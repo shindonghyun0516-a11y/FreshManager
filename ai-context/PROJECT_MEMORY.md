@@ -78,7 +78,14 @@ EG-6B  13개 Area 최초 Live Collection
         + EG-6B Quality Review
 EG-7   13개 Area 반복수집
         + 독립 S-DoT 접근성·스키마·품질 검증 Workstream
-EG-8   Area Feature + 선택적 S-DoT Feature + Spot Candidate Evaluation
+EG-8   데이터 분석·예측·추천 준비 상위 Gate
+        EG-8A Python Loader·정규화·데이터 품질
+        EG-8B EDA·서울시 Forecast 평가·Baseline·Feature Dataset
+        EG-8C 미래 Area 인구·피크 예측 모델
+        EG-8D Area Ranking·선택적 S-DoT·Spot Candidate Evaluation
+              (기존 EG-8 정의 계승)
+        EG-8E Recommendation Output Contract·UI/UX Readiness
+              (Recommendation MVP 구현 Gate 아님)
 후속   Recommendation MVP Workstream
         상태 PLANNED / Gate number NOT_ASSIGNED / 별도 PM 승인
 ```
@@ -113,6 +120,25 @@ PM 승인으로 검토한다. 동일 13개 Area 반복수집은 `Asia/Seoul` 벽
   24시간 이상 장기 무중단 지속성 검증은 `NOT_COMPLETED`다. 새 세션은 이 둘을 같은
   의미로 표현하지 않는다. Python ML은 수집 Runtime과 독립적인 관심사이며, "ML이
   Python이므로 수집도 Python이어야 한다"는 추론을 다시 적용하지 않는다.
+
+### 6.2 EG-8은 상위 Gate이며 하위 Gate로 세분화됐다
+
+- 기존 "EG-8 = Area Feature + 선택적 S-DoT Feature + Spot Candidate Evaluation"
+  정의는 삭제되지 않고 **EG-8D**로 흡수됐다. 내용은 그대로다.
+- EG-8A~8E 순서: Python Loader·정규화·품질(8A) → EDA·Forecast 평가·Baseline·
+  Feature Dataset(8B) → 예측 모델(8C) → Ranking·Spot Candidate Evaluation(8D)
+  → Recommendation Contract·UI/UX Readiness(8E). 각 하위 Gate는 이전 하위 Gate
+  통과 후 순차 진입한다.
+- Apps Script는 수집 Runtime, Python은 이후 정규화·분석·ML Runtime이라는 역할
+  분리는 §6.1의 결정과 일관된다.
+- `v3 source sheets`(Apps Script가 쓰는 원본 Spreadsheet) 자체는 ML-ready
+  Dataset이 아니다. EG-8A Python Loader를 거쳐야 정규화 데이터셋이 된다.
+- UI/UX 상세 설계(EG-8E)는 Recommendation Output Contract 확정 이후에 진행한다.
+  UI는 Model Output을 직접 소비하지 않는다(Model Output → Recommendation
+  Output → UI Presentation 계층 분리).
+- Recommendation MVP Workstream의 공식 Gate 번호는 여전히 `NOT_ASSIGNED`다.
+  EG-8E는 그 준비 단계일 뿐 구현 Gate가 아니다. D-008과 ADR-14는 대체되지
+  않았다.
 
 ## 7. 새 세션 복원 순서
 
