@@ -416,10 +416,17 @@ S-DoT 미지원 Area도 Area 분석과 추천 후보에서 제외하지 않는�
 
 ```text
 schema_version, pilot_run_id, timezone, cadence_minutes,
+cadence_decision_status, cadence_scope, cadence_change_allowed,
 planned_start_at, planned_end_at, planned_slot_count, max_api_calls,
 retry_count, area_count, area_order_contract, quota_confirmation_status,
 live_approval_status, slots
 ```
+
+계획 schema는 `eg7-pilot-plan-v2`다. `cadence_minutes=5`,
+`cadence_decision_status=PM_APPROVED_FIXED`,
+`cadence_scope=LONG_TERM_OPERATING_BASELINE`,
+`cadence_change_allowed=false`를 정확히 요구한다. 비 5분 계획은 거부하고 임의
+주기 선택 필드는 두지 않는다.
 
 각 `slots` 항목은 `slot_index`, `scheduled_at`, `batch_id`,
 `planned_status`를 가진다. `quota_confirmation_status`는 기본
@@ -478,11 +485,16 @@ backup_eligible, backup_status
 수집시각, API 관측시각, Raw SHA-256, 순서가 보존된 Forecast 대상시각 집합을
 각각 구분한다. `spot_id`는 포함하지 않고 `area_code`를 후속 결합키로 유지한다.
 이 인덱스와 Summary는 canonical Raw·Metadata·Collection Log·Manifest를
-대체하거나 수정하지 않는다.
+대체하거나 수정하지 않는다. 중복 플래그는 계획 호출 생략이나 5분 주기 변경
+신호가 아니며 EG-8 데이터셋 제거·선별·가중치 판단에 사용한다.
 
 `eg7_pilot_summary`는 계획·실행·건너뜀·치명중단·Area 성공실패·실제 호출·중복
 건수와 비율·Forecast 구조 일관성·Collector/Backup 소요시간·Source/Backup 용량
-증가·Backup 적격/검증 수·무재수집 확인을 기록한다. ML 성능은 평가하지 않는다.
+증가·Backup 적격/검증 수·무재수집 확인을 기록한다. schema는
+`eg7-pilot-summary-v2`이고 `cadence_minutes`,
+`cadence_decision_status`, `cadence_scope`, `cadence_change_allowed`,
+`alternative_cadences_supported`, `duplicate_triggered_cadence_change`를 함께
+기록한다. 마지막 두 값은 모두 `false`다. ML 성능은 평가하지 않는다.
 
 ---
 
@@ -713,6 +725,7 @@ Field Dictionary v0.1은 다음 조건을 만족해야 한다.
 
 | 버전 | 날짜 | 변경내용 | 작성자 | 승인상태 |
 |---|---|---|---|---|
+| v0.1.4 | 2026-07-23 | EG-7 plan·summary v2의 고정 5분 결정 필드와 중복 기반 주기 변경 금지 반영 | 신동현 | PM 최종 결정 |
 | v0.1.3 | 2026-07-23 | EG-6B·Backup 현재 상태와 EG-7 계획·사건·Slot/Area Index·Summary 필드·표현·중복 계약 반영 | 신동현 | PM 구현 범위 승인 |
 | v0.1.2 (Issue #58 보완) | 2026-07-22 | 백업·CSV와 Area·S-DoT·Spot Candidate·Recommendation 미래 데이터 계약 분리 | 신동현 | PM Diff 검토 전 |
 | v0.1.1 | 2026-07-20 | collection_logs를 공식 8개 메타데이터 계약으로 정렬하고 parser_version을 향후 정규화·분석 추적 필드로 분리 | 신동현 | PM 검토 전 |

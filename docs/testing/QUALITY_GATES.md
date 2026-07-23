@@ -82,9 +82,10 @@ EG-6A의 13개 제안 지역 Area·Spot·센서 참조에서 삼성역은 강남
 
 EG-6A에서 기존 `H-703`을 13지역 참조데이터 무결성 검사로 활성화했고, EG-6B
 구현과 함께 `H-706`을, Backup Worker 계약에서 `H-708`을 로컬 복사 무결성
-검사로 정의했다. EG-7 오프라인 구현에서는 기존 `H-707`을 5분·1시간·12회차,
-13 Area·최대 156호출·재시도 0회와 할당량 미확인 Live 차단을 확인하는 검사로
-활성화한다. 검사별 현재 PASS·SKIP과 집계는 `PROJECT_STATUS.md`를 따른다.
+검사로 정의했다. EG-7 오프라인 구현에서는 기존 `H-707`을 PM 확정 5분 장기 기준,
+비 5분 계획 거부, 대안·중복 기반 변경 금지, 1시간·12회차·13 Area·최대 156호출·
+재시도 0회와 할당량 미확인 Live 차단을 확인하는 검사로 활성화한다. 검사별 현재
+PASS·SKIP과 집계는 `PROJECT_STATUS.md`를 따른다.
 
 ---
 
@@ -408,14 +409,18 @@ EG-6B 단일 수집·백업·Closeout 결과와 별도 PM 범위 승인을 받�
 ### 진입조건
 
 - EG-6B 통과와 첫 실제 Batch 품질·Backup Closeout 완료
-- PM의 5분·1시간·12회차·13 Area·최대 156호출·재시도 0회 구현 범위 승인
+- PM의 5분 장기 기준과 첫 1시간·12회차·13 Area·최대 156호출·재시도 0회 구현 승인
 - Google Drive 자동 백업 Worker의 로컬 복사·무결성·원격 동기화 확인 계약 검증
 - 실제 날짜·시각·API 할당량·운영 ID·계획 지문·PM Live 승인은 구현과 분리해 OPEN 유지
 
 ### 구현 계약
 
-- 버전이 있는 불변 계획은 `pilot_run_id`, 12개 벽시계 시각과 사전 생성 UUIDv4
-  Batch ID, Area 순서, 호출예산, 할당량·Live 승인 상태를 보존한다.
+- 버전이 있는 불변 계획은 `cadence_minutes=5`,
+  `cadence_decision_status=PM_APPROVED_FIXED`,
+  `cadence_scope=LONG_TERM_OPERATING_BASELINE`, `cadence_change_allowed=false`,
+  `pilot_run_id`, 12개 벽시계 시각과 사전 생성 UUIDv4 Batch ID, Area 순서,
+  호출예산, 할당량·Live 승인 상태를 보존한다. 비 5분 계획과 런타임 주기 옵션은
+  거부한다.
 - `Asia/Seoul` 5분 경계 12개를 누적 오차 없이 계산한다. 늦은 회차와 이전
   Collector·즉시 Backup이 끝나지 않은 회차는 각각 `SKIPPED_MISSED`,
   `SKIPPED_OVERLAP`으로 종결하고 지연 보충수집을 하지 않는다.
@@ -428,10 +433,15 @@ EG-6B 단일 수집·백업·Closeout 결과와 별도 PM 범위 승인을 받�
 - 모든 계획 회차는 append-only 사건 로그와 고정 12행 Slot Index에 종결상태를 남긴다.
 - 실제 시도 Area만 최대 156행 Area Observation Index에 기록한다. 중복 관측시각,
   Raw SHA-256과 정렬된 Forecast 대상시각 집합은 Area별 파생 플래그로 남기며 Raw를
-  삭제·병합·수정하지 않는다.
+  삭제·병합·수정하지 않는다. 중복만으로 계획 호출을 생략하거나 주기를 바꾸지 않고
+  제거·표본선택·가중치는 EG-8 데이터셋 구성으로 미룬다.
 - 파생 CSV·JSONL은 canonical Batch 증거로 재생성할 수 있고 기존 Manifest에 추가하지 않는다.
 - H-707은 합성 입력으로 위 계약과 `UNCONFIRMED` Live 차단을 검증한다. H-707 PASS는
   실제 할당량 확인·운영 계획 생성·PM Live 승인을 뜻하지 않는다.
+- 첫 1시간은 5분 주기를 고르는 시험이 아니라 12개 정렬 슬롯, Collector·Backup,
+  무중첩·무보충, 호출상한, 시간·용량·중복·추적·실패 안전성을 검증한다.
+- 일일 운영시간대, 24시간 또는 선택 시간 운영, 첫 1시간 이후 확대 시점은 별도
+  OPEN이며 5분 주기는 `CLOSED · PM_APPROVED`다.
 - S-DoT 동적 수집, Spot 평가, Recommendation, ML 학습, 24시간 Scheduler와 영구
   백그라운드 서비스는 제외한다.
 

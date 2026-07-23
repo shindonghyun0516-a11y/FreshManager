@@ -38,6 +38,9 @@ def plan_document(
         "pilot_run_id": PILOT_RUN_ID,
         "timezone": eg7.TIMEZONE_NAME,
         "cadence_minutes": eg7.CADENCE_MINUTES,
+        "cadence_decision_status": eg7.CADENCE_DECISION_STATUS,
+        "cadence_scope": eg7.CADENCE_SCOPE,
+        "cadence_change_allowed": eg7.CADENCE_CHANGE_ALLOWED,
         "planned_start_at": start.isoformat(),
         "planned_end_at": end.isoformat(),
         "planned_slot_count": eg7.PLANNED_SLOT_COUNT,
@@ -333,6 +336,19 @@ class Eg7PlanTests(unittest.TestCase):
             eg7.validate_plan(reordered).fingerprint,
         )
 
+    def test_runtime_cadence_override_is_not_supported(self) -> None:
+        with self.assertRaises(eg7.PilotPlanError) as raised:
+            eg7.build_parser().parse_args(
+                [
+                    "--plan",
+                    "synthetic-plan.json",
+                    "--dry-run",
+                    "--cadence",
+                    "10",
+                ]
+            )
+        self.assertEqual(str(raised.exception), "CLI_INPUT_ERROR")
+
     def test_invalid_plan_variants_are_rejected(self) -> None:
         mutations = []
 
@@ -343,6 +359,18 @@ class Eg7PlanTests(unittest.TestCase):
         wrong_cadence = plan_document()
         wrong_cadence["cadence_minutes"] = 10
         mutations.append(wrong_cadence)
+
+        wrong_decision = plan_document()
+        wrong_decision["cadence_decision_status"] = "PILOT_ONLY"
+        mutations.append(wrong_decision)
+
+        wrong_scope = plan_document()
+        wrong_scope["cadence_scope"] = "ONE_HOUR_PILOT_ONLY"
+        mutations.append(wrong_scope)
+
+        cadence_change_allowed = plan_document()
+        cadence_change_allowed["cadence_change_allowed"] = True
+        mutations.append(cadence_change_allowed)
 
         wrong_count = plan_document()
         wrong_count["planned_slot_count"] = 11
@@ -744,6 +772,12 @@ class Eg7LockAndDryRunTests(unittest.TestCase):
         collector.assert_not_called()
         backup_worker.assert_not_called()
         report = output.getvalue()
+        self.assertIn("cadence_minutes=5", report)
+        self.assertIn("cadence_decision_status=PM_APPROVED_FIXED", report)
+        self.assertIn("cadence_scope=LONG_TERM_OPERATING_BASELINE", report)
+        self.assertIn("cadence_change_allowed=false", report)
+        self.assertIn("alternative_cadences_supported=false", report)
+        self.assertIn("duplicate_triggered_cadence_change=false", report)
         self.assertIn("transport_calls=0", report)
         self.assertIn("credential_access=0", report)
         self.assertIn("operational_batch_ids_generated=0", report)
@@ -795,6 +829,19 @@ class Eg7IndexTests(unittest.TestCase):
         self.assertTrue(rows[13]["duplicate_observation_time"])
         self.assertTrue(rows[13]["duplicate_raw_hash"])
         self.assertTrue(rows[13]["duplicate_forecast_targets"])
+        self.assertEqual(
+            [slot.scheduled_at for slot in plan.slots],
+            [START + timedelta(minutes=5 * index) for index in range(12)],
+        )
+        summary = eg7.build_pilot_summary(
+            plan,
+            eg7.build_slot_index(plan, records),
+            rows,
+            records,
+        )
+        self.assertFalse(summary["duplicate_triggered_cadence_change"])
+        self.assertFalse(summary["cadence_change_allowed"])
+        self.assertEqual(summary["cadence_minutes"], 5)
         self.assertTrue(all(not str(row["raw_relative_path"]).startswith("/") for row in rows))
         self.assertTrue(all("FreshManager-Data" not in str(row) for row in rows))
 
@@ -898,6 +945,10 @@ class Eg7IndexTests(unittest.TestCase):
         slot_rows = eg7.build_slot_index(plan, records)
         summary = eg7.build_pilot_summary(plan, slot_rows, [], records)
         self.assertEqual(summary["planned_slot_count"], 12)
+        self.assertEqual(summary["cadence_decision_status"], "PM_APPROVED_FIXED")
+        self.assertEqual(summary["cadence_scope"], "LONG_TERM_OPERATING_BASELINE")
+        self.assertFalse(summary["alternative_cadences_supported"])
+        self.assertFalse(summary["duplicate_triggered_cadence_change"])
         self.assertEqual(summary["total_actual_seoul_api_calls"], 156)
         self.assertTrue(summary["no_recollection_confirmation"])
         self.assertFalse(summary["ml_model_performance_assessed"])

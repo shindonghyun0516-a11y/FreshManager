@@ -13,7 +13,7 @@
 - 저장소: `shindonghyun0516-a11y/FreshManager`
 - 기준 `main` SHA: `be07b4bf37d5e0ad7c4ee65e7208f44c9b2b4ea3`
 - 현재 Branch: `feat/issue-70-eg7-one-hour-pilot`
-- 구현 Commit: `a648a2f18ce157957ddb9662b4e630479177ff00`
+- 구현 기준: Draft PR #71의 최신 HEAD
 - Planning Issue #69: `OPEN`
 - Implementation Issue #70: `OPEN`
 - Draft PR #71: `OPEN · DRAFT`
@@ -24,9 +24,10 @@
 - 24시간 Scheduler: `NOT_IMPLEMENTED`
 - ML 학습: `NOT_STARTED`
 
-현재 작업은 Issue #69에서 PM이 승인한 첫 EG-7 5분·1시간 파일럿의 오프라인
-Controller와 파생 인덱스를 Issue #70의 한 Branch·한 Draft PR로 구현하는 것이다.
-실제 날짜·시각·할당량·운영 ID와 계획 지문은 생성하거나 확정하지 않는다.
+현재 작업은 PM이 장기 기준으로 확정한 5분 주기의 첫 통제 검증인 EG-7 1시간
+파일럿 Controller와 파생 인덱스를 Issue #70의 한 Branch·한 Draft PR로 구현하는
+것이다. 실제 날짜·시각·운영시간대·할당량·운영 ID와 계획 지문은 생성하거나
+확정하지 않는다.
 
 ## 3. Engineering Gate 상태
 
@@ -58,7 +59,24 @@ EG-6B Closeout 이력:
 
 ## 4. EG-7 승인 구현 계약
 
-### 4.1 시간·호출
+### 4.1 영구 주기 결정
+
+| Permanent Cadence Decision | 상태 |
+|---|---|
+| Five-minute Cadence Fixed | `YES` |
+| PM Approval Status | `PM_APPROVED_FIXED` |
+| Long-term Baseline Status | `ACTIVE` |
+| Alternative Cadences Supported | `NO` |
+| Duplicate-triggered Cadence Change | `NO` |
+| Plan Validation for Non-five-minute Cadence | `REJECTED` |
+| Documentation Updated | `YES` |
+| Operating Window Status | `OPEN_PM_DECISION` |
+
+첫 1시간은 5분 주기 채택 여부를 결정하는 시험이 아니다. 이미 확정된 주기에서
+12개 회차의 Collector·Backup 완료, 중첩·보충 금지, 156호출 상한, 실행시간·
+저장 증가·중복률·추적성·실패처리와 장시간 확대 전 용량 문제를 검증한다.
+
+### 4.2 시간·호출
 
 - 시간대: `Asia/Seoul`
 - Scheduling: 벽시계 5분 경계
@@ -73,7 +91,7 @@ EG-6B Closeout 이력:
 - 지연 보충수집: 금지
 - 중첩: 해당 회차 `SKIPPED_OVERLAP`, API 호출 0회
 
-### 4.2 계획·식별자
+### 4.3 계획·식별자
 
 - 한 파일럿에 하나의 `pilot_run_id`
 - 정확히 12개의 계획 시각
@@ -85,7 +103,7 @@ EG-6B Closeout 이력:
 이 작업에서는 합성 테스트 ID만 임시 디렉터리에서 사용한다. 운영 ID·운영 계획은
 생성하거나 예약하지 않는다.
 
-### 4.3 실패·백업
+### 4.4 실패·백업
 
 - 개별 Area 실패: 재시도 없이 기록하고 기존 Collector 계약이 허용하면 다음 Area 진행
 - 확정 공통 API·자격증명·스키마·할당량 오류: 현재 Batch 안전 중단, 남은 회차 중단
@@ -94,7 +112,7 @@ EG-6B Closeout 이력:
 - 적격 Batch는 Backup Worker를 최대 한 번 실행
 - `LOCAL_SYNC_COPY_VERIFIED` 전에는 회차 성공으로 종결하지 않음
 
-### 4.4 산출물
+### 4.5 산출물
 
 - 불변 JSON Pilot Plan
 - append-only JSONL Execution Events
@@ -105,6 +123,8 @@ EG-6B Closeout 이력:
 
 Raw·Metadata·Collection Log·Manifest는 canonical 원본이다. EG-7 파생 산출물은
 이를 대체·수정·삭제하지 않고 기존 Batch Manifest에도 추가하지 않는다.
+중복이 있어도 해당 계획 호출을 건너뛰거나 5분 주기를 변경하지 않는다. 제거·
+선별·가중치는 EG-8 데이터셋 구성에서 검토한다.
 
 ## 5. Live 차단 상태
 
@@ -112,12 +132,18 @@ Raw·Metadata·Collection Log·Manifest는 canonical 원본이다. EG-7 파생 �
 
 - 실제 파일럿 날짜
 - 실제 시작시각
+- 일일 운영시간대
+- 장기 운영을 24시간 또는 선택 시간대로 할지
 - 확인된 API 할당량
+- 장시간 운영 용량 Gate
 - 운영 `pilot_run_id`
 - 운영 12개 Batch ID
 - 운영 계획 지문
 - 명시적 PM Live 승인
-- 24시간 확대
+- 첫 1시간 이후 확대 시점
+
+5분 주기·벽시계 Scheduling·대안 주기 제외·중복 기반 주기 변경 금지·장기 5분
+기준은 `CLOSED · PM_APPROVED`이며 위 OPEN 목록에 포함되지 않는다.
 
 기본값:
 
@@ -162,16 +188,20 @@ live_approval_status=NOT_APPROVED
 | `docs/engineering/FreshManager_TRD_v1.0.md` | Controller와 파생 인덱스 기술 구조 |
 | `docs/rules/DATA_COLLECTION_RULES.md` | 5분·무보충·실패·중복 보존 규칙 |
 | `docs/data/FIELD_DICTIONARY.md` | 계획·사건·Slot/Area Index·Summary 필드 |
-| `ai-context/DECISION_LOG.md` | PM 승인 결정 D-012 |
-| `ai-context/ARCHITECTURE_DECISIONS.md` | 구조 결정 ADR-008 |
+| `ai-context/DECISION_LOG.md` | 1시간 구현 D-012·장기 5분 결정 D-013 |
+| `ai-context/ARCHITECTURE_DECISIONS.md` | Controller ADR-008·고정 주기 ADR-009 |
+| `AGENTS.md` | 고정 주기와 별도 OPEN 운영시간·Live 승인 경계 |
+| `docs/product/FreshManager_PRD_v1.0.md` | 장기 5분 제품·운영 결정 |
+| `docs/analysis/ANALYSIS_PLAN.md` | 분석 집계구간과 수집주기 대안 구분 |
+| `ai-context/PROJECT_MEMORY.md` | 장기 주기 복원 기준 |
 | `PROJECT_STATUS.md` | 현재 Issue·Branch·PR·검증·다음 행동 |
 
 ## 8. 검증 상태
 
 현재 로컬 최종검증:
 
-- EG-7 Target Tests: `24/24 PASS`
-- Full Unit Tests: `345/345 PASS`
+- EG-7 Target Tests: `25/25 PASS`
+- Full Unit Tests: `347/347 PASS`
 - Project Guard: `PASS 43 / FAIL 0 / WARN 0 / SKIP 4 / TOTAL 47`
 - H-706: `PASS`
 - H-707: `PASS`

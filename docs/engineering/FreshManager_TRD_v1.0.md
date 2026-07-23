@@ -21,7 +21,9 @@ Recommendation MVP Workstream(Gate number `NOT_ASSIGNED`) 목표 구조
 **2026-07-22~23 완료·진행 이력:** Issue #60에서 Google Drive for Desktop Sync와 분리된
 1회 실행형 Backup Worker·append-only Receipt·H-708을 구현했고 PR #61로 `main`에
 병합했다. 첫 EG-6B 실제 Batch 13/13, 품질·백업 Closeout 후 Issue #69가 EG-7
-5분·1시간·12회차 Controller와 파생 인덱스 범위를 승인했고 Issue #70에서 구현한다.
+1시간·12회차 Controller와 파생 인덱스 범위를 승인했고 Issue #70에서 구현한다.
+5분은 `PM_APPROVED_FIXED` 장기 반복수집 기준이며 이 1시간은 주기 선택이 아니라
+첫 구현·운영 안전성 검증이다.
 Issue #58의 Area Core Observation·선택적 S-DoT Supporting Observation·Spot Candidate
 Evaluation·Recommendation 결과 구조는 유지하되 동적 S-DoT는 EG-7에서 수집하지 않는다.
 파일 버전은 PM의 별도 결정 전 `v1.0`을 유지한다.
@@ -403,7 +405,7 @@ Area Collector는 Spot 추천 여부와 무관하게 공식 Area 관측을 계�
 
 | **컴포넌트** | **책임** | **상태** |
 | --- | --- | --- |
-| Pilot Plan | 1개 `pilot_run_id`, 12개 시각·UUIDv4 Batch ID, 호출예산·승인상태 | 구현·합성 검증 |
+| Pilot Plan | v2; 고정 5분 결정·1개 `pilot_run_id`·12개 시각·UUIDv4 Batch ID·호출예산·승인상태 | 구현·합성 검증 |
 | Plan Fingerprint | 정렬 canonical JSON의 결정적 SHA-256; 추적용 | 구현 |
 | Live Gate | `CONFIRMED` 할당량·`PM_APPROVED`·지문·시간창·환경·충돌 | 구현; 운영 값 OPEN |
 | Pilot Lock | 원자적 단일 실행, stale 자동삭제·정상 force-unlock 없음 | 구현 |
@@ -418,7 +420,13 @@ Area Collector는 Spot 추천 여부와 무관하게 공식 Area 관측을 계�
 
 ### 15.1 계획과 시간 계약
 
-- 시간대는 `Asia/Seoul`, 주기는 벽시계 5분, 길이는 1시간, 계획 회차는 12다.
+- 시간대는 `Asia/Seoul`, 장기 주기는 벽시계 5분으로
+  `PM_APPROVED_FIXED`·`LONG_TERM_OPERATING_BASELINE`이다.
+- 계획 v2는 `cadence_minutes=5`, `cadence_decision_status=PM_APPROVED_FIXED`,
+  `cadence_scope=LONG_TERM_OPERATING_BASELINE`, `cadence_change_allowed=false`를
+  모두 강제하고 비 5분 계획과 런타임 주기 옵션을 거부한다.
+- 첫 통제 검증 길이는 1시간이고 계획 회차는 12다. 이 결과로 5분 유지 여부를
+  평가하거나 10분·15분 대안을 비교하지 않는다.
 - 회차당 13 Area, 전체 최대 156호출, Area별 회차당 최대 1회, 재시도는 0회다.
 - 이미 늦은 회차는 `SKIPPED_MISSED`, 이전 Collector와 즉시 Backup이 다음 경계를
   넘으면 `SKIPPED_OVERLAP`이다. 둘 다 호출 0회이고 지연 보충수집을 하지 않는다.
@@ -441,7 +449,9 @@ Slot Index는 정확히 12행이고 알 수 없는 값을 0으로 추정하지 �
 유지하고 `spot_id`를 추가하지 않는다. 수집시각, API 관측시각, Raw SHA-256,
 순서가 보존된 Forecast 대상시각 집합을 Area별로 구분해 중복 플래그를 만든다.
 Raw·Metadata·Collection Log·Manifest는 수정·병합·삭제하지 않으며 파생 출력은
-기존 Batch Manifest에 추가하지 않는다.
+기존 Batch Manifest에 추가하지 않는다. 중복 건수·비율은 저장·EG-8 데이터셋 구성
+근거이며 계획 API 호출 생략이나 주기 변경 조건이 아니다. 중복 제거·선별·가중치는
+EG-8에서 다룬다.
 
 ### 15.4 승인 경계
 
@@ -449,7 +459,9 @@ Raw·Metadata·Collection Log·Manifest는 수정·병합·삭제하지 않으�
 계획 검증만 허용하며 실제 할당량, 파일럿 날짜·시작시각, 운영 `pilot_run_id`,
 12개 운영 Batch ID, 승인 계획 지문과 PM Live 승인이 모두 확인되기 전 실제
 실행을 거부한다. H-707 PASS는 이 차단과 합성 orchestration 계약을 검증할 뿐
-실제 Live 승인을 뜻하지 않는다. 24시간 Scheduler와 영구 백그라운드 서비스는 없다.
+실제 Live 승인을 뜻하지 않는다. 일일 운영시간대, 24시간 또는 선택 시간 운영,
+첫 1시간 이후 확대 시점은 OPEN이며 이는 주기 미결정을 뜻하지 않는다. 24시간
+Scheduler와 영구 백그라운드 서비스는 없다.
 
 ## 16. 백업과 복구
 
@@ -633,7 +645,8 @@ Project Guard 검사별 현재 PASS·SKIP, 전체 집계와 Live 실행 여부�
 ## 25. 미결정 기술사항
 
 - O-01 Google Drive for Desktop Sync 설치·로그인과 논리 루트 접근·용량 확인 방법
-- O-02 반복수집 간격·운영시간·일 호출예산·공휴일 처리
+- O-02 일일 운영시간대·24시간 또는 선택 시간 운영·일 호출예산·공휴일 처리와
+  첫 1시간 이후 확대 시점; 반복수집 간격 5분은 확정
 - O-03 stale lock의 승인된 수동 복구 규칙; 자동 삭제 금지
 - O-04 정규화 저장 형식: 분할 CSV vs SQLite 등 표준 라이브러리 기반 로컬 DB
 - O-05 parser_version과 schema migration 기록 방식

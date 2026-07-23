@@ -9,8 +9,9 @@
 
 서울시 주요 121장소를 장기 공식 후보군으로 유지하되, 현재는 EG-6A에서 확정한
 13개 Area 패널의 수집·분석 가능성을 먼저 검증한다. EG-6B 첫 실제 단일 회차와
-백업 검증은 완료됐다. EG-7은 승인된 5분·1시간·12회차 Controller와 파생 인덱스를
-Issue #70에서 오프라인 구현 중이며, 실제 반복수집은 별도 PM Live 승인 전까지 금지한다.
+백업 검증은 완료됐다. 5분은 PM이 확정한 장기 반복수집 기준이며, EG-7의 1시간·
+12회차는 이 고정 주기의 첫 통제 검증이다. Issue #70에서 Controller와 파생 인덱스를
+오프라인 구현 중이며, 실제 반복수집은 별도 PM Live 승인 전까지 금지한다.
 
 ### 공식 문서 안내
 
@@ -60,8 +61,8 @@ Issue #70에서 오프라인 구현 중이며, 실제 반복수집은 별도 PM 
 - 실제 EG-6B 13개 Area 단일 회차: 13/13 성공·품질 PASS·백업 무결성 PASS
 - Issue #57: EG-6B 최종 Closeout 완료 후 CLOSED
 - Google Drive 자동 백업: 독립 Backup Worker 구현·검증 완료, PM 원격 동기화 확인 완료
-- EG-7: Issue #69 범위 승인, Issue #70에서 5분·1시간 파일럿 Controller와
-  ML-ready 파생 인덱스를 오프라인 구현 중
+- EG-7: 5분 장기 기준 PM 확정, Issue #70에서 첫 1시간·12회차 안전성 검증
+  Controller와 ML-ready 파생 인덱스를 오프라인 구현 중
 
 ### 현재 분석 범위
 
@@ -119,7 +120,7 @@ MVP Workstream의 데이터 필요성을 확인한 뒤 별도 PM 승인으로 12
 - 대중교통·문화행사 데이터의 필수 연동
 - 프로덕션 수준의 대규모 인프라
 - 호출한도 확인 전 121장소 고빈도 자동수집
-- PM 승인 없는 5분 단위 전체수집
+- 별도 PM Live 승인 없는 실제 5분 반복수집
 
 ---
 
@@ -392,15 +393,23 @@ Gate A·Gate B·Gate C는 별도의 데이터 PoC 판정 게이트이며,
 
 ## 10. 수집주기 원칙
 
-EG-7 첫 파일럿의 구현 계약은 `Asia/Seoul` 벽시계 기준 5분 간격, 1시간,
-정확히 12회차, 회차당 13 Area, 전체 최대 156호출, 재시도 0회다. 늦은 회차는
+반복수집은 `cadence_minutes=5`, `cadence_decision_status=PM_APPROVED_FIXED`,
+`cadence_scope=LONG_TERM_OPERATING_BASELINE`, `cadence_change_allowed=false`인
+PM 확정 장기 기준이다. 10분·15분 대안과 런타임 주기 옵션을 지원하지 않으며,
+향후 변경에는 새 PM 명시 결정과 버전 계약·코드 변경 검토가 필요하다.
+
+EG-7 첫 1시간 파일럿은 주기를 선택하는 시험이 아니라 이 고정 계약의 구현·운영
+안전성을 검증한다. `Asia/Seoul` 벽시계 기준 정확히 12회차, 회차당 13 Area,
+전체 최대 156호출, 재시도 0회다. 늦은 회차는
 `SKIPPED_MISSED`, 이전 Collector와 즉시 Backup이 끝나지 않은 회차는
 `SKIPPED_OVERLAP`으로 기록하고 지연 보충수집을 하지 않는다.
 
-이는 오프라인 구현 범위 승인이다. 실제 날짜·시작시각·API 할당량 확인·운영
+실제 날짜·시작시각·일일 운영시간대·24시간 또는 선택 시간 운영 여부·API 할당량·
+용량 확인·운영
 `pilot_run_id`·12개 운영 Batch ID·계획 지문과 PM Live 승인은 아직 열려 있다.
 `quota_confirmation_status=UNCONFIRMED` 또는
-`live_approval_status=NOT_APPROVED`이면 실제 실행을 거부한다. 24시간 Scheduler,
+`live_approval_status=NOT_APPROVED`이면 실제 실행을 거부한다. 첫 1시간 이후 확대
+시점도 별도 결정이다. 운영시간 미결정을 주기 미결정으로 해석하지 않는다. 24시간 Scheduler,
 영구 백그라운드 서비스, S-DoT 수집, Spot 평가, Recommendation과 ML 학습은 포함하지 않는다.
 
 ---
@@ -585,8 +594,9 @@ SEOUL_OPEN_API_KEY=your_api_key_here
 ## 18. 현재 실행방법
 
 Python 기반 Project Guard가 `scripts/project_guard_check.py`에 구현돼 있다.
-EG-7 구현에서는 `H-707`이 승인된 반복주기 안전계약의 오프라인 검사로 활성화된다.
-이 PASS는 실제 할당량 확인이나 Live 승인을 뜻하지 않는다.
+EG-7 구현에서는 `H-707`이 PM 확정 5분 장기 기준, 비 5분 계획 거부, 대안 미지원,
+중복 기반 주기 변경 금지와 1시간 안전계약의 오프라인 검사로 활성화된다. 이 PASS는
+실제 할당량 확인이나 Live 승인을 뜻하지 않는다.
 
 표준 Project Guard 실행 명령:
 

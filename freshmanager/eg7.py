@@ -28,14 +28,19 @@ from .batch_id import BatchIdValidationError, canonical_batch_id
 from .collector import load_place, parse_population_response
 
 
-PLAN_SCHEMA_VERSION = "eg7-pilot-plan-v1"
+PLAN_SCHEMA_VERSION = "eg7-pilot-plan-v2"
 EVENT_SCHEMA_VERSION = "eg7-execution-event-v1"
 SLOT_INDEX_SCHEMA_VERSION = "eg7-slot-index-v1"
 AREA_INDEX_SCHEMA_VERSION = "eg7-area-observation-index-v1"
-SUMMARY_SCHEMA_VERSION = "eg7-pilot-summary-v1"
+SUMMARY_SCHEMA_VERSION = "eg7-pilot-summary-v2"
 TIMEZONE_NAME = "Asia/Seoul"
 SEOUL_TIMEZONE = ZoneInfo(TIMEZONE_NAME)
 CADENCE_MINUTES = 5
+CADENCE_DECISION_STATUS = "PM_APPROVED_FIXED"
+CADENCE_SCOPE = "LONG_TERM_OPERATING_BASELINE"
+CADENCE_CHANGE_ALLOWED = False
+ALTERNATIVE_CADENCES_SUPPORTED = False
+DUPLICATE_TRIGGERED_CADENCE_CHANGE = False
 PILOT_DURATION_MINUTES = 60
 PLANNED_SLOT_COUNT = 12
 AREA_COUNT = 13
@@ -54,6 +59,9 @@ PLAN_FIELDS = (
     "pilot_run_id",
     "timezone",
     "cadence_minutes",
+    "cadence_decision_status",
+    "cadence_scope",
+    "cadence_change_allowed",
     "planned_start_at",
     "planned_end_at",
     "planned_slot_count",
@@ -412,6 +420,12 @@ def validate_plan(document: Mapping[str, object]) -> PilotPlan:
         raise PilotPlanError("TIMEZONE_INVALID")
     if _integer(document.get("cadence_minutes"), "CADENCE_INVALID") != CADENCE_MINUTES:
         raise PilotPlanError("CADENCE_INVALID")
+    if document.get("cadence_decision_status") != CADENCE_DECISION_STATUS:
+        raise PilotPlanError("CADENCE_DECISION_STATUS_INVALID")
+    if document.get("cadence_scope") != CADENCE_SCOPE:
+        raise PilotPlanError("CADENCE_SCOPE_INVALID")
+    if document.get("cadence_change_allowed") is not CADENCE_CHANGE_ALLOWED:
+        raise PilotPlanError("CADENCE_CHANGE_POLICY_INVALID")
     if _integer(document.get("planned_slot_count"), "SLOT_COUNT_INVALID") != PLANNED_SLOT_COUNT:
         raise PilotPlanError("SLOT_COUNT_INVALID")
     max_api_calls = _integer(document.get("max_api_calls"), "CALL_BUDGET_INVALID")
@@ -1393,6 +1407,12 @@ def build_pilot_summary(
         "schema_version": SUMMARY_SCHEMA_VERSION,
         "pilot_run_id": plan.pilot_run_id,
         "plan_fingerprint": plan.fingerprint,
+        "cadence_minutes": CADENCE_MINUTES,
+        "cadence_decision_status": CADENCE_DECISION_STATUS,
+        "cadence_scope": CADENCE_SCOPE,
+        "cadence_change_allowed": CADENCE_CHANGE_ALLOWED,
+        "alternative_cadences_supported": ALTERNATIVE_CADENCES_SUPPORTED,
+        "duplicate_triggered_cadence_change": DUPLICATE_TRIGGERED_CADENCE_CHANGE,
         "planned_slot_count": PLANNED_SLOT_COUNT,
         "executed_batch_count": sum(record.collector_execution_count for record in records),
         "skipped_missed_count": sum(
@@ -1751,6 +1771,18 @@ def _report_dry_run(plan: PilotPlan) -> None:
     print("EG7_DRY_RUN")
     print("plan_valid=true")
     print(f"plan_fingerprint={plan.fingerprint}")
+    print(f"cadence_minutes={CADENCE_MINUTES}")
+    print(f"cadence_decision_status={CADENCE_DECISION_STATUS}")
+    print(f"cadence_scope={CADENCE_SCOPE}")
+    print(f"cadence_change_allowed={str(CADENCE_CHANGE_ALLOWED).lower()}")
+    print(
+        "alternative_cadences_supported="
+        f"{str(ALTERNATIVE_CADENCES_SUPPORTED).lower()}"
+    )
+    print(
+        "duplicate_triggered_cadence_change="
+        f"{str(DUPLICATE_TRIGGERED_CADENCE_CHANGE).lower()}"
+    )
     print(f"planned_slot_count={len(plan.slots)}")
     print(f"maximum_api_calls={plan.max_api_calls}")
     print(f"quota_confirmation_status={plan.document['quota_confirmation_status']}")

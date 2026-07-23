@@ -2491,6 +2491,11 @@ def check_h707(context: ProjectGuardContext) -> CheckResult:
     expected_contract = (
         eg7_cli.TIMEZONE_NAME == "Asia/Seoul"
         and eg7_cli.CADENCE_MINUTES == 5
+        and eg7_cli.CADENCE_DECISION_STATUS == "PM_APPROVED_FIXED"
+        and eg7_cli.CADENCE_SCOPE == "LONG_TERM_OPERATING_BASELINE"
+        and eg7_cli.CADENCE_CHANGE_ALLOWED is False
+        and eg7_cli.ALTERNATIVE_CADENCES_SUPPORTED is False
+        and eg7_cli.DUPLICATE_TRIGGERED_CADENCE_CHANGE is False
         and eg7_cli.PILOT_DURATION_MINUTES == 60
         and eg7_cli.PLANNED_SLOT_COUNT == 12
         and eg7_cli.AREA_COUNT == 13
@@ -2503,7 +2508,7 @@ def check_h707(context: ProjectGuardContext) -> CheckResult:
     if not expected_contract:
         return failed(
             "H-707",
-            "5분·1시간·12회차·13 Area·최대 156호출·재시도 0회 계약 불일치",
+            "PM 고정 5분·장기 기준·대안 미지원·1시간·12회차·13 Area·최대 156호출·재시도 0회 계약 불일치",
             "freshmanager/eg7.py",
         )
 
@@ -2515,6 +2520,9 @@ def check_h707(context: ProjectGuardContext) -> CheckResult:
             "pilot_run_id": "77777777-7777-4777-8777-777777777707",
             "timezone": "Asia/Seoul",
             "cadence_minutes": 5,
+            "cadence_decision_status": "PM_APPROVED_FIXED",
+            "cadence_scope": "LONG_TERM_OPERATING_BASELINE",
+            "cadence_change_allowed": False,
             "planned_start_at": start.isoformat(),
             "planned_end_at": (start + timedelta(minutes=60)).isoformat(),
             "planned_slot_count": 12,
@@ -2565,6 +2573,26 @@ def check_h707(context: ProjectGuardContext) -> CheckResult:
             return failed(
                 "H-707",
                 "UNCONFIRMED 상태의 무호출 Dry-run 12회차 미생성",
+                "freshmanager/eg7.py",
+            )
+        non_five_minute = document(
+            eg7_cli.QuotaConfirmationStatus.UNCONFIRMED.value,
+            eg7_cli.LiveApprovalStatus.NOT_APPROVED.value,
+        )
+        non_five_minute["cadence_minutes"] = 10
+        try:
+            eg7_cli.validate_plan(non_five_minute)
+        except eg7_cli.PilotPlanError as error:
+            if str(error) != "CADENCE_INVALID":
+                return failed(
+                    "H-707",
+                    "비 5분 계획 거부 사유 불일치",
+                    "freshmanager/eg7.py",
+                )
+        else:
+            return failed(
+                "H-707",
+                "비 5분 계획이 거부되지 않음",
                 "freshmanager/eg7.py",
             )
 
@@ -2663,7 +2691,7 @@ def check_h707(context: ProjectGuardContext) -> CheckResult:
         )
     return passed(
         "H-707",
-        "UNCONFIRMED Live 차단과 5분·12회차·13 Area·최대 156호출·재시도 0회·회차별 Backup 검증 계약 확인",
+        "PM 고정 5분·장기 기준·비 5분 계획 거부·대안 미지원·중복 기반 변경 금지와 UNCONFIRMED Live 차단·12회차·13 Area·최대 156호출·재시도 0회·회차별 Backup 계약 확인",
         "freshmanager/eg7.py",
         "합성 실행",
     )

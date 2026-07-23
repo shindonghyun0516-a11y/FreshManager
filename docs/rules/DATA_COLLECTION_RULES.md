@@ -788,13 +788,16 @@ EG-5 대표 3장소와 EG-6B 승인 13개 Area 단일 회차는 `retry_count=0`�
 
 ---
 
-## 22. 호출주기 결정
+## 22. 고정 호출주기와 별도 운영시간 결정
 
-EG-7 첫 구현 파일럿의 주기는 PM이 다음과 같이 승인했다.
+PM은 동일 13개 Area 반복수집의 장기 주기를 다음과 같이 최종 확정했다.
 
 ```text
 Timezone: Asia/Seoul
 벽시계 경계: 5분
+cadence_decision_status: PM_APPROVED_FIXED
+cadence_scope: LONG_TERM_OPERATING_BASELINE
+cadence_change_allowed: false
 파일럿 길이: 1시간
 계획 회차: 12
 회차당 Area: 13
@@ -805,10 +808,19 @@ Area별 회차당 최대 호출: 1
 이전 Collector·즉시 Backup 중첩: 해당 회차 건너뜀
 ```
 
-이 승인은 Controller와 파생 인덱스의 오프라인 구현 범위다. 실제 파일럿 날짜·
-시작시각·API 할당량·운영 `pilot_run_id`·12개 운영 Batch ID·계획 지문과 PM Live
-승인은 별도 OPEN 결정이다. `UNCONFIRMED` 할당량 또는 `NOT_APPROVED` Live 상태에서는
-실제 실행을 차단한다. 첫 파일럿 이후의 장기 주기와 24시간 확대는 확정하지 않는다.
+5분은 파일럿 전용 또는 비교 후보가 아닌 영구 운영 기준이다. 10분·15분 대안을
+평가하거나 런타임 옵션으로 제공하지 않는다. 변경하려면 새 PM 명시 결정, 버전
+계약 변경과 별도 코드 검토가 필요하다.
+
+첫 1시간 파일럿은 12개 정렬 회차, Collector·Backup 완료, 무중첩·무보충, 156호출
+상한, 소요시간·저장 증가·중복률·추적성·실패처리와 장기 확대 전 구현·용량 문제를
+검증한다. 5분 주기를 유지할지 결정하는 실험이 아니다.
+
+실제 파일럿 날짜·시작시각, 일일 운영시간대, 24시간 또는 선택 시간 운영 여부,
+API 할당량·용량, 운영 `pilot_run_id`·12개 운영 Batch ID·계획 지문, PM Live 승인과
+첫 1시간 이후 확대 시점은 별도 OPEN 결정이다. `UNCONFIRMED` 할당량 또는
+`NOT_APPROVED` Live 상태에서는 실제 실행을 차단한다. 운영시간 미결정을 주기
+미결정으로 해석하지 않는다.
 
 반복수집 전 백업 Gate는 Google Drive for Desktop Sync 기반 자동 백업으로 확정한다.
 수집은 로컬 Python에 유지하고 Collector와 분리된 1회 실행형 Backup Worker를 Batch
@@ -829,7 +841,9 @@ EG-6B Collector 자체에는 Backup Worker와 CSV Exporter가 없다. EG-7 Contr
 실제 응답이 같은 관측 기준시각·Raw SHA-256·정렬된 Forecast 대상시각 집합을
 반복하더라도 모든 Raw를 보존한다. 중복 여부는 `area_code` 범위의 파생 인덱스에
 기록하고 수집 중 삭제·병합·덮어쓰기를 하지 않는다. 중복 건수와 비율은 파일럿
-결과이지 자동 실패 사유가 아니다.
+결과이지 자동 실패 사유나 주기 변경 조건이 아니다. 직전 결과가 중복이라는 이유만으로
+다음 계획 API 호출을 생략하지 않는다. 제거·표본선택·가중치는 EG-8 데이터셋
+구성에서 검토한다.
 
 24시간 Scheduler, 영구 백그라운드 서비스, 자동 재시도, 동적 S-DoT 수집, Spot
 평가, Recommendation과 ML 학습은 이 계약에 포함하지 않는다.
@@ -973,6 +987,7 @@ EG-6B Collector 자체에는 Backup Worker와 CSV Exporter가 없다. EG-7 Contr
 
 | 버전 | 날짜 | 변경내용 | 작성자 | 승인상태 |
 |---|---|---|---|---|
+| v0.1.9 | 2026-07-23 | 5분을 `PM_APPROVED_FIXED` 장기 기준으로 확정하고 대안·중복 기반 변경 금지, 운영시간·Live 확대 OPEN 경계 반영 | 신동현 | PM 최종 결정 |
 | v0.1.8 | 2026-07-23 | Issue #69 승인 EG-7 5분·1시간·12회차·최대 156호출·재시도 0회·무보충·중복 보존·Live 차단 계약 반영 | 신동현 | PM 구현 범위 승인 |
 | v0.1.7 | 2026-07-22 | Issue #60·PR #61 독립 Backup Worker·append-only Receipt·`LOCAL_SYNC_COPY_VERIFIED`·H-708 완료 이력 반영 | 신동현 | 완료 이력 |
 | v0.1.6 (Issue #58 보완) | 2026-07-22 | Google Drive 자동 백업과 Area·S-DoT·Spot Candidate·Recommendation 데이터 계층 경계 정렬 | 신동현 | PM Diff 검토 전 |

@@ -86,7 +86,7 @@ Decision Record, 기술 구조 결정 기록) 형식으로 보존한다. 현행 
 ## ADR-008 — EG-7은 승인 계획 기반 1시간 Controller와 재생성 가능한 인덱스를 사용
 
 - Status: `ACCEPTED`
-- Context: 첫 반복수집은 정확한 5분 비교 가능성, 중첩 방지, 호출 상한, Backup
+- Context: 첫 반복수집은 정확한 5분 정렬 실행 가능성, 중첩 방지, 호출 상한, Backup
   무재수집과 PM 승인 추적을 함께 만족해야 하지만 영구 Scheduler나 ML 플랫폼은 필요 없다.
 - Decision: 하나의 불변 계획에 `pilot_run_id`, 12개 벽시계 시각과 UUIDv4 Batch ID,
   Area 순서, 최대 156호출, 할당량·Live 승인 상태를 넣는다. 파일럿 전역 Lock 아래
@@ -104,7 +104,26 @@ Decision Record, 기술 구조 결정 기록) 형식으로 보존한다. 현행 
 - Scope boundary: 동적 S-DoT, Spot 평가, Recommendation, ML 학습, 24시간·영구
   Scheduler는 제외한다.
 - Validation: `freshmanager/eg7.py`, `tests/test_eg7.py`, H-707.
-- Related decision: D-003, D-005, D-010, D-012.
+- Related decision: D-003, D-005, D-010, D-012, D-013.
+
+## ADR-009 — 5분 장기 주기는 버전 계획의 불변 계약
+
+- Status: `ACCEPTED`
+- Context: PM은 5분을 파일럿 비교 후보가 아닌 장기 반복수집 기준으로 확정했다.
+  운영시간·24시간 확대·할당량이 OPEN인 사실과 주기 결정을 분리해야 한다.
+- Decision: 계획 schema v2는 `cadence_minutes=5`,
+  `cadence_decision_status=PM_APPROVED_FIXED`,
+  `cadence_scope=LONG_TERM_OPERATING_BASELINE`, `cadence_change_allowed=false`를
+  정확히 요구한다. CLI에 임의 주기 옵션을 두지 않고 비 5분 계획을 거부한다.
+- Alternatives: 10분·15분 비교, runtime cadence 선택, 중복률 기반 자동 변경.
+  PM 결정으로 모두 제외한다.
+- Consequences: 중복 응답도 불변 Raw와 파생 플래그로 보존하며 다음 계획 호출을
+  중복만으로 생략하지 않는다. 제거·선별·가중치는 EG-8 데이터셋 책임이다. 향후
+  주기 변경에는 새 PM 결정, schema 버전 변경과 별도 코드 검토가 필요하다.
+- Open boundary: 파일럿 날짜·시작시각, 일일 운영시간대, 24시간 또는 선택 시간 운영,
+  API 할당량·용량, 운영 ID·지문, Live 승인과 확대 시점은 별도 OPEN 결정이다.
+- Validation: plan v2 검증, `--cadence` 거부 테스트, 중복 보존 테스트, H-707.
+- Related decision: D-013.
 
 ## 2. ADR 갱신 규칙
 

@@ -211,7 +211,7 @@ data/samples/population_yeouido_sample.json
 | `H-704` | 실패 격리·재시도 제한 | 한 장소 실패의 전체 중단 방지 | 가운데 장소 실패를 삽입한 가짜 응답, EG-5 코드·결과·로그 | 실패한 장소를 재호출하지 않고 다음 장소를 처리하며 세 장소를 각각 최대 1회 처리하고 `retry_count=0` | 실패 후 즉시 전체 중단, 한 장소 재호출 또는 재시도 수 불일치 | EG-5 전 SKIP만 가능 | EG-5 이후 |
 | `H-705` | 회차 결과 요약 | 성공·실패 추적 | 정상·부분실패 가짜 회차의 결과·로그 | 두 회차 모두 대상=성공+실패이며 실패 수·실패 목록·종료코드가 실제 처리 결과와 일치 | 집계 누락, 대상≠성공+실패, 실패 목록 또는 종료코드 불일치 | 실제 승인 호출에서 실패가 1건 이상이고 집계·목록이 정확하면 WARN, EG-5 전 SKIP 가능 | EG-5 이후 |
 | `H-706` | EG-6B 13지역 1회 완전성 | 승인 Batch ID와 패널의 단일 순차수집 검증 | 공통 Batch ID validator, 승인된 EG-6A Area 패널, 단일 회차 결과·로그 | PM 승인 형식의 Batch ID를 변경 없이 Log·Manifest에 전파하고 승인된 13개 Area를 중복·누락 없이 각각 최대 1회 시도하며 소요시간·성공·실패를 기록 | Batch ID 누락·변경·불일치, 대상 누락·중복·임의 코드, 재시도 또는 소요시간 미기록 | EG-6B 전 SKIP만 가능 | EG-6B 이후 |
-| `H-707` | EG-7 반복주기 승인 준수 | 승인 없는 반복수집과 백업 없는 반복 실행 방지 | `freshmanager/eg7.py`, 합성 계획·Clock·Collector·Backup 결과 | `UNCONFIRMED` Live 차단을 확인하고 `Asia/Seoul` 5분·1시간·12회차·13 Area·전체 최대 156호출·재시도 0회 계약에서 합성 Collector와 Backup이 회차별 최대 1회 실행되며 12개 종결상태와 `LOCAL_SYNC_COPY_VERIFIED`를 기록 | 할당량 미확인 Live 허용, 회차·Area·호출 상한·재시도·종결상태 불일치, Collector·Backup 중복 또는 검증되지 않은 Backup을 성공 처리 | EG-7 구현 전 SKIP 가능, 구현 후 불가 | EG-7 이후 |
+| `H-707` | EG-7 반복주기 승인 준수 | 승인 없는 반복수집·임의 주기와 백업 없는 반복 실행 방지 | `freshmanager/eg7.py`, 합성 계획·Clock·Collector·Backup 결과 | `PM_APPROVED_FIXED`·`LONG_TERM_OPERATING_BASELINE`·변경 불가 5분을 강제하고 비 5분 계획·대안 지원·중복 기반 변경을 거부하며, `UNCONFIRMED` Live 차단과 1시간·12회차·13 Area·전체 최대 156호출·재시도 0회에서 합성 Collector와 Backup이 회차별 최대 1회 실행되고 12개 종결상태와 `LOCAL_SYNC_COPY_VERIFIED`를 기록 | 고정 주기 계약 불일치, 비 5분 계획 허용, 할당량 미확인 Live 허용, 회차·Area·호출 상한·재시도·종결상태 불일치, Collector·Backup 중복 또는 검증되지 않은 Backup 성공 처리 | EG-7 구현 전 SKIP 가능, 구현 후 불가 | EG-7 이후 |
 | `H-708` | Backup Worker 로컬 복사 무결성 | 완료 Batch의 안전한 동기화 폴더 복사와 원격 완료 오표현 방지 | `freshmanager/backup.py`, 성공·부분실패 Fake Batch, 임시 Sync·Ledger Root | 성공·증거 완결 부분실패 Batch가 파일 수·크기·Manifest SHA-256 검증 후 게시되고 동일 Batch는 멱등 성공, 상이한 내용은 `CONFLICT`, Receipt는 비민감하며 Worker가 원격 완료 상태를 생성하지 않음 | 불완전 복사 성공 처리, 해시·파일 수 불일치 미검출, 덮어쓰기, 민감 경로 기록, Collector·네트워크 호출 또는 원격 완료 상태 생성 | 구현 전 SKIP 가능, Backup Worker 구현 후 불가 | Backup Readiness 이후 |
 
 `H-702`, `H-704`, `H-705`는 EG-5부터 활성화한다. `H-703`은 EG-6A 참조데이터
@@ -238,9 +238,9 @@ PM 승인된 실제 호출은 별도 수동 단계이며 Project Guard가 호출
   PR #52로 `main`에 반영하고 통과했다.
 - EG-6B: 13개 Area 단일 순차수집·실패 격리·Batch Log·Manifest·SHA-256 구현,
   첫 실제 Batch 13/13·품질·백업 무결성·PM 원격 동기화 확인과 Closeout을 완료했다.
-- EG-7: Issue #69 승인 범위에 따라 Issue #70에서 5분·1시간 Controller·파생 인덱스를
-  오프라인 구현하고 H-707을 활성화했다. 실제 날짜·시각·할당량·운영 ID와 PM Live
-  승인은 열려 있으며 실제 반복수집은 수행하지 않았다.
+- EG-7: PM이 5분을 장기 기준으로 확정했고 Issue #70에서 첫 1시간 Controller·파생
+  인덱스를 오프라인 구현해 H-707을 활성화했다. 실제 날짜·시각·운영시간대·할당량·
+  운영 ID와 PM Live 승인은 열려 있으며 실제 반복수집은 수행하지 않았다.
 - EG-8: 미진행
 
 현재 `H-206`, `H-702`, `H-703`, `H-704`, `H-705`, `H-706`, `H-707`, `H-708`을

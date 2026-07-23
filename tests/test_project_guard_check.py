@@ -1962,6 +1962,15 @@ class Eg7ProjectGuardTests(unittest.TestCase):
             result = self.check()
         self.assertEqual(result.status, project_guard.Status.FAIL)
 
+    def test_h707_changed_permanent_cadence_decision_fails(self) -> None:
+        with mock.patch.object(
+            project_guard.eg7_cli,
+            "CADENCE_DECISION_STATUS",
+            "PILOT_ONLY",
+        ):
+            result = self.check()
+        self.assertEqual(result.status, project_guard.Status.FAIL)
+
     def test_h707_unconfirmed_live_gate_bypass_fails(self) -> None:
         with mock.patch.object(
             project_guard.eg7_cli,
