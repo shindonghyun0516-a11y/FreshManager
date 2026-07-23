@@ -191,6 +191,12 @@ Backup Worker는 Batch의 Collection Log·Manifest 게시와 무결성 검증이
   상대경로·크기·SHA-256을 기준으로 한다.
 - 일반 파일이면서 basename이 정확히 `.DS_Store`인 항목만 정본 수·해시 판정에서
   제외하고 `ignored_platform_metadata_count`로 별도 집계한다.
+- Batch Root가 심볼릭 링크면 실제 대상 경로를 따라가지 않고
+  `SYMLINK_BATCH_ROOT_REJECTED`로 실패한다.
+- Manifest 정본 파일을 담는 데 필요한 상위 디렉터리만 허용한다. 그 밖의 빈
+  디렉터리와 파일이 든 디렉터리는 `UNEXPECTED_NONCANONICAL_FILE`로 실패한다.
+- `.DS_Store` 디렉터리와 `.DS_Store` 심볼릭 링크는 플랫폼 메타데이터로
+  인정하지 않고 실패한다.
 - 모든 숨김파일·dotfile·운영체제 파일을 넓게 무시하지 않는다. 다른 추가 파일,
   승인되지 않은 숨김파일과 예상 밖 심볼릭 링크는
   `UNEXPECTED_NONCANONICAL_FILE`로 실패한다.

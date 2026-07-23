@@ -319,6 +319,92 @@ class BackupWorkerTests(unittest.TestCase):
         self.assertEqual(verification.ignored_platform_metadata_count, 0)
         self.assertIsNone(verification.ignored_platform_metadata_type)
         self.assertEqual(verification.unknown_additional_file_count, 0)
+        self.assertEqual(verification.unexpected_directory_count, 0)
+
+    def test_batch_root_symlink_fails_independent_verification(self) -> None:
+        stage = create_fake_batch(self.root)
+        backup.backup_batch(stage, self.sync_root, self.ledger_root, BATCH_ID)
+        destination = self.destination()
+        real_destination = destination.with_name("real-canonical-copy")
+        destination.rename(real_destination)
+        destination.symlink_to(real_destination, target_is_directory=True)
+
+        verification = backup.verify_backup_copy(destination)
+
+        self.assertFalse(verification.verified)
+        self.assertEqual(
+            verification.reason_code,
+            backup.SYMLINK_BATCH_ROOT_REJECTED,
+        )
+        self.assertNotEqual(verification.reason_code, "VERIFIED")
+
+    def test_batch_root_symlink_never_returns_already_verified(self) -> None:
+        stage = create_fake_batch(self.root)
+        backup.backup_batch(stage, self.sync_root, self.ledger_root, BATCH_ID)
+        destination = self.destination()
+        real_destination = destination.with_name("real-canonical-copy")
+        destination.rename(real_destination)
+        destination.symlink_to(real_destination, target_is_directory=True)
+
+        result = backup.backup_batch(
+            stage,
+            self.sync_root,
+            self.ledger_root,
+            BATCH_ID,
+        )
+
+        self.assertEqual(result.backup_status, backup.BackupStatus.CONFLICT)
+        self.assertEqual(result.reason_code, backup.SYMLINK_BATCH_ROOT_REJECTED)
+        self.assertNotEqual(result.reason_code, "ALREADY_VERIFIED")
+        self.assertTrue(destination.is_symlink())
+
+    def test_unexpected_empty_directory_fails_verification(self) -> None:
+        stage = create_fake_batch(self.root)
+        backup.backup_batch(stage, self.sync_root, self.ledger_root, BATCH_ID)
+        (self.destination() / "unexpected-empty").mkdir()
+
+        verification = backup.verify_backup_copy(self.destination())
+
+        self.assertFalse(verification.verified)
+        self.assertEqual(verification.reason_code, "UNEXPECTED_NONCANONICAL_FILE")
+        self.assertEqual(verification.canonical_backup_file_count, 28)
+        self.assertEqual(verification.unknown_additional_file_count, 0)
+        self.assertEqual(verification.unexpected_directory_count, 1)
+
+    def test_unexpected_nonempty_directory_fails_verification(self) -> None:
+        stage = create_fake_batch(self.root)
+        backup.backup_batch(stage, self.sync_root, self.ledger_root, BATCH_ID)
+        write_bytes(
+            self.destination() / "unexpected-nonempty" / "unknown.json",
+            b"unexpected",
+        )
+
+        verification = backup.verify_backup_copy(self.destination())
+
+        self.assertFalse(verification.verified)
+        self.assertEqual(verification.reason_code, "UNEXPECTED_NONCANONICAL_FILE")
+        self.assertEqual(verification.canonical_backup_file_count, 28)
+        self.assertEqual(verification.unknown_additional_file_count, 1)
+        self.assertEqual(verification.unexpected_directory_count, 1)
+
+    def test_single_regular_ds_store_is_ignored_without_modification(self) -> None:
+        stage = create_fake_batch(self.root)
+        backup.backup_batch(stage, self.sync_root, self.ledger_root, BATCH_ID)
+        metadata = self.destination() / ".DS_Store"
+        write_bytes(metadata, b"finder-metadata")
+        before = metadata.read_bytes()
+
+        verification = backup.verify_backup_copy(self.destination())
+
+        self.assertTrue(verification.verified)
+        self.assertEqual(
+            verification.reason_code,
+            backup.CANONICAL_VERIFIED_WITH_IGNORED_PLATFORM_METADATA,
+        )
+        self.assertEqual(verification.ignored_platform_metadata_count, 1)
+        self.assertEqual(verification.unknown_additional_file_count, 0)
+        self.assertEqual(verification.unexpected_directory_count, 0)
+        self.assertEqual(metadata.read_bytes(), before)
 
     def test_ds_store_at_multiple_levels_is_ignored_without_modification(self) -> None:
         stage = create_fake_batch(self.root)
@@ -353,8 +439,53 @@ class BackupWorkerTests(unittest.TestCase):
             backup.IGNORED_PLATFORM_METADATA_BASENAME,
         )
         self.assertEqual(verification.unknown_additional_file_count, 0)
+        self.assertEqual(verification.unexpected_directory_count, 0)
         self.assertEqual({path: path.read_bytes() for path in metadata_files}, before)
         self.assertEqual(tree_hashes(destination), before_tree)
+
+    def test_ds_store_directory_fails_verification(self) -> None:
+        stage = create_fake_batch(self.root)
+        backup.backup_batch(stage, self.sync_root, self.ledger_root, BATCH_ID)
+        (self.destination() / ".DS_Store").mkdir()
+
+        verification = backup.verify_backup_copy(self.destination())
+
+        self.assertFalse(verification.verified)
+        self.assertEqual(verification.reason_code, "UNEXPECTED_NONCANONICAL_FILE")
+        self.assertEqual(verification.ignored_platform_metadata_count, 0)
+        self.assertEqual(verification.unknown_additional_file_count, 0)
+        self.assertEqual(verification.unexpected_directory_count, 1)
+
+    def test_ds_store_symlink_fails_verification(self) -> None:
+        stage = create_fake_batch(self.root)
+        backup.backup_batch(stage, self.sync_root, self.ledger_root, BATCH_ID)
+        target = self.root / "symlink-target"
+        target.write_bytes(b"unexpected")
+        metadata = self.destination() / ".DS_Store"
+        metadata.symlink_to(target)
+
+        verification = backup.verify_backup_copy(self.destination())
+
+        self.assertFalse(verification.verified)
+        self.assertEqual(verification.reason_code, "UNEXPECTED_NONCANONICAL_FILE")
+        self.assertEqual(verification.ignored_platform_metadata_count, 0)
+        self.assertEqual(verification.unknown_additional_file_count, 1)
+        self.assertEqual(verification.unexpected_directory_count, 0)
+        self.assertTrue(metadata.is_symlink())
+
+    def test_ds_store_nonregular_entry_fails_verification(self) -> None:
+        stage = create_fake_batch(self.root)
+        backup.backup_batch(stage, self.sync_root, self.ledger_root, BATCH_ID)
+        metadata = self.destination() / ".DS_Store"
+        os.mkfifo(metadata)
+
+        verification = backup.verify_backup_copy(self.destination())
+
+        self.assertFalse(verification.verified)
+        self.assertEqual(verification.reason_code, "UNEXPECTED_NONCANONICAL_FILE")
+        self.assertEqual(verification.ignored_platform_metadata_count, 0)
+        self.assertEqual(verification.unknown_additional_file_count, 1)
+        self.assertEqual(verification.unexpected_directory_count, 0)
 
     def test_unknown_additional_file_fails_canonical_verification(self) -> None:
         stage = create_fake_batch(self.root)
@@ -374,23 +505,22 @@ class BackupWorkerTests(unittest.TestCase):
         self.assertEqual(verification.canonical_backup_file_count, 28)
         self.assertEqual(verification.ignored_platform_metadata_count, 0)
         self.assertEqual(verification.unknown_additional_file_count, 1)
+        self.assertEqual(verification.unexpected_directory_count, 0)
         self.assertEqual(unexpected.read_bytes(), b"unexpected")
 
-    def test_unapproved_hidden_file_and_unexpected_symlink_fail(self) -> None:
-        for extra_type in ("hidden", "case_variant", "symlink"):
-            with self.subTest(extra_type=extra_type):
+    def test_similar_nonexact_ds_store_names_fail_verification(self) -> None:
+        for filename in (
+            ".ds_store",
+            ".DS_STORE",
+            ".DS_Store.json",
+            "foo.DS_Store",
+        ):
+            with self.subTest(filename=filename):
                 shutil.rmtree(self.root / "sync")
                 self.sync_root.mkdir()
                 stage = create_fake_batch(self.root)
                 backup.backup_batch(stage, self.sync_root, self.ledger_root, BATCH_ID)
-                if extra_type == "hidden":
-                    write_bytes(self.destination() / ".not-approved", b"unexpected")
-                elif extra_type == "case_variant":
-                    write_bytes(self.destination() / ".ds_store", b"unexpected")
-                else:
-                    target = self.root / "symlink-target"
-                    target.write_bytes(b"unexpected")
-                    (self.destination() / ".DS_Store").symlink_to(target)
+                write_bytes(self.destination() / filename, b"unexpected")
 
                 verification = backup.verify_backup_copy(self.destination())
 
@@ -401,6 +531,7 @@ class BackupWorkerTests(unittest.TestCase):
                 )
                 self.assertEqual(verification.ignored_platform_metadata_count, 0)
                 self.assertEqual(verification.unknown_additional_file_count, 1)
+                self.assertEqual(verification.unexpected_directory_count, 0)
 
     def test_missing_canonical_file_fails_and_reports_counts(self) -> None:
         stage = create_fake_batch(self.root)
@@ -418,6 +549,40 @@ class BackupWorkerTests(unittest.TestCase):
         self.assertEqual(verification.canonical_backup_file_count, 27)
         self.assertFalse(verification.canonical_count_match)
         self.assertEqual(verification.unknown_additional_file_count, 0)
+
+    def test_expected_file_replaced_by_directory_fails_verification(self) -> None:
+        stage = create_fake_batch(self.root)
+        backup.backup_batch(stage, self.sync_root, self.ledger_root, BATCH_ID)
+        manifest = load_document(manifest_path(stage))
+        artifacts = manifest["artifacts"]
+        assert isinstance(artifacts, list) and isinstance(artifacts[0], dict)
+        replaced = self.destination() / str(artifacts[0]["relative_path"])
+        replaced.unlink()
+        replaced.mkdir()
+
+        verification = backup.verify_backup_copy(self.destination())
+
+        self.assertFalse(verification.verified)
+        self.assertEqual(verification.reason_code, "UNEXPECTED_NONCANONICAL_FILE")
+        self.assertEqual(verification.canonical_backup_file_count, 27)
+        self.assertEqual(verification.unexpected_directory_count, 1)
+
+    def test_expected_directory_replaced_by_symlink_fails_verification(self) -> None:
+        stage = create_fake_batch(self.root)
+        backup.backup_batch(stage, self.sync_root, self.ledger_root, BATCH_ID)
+        expected_directory = self.destination() / "data" / "raw"
+        real_directory = self.root / "real-raw-directory"
+        expected_directory.rename(real_directory)
+        expected_directory.symlink_to(real_directory, target_is_directory=True)
+
+        verification = backup.verify_backup_copy(self.destination())
+
+        self.assertFalse(verification.verified)
+        self.assertEqual(verification.reason_code, "UNEXPECTED_NONCANONICAL_FILE")
+        self.assertEqual(verification.ignored_platform_metadata_count, 0)
+        self.assertEqual(verification.unknown_additional_file_count, 1)
+        self.assertEqual(verification.unexpected_directory_count, 0)
+        self.assertTrue(expected_directory.is_symlink())
 
     def test_changed_canonical_file_fails_hash_verification(self) -> None:
         stage = create_fake_batch(self.root)
