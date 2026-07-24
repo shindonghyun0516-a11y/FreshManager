@@ -92,11 +92,11 @@ Evaluation·Recommendation 결과 구조는 유지하되 동적 S-DoT는 EG-7에
 | Apps Script 13개 Area 반복수집 | 5분 시간 기반 Trigger(`ACTIVE`)·POI 코드 호출·LockService 중복실행 방지·Script Properties Key·실행별 `collection_run_id`·v3 시트 저장(Raw 13·Current 13·Forecast 156건/회) | PoC 상시 Runtime; 저장소 밖 Apps Script 프로젝트, 소스 버전관리는 `PLANNED`, 24시간 이상 지속성은 `NOT_COMPLETED` |
 | Raw-to-CSV Exporter | 첫 실제 Batch 이후 확정할 파생자료 계약 | 별도 승인 대상 |
 | S-DoT 관측 데이터 계층 | Area Collector와 독립적인 보조 Feature 계층 | EG-7 제외·후속 별도 승인 |
-| EG-8A Python Loader | v3 source sheets 읽기 전용 파싱·정규화·데이터 품질 리포트 | `PLANNED`; 상세 계약은 `docs/data/ML_READY_DATASET_SPEC.md`(PR2 예정) |
-| EG-8B Forecast 평가·Baseline·Feature Dataset | B0/B1/B2 기준선·리드타임별 오차·Feature Dataset 구성 | `PLANNED`; 상세 계약은 `docs/analysis/ANALYSIS_PLAN.md` 확장(PR2 예정) |
+| EG-8A Python Loader | v3 source sheets 읽기 전용 파싱·정규화·데이터 품질 리포트 | `PLANNED`; 상세 계약은 `docs/data/ML_READY_DATASET_SPEC.md` |
+| EG-8B Forecast 평가·Baseline·Feature Dataset | B0/B1/B2 기준선·리드타임별 오차·Feature Dataset 구성 | `PLANNED`; 상세 계약은 `docs/analysis/ANALYSIS_PLAN.md` §6.5/§10.1/§21.1/§29.1 확장 |
 | EG-8C 예측 모델 | 미래 Area 인구·피크 여부·피크시각 예측, Baseline 대비 성능 확인 후 채택 | `PLANNED` |
 | EG-8D Area Ranking·Spot Candidate Evaluation | Area·선택적 S-DoT·공간 Context 결합(기존 EG-8 정의 계승) | Score·가중치·임계값 OPEN_DECISION |
-| EG-8E Recommendation Output Contract | Recommendation 출력 계약·UI/UX Readiness 판정 | `PLANNED`; 상세 계약은 `docs/product/RECOMMENDATION_OUTPUT_CONTRACT.md`(PR2 예정); Recommendation MVP 구현 Gate 아님 |
+| EG-8E Recommendation Output Contract | Recommendation 출력 계약·UI/UX Readiness 판정 | `PLANNED`; 상세 계약은 `docs/product/RECOMMENDATION_OUTPUT_CONTRACT.md`; Recommendation MVP 구현 Gate 아님 |
 | Recommendation MVP | 별도 계획 Workstream | Gate number `NOT_ASSIGNED` |
 
 > **상태 정렬**  위 표는 기술 책임을 정의하며 완료·미완료 상태표가 아니다. 현재
@@ -377,9 +377,9 @@ PM 승인으로 결정한다.
 | spot_candidate_evaluations | evaluation_version + candidate_id + decision_time | Area Feature·선택적 S-DoT Feature·Context 기반 후보 근거 평가 |
 | recommendations | recommendation_id | target_level·target_id·fallback_reason·사용 Feature 버전 |
 
-> **정본 예정**  이 표는 목표 구조 요약이다. 상세 스키마·중복/결측 처리·품질 기준·
-> 버전 계약은 EG-8A/EG-8B 정본인 `docs/data/ML_READY_DATASET_SPEC.md`(`PLANNED`,
-> PR2에서 생성 예정)가 담당할 예정이며, 생성 전까지는 이 표가 유일한 요약이다.
+> **정본 안내**  이 표는 목표 구조 요약이다. 상세 스키마·중복/결측 처리·품질 기준·
+> 버전 계약은 EG-8A/EG-8B 정본인 `docs/data/ML_READY_DATASET_SPEC.md`가 담당한다.
+> 이 표는 요약이며 상세는 그 문서를 따른다.
 
 ### 14.1 버전 계약
 
@@ -725,8 +725,9 @@ Project Guard 검사별 현재 PASS·SKIP, 전체 집계와 Live 실행 여부�
   버전관리 방식(`PLANNED`), v3 시트 데이터와 Python 정규화 파이프라인의 통합 스키마(`PLANNED`)
 - O-14 EG-8A~8E 모델 알고리즘, Area/Spot Ranking 가중치, 추천 신뢰도 기준, 최소
   학습 기간과 예측 Horizon 최종값, 피크 정의 임계값(ANALYSIS_PLAN 후보값 존재,
-  최종 확정은 OPEN); `docs/data/ML_READY_DATASET_SPEC.md`·
-  `docs/product/RECOMMENDATION_OUTPUT_CONTRACT.md` 상세 스펙은 PR2에서 생성 예정
+  최종 확정은 OPEN); 상세 스펙 정본은 `docs/data/ML_READY_DATASET_SPEC.md`·
+  `docs/product/RECOMMENDATION_OUTPUT_CONTRACT.md`이며 임계값 자체는 두 문서에서도
+  `OPEN_DECISION`으로 유지
 
 ## 26. PRD–구현 추적성
 
@@ -802,5 +803,6 @@ Project Guard 검사별 현재 PASS·SKIP, 전체 집계와 Live 실행 여부�
 
 | 버전 | 날짜 | 변경내용 | 승인상태 |
 |---|---|---|---|
+| v1.2 | 2026-07-24 | `ML_READY_DATASET_SPEC.md`·`RECOMMENDATION_OUTPUT_CONTRACT.md` 생성 완료에 따라 §3/§14/§25 O-14의 "PR2 예정" 문구를 정본 링크로 정렬(조건부 최소 변경). §15(EG-7)는 변경하지 않음 | PM 결정 |
 | v1.1 | 2026-07-24 | EG-8을 상위 Gate로 유지하고 EG-8A~EG-8E로 세분화(기존 EG-8 정의는 EG-8D로 계승). Raw/Normalized/Feature/Model Output/Recommendation Output/UI Presentation 계층 분리 원칙과 ADR-16 추가. §3, §14, §19, ADR표, 부록B 갱신. §15(EG-7)는 변경하지 않음 | PM 결정 |
 | v1.0 | 2026-07-23 | 최초 공식 기술 기준 확정 | PM 승인 |
