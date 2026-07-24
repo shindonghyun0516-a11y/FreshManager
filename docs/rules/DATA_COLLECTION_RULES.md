@@ -1,11 +1,11 @@
 # Data Collection Rules
 
 - 문서 상태: 공식 수집 기준
-- 버전: v0.1.6
+- 버전: v0.1.12
 - 작성자: 신동현
 - 최종 승인자: 신동현
 - 최초 작성일: 2026-07-17
-- 최종 수정일: 2026-07-21
+- 최종 수정일: 2026-07-24
 - 적용 프로젝트: Freshmanager Data PoC
 - 관련 문서:
   - `AGENTS.md`
@@ -318,7 +318,7 @@ Loader는 이 시트에 **읽기 전용**으로만 접근하며, 셀 값을 수�
 금지 원칙은 §22를 그대로 따르며 이 절에서 다시 정의하지 않는다.
 
 Loader의 Spreadsheet 접근 방식(API·CSV 반출 등)과 정규화 스키마는
-`docs/data/ML_READY_DATASET_SPEC.md`가 소유한다(`PLANNED`, PR2에서 생성 예정).
+`docs/data/ML_READY_DATASET_SPEC.md`가 소유한다.
 
 ---
 
@@ -1011,6 +1011,7 @@ EG-6B Collector 자체에는 Backup Worker와 CSV Exporter가 없다. EG-7 Contr
 
 | 버전 | 날짜 | 변경내용 | 작성자 | 승인상태 |
 |---|---|---|---|---|
+| v0.1.12 | 2026-07-24 | §3.6의 "PR2에서 생성 예정" stale 문구를 `ML_READY_DATASET_SPEC.md`(PR #80 생성·병합 완료) 정본 참조로 수정. 문서 헤더 버전을 변경이력과 정렬 | 신동현 | PM 결정 |
 | v0.1.11 | 2026-07-24 | EG-8 상위 Gate·EG-8A~8E 로드맵 반영, v3 source sheets 읽기 전용 원칙(§3.6) 추가 | 신동현 | PM 결정 |
 | v0.1.10 | 2026-07-23 | ACTIVE 장기 기준 필드와 Forecast canonical 정렬 집합·Raw 원본 순서 보존 계약 명확화 | 신동현 | PR #71 변경요청 보완 |
 | v0.1.9 | 2026-07-23 | 5분을 `PM_APPROVED_FIXED` 장기 기준으로 확정하고 대안·중복 기반 변경 금지, 운영시간·Live 확대 OPEN 경계 반영 | 신동현 | PM 최종 결정 |
