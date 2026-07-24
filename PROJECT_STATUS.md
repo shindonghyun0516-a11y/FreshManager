@@ -86,7 +86,7 @@ PM이 장기 기준으로 확정한 5분 주기의 EG-7 1시간 파일럿 Contro
 - EG-8B Phase 1 Read-only 준비도 분석(ML-ready Dataset·EDA·Forecast 평가·Baseline 가능성): `COMPLETED`
 - ML-ready Dataset: `NOT_IMPLEMENTED`
 - EDA: `NOT_STARTED`
-- Forecast Evaluation: `NOT_STARTED`(B0 Baseline·서울시 Forecast 오차 지표는 EG-8B B2a로 계획, 미착수)
+- EG-8B B2a(B0 Persistence Baseline·서울시 Forecast 단일 일자 잠정 Backtest): `IMPLEMENTATION_AVAILABLE_ON_MAIN`(PR #90, Issue #89) — 단일 일자 잠정 결과이며 공식 성공 임계값·EG-8B Gate PASS/FAIL 판정이 아님
 - EG-8B B2b 다일자 Baseline·Gate 평가: `WAITING_FOR_MORE_DATA`(직전 Phase 1 read-only 분석에서 최소 5영업일 데이터 축적 필요로 확인, B2a 오차 지표 계산과는 별도)
 - ML Model: `NOT_STARTED`
 - Area Ranking: `NOT_STARTED`
