@@ -34,6 +34,13 @@ from . import eg8a, eg8b
 PHASE_B2A_VERSION = "phase-b2a-v1"
 BACKTEST_SUMMARY_SCHEMA_VERSION = "eg8b-b2a-backtest-summary-v1"
 
+EVALUATION_STATUS_PROVISIONAL = "PROVISIONAL"
+"""The only value this module ever produces -- B2a is by definition a
+single-day provisional backtest, never a final evaluation."""
+COVERAGE_STATUS_SINGLE_DAY_PARTIAL = "SINGLE_DAY_PARTIAL_COVERAGE"
+"""The only value this module ever produces -- multi-day coverage is
+EG-8B B2b's responsibility (WAITING_FOR_MORE_DATA), not this module's."""
+
 B0_BASELINE_PAIRS_FILENAME = "b0_baseline_pairs.csv"
 AREA_PERFORMANCE_FILENAME = "forecast_vs_b0_area_performance.csv"
 HORIZON_PERFORMANCE_FILENAME = "forecast_vs_b0_horizon_performance.csv"
@@ -526,6 +533,8 @@ def build_backtest_summary(
             "EG-8B Gate PASS/FAIL을 판정하지 않는다. B1(요일·시간)·B2(4주 "
             "평균) Baseline은 포함하지 않는다(추가 데이터 필요, B2b)."
         ),
+        "evaluation_status": EVALUATION_STATUS_PROVISIONAL,
+        "coverage_status": COVERAGE_STATUS_SINGLE_DAY_PARTIAL,
         "gate_judgment": None,
     }
 

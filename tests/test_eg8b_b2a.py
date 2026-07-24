@@ -387,6 +387,24 @@ class B0BaselineComputationTests(unittest.TestCase):
             self.assertFalse(row["b0_congestion_match"])
 
 
+class BacktestSummaryTests(unittest.TestCase):
+    def test_evaluation_and_coverage_status_are_always_provisional_single_day(self) -> None:
+        b1_bundle = make_b1_bundle()
+        summary = eg8b_b2a.build_backtest_summary(
+            generated_at=datetime(2026, 7, 24, 12, 0, 0, tzinfo=eg8a.SEOUL),
+            b1_bundle=b1_bundle,
+            eg8a_dataset_id=b1_bundle.dataset_id,
+            pairs_rows=[make_pairs_row()],
+            origin_lookup_missing_count=0,
+        )
+
+        self.assertEqual(summary["evaluation_status"], eg8b_b2a.EVALUATION_STATUS_PROVISIONAL)
+        self.assertEqual(summary["evaluation_status"], "PROVISIONAL")
+        self.assertEqual(summary["coverage_status"], eg8b_b2a.COVERAGE_STATUS_SINGLE_DAY_PARTIAL)
+        self.assertEqual(summary["coverage_status"], "SINGLE_DAY_PARTIAL_COVERAGE")
+        self.assertIsNone(summary["gate_judgment"])
+
+
 class OriginLookupMissingTests(unittest.TestCase):
     def test_missing_origin_excluded_and_counted(self) -> None:
         pair = make_pair_row(forecast_observed_at="2026-07-24T09:00:00+09:00")
