@@ -201,17 +201,22 @@ class NormalizeCurrentRowTests(unittest.TestCase):
         self.assertIsInstance(result, eg8a.ErrorRow)
         self.assertEqual(result.error_code, eg8a.ERROR_RAW_LOG_KEY_DUPLICATE)
 
-    def test_raw_log_key_missing_still_normalizes_with_null_source_status(self) -> None:
+    def test_raw_log_key_missing_isolates_error_row(self) -> None:
+        """Raw Log 키가 없으면 정상 결과에 포함하지 않고 Error Row로만 남긴다
+        (source_status=None인 정상 레코드를 만들지 않는다)."""
         result = self._run(self._row())
-        self.assertIsInstance(result, eg8a.NormalizedCurrentRecord)
-        self.assertIsNone(result.source_status)
+        self.assertIsInstance(result, eg8a.ErrorRow)
+        self.assertEqual(result.error_code, eg8a.ERROR_RAW_LOG_KEY_MISSING)
+        self.assertIsNotNone(result.raw_row)
 
 
 class NormalizeForecastRowTests(unittest.TestCase):
-    def _run(self, raw_row: dict[str, str]):
+    def _run(self, raw_row: dict[str, str], *, raw_log_status=None, raw_log_dupes=None):
         source_row = eg8a.SourceRow(source_file="population_forecast_v3", source_row_number=2, raw_row=raw_row)
         return eg8a._normalize_forecast_row(
-            source_row, raw_log_status_by_key={}, raw_log_duplicate_keys=set()
+            source_row,
+            raw_log_status_by_key=raw_log_status or {},
+            raw_log_duplicate_keys=raw_log_dupes or set(),
         )
 
     def _row(self, **overrides) -> dict[str, str]:
@@ -230,9 +235,43 @@ class NormalizeForecastRowTests(unittest.TestCase):
         self.assertEqual(result.error_code, eg8a.ERROR_FORECAST_NOT_AFTER_OBSERVED)
 
     def test_valid_forecast_row_produces_record(self) -> None:
-        result = self._run(self._row())
+        result = self._run(self._row(), raw_log_status={(RUN_A, "POI072"): "SUCCESS"})
         self.assertIsInstance(result, eg8a.NormalizedForecastRecord)
         self.assertEqual(result.forecast_population_mid, 30000.0)
+        self.assertEqual(result.source_status, "SUCCESS")
+
+    def test_raw_log_key_missing_isolates_error_row(self) -> None:
+        result = self._run(self._row())
+        self.assertIsInstance(result, eg8a.ErrorRow)
+        self.assertEqual(result.error_code, eg8a.ERROR_RAW_LOG_KEY_MISSING)
+
+
+class StructuralDuplicateDetectionTests(unittest.TestCase):
+    """Unit tests for the Source Correlation Key uniqueness pre-passes."""
+
+    def test_duplicate_keys_within_detects_repeated_current_key(self) -> None:
+        rows = [
+            eg8a.SourceRow("population_current_v3", 2, dict(zip(CURRENT_HEADER, current_row()))),
+            eg8a.SourceRow("population_current_v3", 3, dict(zip(CURRENT_HEADER, current_row(population_min="1")))),
+            eg8a.SourceRow("population_current_v3", 4, dict(zip(CURRENT_HEADER, current_row(area_requested="POI019", area_returned="POI019")))),
+        ]
+        duplicates = eg8a._duplicate_keys_within(rows)
+        self.assertEqual(duplicates, {(RUN_A, "POI072")})
+
+    def test_forecast_target_duplicate_keys_ignores_different_targets(self) -> None:
+        rows = [
+            eg8a.SourceRow("population_forecast_v3", 2, dict(zip(FORECAST_HEADER, forecast_row(forecast_at="2026-07-24 10:00")))),
+            eg8a.SourceRow("population_forecast_v3", 3, dict(zip(FORECAST_HEADER, forecast_row(forecast_at="2026-07-24 11:00")))),
+        ]
+        self.assertEqual(eg8a._forecast_target_duplicate_keys(rows), set())
+
+    def test_forecast_target_duplicate_keys_collapses_equivalent_formats(self) -> None:
+        rows = [
+            eg8a.SourceRow("population_forecast_v3", 2, dict(zip(FORECAST_HEADER, forecast_row(forecast_at="2026-07-24 10:00")))),
+            eg8a.SourceRow("population_forecast_v3", 3, dict(zip(FORECAST_HEADER, forecast_row(forecast_at="2026-07-24 10:00:00")))),
+        ]
+        duplicates = eg8a._forecast_target_duplicate_keys(rows)
+        self.assertEqual(len(duplicates), 1)
 
 
 class NormalizeV3SourcesIntegrationTests(unittest.TestCase):
@@ -264,19 +303,39 @@ class NormalizeV3SourcesIntegrationTests(unittest.TestCase):
         self.assertEqual(set(forecast_counts), current_keys)
         self.assertTrue(all(count == 2 for count in forecast_counts.values()))
 
-    def test_raw_log_key_missing_flagged_but_current_row_kept(self) -> None:
+    def test_raw_log_key_missing_excludes_current_row_no_null_record(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             directory = Path(tmp)
-            raw_path = write_csv(directory, "raw.csv", RAW_LOG_HEADER, [raw_log_row(area_requested="POI019")])
+            raw_path = write_csv(directory, "raw.csv", RAW_LOG_HEADER, [])
             current_path = write_csv(directory, "current.csv", CURRENT_HEADER, [current_row(area_requested="POI072", area_returned="POI072")])
             forecast_path = write_csv(directory, "forecast.csv", FORECAST_HEADER, [])
             result = eg8a.normalize_v3_sources(
                 raw_log_path=raw_path, current_path=current_path, forecast_path=forecast_path,
             )
-            self.assertEqual(len(result.current_records), 1)
-            self.assertIsNone(result.current_records[0].source_status)
-            mismatch_codes = [e.error_code for e in result.error_rows]
-            self.assertIn(eg8a.ERROR_SOURCE_KEY_MISMATCH, mismatch_codes)
+            self.assertEqual(result.current_records, ())
+            error_codes = [e.error_code for e in result.error_rows]
+            self.assertIn(eg8a.ERROR_RAW_LOG_KEY_MISSING, error_codes)
+            self.assertNotIn(eg8a.ERROR_SOURCE_KEY_MISMATCH, error_codes)
+            missing_row = next(e for e in result.error_rows if e.error_code == eg8a.ERROR_RAW_LOG_KEY_MISSING)
+            self.assertIsNotNone(missing_row.raw_row)
+            self.assertEqual(missing_row.raw_row["area_code_requested"], "POI072")
+
+    def test_raw_log_key_duplicate_excludes_current_and_preserves_all_raw_rows(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp)
+            raw_path = write_csv(
+                directory, "raw.csv", RAW_LOG_HEADER,
+                [raw_log_row(result_status="SUCCESS"), raw_log_row(result_status="SUCCESS")],
+            )
+            current_path = write_csv(directory, "current.csv", CURRENT_HEADER, [current_row()])
+            forecast_path = write_csv(directory, "forecast.csv", FORECAST_HEADER, [forecast_row()])
+            result = eg8a.normalize_v3_sources(
+                raw_log_path=raw_path, current_path=current_path, forecast_path=forecast_path,
+            )
+            self.assertEqual(result.current_records, ())
+            self.assertEqual(result.forecast_records, ())
+            codes = [e.error_code for e in result.error_rows]
+            self.assertEqual(codes.count(eg8a.ERROR_RAW_LOG_KEY_DUPLICATE), 2)
 
     def test_raw_log_only_key_flagged_as_source_key_mismatch(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -292,10 +351,7 @@ class NormalizeV3SourcesIntegrationTests(unittest.TestCase):
             self.assertIn("population_current_v3", result.error_rows[0].error_message)
             self.assertIn("population_forecast_v3", result.error_rows[0].error_message)
 
-    def test_duplicate_current_key_is_preserved_not_merged_or_errored(self) -> None:
-        """Matches the project's established 'never delete duplicates, only flag
-        downstream' principle (DATA_COLLECTION_RULES §22) -- duplicate_flag
-        itself is Issue B's responsibility, not an Issue A exclusion reason."""
+    def test_current_key_duplicate_isolates_all_rows_none_normalized(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             directory = Path(tmp)
             raw_path = write_csv(directory, "raw.csv", RAW_LOG_HEADER, [raw_log_row()])
@@ -307,27 +363,35 @@ class NormalizeV3SourcesIntegrationTests(unittest.TestCase):
             result = eg8a.normalize_v3_sources(
                 raw_log_path=raw_path, current_path=current_path, forecast_path=forecast_path,
             )
-            self.assertEqual(len(result.current_records), 2)
-            self.assertEqual(
-                {r.population_min for r in result.current_records}, {30000, 30500}
-            )
+            self.assertEqual(result.current_records, ())
+            duplicate_errors = [e for e in result.error_rows if e.error_code == eg8a.ERROR_CURRENT_KEY_DUPLICATE]
+            self.assertEqual(len(duplicate_errors), 2)
+            preserved_mins = {e.raw_row["population_min"] for e in duplicate_errors}
+            self.assertEqual(preserved_mins, {"30000", "30500"})
 
-    def test_duplicate_forecast_target_is_preserved_not_merged_or_errored(self) -> None:
+    def test_forecast_target_duplicate_isolates_only_that_target(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             directory = Path(tmp)
             raw_path = write_csv(directory, "raw.csv", RAW_LOG_HEADER, [raw_log_row()])
             current_path = write_csv(directory, "current.csv", CURRENT_HEADER, [])
             forecast_path = write_csv(
                 directory, "forecast.csv", FORECAST_HEADER,
-                [forecast_row(population_min="29000"), forecast_row(population_min="29500")],
+                [
+                    forecast_row(forecast_at="2026-07-24 10:00", population_min="29000"),
+                    forecast_row(forecast_at="2026-07-24 10:00", population_min="29500"),
+                    forecast_row(forecast_at="2026-07-24 11:00", population_min="35000", population_max="37000"),
+                ],
             )
             result = eg8a.normalize_v3_sources(
                 raw_log_path=raw_path, current_path=current_path, forecast_path=forecast_path,
             )
-            self.assertEqual(len(result.forecast_records), 2)
-            self.assertEqual(
-                {r.forecast_population_min for r in result.forecast_records}, {29000, 29500}
-            )
+            # the non-duplicated 11:00 target survives normally
+            self.assertEqual(len(result.forecast_records), 1)
+            self.assertEqual(result.forecast_records[0].forecast_at, "2026-07-24T11:00:00+09:00")
+            duplicate_errors = [
+                e for e in result.error_rows if e.error_code == eg8a.ERROR_FORECAST_TARGET_DUPLICATE
+            ]
+            self.assertEqual(len(duplicate_errors), 2)
 
     def test_ragged_row_does_not_abort_remaining_rows(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -344,6 +408,21 @@ class NormalizeV3SourcesIntegrationTests(unittest.TestCase):
             self.assertEqual(len(result.current_records), 1)
             ragged = [e for e in result.error_rows if e.error_code == eg8a.ERROR_RAGGED_ROW]
             self.assertEqual(len(ragged), 1)
+
+    def test_no_row_appears_in_both_normal_and_error_results(self) -> None:
+        """§6: 정상 결과와 오류 결과에 같은 행을 동시에 포함하지 않는다."""
+        result = eg8a.normalize_v3_sources(
+            raw_log_path=FIXTURES / "valid_raw_log_v3.csv",
+            current_path=FIXTURES / "valid_population_current_v3.csv",
+            forecast_path=FIXTURES / "valid_population_forecast_v3.csv",
+        )
+        normal_keys = {(r.collection_run_id, r.area_code) for r in result.current_records}
+        error_keys = {
+            (e.collection_run_id, e.area_code_requested)
+            for e in result.error_rows
+            if e.collection_run_id and e.area_code_requested
+        }
+        self.assertEqual(normal_keys & error_keys, set())
 
 
 if __name__ == "__main__":

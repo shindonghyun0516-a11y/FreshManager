@@ -6,7 +6,7 @@
 단일 운영 기준이다. 제품 목적은 PRD, 기술 계약은 TRD, 검사 ID와 판정은
 `docs/testing/PROJECT_GUARD_SPEC.md`를 따른다.
 
-마지막 동기화 시각: `2026-07-23` (Asia/Seoul)
+마지막 동기화 시각: `2026-07-24` (Asia/Seoul)
 
 ## 2. 현재 요약
 
@@ -67,7 +67,7 @@ PM이 장기 기준으로 확정한 5분 주기의 EG-7 1시간 파일럿 Contro
 ## 2.2 EG-8A~EG-8E 데이터 분석·ML·추천·UI 준비 상태
 
 - EG-8(상위): `NOT_STARTED` — 데이터 분석·예측·추천 준비 상위 Gate, EG-8A~8E로 세분화
-- EG-8A(Python Loader·정규화·데이터 품질): `NEXT`
+- EG-8A(Python Loader·정규화·데이터 품질): `IN_PROGRESS`
 - EG-8B(EDA·서울시 Forecast 평가·Baseline·Feature Dataset): `PLANNED`
 - EG-8C(미래 Area 인구·피크 예측 모델): `PLANNED`
 - EG-8D(Area Ranking·선택적 S-DoT·Spot Candidate Evaluation): `PLANNED` — 기존
@@ -78,7 +78,10 @@ PM이 장기 기준으로 확정한 5분 주기의 EG-7 1시간 파일럿 Contro
 
 구현 상태:
 
-- Python Loader: `NOT_IMPLEMENTED`
+- Python Loader: `IN_PROGRESS`
+  - Source Reader·Schema Validation·Normalization: `IMPLEMENTATION_AVAILABLE_ON_MAIN`(PR #84)
+  - Quality Report·Dataset Manifest·최종 Output Writer: `NOT_STARTED`
+  - 실제 오류 응답 기반 검증: `NOT_COMPLETED`(합성 Fixture 오류 경로만 테스트 통과)
 - ML-ready Dataset: `NOT_IMPLEMENTED`
 - EDA: `NOT_STARTED`
 - Forecast Evaluation: `NOT_STARTED`
@@ -106,7 +109,7 @@ PM이 장기 기준으로 확정한 5분 주기의 EG-7 1시간 파일럿 Contro
 | EG-6B | PASS | 첫 실제 13 Area 13/13, 품질·백업·원격 동기화 확인과 Closeout |
 | EG-7 | IMPLEMENTATION_AVAILABLE_ON_MAIN | PR #71 병합, Issue #70 종료; 첫 Live 미시작 |
 | EG-8(상위) | NOT_STARTED | 데이터 분석·예측·추천 준비 상위 Gate; EG-8A~8E로 세분화(§2.2) |
-| EG-8A | `NEXT` | Python Loader·정규화·데이터 품질 |
+| EG-8A | `IN_PROGRESS` | Source Reader·Schema Validation·Normalization `IMPLEMENTATION_AVAILABLE_ON_MAIN`(PR #84); Quality Report·Manifest·Output Writer `NOT_STARTED` |
 | EG-8B | `PLANNED` | EDA·Forecast 평가·Baseline·Feature Dataset |
 | EG-8C | `PLANNED` | 미래 Area 인구·피크 예측 모델 |
 | EG-8D | `PLANNED` | Area Ranking·선택적 S-DoT·Spot Candidate Evaluation(기존 EG-8 정의 계승) |
