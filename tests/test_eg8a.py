@@ -1,6 +1,10 @@
 from __future__ import annotations
 
 import csv
+import dataclasses
+import hashlib
+import io
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -76,6 +80,47 @@ def forecast_row(
         run_id, called_at, observed_at, forecast_at, area_requested,
         area_returned, area_name, congestion, population_min, population_max,
     ]
+
+
+def make_current_record(**overrides: object) -> eg8a.NormalizedCurrentRecord:
+    base: dict[str, object] = dict(
+        collection_run_id=RUN_A,
+        called_at="2026-07-24T09:00:05+09:00",
+        observed_at="2026-07-24T08:35:00+09:00",
+        area_code="POI072",
+        area_code_requested="POI072",
+        area_code_returned="POI072",
+        area_name="여의도",
+        congestion_level="여유",
+        population_min=30000,
+        population_max=32000,
+        population_mid=31000.0,
+        source_status="SUCCESS",
+        duplicate_flag=False,
+    )
+    base.update(overrides)
+    return eg8a.NormalizedCurrentRecord(**base)
+
+
+def make_forecast_record(**overrides: object) -> eg8a.NormalizedForecastRecord:
+    base: dict[str, object] = dict(
+        collection_run_id=RUN_A,
+        called_at="2026-07-24T09:00:05+09:00",
+        observed_at="2026-07-24T08:35:00+09:00",
+        forecast_at="2026-07-24T10:00:00+09:00",
+        area_code="POI072",
+        area_code_requested="POI072",
+        area_code_returned="POI072",
+        area_name="여의도",
+        forecast_congestion_level="여유",
+        forecast_population_min=29000,
+        forecast_population_max=31000,
+        forecast_population_mid=30000.0,
+        source_status="SUCCESS",
+        duplicate_flag=False,
+    )
+    base.update(overrides)
+    return eg8a.NormalizedForecastRecord(**base)
 
 
 class SourceReaderTests(unittest.TestCase):
@@ -423,6 +468,551 @@ class NormalizeV3SourcesIntegrationTests(unittest.TestCase):
             if e.collection_run_id and e.area_code_requested
         }
         self.assertEqual(normal_keys & error_keys, set())
+
+
+class DuplicateDetectorTests(unittest.TestCase):
+    """Issue B §1: duplicate_flag is a non-exclusionary signal over already-
+    structurally-unique records, distinct from CURRENT_KEY_DUPLICATE /
+    FORECAST_TARGET_DUPLICATE (which already hard-exclude on collection_run_id
+    key uniqueness before a record ever reaches these functions)."""
+
+    def test_current_first_occurrence_is_false(self) -> None:
+        flagged = eg8a._flag_duplicate_current_records([make_current_record()])
+        self.assertFalse(flagged[0].duplicate_flag)
+
+    def test_current_second_occurrence_of_same_observation_is_true(self) -> None:
+        records = [
+            make_current_record(collection_run_id=RUN_A),
+            make_current_record(collection_run_id=RUN_B),
+        ]
+        flagged = eg8a._flag_duplicate_current_records(records)
+        self.assertFalse(flagged[0].duplicate_flag)
+        self.assertTrue(flagged[1].duplicate_flag)
+
+    def test_current_different_observed_at_is_not_duplicate(self) -> None:
+        records = [
+            make_current_record(observed_at="2026-07-24T08:35:00+09:00"),
+            make_current_record(observed_at="2026-07-24T08:40:00+09:00"),
+        ]
+        flagged = eg8a._flag_duplicate_current_records(records)
+        self.assertFalse(flagged[0].duplicate_flag)
+        self.assertFalse(flagged[1].duplicate_flag)
+
+    def test_current_different_area_is_not_duplicate(self) -> None:
+        records = [
+            make_current_record(area_code="POI072"),
+            make_current_record(area_code="POI019"),
+        ]
+        flagged = eg8a._flag_duplicate_current_records(records)
+        self.assertFalse(flagged[0].duplicate_flag)
+        self.assertFalse(flagged[1].duplicate_flag)
+
+    def test_current_third_distinct_key_after_a_duplicate_is_false(self) -> None:
+        records = [
+            make_current_record(area_code="POI072"),
+            make_current_record(area_code="POI072"),
+            make_current_record(area_code="POI019"),
+        ]
+        flagged = eg8a._flag_duplicate_current_records(records)
+        self.assertFalse(flagged[0].duplicate_flag)
+        self.assertTrue(flagged[1].duplicate_flag)
+        self.assertFalse(flagged[2].duplicate_flag)
+
+    def test_forecast_first_occurrence_is_false(self) -> None:
+        flagged = eg8a._flag_duplicate_forecast_records([make_forecast_record()])
+        self.assertFalse(flagged[0].duplicate_flag)
+
+    def test_forecast_normal_five_minute_re_forecast_is_not_duplicate(self) -> None:
+        """가장 중요한 회귀 테스트: 서로 다른 collection_run_id가 같은
+        forecast_at을 다시 예측하는 것은 정상 5분 재예측이며 중복이 아니다 --
+        observed_at이 다르면 forecast_at이 같아도 flag하지 않는다."""
+        records = [
+            make_forecast_record(
+                collection_run_id=RUN_A,
+                observed_at="2026-07-24T08:35:00+09:00",
+                forecast_at="2026-07-24T10:00:00+09:00",
+            ),
+            make_forecast_record(
+                collection_run_id=RUN_B,
+                observed_at="2026-07-24T08:40:00+09:00",
+                forecast_at="2026-07-24T10:00:00+09:00",
+            ),
+        ]
+        flagged = eg8a._flag_duplicate_forecast_records(records)
+        self.assertFalse(flagged[0].duplicate_flag)
+        self.assertFalse(flagged[1].duplicate_flag)
+
+    def test_forecast_same_observed_and_target_is_duplicate(self) -> None:
+        records = [
+            make_forecast_record(
+                observed_at="2026-07-24T08:35:00+09:00",
+                forecast_at="2026-07-24T10:00:00+09:00",
+            ),
+            make_forecast_record(
+                collection_run_id=RUN_B,
+                observed_at="2026-07-24T08:35:00+09:00",
+                forecast_at="2026-07-24T10:00:00+09:00",
+            ),
+        ]
+        flagged = eg8a._flag_duplicate_forecast_records(records)
+        self.assertFalse(flagged[0].duplicate_flag)
+        self.assertTrue(flagged[1].duplicate_flag)
+
+    def test_via_normalize_v3_sources_fixtures_all_false(self) -> None:
+        """실 계약 fixture(2 run × 2 area × 2 target, observed_at이 run마다
+        다름)는 전부 duplicate_flag=False여야 한다 -- 정상 5분 재예측 재현."""
+        result = eg8a.normalize_v3_sources(
+            raw_log_path=FIXTURES / "valid_raw_log_v3.csv",
+            current_path=FIXTURES / "valid_population_current_v3.csv",
+            forecast_path=FIXTURES / "valid_population_forecast_v3.csv",
+        )
+        self.assertTrue(all(not r.duplicate_flag for r in result.current_records))
+        self.assertTrue(all(not r.duplicate_flag for r in result.forecast_records))
+
+
+class QualityReportTests(unittest.TestCase):
+    """Issue B §4: build_quality_report against ML_READY_DATASET_SPEC.md
+    §10/§13's must_produce/recommended split. No pass/fail threshold logic
+    should exist anywhere in the output (§13 leaves thresholds OPEN_DECISION)."""
+
+    GENERATED_AT = eg8a.parse_kst_datetime("2026-07-24 12:00:00")
+
+    def _build_result(self) -> eg8a.NormalizationResult:
+        current_records = (
+            make_current_record(area_code="POI072", collection_run_id=RUN_A),
+            make_current_record(
+                area_code="POI019",
+                collection_run_id=RUN_A,
+                observed_at="2026-07-24T08:36:00+09:00",
+            ),
+        )
+        forecast_records = (
+            make_forecast_record(area_code="POI072", collection_run_id=RUN_A),
+            make_forecast_record(
+                area_code="POI019",
+                collection_run_id=RUN_A,
+                observed_at="2026-07-24T08:36:00+09:00",
+            ),
+        )
+        error_rows = (
+            eg8a.ErrorRow(
+                source_file="population_current_v3",
+                source_row_number=5,
+                collection_run_id=RUN_B,
+                area_code_requested="POI072",
+                area_code_returned=None,
+                error_code=eg8a.ERROR_MISSING_REQUIRED_VALUE,
+                error_message="missing",
+                raw_row={"collection_run_id": RUN_B},
+            ),
+            eg8a.ErrorRow(
+                source_file="population_forecast_v3",
+                source_row_number=6,
+                collection_run_id=RUN_B,
+                area_code_requested="POI072",
+                area_code_returned="POI072",
+                error_code=eg8a.ERROR_INVALID_NUMBER,
+                error_message="bad number",
+                raw_row={"collection_run_id": RUN_B},
+            ),
+        )
+        return eg8a.NormalizationResult(
+            current_records=current_records,
+            forecast_records=forecast_records,
+            error_rows=error_rows,
+            raw_log_input_row_count=3,
+            current_input_row_count=3,
+            forecast_input_row_count=3,
+        )
+
+    def test_row_counts(self) -> None:
+        report = eg8a.build_quality_report(
+            self._build_result(), dataset_id="ds-1", generated_at=self.GENERATED_AT
+        )
+        counts = report["must_produce"]["row_counts"]
+        self.assertEqual(counts["raw_log_v3_input_rows"], 3)
+        self.assertEqual(counts["population_current_v3_input_rows"], 3)
+        self.assertEqual(counts["population_forecast_v3_input_rows"], 3)
+        self.assertEqual(counts["current_normal_rows"], 2)
+        self.assertEqual(counts["forecast_normal_rows"], 2)
+        self.assertEqual(counts["error_rows_total"], 2)
+        self.assertEqual(
+            counts["error_rows_by_code"],
+            {eg8a.ERROR_MISSING_REQUIRED_VALUE: 1, eg8a.ERROR_INVALID_NUMBER: 1},
+        )
+
+    def test_area_row_counts_and_consistency(self) -> None:
+        report = eg8a.build_quality_report(
+            self._build_result(), dataset_id="ds-1", generated_at=self.GENERATED_AT
+        )
+        area = report["must_produce"]["area_row_counts"]
+        self.assertEqual(len(area["official_area_codes"]), 13)
+        self.assertEqual(area["unexpected_area_codes"], [])
+        per_area_by_code = {row["area_code"]: row for row in area["per_area"]}
+        self.assertEqual(per_area_by_code["POI072"]["current_row_count"], 1)
+        self.assertEqual(per_area_by_code["POI072"]["forecast_row_count"], 1)
+        self.assertNotIn("POI072", area["areas_with_zero_current_rows"])
+        self.assertIn("POI072", [c["area_code"] for c in area["per_area"]])
+        consistency = report["must_produce"]["area_code_consistency"]
+        self.assertEqual(consistency["official_area_count"], 13)
+        self.assertTrue(consistency["current_area_codes_all_official"])
+        self.assertTrue(consistency["forecast_area_codes_all_official"])
+
+    def test_success_and_missing_rates(self) -> None:
+        report = eg8a.build_quality_report(
+            self._build_result(), dataset_id="ds-1", generated_at=self.GENERATED_AT
+        )
+        must = report["must_produce"]
+        self.assertAlmostEqual(must["missing_value_rate"]["current"], 1 / 3)
+        self.assertEqual(must["missing_value_rate"]["forecast"], 0.0)
+        self.assertAlmostEqual(must["numeric_conversion_success_rate"]["forecast"], 2 / 3)
+        self.assertEqual(must["numeric_conversion_success_rate"]["current"], 1.0)
+        self.assertEqual(must["time_parse_success_rate"]["current"], 1.0)
+        self.assertEqual(must["time_parse_success_rate"]["forecast"], 1.0)
+
+    def test_zero_denominator_rates_are_none(self) -> None:
+        empty_result = eg8a.NormalizationResult(
+            current_records=(),
+            forecast_records=(),
+            error_rows=(),
+            raw_log_input_row_count=0,
+            current_input_row_count=0,
+            forecast_input_row_count=0,
+        )
+        report = eg8a.build_quality_report(
+            empty_result, dataset_id="ds-1", generated_at=self.GENERATED_AT
+        )
+        must = report["must_produce"]
+        self.assertIsNone(must["time_parse_success_rate"]["current"])
+        self.assertIsNone(must["missing_value_rate"]["forecast"])
+
+    def test_duplicate_metrics(self) -> None:
+        result = self._build_result()
+        result = dataclasses.replace(
+            result,
+            current_records=(
+                dataclasses.replace(result.current_records[0], duplicate_flag=True),
+                result.current_records[1],
+            ),
+            error_rows=result.error_rows
+            + (
+                eg8a.ErrorRow(
+                    source_file="population_current_v3",
+                    source_row_number=7,
+                    collection_run_id=RUN_B,
+                    area_code_requested="POI019",
+                    area_code_returned=None,
+                    error_code=eg8a.ERROR_CURRENT_KEY_DUPLICATE,
+                    error_message="dup",
+                    raw_row={"collection_run_id": RUN_B},
+                ),
+            ),
+        )
+        report = eg8a.build_quality_report(
+            result, dataset_id="ds-1", generated_at=self.GENERATED_AT
+        )
+        current_dup = report["recommended"]["current_duplicate"]
+        self.assertEqual(current_dup["structural_duplicate_rows_excluded"], 1)
+        self.assertEqual(current_dup["semantic_duplicate_rows_flagged"], 1)
+        self.assertAlmostEqual(current_dup["semantic_duplicate_rate"], 0.5)
+
+    def test_no_threshold_fields_present(self) -> None:
+        report = eg8a.build_quality_report(
+            self._build_result(), dataset_id="ds-1", generated_at=self.GENERATED_AT
+        )
+        self.assertEqual(
+            set(report),
+            {"schema_version", "dataset_id", "generated_at", "must_produce", "recommended"},
+        )
+        serialized = json.dumps(report).lower()
+        self.assertNotIn("threshold", serialized)
+        self.assertNotIn('"pass"', serialized)
+
+
+class DatasetManifestTests(unittest.TestCase):
+    GENERATED_AT = eg8a.parse_kst_datetime("2026-07-24 12:00:00")
+
+    def test_sha256_file_matches_hashlib(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "sample.bin"
+            payload = b"hello world" * 100
+            path.write_bytes(payload)
+            self.assertEqual(eg8a._sha256_file(path), hashlib.sha256(payload).hexdigest())
+
+    def _minimal_result(self) -> eg8a.NormalizationResult:
+        return eg8a.NormalizationResult(
+            current_records=(make_current_record(),),
+            forecast_records=(make_forecast_record(),),
+            error_rows=(),
+            raw_log_input_row_count=1,
+            current_input_row_count=1,
+            forecast_input_row_count=1,
+        )
+
+    def test_manifest_fields(self) -> None:
+        manifest = eg8a.build_dataset_manifest(
+            dataset_id="ds-123",
+            generated_at=self.GENERATED_AT,
+            result=self._minimal_result(),
+            input_artifacts=[{"logical_name": "raw_log_v3", "sha256": "a" * 64, "byte_size": 10}],
+            output_artifacts=[
+                {"relative_path": "normalized_current.csv", "sha256": "b" * 64, "byte_size": 20}
+            ],
+        )
+        self.assertEqual(manifest["schema_version"], eg8a.DATASET_MANIFEST_SCHEMA_VERSION)
+        self.assertEqual(manifest["dataset_id"], "ds-123")
+        self.assertEqual(manifest["dataset_version"], "ds-123")
+        self.assertEqual(manifest["loader_version"], eg8a.LOADER_VERSION)
+        self.assertEqual(manifest["hash_algorithm"], "sha256")
+        self.assertEqual(manifest["source_row_counts"]["current_normal_rows"], 1)
+
+    def test_input_artifacts_carry_no_path_field(self) -> None:
+        manifest = eg8a.build_dataset_manifest(
+            dataset_id="ds-123",
+            generated_at=self.GENERATED_AT,
+            result=self._minimal_result(),
+            input_artifacts=[{"logical_name": "raw_log_v3", "sha256": "a" * 64, "byte_size": 10}],
+            output_artifacts=[],
+        )
+        for artifact in manifest["input_artifacts"]:
+            self.assertNotIn("path", artifact)
+            self.assertNotIn("relative_path", artifact)
+            self.assertNotIn("absolute_path", artifact)
+            self.assertIn("logical_name", artifact)
+
+
+class OutputWriterTests(unittest.TestCase):
+    def test_write_current_csv_header_and_bool_true_serialization(self) -> None:
+        payload = eg8a.write_current_csv([make_current_record(duplicate_flag=True)])
+        reader = csv.DictReader(io.StringIO(payload.decode("utf-8")))
+        self.assertEqual(reader.fieldnames, list(eg8a.CURRENT_CSV_FIELDNAMES))
+        self.assertEqual(next(reader)["duplicate_flag"], "true")
+
+    def test_write_forecast_csv_bool_false_serialization(self) -> None:
+        payload = eg8a.write_forecast_csv([make_forecast_record(duplicate_flag=False)])
+        row = next(csv.DictReader(io.StringIO(payload.decode("utf-8"))))
+        self.assertEqual(row["duplicate_flag"], "false")
+
+    def test_write_error_rows_csv_raw_row_json_round_trips(self) -> None:
+        error = eg8a.ErrorRow(
+            source_file="population_current_v3",
+            source_row_number=2,
+            collection_run_id=RUN_A,
+            area_code_requested="POI072",
+            area_code_returned=None,
+            error_code=eg8a.ERROR_MISSING_REQUIRED_VALUE,
+            error_message="x",
+            raw_row={"extra_column": "kept", "population_min": "1"},
+        )
+        payload = eg8a.write_error_rows_csv([error])
+        row = next(csv.DictReader(io.StringIO(payload.decode("utf-8"))))
+        self.assertEqual(
+            json.loads(row["raw_row_json"]), {"extra_column": "kept", "population_min": "1"}
+        )
+
+    def test_write_error_rows_csv_none_raw_row_is_empty_string(self) -> None:
+        error = eg8a.ErrorRow(
+            source_file="__source_correlation__",
+            source_row_number=None,
+            collection_run_id=RUN_A,
+            area_code_requested="POI072",
+            area_code_returned=None,
+            error_code=eg8a.ERROR_SOURCE_KEY_MISMATCH,
+            error_message="x",
+            raw_row=None,
+        )
+        row = next(csv.DictReader(io.StringIO(eg8a.write_error_rows_csv([error]).decode("utf-8"))))
+        self.assertEqual(row["raw_row_json"], "")
+
+    def _minimal_result(self) -> eg8a.NormalizationResult:
+        return eg8a.NormalizationResult(
+            current_records=(make_current_record(),),
+            forecast_records=(make_forecast_record(),),
+            error_rows=(),
+            raw_log_input_row_count=1,
+            current_input_row_count=1,
+            forecast_input_row_count=1,
+        )
+
+    def _write_input_csvs(self, directory: Path) -> dict[str, Path]:
+        return {
+            "raw_log_v3": write_csv(directory, "raw.csv", RAW_LOG_HEADER, [raw_log_row()]),
+            "population_current_v3": write_csv(
+                directory, "current.csv", CURRENT_HEADER, [current_row()]
+            ),
+            "population_forecast_v3": write_csv(
+                directory, "forecast.csv", FORECAST_HEADER, [forecast_row()]
+            ),
+        }
+
+    def test_export_dataset_creates_five_files(self) -> None:
+        with tempfile.TemporaryDirectory() as input_dir, tempfile.TemporaryDirectory() as output_root:
+            inputs = self._write_input_csvs(Path(input_dir))
+            export_result = eg8a.export_dataset(
+                self._minimal_result(), output_root=Path(output_root), input_paths=inputs
+            )
+            for filename in (
+                eg8a.CURRENT_OUTPUT_FILENAME,
+                eg8a.FORECAST_OUTPUT_FILENAME,
+                eg8a.ERROR_ROWS_OUTPUT_FILENAME,
+                eg8a.QUALITY_REPORT_OUTPUT_FILENAME,
+                eg8a.DATASET_MANIFEST_OUTPUT_FILENAME,
+            ):
+                self.assertTrue((export_result.dataset_dir / filename).is_file())
+            manifest = json.loads(
+                (export_result.dataset_dir / eg8a.DATASET_MANIFEST_OUTPUT_FILENAME).read_text()
+            )
+            self.assertEqual(len(manifest["output_artifacts"]), 4)
+            self.assertEqual(len(manifest["input_artifacts"]), 3)
+
+    def test_export_dataset_input_files_unchanged(self) -> None:
+        with tempfile.TemporaryDirectory() as input_dir, tempfile.TemporaryDirectory() as output_root:
+            inputs = self._write_input_csvs(Path(input_dir))
+            before = {name: path.read_bytes() for name, path in inputs.items()}
+            eg8a.export_dataset(
+                self._minimal_result(), output_root=Path(output_root), input_paths=inputs
+            )
+            after = {name: path.read_bytes() for name, path in inputs.items()}
+            self.assertEqual(before, after)
+
+    def test_export_dataset_rejects_wrong_input_path_keys(self) -> None:
+        with tempfile.TemporaryDirectory() as output_root:
+            with self.assertRaises(eg8a.DatasetWriteError):
+                eg8a.export_dataset(
+                    self._minimal_result(),
+                    output_root=Path(output_root),
+                    input_paths={"raw_log_v3": Path("x")},
+                )
+
+    def test_write_exclusive_never_overwrites(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "out.txt"
+            eg8a._write_exclusive(path, b"first")
+            with self.assertRaises(eg8a.DatasetWriteError):
+                eg8a._write_exclusive(path, b"second")
+            self.assertEqual(path.read_bytes(), b"first")
+
+    def test_export_dataset_same_dataset_id_same_root_collides(self) -> None:
+        with tempfile.TemporaryDirectory() as input_dir, tempfile.TemporaryDirectory() as output_root:
+            inputs = self._write_input_csvs(Path(input_dir))
+            eg8a.export_dataset(
+                self._minimal_result(),
+                output_root=Path(output_root),
+                input_paths=inputs,
+                dataset_id="fixed-id",
+            )
+            with self.assertRaises(eg8a.DatasetWriteError):
+                eg8a.export_dataset(
+                    self._minimal_result(),
+                    output_root=Path(output_root),
+                    input_paths=inputs,
+                    dataset_id="fixed-id",
+                )
+
+    def test_resolve_output_root_from_env_missing_raises(self) -> None:
+        with self.assertRaises(eg8a.OutputRootConfigurationError):
+            eg8a.resolve_output_root_from_env({})
+
+    def test_resolve_output_root_from_env_nonexistent_raises(self) -> None:
+        with self.assertRaises(eg8a.OutputRootConfigurationError):
+            eg8a.resolve_output_root_from_env(
+                {eg8a.FRESHMANAGER_EG8A_OUTPUT_ROOT_ENV: "/no/such/path/at/all/eg8a"}
+            )
+
+    def test_resolve_output_root_from_env_valid_directory(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            resolved = eg8a.resolve_output_root_from_env(
+                {eg8a.FRESHMANAGER_EG8A_OUTPUT_ROOT_ENV: tmp}
+            )
+            self.assertTrue(resolved.is_dir())
+
+
+class DeterministicReExecutionTests(unittest.TestCase):
+    """Issue B §5/§6: same input + same dataset_id/generated_at ⇒ byte-
+    identical output across two independent export_dataset calls."""
+
+    def _write_input_csvs(self, directory: Path) -> dict[str, Path]:
+        return {
+            "raw_log_v3": write_csv(
+                directory,
+                "raw.csv",
+                RAW_LOG_HEADER,
+                [raw_log_row(), raw_log_row(run_id=RUN_B, area_requested="POI019")],
+            ),
+            "population_current_v3": write_csv(
+                directory,
+                "current.csv",
+                CURRENT_HEADER,
+                [
+                    current_row(),
+                    current_row(run_id=RUN_B, area_requested="POI019", area_returned="POI019"),
+                ],
+            ),
+            "population_forecast_v3": write_csv(
+                directory,
+                "forecast.csv",
+                FORECAST_HEADER,
+                [
+                    forecast_row(),
+                    forecast_row(run_id=RUN_B, area_requested="POI019", area_returned="POI019"),
+                ],
+            ),
+        }
+
+    def test_same_dataset_id_and_generated_at_produce_byte_identical_output(self) -> None:
+        with tempfile.TemporaryDirectory() as input_dir, tempfile.TemporaryDirectory() as root_a, tempfile.TemporaryDirectory() as root_b:
+            inputs = self._write_input_csvs(Path(input_dir))
+            result = eg8a.normalize_v3_sources(
+                raw_log_path=inputs["raw_log_v3"],
+                current_path=inputs["population_current_v3"],
+                forecast_path=inputs["population_forecast_v3"],
+            )
+            fixed_id = "11111111-1111-4111-8111-111111111111"
+            fixed_time = eg8a.parse_kst_datetime("2026-07-24 12:00:00")
+            export_a = eg8a.export_dataset(
+                result,
+                output_root=Path(root_a),
+                input_paths=inputs,
+                dataset_id=fixed_id,
+                generated_at=fixed_time,
+            )
+            export_b = eg8a.export_dataset(
+                result,
+                output_root=Path(root_b),
+                input_paths=inputs,
+                dataset_id=fixed_id,
+                generated_at=fixed_time,
+            )
+            for filename in (
+                eg8a.CURRENT_OUTPUT_FILENAME,
+                eg8a.FORECAST_OUTPUT_FILENAME,
+                eg8a.ERROR_ROWS_OUTPUT_FILENAME,
+                eg8a.QUALITY_REPORT_OUTPUT_FILENAME,
+                eg8a.DATASET_MANIFEST_OUTPUT_FILENAME,
+            ):
+                content_a = (export_a.dataset_dir / filename).read_bytes()
+                content_b = (export_b.dataset_dir / filename).read_bytes()
+                self.assertEqual(content_a, content_b, f"{filename} differs between runs")
+
+    def test_unspecified_dataset_id_differs_but_csv_content_matches(self) -> None:
+        with tempfile.TemporaryDirectory() as input_dir, tempfile.TemporaryDirectory() as root_a, tempfile.TemporaryDirectory() as root_b:
+            inputs = self._write_input_csvs(Path(input_dir))
+            result = eg8a.normalize_v3_sources(
+                raw_log_path=inputs["raw_log_v3"],
+                current_path=inputs["population_current_v3"],
+                forecast_path=inputs["population_forecast_v3"],
+            )
+            export_a = eg8a.export_dataset(result, output_root=Path(root_a), input_paths=inputs)
+            export_b = eg8a.export_dataset(result, output_root=Path(root_b), input_paths=inputs)
+            self.assertNotEqual(export_a.dataset_id, export_b.dataset_id)
+            for filename in (
+                eg8a.CURRENT_OUTPUT_FILENAME,
+                eg8a.FORECAST_OUTPUT_FILENAME,
+                eg8a.ERROR_ROWS_OUTPUT_FILENAME,
+            ):
+                content_a = (export_a.dataset_dir / filename).read_bytes()
+                content_b = (export_b.dataset_dir / filename).read_bytes()
+                self.assertEqual(content_a, content_b, f"{filename} differs between runs")
 
 
 if __name__ == "__main__":
