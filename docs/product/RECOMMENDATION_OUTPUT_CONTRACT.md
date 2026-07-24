@@ -137,13 +137,16 @@ Master를 참조 정본으로 사용하며, 이 문서는 그 식별자를 Recom
 | `longitude` | Spot Master가 보유한 대표좌표 경도 |
 | `area_code` | 연결된 공식 `AREA_CD` |
 | `area_name` | 연결된 공식 `AREA_NM` |
-| `coordinate_type` | 좌표 종류(§6 참조) |
-| `field_verified` | 현장검증 여부 |
-| `validation_status` | 검증 상태(§6 참조) |
+| `coordinate_type` | 좌표 종류(§12 참조) |
+| `field_verified` | 현장검증 여부(값 기준은 §9.1) |
+| `validation_status` | 검증 상태(값 정의는 §12, 값 기준은 §9.1) |
 
 **현재 13개 Spot이 실제 출구로 검증됐다고 기록하지 않는다.** 예시의
 `GANGNAM_EXIT_5`/`강남역 5번 출구`는 계약 구조를 설명하기 위한 예시 식별자이며,
-실제 Spot Master 데이터가 이 값을 확정했음을 의미하지 않는다. 실제 값은 §6의
+실제 Spot Master 데이터가 이 값을 확정했음을 의미하지 않는다. 이 표의 각
+필드가 `Confirmed`처럼 보이는 것은 "레코드가 존재하고 식별 정보를 담고
+있다"는 뜻일 뿐, `field_verified=true`·`validation_status=VERIFIED`·SPOT
+Recommendation 가능·Spot Forecast 가능을 의미하지 않는다. 실제 값은 §12의
 기본 상태를 따른다.
 
 ## 5. Spatial Evidence Contract
@@ -204,7 +207,7 @@ S-DoT 또는 다른 공간 근거가 해당 Spot을 얼마나 직접적으로 �
 | `trend` | 증가·감소·유지 추세 |
 | `expected_peak_at` | 예상 피크시각 |
 | `minutes_until_peak` | 피크까지 남은 시간(분) |
-| `confidence_level` | 신뢰도(§9 참조, `OPEN_DECISION`) |
+| `confidence_level` | 신뢰도(§14 참조, `OPEN_DECISION`) |
 | `forecast_summary` | 예측 내용을 요약한 문장(§7 참조) |
 
 표현 가능한 콘텐츠:
@@ -362,7 +365,7 @@ fallback_reason = NO_FIELD_VERIFIED_SPOT
 | `trend` | Area 또는 Spot 수준 증가·감소 추세 |
 | `spatial_support_type`/`support_source`/`support_sensor_id`/`support_distance_m`/`support_observed_at` | Spatial Evidence(§5) |
 | `current_spot_congestion_level`/`predicted_spot_congestion_level`/`forecast_target_at`/`forecast_horizon_minutes`/`expected_peak_at`/`minutes_until_peak`/`forecast_summary` | Spot Forecast Content(§6, `prediction_scope=SPOT`일 때만) |
-| `confidence_level` | 신뢰도(§9 `OPEN_DECISION`) |
+| `confidence_level` | 신뢰도(§14 `OPEN_DECISION`) |
 | `reason_codes` | 추천 사유 코드 목록(§7, §13) |
 | `action_message` | 행동 권고 메시지(§7) |
 | `fallback_reason` | AREA 추천 시 필수, SPOT 추천 시 명시적 `null` |
