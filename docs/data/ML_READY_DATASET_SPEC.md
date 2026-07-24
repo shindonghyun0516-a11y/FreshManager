@@ -1,7 +1,7 @@
 # ML-ready Dataset Spec
 
 - 문서 상태: Draft
-- 버전: v0.4.0
+- 버전: v0.5.0
 - 작성자: 신동현
 - 최종 승인자: 신동현
 - 최초 작성일: 2026-07-24
@@ -153,6 +153,20 @@ Forecast 평가에서 다음을 금지한다.
 - 실제 v3 sheets 샘플(Forecast 19,032행)에서는 이 조건을 100% 충족했다.
   이 확인은 2026-07-24 하루·122회차 표본 기준이며, 장기간 반복 관측에서도
   항상 성립한다고 확정하지 않는다.
+- Source 해석: `called_at`/`observed_at`/`forecast_at`의 원본 문자열은
+  timezone Offset이 없지만 전부 `Asia/Seoul`(KST) 기준이다(§4가 이미
+  정의한 원칙과 동일하며 새 규칙을 추가하지 않는다).
+- Normalized 출력 계약: ISO 8601이며 명시적 Offset을 포함한다(예:
+  `2026-07-24T01:06:06+09:00`). UTC로 임의 변환하지 않고, Offset이 없는
+  naive datetime으로 출력하지 않는다.
+- 파싱 방법: 고정폭 문자열 슬라이싱을 금지하고 `datetime.strptime` 등
+  포맷 기반 파싱만 사용한다 — 위 첫 항목처럼 `observed_at`/`forecast_at`의
+  시(hour) 자릿수가 15자/16자로 혼재하기 때문이다.
+- 필드 의미(§5 표와 동일, 재정의 아님): `called_at`=API 호출 실행 시각,
+  `observed_at`=현재 인구 데이터 기준시각, `forecast_at`=예측 대상시각.
+- `called_at`이 `observed_at`보다 늦는 것(수집 지연)은 그 자체로 오류가
+  아니다. Quality Metric으로만 산출하며(§10 "수집 지연"), 임계값은 §13에
+  따라 계속 `OPEN_DECISION`이다.
 
 ## 6. 데이터 계층
 
@@ -180,16 +194,16 @@ Python Loader의 책임은 CSV Schema Validation·Quality Validation·Dataset
 | `collection_run_id` | Apps Script 실행 단위 식별자(D-014 근거) | `CONFIRMED_SOURCE_FIELD` |
 | `called_at` | API 호출시각 | `CONFIRMED_SOURCE_FIELD` |
 | `observed_at` | 관측 기준시각 | `CONFIRMED_SOURCE_FIELD`(§5.1 포맷 주의) |
-| `area_code_requested` | 요청한 공식 `AREA_CD`(POI 코드) | `CONFIRMED_SOURCE_FIELD`(§7.1) |
+| `area_code_requested` | 요청한 공식 `AREA_CD`(POI 코드). Source Correlation Key 기준(§8.1) | `CONFIRMED_SOURCE_FIELD`(§7.1) |
 | `area_code_returned` | 응답이 실제로 반환한 공식 `AREA_CD` | `CONFIRMED_SOURCE_FIELD`(§7.1) |
 | `area_name` | 공식 `AREA_NM` | `CONFIRMED_SOURCE_FIELD` |
 | `congestion_level` | 혼잡도 | `CONFIRMED_SOURCE_FIELD` |
 | `population_min` | 추정 인구 하한 | `CONFIRMED_SOURCE_FIELD` |
 | `population_max` | 추정 인구 상한 | `CONFIRMED_SOURCE_FIELD` |
 | `population_mid` | §9 정의의 파생 대표값 | `DERIVED_FIELD`(원본에 없음, Loader 산출) |
-| `duplicate_flag` | 동일 관측의 중복 여부 | `NOT_AVAILABLE`(원본에 없음, Loader 산출) |
-| `error_flag` | 오류행 여부 | `NOT_AVAILABLE`(원본에 없음, Loader 산출) |
-| `source_status` | 원본 응답 상태(success/오류 분류) | `NOT_AVAILABLE`(Current 파일에는 없음. `raw_log_v3`의 `result_status`/`http_code`가 이 역할을 대체) |
+| `duplicate_flag` | 동일 관측의 중복 여부 | `LOADER_DERIVED_FIELD`(원본에 없음, Loader가 중복 검증 결과로 생성) |
+| `error_flag` | 오류행 여부 | `LOADER_DERIVED_FIELD`(원본에 없음, Loader가 Schema·시간·Area·숫자 검증 결과로 생성) |
+| `source_status` | 원본 응답 상태(success/오류 분류) | `JOINED_FROM_RAW_LOG`(Current 파일에는 없음. `raw_log_v3.result_status`를 Source Correlation Key(§8.1)로 Join) |
 
 이 상태는 PM이 제공한 실제 v3 sheets CSV Export(2026-07-24, 122회차·13개
 Area·약 10시간 12분 구간)를 기준으로 확인했다. 이 표본에는 `result_status`가
@@ -200,14 +214,15 @@ Area·약 10시간 12분 구간)를 기준으로 확인했다. 이 표본에는 
 ### 7.1 `area_code` 이중 컬럼 구조(실 데이터 확인)
 
 v3 source sheets는 `area_code`를 단일 필드로 기록하지 않는다. Current·
-Forecast 두 시트 모두 다음 두 컬럼으로 분리돼 있다.
+Forecast 두 시트 모두 다음 두 컬럼으로 분리돼 있다. `raw_log_v3`에는
+`area_code_requested`만 있고 `area_code_returned`는 없다(§8.1).
 
 | 컬럼 | 정의 |
 |---|---|
 | `area_code_requested` | Apps Script가 API에 요청한 대상 Area 코드 |
-| `area_code_returned` | API 응답이 실제로 반환한 Area 코드 |
+| `area_code_returned` | API 응답이 실제로 반환한 Area 코드(Current·Forecast에만 존재) |
 
-정합성 규칙:
+Response Integrity Check(정합성 규칙):
 
 ```text
 area_code_requested == area_code_returned
@@ -215,8 +230,18 @@ area_code_requested == area_code_returned
 
 이 등식이 성립하지 않으면 Data Quality Error로 분류한다(§11 "Area 코드
 불일치"). 실제 v3 sheets 샘플(Current 1,586행·Forecast 19,032행)에서는
-불일치가 0건이었다. 후속 조인 키(§8.1)는 `area_code_returned`를 기준으로
-한다.
+불일치가 0건이었다. Source Correlation Key(§8.1)는 `area_code_requested`를
+기준으로 한다 — `raw_log_v3`가 `area_code_returned`를 갖지 않기 때문이다.
+
+Normalized 계층의 canonical `area_code`는 다음 규칙을 따른다.
+
+- 두 값이 일치하는 행만 Normalized Dataset에 포함하고, canonical
+  `area_code = area_code_requested`로 기록한다.
+- `area_code_requested`/`area_code_returned` 두 원본 필드는 Lineage
+  추적을 위해 Normalized 행에도 별도로 보존할 수 있다.
+- 두 값이 다른 행은 정상 Normalized Dataset에 포함하지 않고 Error Rows로
+  격리하며(§12.1), 요청값·응답값을 모두 보존한다. 둘 중 하나를 임의로
+  정답으로 선택하지 않는다.
 
 ## 8. Forecast 필드 후보
 
@@ -226,34 +251,65 @@ area_code_requested == area_code_returned
 | `called_at` | API 호출시각 | `CONFIRMED_SOURCE_FIELD` |
 | `observed_at` | 예측 스냅샷을 확보한 시점의 관측 기준시각 | `CONFIRMED_SOURCE_FIELD`(§5.1 포맷 주의) |
 | `forecast_at` | 예측 대상시각 | `CONFIRMED_SOURCE_FIELD`(§5.1 포맷 주의·검증 규칙) |
-| `area_code_requested` | 요청한 공식 `AREA_CD` | `CONFIRMED_SOURCE_FIELD`(§7.1) |
-| `area_code_returned` | 응답이 실제로 반환한 공식 `AREA_CD`. Join Key 기준(§8.1) | `CONFIRMED_SOURCE_FIELD`(§7.1) |
+| `area_code_requested` | 요청한 공식 `AREA_CD`. Source Correlation Key 기준(§8.1) | `CONFIRMED_SOURCE_FIELD`(§7.1) |
+| `area_code_returned` | 응답이 실제로 반환한 공식 `AREA_CD` | `CONFIRMED_SOURCE_FIELD`(§7.1) |
 | `area_name` | 공식 `AREA_NM` | `CONFIRMED_SOURCE_FIELD` |
 | `forecast_congestion_level` | 예측 혼잡도 | `CONFIRMED_SOURCE_FIELD` |
 | `forecast_population_min` | 예측 인구 하한 | `CONFIRMED_SOURCE_FIELD` |
 | `forecast_population_max` | 예측 인구 상한 | `CONFIRMED_SOURCE_FIELD` |
 | `forecast_population_mid` | 예측 대표값(§9와 동일 계산식) | `DERIVED_FIELD`(원본에 없음, Loader 산출) |
-| `duplicate_flag` | 동일 대상시각 예측의 중복 여부 | `NOT_AVAILABLE`(원본에 없음, Loader 산출) |
-| `error_flag` | 오류행 여부 | `NOT_AVAILABLE`(원본에 없음, Loader 산출) |
-| `source_status` | 원본 응답 상태 | `NOT_AVAILABLE`(Forecast 파일에는 없음. `raw_log_v3`의 `result_status`/`http_code`가 이 역할을 대체) |
+| `duplicate_flag` | 동일 대상시각 예측의 중복 여부 | `LOADER_DERIVED_FIELD`(원본에 없음, Loader가 중복 검증 결과로 생성) |
+| `error_flag` | 오류행 여부 | `LOADER_DERIVED_FIELD`(원본에 없음, Loader가 Schema·시간·Area·숫자 검증 결과로 생성) |
+| `source_status` | 원본 응답 상태 | `JOINED_FROM_RAW_LOG`(Forecast 파일에는 없음. `raw_log_v3.result_status`를 Source Correlation Key(§8.1)로 Join) |
 
 상태 확인 근거와 표본 한계는 §7의 확인 문단과 동일하다(중복 서술하지
 않는다).
 
-### 8.1 Current-Forecast Join Key(실 데이터 확인)
+### 8.1 Source Correlation Key와 Response Integrity(실 데이터 확인)
 
-`population_current_v3`와 `population_forecast_v3`를 연결하는 정식 Key는
-다음과 같다.
+세 v3 sheets(`raw_log_v3`·`population_current_v3`·`population_forecast_v3`)
+전체를 연결하는 정식 Source Correlation Key는 다음과 같다.
 
 ```text
-collection_run_id + area_code_returned
+collection_run_id + area_code_requested
 ```
 
-실제 v3 sheets 샘플(122회차·13개 Area)에서 이 Key로 조인한 결과, Forecast
-쪽에서 매칭되지 않는 키 0건, Current 쪽에서 매칭되지 않는 키 0건이었고,
-`(collection_run_id, area_code_returned)` 조합마다 Forecast 행이 정확히
-12건씩 존재했다(19,032 = 1,586 × 12). 이 Key는 문서가 아니라 실 데이터로
-검증된 결과다.
+**`area_code_returned`가 아니라 `area_code_requested`를 쓰는 이유**:
+`raw_log_v3`에는 `area_code_returned` 컬럼 자체가 없다(§7.1). Current·
+Forecast 두 시트만 보면 두 Key 후보가 같은 결과를 내지만(불일치 0건이기
+때문, 아래 참조), `raw_log_v3`까지 포함하는 세 시트 공통 Key는
+`area_code_requested`만 가능하다.
+
+**용도**: `raw_log_v3` ↔ `population_current_v3` 연결, `raw_log_v3` ↔
+`population_forecast_v3` 연결, `population_current_v3` ↔
+`population_forecast_v3` 요청 계보 연결에 모두 이 Key를 사용한다.
+
+Response Integrity Check(`area_code_requested == area_code_returned`)는
+Join Key와 별개의 검증이다(§7.1).
+
+실제 v3 sheets 샘플(122회차·13개 Area)로 재검증한 결과:
+
+- `(collection_run_id, area_code_requested)`는 `raw_log_v3`·
+  `population_current_v3`에서 각각 정확히 1행(고유 키 1,586개)이고,
+  `population_forecast_v3`에서는 키마다 정확히 12행(`forecast_at`별
+  1행씩, 총 19,032행)이다. 이는 정상적인 1:12 관계이며 "중복 요청"이
+  아니다.
+- 세 파일의 `(collection_run_id, area_code_requested)` 키 집합은 완전히
+  동일하다(어느 방향으로도 누락 없음).
+- `area_code_requested`≠`area_code_returned` 불일치는 Current·Forecast
+  모두 0건이었다(§7.1).
+- 이 표본에서 `area_code_returned` 기준 Join과 `area_code_requested`
+  기준 Join이 같은 결과를 낸 이유는 위 불일치가 0건이기 때문일 뿐이다 —
+  구조적으로 항상 같다는 뜻이 아니며, `raw_log_v3`를 포함하는 순간
+  `area_code_returned` 기준은 애초에 성립하지 않는다.
+
+**`source_status`/`http_code` Join 가능성**: `raw_log_v3`의
+`(collection_run_id, area_code_requested)` → `result_status`/`http_code`
+매핑은 이 표본에서 유일하다(같은 키에 서로 다른 상태값이 없음) — 따라서
+이 Key로 `source_status`(§7/§8)를 `raw_log_v3`에서 Join해 오는 것이
+안전하다. `http_code`도 같은 방식으로 Join할지는 품질·추적 목적의 후속
+검토 대상이다 — 이번 표본은 값이 전부 `200`뿐이라 필요성을 판단하기
+어렵다.
 
 ## 9. `population_mid` 정의
 
@@ -426,6 +482,7 @@ Spot은 위치 식별 정보는 `Confirmed`이지만 전부 `field_verified=fals
 
 | 버전 | 날짜 | 변경내용 | 작성자 | 승인상태 |
 |---|---|---|---|---|
+| v0.5.0 | 2026-07-24 | Source Correlation Key를 `area_code_returned`에서 `area_code_requested`로 정정(§8.1) — `raw_log_v3`에 `area_code_returned` 컬럼이 없어 세 시트 전체를 연결할 수 없었던 오류를 실 데이터 3-way 키 비교로 확인·수정. Response Integrity Check와 canonical `area_code` 정규화 규칙·불일치 행 Error Rows 격리 규칙을 §7.1에 추가. `duplicate_flag`/`error_flag`를 `LOADER_DERIVED_FIELD`, `source_status`를 `JOINED_FROM_RAW_LOG`로 세분화. §5.1에 KST 소스 해석·ISO 8601 명시적 Offset 출력 계약·`strptime` 기반 파싱 원칙·수집 지연이 오류가 아님을 추가 | 신동현 | PM 결정 |
 | v0.4.0 | 2026-07-24 | PM이 제공한 실제 v3 sheets CSV Export(122회차)로 §7/§8 필드 후보 상태를 `CONFIRMED_SOURCE_FIELD`/`DERIVED_FIELD`/`NOT_AVAILABLE`로 갱신. `area_code`를 `area_code_requested`/`area_code_returned` 이중 컬럼으로 정정(§7.1). Current-Forecast Join Key `collection_run_id`+`area_code_returned` 확정(§8.1). §6 데이터 계층을 Raw(`raw_log_v3`)/Normalized Source(`population_current_v3`·`population_forecast_v3`)로 재정의. 시간 표현·검증 규칙 추가(§5.1). 오류 분류에 "시간 순서 위반" 추가(§11). 장기 자동화 방식·최종 정본 형식·품질 임계값은 계속 `OPEN_DECISION` | 신동현 | PM 결정 |
 | v0.3.0 | 2026-07-24 | EG-8A Loader V0 입력 방식(수동 CSV Export, §3.1)·V0 실행 방식(§4.1)·V0 출력 형식과 산출물 구성(§12/§12.1)·품질 항목 반드시산출/권장 분류(§13) PM 결정 반영. 장기 자동화 방식·최종 정본 형식·품질 임계값은 계속 `OPEN_DECISION` | 신동현 | PM 결정 |
 | v0.2.1 | 2026-07-24 | 검증된 Spot Master(위치 식별)와 미검증 Spot Proxy(추천 가능 여부)를 구분(§14.1), Spot Recommendation/Forecast eligibility는 RECOMMENDATION_OUTPUT_CONTRACT.md §9.1/§9.2 소유임을 명시 | 신동현 | PM 결정 |
