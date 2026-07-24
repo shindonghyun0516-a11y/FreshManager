@@ -1,7 +1,7 @@
 # Analysis Plan
 
 - 문서 상태: Draft
-- 버전: v0.1.3
+- 버전: v0.1.4
 - 작성자: 신동현
 - 최종 승인자: 신동현
 - 최초 작성일: 2026-07-17
@@ -209,6 +209,48 @@ EG-8C(미래 Area 인구·피크 예측 모델)에 대응한다. EG-8C는 EG-8B�
 ML-ready 데이터셋의 상세 스키마·버전 계약은 `docs/data/ML_READY_DATASET_SPEC.md`
 가, Recommendation 결과 출력 계약은 `docs/product/RECOMMENDATION_OUTPUT_CONTRACT.md`가
 소유한다. 이 문서는 그 두 문서와 분석 방법론을 중복 정의하지 않는다.
+
+### 6.6 Spot Forecast 분석 가능성 조건
+
+이 문서의 예측 평가(§18~21)는 지금까지 Area 단위를 전제로 한다. Area
+Forecast와 Spot Forecast는 별도 분석 단위로 구분하며, 다음 조건을 만족하는
+경우에만 Spot Forecast 분석을 검토한다.
+
+- **검증조건**: `docs/product/RECOMMENDATION_OUTPUT_CONTRACT.md` §5의
+  `spatial_support_type`이 `DIRECT_SENSOR` 또는 `NEARBY_SENSOR`인 Spot만
+  Spot Forecast 분석 후보로 검토한다. `AREA_INFERENCE`·`UNSUPPORTED` Spot은
+  Area Forecast만 사용한다(§3 Prediction Scope와 동일한 경계).
+- **DIRECT_SENSOR 평가**: 센서가 Spot을 직접 대표한다고 판단한 근거(설치
+  위치·거리·데이터 최신성)를 함께 기록하고, 센서 자체의 결측·오류율도 Area
+  데이터와 동일한 품질 기준(§28)으로 관리한다.
+- **NEARBY_SENSOR 평가**: 거리가 있는 근사 근거이므로 DIRECT_SENSOR보다 낮은
+  신뢰도로 다루며, 예측 표현도 §6.6이 아니라
+  `docs/product/RECOMMENDATION_OUTPUT_CONTRACT.md` §8의 "가능성이 있습니다"
+  수준 표현으로 제한한다.
+- **AREA_INFERENCE 사용 한계**: Spot 직접 근거 없이 Area 예측만으로 Spot 상태를
+  추정하는 경우, 그 추정을 Spot의 직접 관측값처럼 표현하지 않는다(PRD §4
+  "Area ≠ Spot" 원칙, 이 문서 §7의 "POI 단위 값은 특정 지하철 출구, 건물 앞,
+  흡연부스 앞의 값으로 해석하지 않는다" 원칙과 동일).
+- **UNSUPPORTED 처리**: 공간 근거가 전혀 없는 Spot은 Spot Forecast 분석
+  대상에서 제외하고, 필요하면 AREA fallback으로만 다룬다.
+- **관측 이력 부족 시 AREA fallback**: Spot 단위 관측 이력이 기준 기간(§9~10)
+  만큼 축적되지 않은 경우, Spot Forecast를 분석하지 않고 Area Forecast로만
+  fallback한다.
+- **센서-Spot 거리·대표성 검증**: `support_distance_m`이 클수록 대표성이
+  낮아진다고 가정하되, 구체적인 거리 임계값은 아직 확정하지 않는다.
+- **동일 Area 내 Spot별 차이 검증**: 같은 Area에 여러 Spot이 연결된 경우, Area
+  평균값 하나로 모든 Spot을 같다고 취급하지 않는다. Spot별 차이를 검증하는
+  구체 방법은 실제 S-DoT 동적 수집이 구현된 뒤 별도 검토한다.
+- **Area 예측값을 Spot Ground Truth로 사용 금지**: Area 예측·관측값은 Spot의
+  실제 상태를 검증하는 정답(ground truth)으로 사용하지 않는다. Area 값은
+  Spot 상태의 보조 추정치일 뿐이다(D-003 Area First 원칙과 동일 경계).
+
+Spot Forecast의 모델·성능기준·최소 데이터 기간은 임의로 확정하지 않는다.
+
+**상태: `OPEN_DECISION`**
+
+S-DoT 동적 수집 자체가 `NOT_IMPLEMENTED`이므로(D-005), 이 절의 조건은 목표
+분석 계획이며 현재 시점에 즉시 적용 가능한 실행 계획이 아니다.
 
 ---
 
@@ -1048,6 +1090,7 @@ ANALYSIS_PLAN은 다음 조건을 만족해야 Approved 상태로 전환할 수 
 
 | 버전 | 날짜 | 변경내용 | 작성자 | 승인상태 |
 |---|---|---|---|---|
+| v0.1.4 | 2026-07-24 | Spot Forecast 분석 가능성 조건(§6.6) 추가 — DIRECT_SENSOR/NEARBY_SENSOR/AREA_INFERENCE/UNSUPPORTED 평가 원칙, Area 예측값의 Spot Ground Truth 사용 금지, 모델·성능기준 OPEN_DECISION | 신동현 | PM 결정 |
 | v0.1.3 | 2026-07-24 | EG-8B·EG-8C Gate 연결(§6.5), 시계열 분할 원칙(§10.1), 피크 탐지 성능 지표(§21.1), EG-8C 모델 OPEN_DECISION(§29.1) 추가; 기존 EG-8 표현을 EG-8B/EG-8D로 정렬 | 신동현 | PM 결정 |
 | v0.1.2 | 2026-07-23 | 15분·30분·1시간 분석 집계·시차를 PM 확정 5분 수집주기 대안과 명확히 분리 | 신동현 | PM 최종 결정 |
 | v0.1.1 (Issue #58 보완) | 2026-07-22 | 첫 Batch·5영업일·4주/5주차 분석과 Area·선택적 S-DoT·Spot Candidate Evaluation·후속 Recommendation 경계 정렬 | 신동현 | PM Diff 검토 전 |

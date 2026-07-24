@@ -1,7 +1,7 @@
 # ML-ready Dataset Spec
 
 - 문서 상태: Draft
-- 버전: v0.1.0
+- 버전: v0.2.0
 - 작성자: 신동현
 - 최종 승인자: 신동현
 - 최초 작성일: 2026-07-24
@@ -213,7 +213,43 @@ EG-8A 통과를 위한 품질조건의 **후보 항목**은 §10의 품질 항�
 정성적 통과 기준(읽기 전용 접근 확인, 재현 가능성 확인, 품질 리포트에 결측·
 중복·오류를 숨기지 않음)은 `docs/testing/QUALITY_GATES.md` §12.1이 소유한다.
 
-## 14. 완료 정의
+## 14. Area-Spot-Sensor 데이터 관계(목표 계약)
+
+`docs/product/RECOMMENDATION_OUTPUT_CONTRACT.md`의 Spot Identity·Spatial
+Evidence 계약이 참조하는 데이터 관계를 정의한다. 다음 다섯 데이터셋을 서로
+다른 책임으로 분리한다.
+
+| 데이터셋 | 책임 | 현재 상태 |
+|---|---|---|
+| Area 관측 데이터 | §7~§9의 Current Population·Forecast 필드 | 이 문서 §7~§9가 소유 |
+| Spot 정적 마스터 | `eg6_spot_master.csv`의 Candidate Anchor Point | `Confirmed`(EG-6A 완료, `docs/product/EG6_AREA_SPOT_PANEL.md`) |
+| S-DoT/Sensor 시계열 | 센서별 동적 관측값 | `FUTURE_CONTRACT`/`NOT_IMPLEMENTED`(D-005) |
+| Area–Spot 관계 | `eg6_area_panel.csv`의 Area·Spot 연결 | `Confirmed`(EG-6A 완료) |
+| Spot–Sensor 관계 | `eg6_sdot_links.csv`의 정적 근접 등급(`DIRECT_COVERAGE`/`NEARBY_SUPPORT`/`NO_NEARBY_SDOT`) | `Confirmed`(정적 분류만, EG-6A 완료) |
+
+후보 필드:
+
+| 필드 | 의미 | 상태 |
+|---|---|---|
+| `area_code` | 공식 `AREA_CD` | `Confirmed` |
+| `spot_id` | Spot 고유 식별자 | `Confirmed`(Spot Master 존재), 값 자체는 대리 식별자 |
+| `spot_name` | Spot 표시명 | `Confirmed` |
+| `spot_type` | Spot 유형 | `Documented` |
+| `sensor_id` | S-DoT/Sensor 식별자 | `FUTURE_CONTRACT` |
+| `sensor_source` | 센서 데이터 출처 | `FUTURE_CONTRACT` |
+| `spatial_support_type` | Spot-Sensor 근거 수준(`DIRECT_SENSOR`/`NEARBY_SENSOR`/`AREA_INFERENCE`/`UNSUPPORTED`) | `PLANNED`(정의는 존재, 실제 산출 로직 `NOT_IMPLEMENTED`) |
+| `support_distance_m` | 센서-Spot 거리(미터) | `FUTURE_CONTRACT` |
+| `sensor_observed_at` | 센서 관측 시각 | `FUTURE_CONTRACT` |
+| `field_verified` | 현장검증 여부 | `Confirmed`(전부 `false`) |
+| `validation_status` | 검증 상태 | `Confirmed`(전부 `FIELD_VALIDATION_REQUIRED`) |
+
+**현재 S-DoT 동적 수집은 구현되지 않았다.** `sensor_id`·`sensor_source`·
+`support_distance_m`·`sensor_observed_at`는 목표 계약이며, S-DoT 동적 Collector가
+별도 승인·구현되기 전까지 실제 값을 생성하지 않는다. `spatial_support_type`은
+동적 수집 구현 전까지 `AREA_INFERENCE` 또는 `UNSUPPORTED`만 산출한다(상세 원칙은
+`docs/product/RECOMMENDATION_OUTPUT_CONTRACT.md` §5.1).
+
+## 15. 완료 정의
 
 이 문서는 다음 조건을 만족해야 Draft를 벗어나 다음 개정을 검토할 수 있다.
 
@@ -226,8 +262,9 @@ EG-8A 통과를 위한 품질조건의 **후보 항목**은 §10의 품질 항�
 - 출력 형식과 품질 임계값을 `OPEN_DECISION`으로 명시
 - PM 승인
 
-## 15. 변경 이력
+## 16. 변경 이력
 
 | 버전 | 날짜 | 변경내용 | 작성자 | 승인상태 |
 |---|---|---|---|---|
+| v0.2.0 | 2026-07-24 | Area-Spot-Sensor 데이터 관계(§14) 추가 — Spot 정적 마스터·S-DoT 시계열·Area-Spot·Spot-Sensor 관계 분리, `spatial_support_type` 후보 필드와 S-DoT 동적 수집 미구현 상태 명시 | 신동현 | PM 결정 |
 | v0.1.0 | 2026-07-24 | 최초 초안 작성(EG-8A/EG-8B ML-ready 데이터셋 목표 계약) | 신동현 | PM 결정 |
