@@ -1,7 +1,7 @@
 # ML-ready Dataset Spec
 
 - 문서 상태: Draft
-- 버전: v0.2.0
+- 버전: v0.2.1
 - 작성자: 신동현
 - 최종 승인자: 신동현
 - 최초 작성일: 2026-07-24
@@ -249,6 +249,22 @@ Evidence 계약이 참조하는 데이터 관계를 정의한다. 다음 다섯 
 동적 수집 구현 전까지 `AREA_INFERENCE` 또는 `UNSUPPORTED`만 산출한다(상세 원칙은
 `docs/product/RECOMMENDATION_OUTPUT_CONTRACT.md` §5.1).
 
+### 14.1 검증된 Spot Master와 미검증 Spot Proxy
+
+이 문서의 "Spot 정적 마스터"는 **위치 식별 정보**(좌표·명칭·Area 연결)가
+`Confirmed`라는 뜻이며, 그 Spot이 **추천 가능**하다는 뜻이 아니다. 현재 13개
+Spot은 위치 식별 정보는 `Confirmed`이지만 전부 `field_verified=false`인
+미검증 Proxy 상태다(§7~9 필드가 아니라 Spot 자체의 상태).
+
+- **Spot Recommendation eligibility**(어떤 Spot을 추천 대상으로 제시할 수
+  있는가)와 **Spot Forecast eligibility**(어떤 Spot의 혼잡 예측을 직접
+  표시할 수 있는가)는 서로 다른 기준이며, 둘 다
+  `docs/product/RECOMMENDATION_OUTPUT_CONTRACT.md` §9.1/§9.2가 소유한다. 이
+  문서는 그 기준이 참조하는 원본 데이터 관계만 정의하고 기준 자체를
+  중복 정의하지 않는다.
+- 현재 13개 Proxy Spot이 Spot Recommendation 또는 Spot Forecast에 즉시 사용
+  가능하다고 표현하지 않는다.
+
 ## 15. 완료 정의
 
 이 문서는 다음 조건을 만족해야 Draft를 벗어나 다음 개정을 검토할 수 있다.
@@ -266,5 +282,6 @@ Evidence 계약이 참조하는 데이터 관계를 정의한다. 다음 다섯 
 
 | 버전 | 날짜 | 변경내용 | 작성자 | 승인상태 |
 |---|---|---|---|---|
+| v0.2.1 | 2026-07-24 | 검증된 Spot Master(위치 식별)와 미검증 Spot Proxy(추천 가능 여부)를 구분(§14.1), Spot Recommendation/Forecast eligibility는 RECOMMENDATION_OUTPUT_CONTRACT.md §9.1/§9.2 소유임을 명시 | 신동현 | PM 결정 |
 | v0.2.0 | 2026-07-24 | Area-Spot-Sensor 데이터 관계(§14) 추가 — Spot 정적 마스터·S-DoT 시계열·Area-Spot·Spot-Sensor 관계 분리, `spatial_support_type` 후보 필드와 S-DoT 동적 수집 미구현 상태 명시 | 신동현 | PM 결정 |
 | v0.1.0 | 2026-07-24 | 최초 초안 작성(EG-8A/EG-8B ML-ready 데이터셋 목표 계약) | 신동현 | PM 결정 |

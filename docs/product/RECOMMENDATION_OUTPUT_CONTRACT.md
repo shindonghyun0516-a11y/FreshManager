@@ -1,7 +1,7 @@
 # Recommendation Output Contract
 
 - 문서 상태: Draft
-- 버전: v0.2.0
+- 버전: v0.3.0
 - 작성자: 신동현
 - 최종 승인자: 신동현
 - 최초 작성일: 2026-07-24
@@ -86,12 +86,41 @@ SPOT이라는 사실과, 그 Spot의 혼잡 상태를 직접 예측할 수 있�
 
 다음 조합표로 요약한다.
 
-| `recommendation_type` | `prediction_scope` | 의미 |
-|---|---|---|
-| `SPOT` | `SPOT` | 이 Spot을 추천하며, Spot 자체의 혼잡 예측도 직접 표시 가능 |
-| `SPOT` | `AREA` | 이 Spot을 추천하지만, 예측 근거는 Area 수준(Spot 자체 예측 콘텐츠 미표시) |
-| `AREA` | `AREA` | Area를 추천하며, 예측도 Area 수준(일반적인 조합) |
-| `AREA` | `SPOT` | 허용하지 않는다(Area 추천에 Spot 단위 예측을 붙이지 않는다) |
+| 조합 | `recommendation_type` | `prediction_scope` | 상태 |
+|---|---|---|---|
+| A | `SPOT` | `SPOT` | 허용(조건부, §9.1) |
+| B | `SPOT` | `AREA` | 허용(조건부, §9.1) |
+| C | `AREA` | `AREA` | 허용(기본 조합, §10) |
+| D | `AREA` | `SPOT` | **금지** — 별도 제품 정책 승인 전까지 허용하지 않는다 |
+
+네 조합의 상세 조건과 예시 문구는 §9.1(SPOT Recommendation Eligibility)이
+소유한다. 이 절은 개념 구분만 정의하고 조건 상세를 중복 정의하지 않는다.
+
+### 3.1 조합 A — SPOT Recommendation + SPOT Prediction
+
+이 Spot을 추천하고, Spot 자체의 혼잡 예측도 직접 표시한다. §9.1의 Spot
+Recommendation Eligibility와 Spot Forecast Eligibility를 모두 충족해야 한다.
+
+### 3.2 조합 B — SPOT Recommendation + AREA Prediction
+
+이 Spot을 추천하지만, 혼잡 예측 콘텐츠는 Area 수준 근거만 사용한다. Spot
+자체는 §9.1의 Spot Recommendation Eligibility(현장검증·운영 적합성)를
+충족해야 하며, Spot Forecast Eligibility(Spot-level 예측 근거)는 충족하지
+않아도 된다. 이 조합에서 §6 Spot Forecast Content 필드는 모두 명시적 `null`
+이다(§12.1).
+
+### 3.3 조합 C — AREA Recommendation + AREA Prediction
+
+Area를 추천하고 예측도 Area 수준이다. `spot_id`는 명시적 `null`, `fallback_reason`
+필수(§10). **현재 13개 Spot이 모두 `field_verified=false`인 상태에서는 이
+조합이 기본값이다.**
+
+### 3.4 조합 D — AREA Recommendation + SPOT Prediction(금지)
+
+Area를 추천하면서 Spot 단위 예측 콘텐츠를 붙이는 조합은 금지한다. 추천
+대상이 Area인데 특정 Spot의 혼잡 상태를 함께 제시하면, 그 Spot이 왜
+언급됐는지 근거가 없는 상태로 정밀도를 과장하게 된다. 이 조합이 필요하다고
+판단되면 이 문서 개정이 아니라 별도 제품 정책 승인을 먼저 받는다.
 
 ## 4. Spot Identity Contract
 
@@ -194,7 +223,11 @@ S-DoT 또는 다른 공간 근거가 해당 Spot을 얼마나 직접적으로 �
 강남역 5번 출구는 현재 여유 상태지만, 1시간 뒤 혼잡도가 높아질 전망입니다.
 ```
 
-`prediction_scope = AREA`인 레코드에는 이 절의 필드를 채우지 않는다(§3 규칙).
+`prediction_scope = AREA`인 레코드(조합 B, §3.2)에는 이 절의 9개 필드를
+**명시적 `null`**로 기록한다 — 필드를 생략하지 않는다(§12.1). 이는 §9.1의
+Spot Recommendation Eligibility(현장검증)는 통과했지만 §9.2의 Spot Forecast
+Eligibility(Spot-level 예측 근거)는 통과하지 못한 상태를 정확히 표현하기
+위함이다.
 
 ## 7. Forecast Summary·Recommendation Reason·Action Message 분리
 
@@ -214,14 +247,21 @@ S-DoT 또는 다른 공간 근거가 해당 Spot을 얼마나 직접적으로 �
 ## 8. 근거 수준별 UI 표현 규칙
 
 `spatial_support_type`별로 허용되는 표현 강도를 제한한다. **근거보다 강한
-문구를 생성하지 않는다.**
+문구를 생성하지 않는다.** 아래 예시는 모두 §9.1 Eligibility를 통과한
+Spot(조합 A 또는 B)을 전제로 하며, §3.3 조합 C(현재 기본값)에는 Spot 명칭
+자체를 이런 방식으로 언급하지 않는다.
 
-| `spatial_support_type` | 허용 표현 예시 |
+| 조합·`spatial_support_type` | 허용 표현 예시 |
 |---|---|
-| `DIRECT_SENSOR` | "강남역 5번 출구는 1시간 뒤 혼잡할 전망입니다." |
-| `NEARBY_SENSOR` | "강남역 5번 출구 인근은 1시간 뒤 혼잡할 가능성이 있습니다." |
-| `AREA_INFERENCE` | "강남역 Area는 혼잡할 전망입니다. 5번 출구 상태는 확인되지 않았습니다." |
-| `UNSUPPORTED` | "5번 출구의 개별 혼잡 상태를 확인할 수 없습니다." |
+| 조합 A·`DIRECT_SENSOR` | "강남역 5번 출구는 1시간 뒤 혼잡할 전망입니다." |
+| 조합 A·`NEARBY_SENSOR` | "강남역 5번 출구 인근은 1시간 뒤 혼잡할 가능성이 있습니다." |
+| 조합 B(`AREA_INFERENCE`/`UNSUPPORTED`와 무관, §3.2 정의상 §6 필드 자체가 없음) | "강남역 Area는 1시간 뒤 혼잡할 전망입니다. 추천 위치는 강남역 5번 출구입니다. 5번 출구 자체의 혼잡 상태는 확인되지 않았습니다." |
+| 조합 C·`AREA_INFERENCE` | "강남역 Area는 혼잡할 전망입니다. 출구 단위 혼잡도는 확인되지 않았습니다." |
+| `UNSUPPORTED`(Spot 언급이 필요한 예외적 맥락) | "5번 출구의 개별 혼잡 상태를 확인할 수 없습니다." |
+
+**금지 예시**: 조합 B 또는 C 상태에서 "강남역 5번 출구는 1시간 뒤 혼잡할
+전망입니다."처럼 Spot 이름과 Spot 자체의 혼잡 예측을 직접 연결하는 문장을
+생성하지 않는다. 이 문장은 조합 A·`DIRECT_SENSOR`에서만 허용된다.
 
 이 표는 표현 강도의 상한을 정의하며, 실제 UI 문구 템플릿은 후속 UI/UX 상세
 설계에서 확정한다.
@@ -233,20 +273,74 @@ S-DoT 또는 다른 공간 근거가 해당 Spot을 얼마나 직접적으로 �
 - `spot_id` 필수
 - `fallback_reason`은 존재하지 않는다 — 필드 자체를 생략하지 않고 명시적
   `null`로 기록한다(§12.1 null/생략 계약 참조)
-- `field_verified` 필수
+- `field_verified` 필수(값 요구사항은 §9.1)
 - `coordinate_type` 필수
-- `validation_status` 필수
+- `validation_status` 필수(값 요구사항은 §9.1)
 
-`prediction_scope = SPOT`이 추가로 성립하면 §6 Spot Forecast Content 필드도
-채운다. `prediction_scope = AREA`면 §6 필드는 비운다.
+필드가 "존재"하는 것과 그 값이 추천을 허용할 만큼 "충분"한 것은 다르다.
+`field_verified=false`도 필드가 존재한다는 조건은 만족하지만, §9.1의 값
+기준을 통과하지 못하면 `recommendation_type = SPOT`을 사용할 수 없다.
+
+### 9.1 SPOT Recommendation Eligibility
+
+`recommendation_type = SPOT`을 사용하려면(조합 A·B 공통, §3.1/§3.2)
+다음을 **모두** 만족해야 한다.
+
+- `spot_id`가 실제 Spot Master(`docs/product/EG6_AREA_SPOT_PANEL.md`)에 존재
+- `field_verified = true`(단순 존재가 아니라 값이 `true`)
+- `validation_status = VERIFIED`(단순 존재가 아니라 값이 `VERIFIED`; 기본값
+  `FIELD_VALIDATION_REQUIRED`는 충족하지 않음, §12)
+- 운영·현장 적합성이 확인됨(현장검증 절차는 이 문서가 정의하지 않으며 별도
+  Issue와 PM 승인이 필요하다)
+- Area와의 관계가 검증됨(EG-6A의 정적 Area-Spot 연결로 이미 충족, 별도 필드
+  불필요)
+
+이 조건은 조합 A와 B에 **동일하게** 적용된다. 즉 Spot 자체를 추천 대상으로
+제시하려면 예측 콘텐츠 수준(§3.1 vs §3.2)과 무관하게 이 조건을 먼저
+통과해야 한다.
+
+새 Eligibility 전용 필드는 추가하지 않는다. `field_verified`와
+`validation_status`의 값 기준을 명확히 하는 것으로 충분히 표현 가능하다고
+판단했다. 향후 이 두 필드로 표현할 수 없는 요구사항이 발견되면, 새 필드명과
+필요성·대안을 먼저 보고한 뒤 추가한다.
+
+**현재 13개 Spot은 전부 `field_verified=false`이므로 이 조건을 만족하지
+않는다. 즉 현재 상태에서는 `recommendation_type = SPOT`을 사용할 수 없다**
+(§3.3 조합 C가 현재의 기본 조합이다).
+
+### 9.2 Spot Forecast Eligibility
+
+조합 A(§3.1)에서 §6 Spot Forecast Content 필드를 채우려면, §9.1의 조건에
+**추가로** 다음을 만족해야 한다.
+
+- `spatial_support_type`이 `DIRECT_SENSOR` 또는 `NEARBY_SENSOR`(§5) —
+  `AREA_INFERENCE`·`UNSUPPORTED`면 §6 필드를 채우지 않는다
+- Spot-level 관측 근거가 존재(§5의 `support_sensor_id`/`support_observed_at`)
+- Spot Forecast 최소 데이터조건을 충족(구체 기준은
+  `docs/analysis/ANALYSIS_PLAN.md` §6.6이 소유하며 `OPEN_DECISION`)
+
+조합 B(§3.2)는 §9.1만 충족하면 되고 이 절의 조건은 필요하지 않다 — 조합
+B에서는 §6 필드를 애초에 채우지 않기 때문이다.
+
+`prediction_scope = SPOT`이 성립하려면(§9.1과 함께) 이 절의 조건도 충족해야
+한다. `prediction_scope = AREA`면 §6 필드는 채우지 않고 명시적 `null`로
+둔다(§3.2, §12.1).
 
 ## 10. AREA 추천 필드 요구사항
 
-`recommendation_type = AREA`인 레코드는 다음을 만족해야 한다.
+`recommendation_type = AREA`인 레코드는 다음을 만족해야 한다(조합 C, §3.3).
 
 - `spot_id`는 명시적 `null`(§12.1 참조)
-- `fallback_reason` 필수(값 존재)
-- `prediction_scope`는 항상 `AREA`다(§3 조합표)
+- `fallback_reason` 필수(값 존재, §12.1에 따라 생략 아님)
+- `prediction_scope`는 항상 `AREA`다(§3 조합표, 조합 D는 금지)
+
+**현재 13개 Spot이 전부 §9.1의 Eligibility를 충족하지 못하므로, 지금
+시점에서는 이 조합이 기본값이다.** 이때 `fallback_reason`의 전형적인 값은
+다음과 같다.
+
+```text
+fallback_reason = NO_FIELD_VERIFIED_SPOT
+```
 
 ## 11. 공통 필드 후보
 
@@ -290,6 +384,17 @@ S-DoT 또는 다른 공간 근거가 해당 Spot을 얼마나 직접적으로 �
 
 이 상태를 실제 검증된 판매 위치로 표현하지 않는다. `STATION_CENTER_PROXY`는
 역 중심 대리좌표이며 고정 판매지점이 아니다(D-004).
+
+`validation_status`의 값 공간은 최소 다음 둘을 포함한다.
+
+| 값 | 의미 |
+|---|---|
+| `FIELD_VALIDATION_REQUIRED` | 현재 13개 Spot의 기본값. 현장검증이 아직 필요함 |
+| `VERIFIED` | 현장검증·운영 적합성 확인 완료. §9.1 Eligibility의 통과 조건 |
+
+`VERIFIED`로의 전환 절차와 판정 기준은 이 문서가 정의하지 않으며 별도 Issue와
+PM 승인이 필요하다. 이 문서는 `VERIFIED`가 §9.1의 통과 조건이라는 계약만
+소유한다.
 
 ### 12.1 null과 필드 생략 계약
 
@@ -356,11 +461,13 @@ UI/UX 상세 설계에서 정한다. 코드 후보 예시:
 
 - SPOT/AREA 스키마와 상호 배타 필드 규칙 정의
 - Prediction Scope와 Recommendation Type의 독립성 정의
+- SPOT+SPOT/SPOT+AREA/AREA+AREA/AREA+SPOT 4개 조합의 허용·금지와 조건 정의
+- Spot Recommendation Eligibility와 Spot Forecast Eligibility를 분리 정의
 - Spot Identity·Spatial Evidence·Spot Forecast Content 계약 정의
 - Forecast Summary·Recommendation Reason·Action Message 분리 정의
-- 근거 수준별 UI 표현 상한 정의
+- 근거 수준별·조합별 UI 표현 상한 정의
 - Model Output·Recommendation Output·UI Presentation 계층 분리 명시
-- Spot 기본 상태(`field_verified=false` 등) 명시
+- Spot 기본 상태와 `validation_status` 값 공간(`FIELD_VALIDATION_REQUIRED`/`VERIFIED`) 명시
 - null과 필드 생략 계약 명시
 - Fallback과 reason code 후보를 `OPEN_DECISION`으로 명시
 - 판매성과 표현 금지 경계 명시
@@ -370,5 +477,6 @@ UI/UX 상세 설계에서 정한다. 코드 후보 예시:
 
 | 버전 | 날짜 | 변경내용 | 작성자 | 승인상태 |
 |---|---|---|---|---|
+| v0.3.0 | 2026-07-24 | SPOT+SPOT/SPOT+AREA/AREA+AREA/AREA+SPOT 4개 조합을 명시적으로 계약화(§3.1~3.4). Spot Recommendation Eligibility(§9.1)와 Spot Forecast Eligibility(§9.2)를 분리해 `field_verified`/`validation_status`의 값 기준(단순 존재가 아니라 `true`/`VERIFIED`)을 명확히 함. `validation_status` 값 공간에 `VERIFIED` 추가(§12). AREA-scope일 때 Spot Forecast 필드가 명시적 null임을 명시(§6). 근거 수준·조합별 UI 표현표에 조합 B 예시와 금지 예시 추가(§8) | 신동현 | PM 결정 |
 | v0.2.0 | 2026-07-24 | Spot Identity·Prediction Scope·Spatial Evidence·Spot Forecast Content 계약 추가. Forecast Summary/Reason Codes/Action Message 3계층 분리와 근거 수준별 UI 표현 규칙 추가. 기존 S-DoT 정적 연결과 `spatial_support_type`의 관계 명시. null/필드 생략 계약 명시 | 신동현 | PM 결정 |
 | v0.1.0 | 2026-07-24 | 최초 초안 작성(EG-8E Recommendation Output 목표 계약) | 신동현 | PM 결정 |

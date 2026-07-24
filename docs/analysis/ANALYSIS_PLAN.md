@@ -1,7 +1,7 @@
 # Analysis Plan
 
 - 문서 상태: Draft
-- 버전: v0.1.4
+- 버전: v0.1.5
 - 작성자: 신동현
 - 최종 승인자: 신동현
 - 최초 작성일: 2026-07-17
@@ -251,6 +251,28 @@ Spot Forecast의 모델·성능기준·최소 데이터 기간은 임의로 확�
 
 S-DoT 동적 수집 자체가 `NOT_IMPLEMENTED`이므로(D-005), 이 절의 조건은 목표
 분석 계획이며 현재 시점에 즉시 적용 가능한 실행 계획이 아니다.
+
+#### 6.6.1 착수 전 사전조건 체크리스트
+
+Spot Forecast 분석에 착수하려면 다음을 **모두** 확인한다. 하나라도
+미충족이면 착수하지 않고 Area Forecast만 사용한다.
+
+- [ ] Spot 좌표와 명칭이 검증됨(`docs/product/RECOMMENDATION_OUTPUT_CONTRACT.md`
+  §9.1 Spot Recommendation Eligibility 통과)
+- [ ] 센서 좌표가 확인됨
+- [ ] Spot–Sensor 거리가 확인됨(`support_distance_m`)
+- [ ] 센서의 Spot 대표성이 검증됨(`spatial_support_type`이 `DIRECT_SENSOR` 또는
+  `NEARBY_SENSOR`)
+- [ ] 해당 Spot의 과거 관측 시계열이 최소 기간만큼 확보됨(구체 기간은 미확정)
+- [ ] Area 값과 독립된 Spot 자체 관측값(Spot Ground Truth)이 확보됨 — Area
+  예측값 자체를 Spot Ground Truth로 대체하지 않음
+- [ ] 최소 데이터 기간이 PM 승인으로 결정됨
+- [ ] `DIRECT_SENSOR`와 `NEARBY_SENSOR` 근거의 예측 성능을 하나로 합치지 않고
+  분리 평가할 계획이 있음
+
+이 체크리스트는 §6.6의 원칙(검증조건·DIRECT/NEARBY/AREA_INFERENCE/UNSUPPORTED
+평가·AREA fallback·Ground Truth 금지)을 실행 전 확인 항목으로 정리한 것이며
+새로운 원칙을 추가하지 않는다.
 
 ---
 
@@ -1090,6 +1112,7 @@ ANALYSIS_PLAN은 다음 조건을 만족해야 Approved 상태로 전환할 수 
 
 | 버전 | 날짜 | 변경내용 | 작성자 | 승인상태 |
 |---|---|---|---|---|
+| v0.1.5 | 2026-07-24 | Spot Forecast 착수 전 사전조건 체크리스트(§6.6.1) 추가 — Spot 좌표·명칭 검증, 센서 좌표·거리·대표성 확인, Spot별 시계열·Ground Truth 확보, 최소 데이터기간, DIRECT/NEARBY 분리평가를 실행 전 확인 항목으로 정리 | 신동현 | PM 결정 |
 | v0.1.4 | 2026-07-24 | Spot Forecast 분석 가능성 조건(§6.6) 추가 — DIRECT_SENSOR/NEARBY_SENSOR/AREA_INFERENCE/UNSUPPORTED 평가 원칙, Area 예측값의 Spot Ground Truth 사용 금지, 모델·성능기준 OPEN_DECISION | 신동현 | PM 결정 |
 | v0.1.3 | 2026-07-24 | EG-8B·EG-8C Gate 연결(§6.5), 시계열 분할 원칙(§10.1), 피크 탐지 성능 지표(§21.1), EG-8C 모델 OPEN_DECISION(§29.1) 추가; 기존 EG-8 표현을 EG-8B/EG-8D로 정렬 | 신동현 | PM 결정 |
 | v0.1.2 | 2026-07-23 | 15분·30분·1시간 분석 집계·시차를 PM 확정 5분 수집주기 대안과 명확히 분리 | 신동현 | PM 최종 결정 |
