@@ -1,11 +1,11 @@
 # Git Workflow
 
 - 문서 상태: Draft
-- 버전: v0.1.4
+- 버전: v0.1.5
 - 작성자: 신동현
 - 최종 승인자: 신동현
 - 최초 작성일: 2026-07-17
-- 최종 수정일: 2026-07-21
+- 최종 수정일: 2026-07-25
 - 적용 프로젝트: Freshmanager Data PoC
 - 관련 문서:
   - `AGENTS.md`
@@ -14,6 +14,7 @@
   - `docs/rules/SECURITY_RULES.md`
   - `docs/testing/PROJECT_GUARD_SPEC.md`
   - `docs/testing/QUALITY_GATES.md`
+  - `docs/engineering/DEVELOPMENT_WORKFLOW.md`
 - 변경 시 PM 승인: 필요
 
 ---
@@ -253,6 +254,12 @@ donghyun
 - Worktree 종료 전 Commit·Push 여부를 확인한다.
 - 사용이 끝난 Worktree는 PM 확인 후 정리한다.
 - 실제 `.env` 복사 여부는 `SECURITY_RULES.md`를 따른다.
+
+여러 Checklist 항목을 병렬로 다루는 Parent Issue의 Worktree 운용과
+Integration Branch/Integration PR 절차는 `docs/engineering/
+DEVELOPMENT_WORKFLOW.md`를 따른다. 이 문서(§4~§19)는 그런 Parent Issue
+흐름에서 대체 적용되며, 단독 Issue·단독 작업에는 계속 이 문서를 그대로
+적용한다.
 
 ---
 
@@ -713,6 +720,13 @@ Issue 1개
 
 ## 16. Merge 후 정리
 
+이 절의 "Merge 후 항상 로컬 Project Guard·전체 테스트 재검증"은 단독
+Issue·단독 PR 흐름(v1)의 기본값이다. Parent Issue/Integration PR
+흐름(v2)의 Post-Merge 기본 검증은 `docs/engineering/
+DEVELOPMENT_WORKFLOW.md` §15를 따른다(기본값은 SHA 동기화·CI 확인이며,
+전체 재검증은 충돌 해결·코드 변형 의심·CI 실패·Release Gate·PM 지시가
+있을 때만 수행한다). 두 절차는 적용 범위로 구분되며 서로 대체하지 않는다.
+
 GitHub에서 Merge 후 다음 절차를 수행한다.
 
 ```bash
@@ -891,6 +905,7 @@ Git 작업은 다음 조건을 모두 만족해야 완료다.
 
 | 버전 | 날짜 | 변경내용 | 작성자 | 승인상태 |
 |---|---|---|---|---|
+| v0.1.5 | 2026-07-25 | §7에 Parent Issue/Integration PR(`DEVELOPMENT_WORKFLOW.md`) 포인터 추가, §16에 v1·v2 Post-Merge 검증 적용범위 정렬 문구 추가(본문 재작성 없음) | 신동현 | PM 승인 구현 중 |
 | v0.1.4 | 2026-07-21 | 모든 Pull Request CI, `main` Push 제한과 Stacked PR 상태 분류 계약 반영 | 신동현 | PM 승인 구현 중 |
 | v0.1.3 | 2026-07-21 | Commit 전 Git 출력을 승인 파일 pathspec과 보호 경로 Boolean·개수 검증으로 분리 | 신동현 | PM 승인 구현 중 |
 | v0.1.2 | 2026-07-21 | 저장소 작업일지 경로 폐기, Legacy 예외 제거와 H-206 안전 검증 정책 반영 | 신동현 | PM 승인 구현 중 |

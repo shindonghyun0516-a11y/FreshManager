@@ -119,6 +119,14 @@ PM Review는 증거와 위험을 검토하는 활동이고, Quality Gate 확인�
 결정이다. 셋은 서로의 대체물이 아니다. Codex는 계획, 구현과 기술검토를
 지원하지만 어느 PM Approval도 대체하지 않는다.
 
+외부 실행이 필요 없는 대다수 작업(현재 이 프로젝트의 절대다수)에서는
+범위 승인과 Merge 승인을 중심으로 한 두 단계 리듬으로 실무를 운용한다.
+이 실무 리듬과 여러 Checklist 항목을 하나의 Integration PR로 묶어 승인
+"횟수"를 줄이는(승인 "요건"은 줄이지 않는) 구체 절차는
+`docs/engineering/DEVELOPMENT_WORKFLOW.md`가 정의한다. 외부 실행 승인은
+그 문서가 정의하는 원칙대로 항상 실행 직전 별도로 받으며, 이 절이 정의한
+세 종류 PM Approval의 구분 자체는 바뀌지 않는다.
+
 ---
 
 ## 3. 해결하려는 문제와 비목적
@@ -446,6 +454,11 @@ Worktree는 Branch를 별도의 실제 폴더에 펼쳐 물리적으로 격리�
 모든 Issue에 Worktree를 요구하지 않는다. 단순 문서 변경이나 작은 단일 작업은
 Branch만으로 충분할 수 있다. 자세한 선택과 정리 절차는
 [`GIT_WORKFLOW.md`](../rules/GIT_WORKFLOW.md)를 따른다.
+
+여러 Checklist 항목을 병렬로 다루는 Parent Issue에서 Worktree로 격리한
+Worker Branch들을 하나의 Integration Branch로 모아 단일 Integration PR로
+`main`에 반영하는 절차는 [`DEVELOPMENT_WORKFLOW.md`](DEVELOPMENT_WORKFLOW.md)가
+정의한다.
 
 ---
 
