@@ -83,9 +83,11 @@ PM이 장기 기준으로 확정한 5분 주기의 EG-7 1시간 파일럿 Contro
   - Duplicate Detector·Quality Report·Dataset Manifest·최종 Output Writer: `IMPLEMENTATION_AVAILABLE_ON_MAIN`(PR #86, Issue #85)
   - 실제 오류 응답 기반 검증: `NOT_COMPLETED`(합성 Fixture 오류 경로만 테스트 통과, 실 v3 CSV Smoke는 정상 경로만 확인)
 - EG-8B Dataset Profile·시간 커버리지·Forecast-Current Exact Join(B1): `IMPLEMENTATION_AVAILABLE_ON_MAIN`(PR #88, Issue #87)
+- EG-8B Phase 1 Read-only 준비도 분석(ML-ready Dataset·EDA·Forecast 평가·Baseline 가능성): `COMPLETED`
 - ML-ready Dataset: `NOT_IMPLEMENTED`
 - EDA: `NOT_STARTED`
 - Forecast Evaluation: `NOT_STARTED`(B0 Baseline·서울시 Forecast 오차 지표는 EG-8B B2a로 계획, 미착수)
+- EG-8B B2b 다일자 Baseline·Gate 평가: `WAITING_FOR_MORE_DATA`(직전 Phase 1 read-only 분석에서 최소 5영업일 데이터 축적 필요로 확인, B2a 오차 지표 계산과는 별도)
 - ML Model: `NOT_STARTED`
 - Area Ranking: `NOT_STARTED`
 - Spot Ranking: `NOT_STARTED`

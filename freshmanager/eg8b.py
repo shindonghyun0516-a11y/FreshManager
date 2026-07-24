@@ -47,6 +47,38 @@ ERROR_DATASET_ID_MISMATCH = "DATASET_ID_MISMATCH"
 ERROR_DATASET_HASH_MISMATCH = "DATASET_HASH_MISMATCH"
 ERROR_DATASET_ROW_COUNT_MISMATCH = "DATASET_ROW_COUNT_MISMATCH"
 
+DATASET_READINESS_READY_FOR_PHASE1 = "READY_FOR_EG8B_PHASE1_ANALYSIS"
+"""Means only: the dataset directory passed load_dataset_bundle's four
+provenance checks (file presence, dataset_id, output-artifact SHA-256,
+Manifest row counts) and EG-8B B1's analysis functions can run on it.
+Does NOT mean: ML training readiness, Seoul Forecast performance passed,
+EG-8B as a whole complete, or Recommendation output possible. This is the
+only value build_dataset_profile ever produces -- it is reached only after
+load_dataset_bundle already succeeded, so it is an invariant marker, not a
+computed judgment."""
+
+RECORD_TYPE_RUN = "RUN"
+RECORD_TYPE_HOUR = "HOUR"
+RUN_COMPLETENESS_COMPLETE = "COMPLETE"
+RUN_COMPLETENESS_PARTIAL = "PARTIAL"
+FIVE_MINUTE_CADENCE_MINUTES = 5.0
+"""The PM_APPROVED_FIXED long-term cadence (AGENTS.md §18, eg7.CADENCE_MINUTES).
+Deviation is a strict inequality against this exact value -- no new tolerance
+window is introduced."""
+
+MATCH_STATUS_EXACT_MATCH = "EXACT_MATCH"
+MATCH_STATUS_BEFORE_DATASET_START = "BEFORE_DATASET_START"
+MATCH_STATUS_AFTER_DATASET_END = "AFTER_DATASET_END"
+MATCH_STATUS_CURRENT_TARGET_MISSING = "CURRENT_TARGET_MISSING"
+MATCH_STATUS_AREA_NOT_FOUND = "AREA_NOT_FOUND"
+MATCH_STATUSES = (
+    MATCH_STATUS_EXACT_MATCH,
+    MATCH_STATUS_BEFORE_DATASET_START,
+    MATCH_STATUS_AFTER_DATASET_END,
+    MATCH_STATUS_CURRENT_TARGET_MISSING,
+    MATCH_STATUS_AREA_NOT_FOUND,
+)
+
 _REQUIRED_FILES = (
     eg8a.CURRENT_OUTPUT_FILENAME,
     eg8a.FORECAST_OUTPUT_FILENAME,
@@ -64,6 +96,7 @@ _HASHED_ARTIFACT_FILES = (
 AREA_CURRENT_SUMMARY_FIELDNAMES = (
     "area_code",
     "row_count",
+    "unique_collection_run_count",
     "population_min_min",
     "population_min_median",
     "population_min_max",
@@ -77,17 +110,26 @@ AREA_CURRENT_SUMMARY_FIELDNAMES = (
     "observed_at_last",
     "consecutive_pairs_within_6min",
     "consecutive_pairs_total",
+    "max_observation_gap_minutes",
+    "error_row_count",
     "congestion_level_counts_json",
 )
 TIME_COVERAGE_FIELDNAMES = (
+    "record_type",
     "collection_run_id",
     "run_start_called_at",
     "run_min_observed_at",
     "run_max_observed_at",
     "distinct_observed_at_count_in_run",
     "area_count",
+    "run_completeness",
     "gap_from_previous_run_minutes",
+    "five_minute_contract_deviation",
     "hour_of_day",
+    "hour_date",
+    "hour_current_row_count",
+    "hour_distinct_observed_at_count",
+    "hour_area_coverage_count",
 )
 FORECAST_EVALUATION_PAIRS_FIELDNAMES = (
     "area_code",
@@ -158,7 +200,7 @@ class DatasetBundle:
     quality_report: Mapping[str, object]
     current_rows: tuple[CurrentRow, ...]
     forecast_rows: tuple[ForecastRow, ...]
-    error_row_count: int
+    error_rows: tuple[Mapping[str, str], ...]
 
 
 @dataclass(frozen=True)
@@ -335,13 +377,43 @@ def load_dataset_bundle(
         quality_report=quality_report,
         current_rows=tuple(_current_row_from_dict(row) for row in current_raw_rows),
         forecast_rows=tuple(_forecast_row_from_dict(row) for row in forecast_raw_rows),
-        error_row_count=len(error_raw_rows),
+        error_rows=tuple(error_raw_rows),
     )
 
 
 # ---------------------------------------------------------------------------
 # Dataset Profile
 # ---------------------------------------------------------------------------
+
+
+def _official_area_codes(bundle: DatasetBundle) -> list[str]:
+    must_produce = bundle.quality_report.get("must_produce", {})
+    area_row_counts = must_produce.get("area_row_counts", {}) if isinstance(must_produce, dict) else {}
+    codes = area_row_counts.get("official_area_codes", []) if isinstance(area_row_counts, dict) else []
+    return list(codes) if isinstance(codes, list) else []
+
+
+def _quality_report_path(bundle: DatasetBundle, *path_keys: str) -> object:
+    """Drill into bundle.quality_report along `path_keys`, returning None if
+    any segment is absent or not a mapping -- defensive against an upstream
+    schema this module does not fully control."""
+    node: object = bundle.quality_report
+    for key in path_keys:
+        if not isinstance(node, Mapping):
+            return None
+        node = node.get(key)
+    return node
+
+
+def _collection_lag_seconds_list(
+    rows: Sequence[CurrentRow] | Sequence[ForecastRow],
+) -> list[float]:
+    """Per-row called_at - observed_at, in seconds. Same lag definition as
+    eg8a.build_quality_report's own collection_lag_seconds computation."""
+    return [
+        (datetime.fromisoformat(row.called_at) - datetime.fromisoformat(row.observed_at)).total_seconds()
+        for row in rows
+    ]
 
 
 def build_dataset_profile(
@@ -351,16 +423,13 @@ def build_dataset_profile(
 ) -> dict[str, object]:
     """Build the EG-8B Dataset Profile.
 
-    Deliberately does not repeat duplicate-rate/collection-lag/area-match-
-    rate numbers already present in the upstream quality_report.json (which
-    remains readable inside the same dataset directory) -- only provenance
-    validation results and information not already in quality_report.json.
+    duplicate_rate and area_code_match_rate are read verbatim from the
+    upstream quality_report.json (never recomputed with a different
+    formula). collection_lag_seconds reuses quality_report.json's mean/min/
+    max verbatim and adds median (absent upstream) computed from the same
+    per-row called_at-observed_at definition eg8a itself uses.
     """
-    must_produce = bundle.quality_report.get("must_produce", {})
-    area_row_counts = must_produce.get("area_row_counts", {}) if isinstance(must_produce, dict) else {}
-    official_area_codes = (
-        area_row_counts.get("official_area_codes", []) if isinstance(area_row_counts, dict) else []
-    )
+    official_area_codes = _official_area_codes(bundle)
     official_area_set = set(official_area_codes)
     current_areas = {row.area_code for row in bundle.current_rows}
     forecast_areas = {row.area_code for row in bundle.forecast_rows}
@@ -372,6 +441,11 @@ def build_dataset_profile(
     forecast_observed = [datetime.fromisoformat(row.observed_at) for row in bundle.forecast_rows]
     forecast_targets = [datetime.fromisoformat(row.forecast_at) for row in bundle.forecast_rows]
     run_ids = {row.collection_run_id for row in bundle.current_rows}
+
+    data_dates = sorted({datetime.fromisoformat(row.observed_at).date().isoformat() for row in bundle.current_rows})
+
+    current_lag = _collection_lag_seconds_list(bundle.current_rows)
+    forecast_lag = _collection_lag_seconds_list(bundle.forecast_rows)
 
     return {
         "schema_version": DATASET_PROFILE_SCHEMA_VERSION,
@@ -387,10 +461,11 @@ def build_dataset_profile(
             "all_output_hashes_match": True,
             "row_counts_match_manifest": True,
         },
+        "dataset_readiness": DATASET_READINESS_READY_FOR_PHASE1,
         "row_counts": {
             "current_rows": len(bundle.current_rows),
             "forecast_rows": len(bundle.forecast_rows),
-            "error_rows": bundle.error_row_count,
+            "error_rows": len(bundle.error_rows),
         },
         "area_coverage": {
             "official_area_count": len(official_area_codes),
@@ -411,8 +486,36 @@ def build_dataset_profile(
             "total_span_seconds": (
                 (max(called_ats) - min(called_ats)).total_seconds() if called_ats else None
             ),
+            "data_date_count": len(data_dates),
+            "data_dates": data_dates,
         },
         "collection_run_count": len(run_ids),
+        "duplicate_rate": {
+            "current": _quality_report_path(
+                bundle, "recommended", "current_duplicate", "semantic_duplicate_rate"
+            ),
+            "forecast": _quality_report_path(
+                bundle, "recommended", "forecast_target_duplicate", "semantic_duplicate_rate"
+            ),
+        },
+        "area_code_match_rate": {
+            "current": _quality_report_path(bundle, "recommended", "area_code_match_rate", "current"),
+            "forecast": _quality_report_path(bundle, "recommended", "area_code_match_rate", "forecast"),
+        },
+        "collection_lag_seconds": {
+            "current": {
+                "mean": _quality_report_path(bundle, "recommended", "collection_lag_seconds", "current", "mean"),
+                "min": _quality_report_path(bundle, "recommended", "collection_lag_seconds", "current", "min"),
+                "median": statistics.median(current_lag) if current_lag else None,
+                "max": _quality_report_path(bundle, "recommended", "collection_lag_seconds", "current", "max"),
+            },
+            "forecast": {
+                "mean": _quality_report_path(bundle, "recommended", "collection_lag_seconds", "forecast", "mean"),
+                "min": _quality_report_path(bundle, "recommended", "collection_lag_seconds", "forecast", "min"),
+                "median": statistics.median(forecast_lag) if forecast_lag else None,
+                "max": _quality_report_path(bundle, "recommended", "collection_lag_seconds", "forecast", "max"),
+            },
+        },
     }
 
 
@@ -421,10 +524,29 @@ def build_dataset_profile(
 # ---------------------------------------------------------------------------
 
 
+def _error_row_area_code(raw_error_row: Mapping[str, str]) -> str | None:
+    """Attribute an Error Row to an official Area: area_code_requested first,
+    area_code_returned as fallback, or unattributed (None) if both are
+    absent -- never guessed onto an arbitrary official Area."""
+    requested = (raw_error_row.get("area_code_requested") or "").strip()
+    if requested:
+        return requested
+    returned = (raw_error_row.get("area_code_returned") or "").strip()
+    if returned:
+        return returned
+    return None
+
+
 def build_area_current_summary_rows(bundle: DatasetBundle) -> list[dict[str, object]]:
     by_area: dict[str, list[CurrentRow]] = defaultdict(list)
     for row in bundle.current_rows:
         by_area[row.area_code].append(row)
+
+    error_counts_by_area: Counter = Counter()
+    for raw_error_row in bundle.error_rows:
+        attributed_area = _error_row_area_code(raw_error_row)
+        if attributed_area is not None:
+            error_counts_by_area[attributed_area] += 1
 
     rows: list[dict[str, object]] = []
     for area_code in sorted(by_area):
@@ -433,16 +555,17 @@ def build_area_current_summary_rows(bundle: DatasetBundle) -> list[dict[str, obj
         pop_max = [r.population_max for r in area_rows]
         pop_mid = [r.population_mid for r in area_rows]
         observed_times = [datetime.fromisoformat(r.observed_at) for r in area_rows]
-        consecutive_pairs = sum(
-            1
+        gaps_minutes = [
+            (later - earlier).total_seconds() / 60
             for earlier, later in zip(observed_times, observed_times[1:])
-            if (later - earlier).total_seconds() <= 360
-        )
+        ]
+        consecutive_pairs = sum(1 for gap in gaps_minutes if gap <= 6.0)
         congestion_counts = Counter(r.congestion_level for r in area_rows)
         rows.append(
             {
                 "area_code": area_code,
                 "row_count": len(area_rows),
+                "unique_collection_run_count": len({r.collection_run_id for r in area_rows}),
                 "population_min_min": min(pop_min),
                 "population_min_median": statistics.median(pop_min),
                 "population_min_max": max(pop_min),
@@ -456,6 +579,8 @@ def build_area_current_summary_rows(bundle: DatasetBundle) -> list[dict[str, obj
                 "observed_at_last": area_rows[-1].observed_at,
                 "consecutive_pairs_within_6min": consecutive_pairs,
                 "consecutive_pairs_total": max(0, len(area_rows) - 1),
+                "max_observation_gap_minutes": max(gaps_minutes) if gaps_minutes else None,
+                "error_row_count": error_counts_by_area.get(area_code, 0),
                 "congestion_level_counts_json": json.dumps(
                     dict(congestion_counts), ensure_ascii=False, sort_keys=True
                 ),
@@ -465,16 +590,22 @@ def build_area_current_summary_rows(bundle: DatasetBundle) -> list[dict[str, obj
 
 
 # ---------------------------------------------------------------------------
-# Time Coverage -- one row per collection_run_id. Real EG-8A datasets have
-# exactly one distinct observed_at per run (all 13 areas share one instant),
-# so this single granularity captures both the run-cadence view and the
-# observed_at-level view. distinct_observed_at_count_in_run measures that
-# uniformity rather than assuming it, so a future dataset that breaks it is
-# still faithfully represented (not silently collapsed).
+# Time Coverage -- two record types in one file (record_type column):
+# RUN rows (one per collection_run_id, chronological) and HOUR rows (one per
+# KST calendar-date+hour bucket of Current rows, date/hour order), so
+# Hour-level coverage is directly readable without a second file.
+#
+# Real EG-8A datasets have exactly one distinct observed_at per run (all 13
+# areas share one instant), so RUN rows capture both the run-cadence view
+# and the observed_at-level view. distinct_observed_at_count_in_run measures
+# that uniformity rather than assuming it, so a future dataset that breaks
+# it is still faithfully represented (not silently collapsed).
 # ---------------------------------------------------------------------------
 
 
 def build_time_coverage_rows(bundle: DatasetBundle) -> list[dict[str, object]]:
+    official_area_set = set(_official_area_codes(bundle))
+
     by_run: dict[str, list[CurrentRow]] = defaultdict(list)
     for row in bundle.current_rows:
         by_run[row.collection_run_id].append(row)
@@ -491,31 +622,76 @@ def build_time_coverage_rows(bundle: DatasetBundle) -> list[dict[str, object]]:
                 "run_max_observed_at": max(observed_ats),
                 "distinct_observed_at_count_in_run": len(set(observed_ats)),
                 "area_count": len(rows),
+                "area_codes": {r.area_code for r in rows},
             }
         )
     run_summaries.sort(key=lambda item: item["run_start_called_at"])
 
-    output_rows: list[dict[str, object]] = []
+    run_rows: list[dict[str, object]] = []
     previous_start: datetime | None = None
     for summary in run_summaries:
         start = summary["run_start_called_at"]
         gap_minutes = (
             (start - previous_start).total_seconds() / 60 if previous_start is not None else None
         )
-        output_rows.append(
+        deviation = (
+            gap_minutes != FIVE_MINUTE_CADENCE_MINUTES if gap_minutes is not None else None
+        )
+        is_complete = bool(official_area_set) and summary["area_codes"] == official_area_set
+        run_rows.append(
             {
+                "record_type": RECORD_TYPE_RUN,
                 "collection_run_id": summary["collection_run_id"],
                 "run_start_called_at": start.isoformat(),
                 "run_min_observed_at": summary["run_min_observed_at"].isoformat(),
                 "run_max_observed_at": summary["run_max_observed_at"].isoformat(),
                 "distinct_observed_at_count_in_run": summary["distinct_observed_at_count_in_run"],
                 "area_count": summary["area_count"],
+                "run_completeness": (
+                    RUN_COMPLETENESS_COMPLETE if is_complete else RUN_COMPLETENESS_PARTIAL
+                ),
                 "gap_from_previous_run_minutes": gap_minutes,
+                "five_minute_contract_deviation": deviation,
                 "hour_of_day": summary["run_min_observed_at"].hour,
+                "hour_date": None,
+                "hour_current_row_count": None,
+                "hour_distinct_observed_at_count": None,
+                "hour_area_coverage_count": None,
             }
         )
         previous_start = start
-    return output_rows
+
+    by_hour_bucket: dict[tuple[str, int], list[CurrentRow]] = defaultdict(list)
+    for row in bundle.current_rows:
+        observed = datetime.fromisoformat(row.observed_at)
+        by_hour_bucket[(observed.date().isoformat(), observed.hour)].append(row)
+
+    hour_rows: list[dict[str, object]] = []
+    for date_str, hour in sorted(by_hour_bucket):
+        bucket_rows = by_hour_bucket[(date_str, hour)]
+        distinct_observed = {r.observed_at for r in bucket_rows}
+        areas_present = {r.area_code for r in bucket_rows} & official_area_set
+        hour_rows.append(
+            {
+                "record_type": RECORD_TYPE_HOUR,
+                "collection_run_id": None,
+                "run_start_called_at": None,
+                "run_min_observed_at": None,
+                "run_max_observed_at": None,
+                "distinct_observed_at_count_in_run": None,
+                "area_count": None,
+                "run_completeness": None,
+                "gap_from_previous_run_minutes": None,
+                "five_minute_contract_deviation": None,
+                "hour_of_day": hour,
+                "hour_date": date_str,
+                "hour_current_row_count": len(bucket_rows),
+                "hour_distinct_observed_at_count": len(distinct_observed),
+                "hour_area_coverage_count": len(areas_present),
+            }
+        )
+
+    return run_rows + hour_rows
 
 
 # ---------------------------------------------------------------------------
@@ -552,14 +728,46 @@ def _forecast_horizon_minutes(row: ForecastRow) -> int:
     )
 
 
+def _area_observed_range(bundle: DatasetBundle) -> dict[str, tuple[datetime, datetime]]:
+    """Per-Area (min, max) Current observed_at. Match classification is
+    scoped to each Area's own observation window, not the dataset-wide
+    window -- an Area that started or stopped reporting earlier than others
+    must not have its misses misclassified against a different Area's range."""
+    per_area: dict[str, list[datetime]] = defaultdict(list)
+    for row in bundle.current_rows:
+        per_area[row.area_code].append(datetime.fromisoformat(row.observed_at))
+    return {area_code: (min(times), max(times)) for area_code, times in per_area.items()}
+
+
+def _classify_forecast_row(
+    row: ForecastRow,
+    *,
+    current_index: Mapping[tuple[str, str], CurrentRow],
+    area_observed_range: Mapping[str, tuple[datetime, datetime]],
+) -> str:
+    """Priority order: AREA_NOT_FOUND (no Current data for this Area at
+    all) -> EXACT_MATCH -> BEFORE_DATASET_START / AFTER_DATASET_END (target
+    outside this Area's own observed range) -> CURRENT_TARGET_MISSING
+    (inside the Area's own range but no exact instant). No nearest-match,
+    rounding, or tolerance is used anywhere in this classification."""
+    if row.area_code not in area_observed_range:
+        return MATCH_STATUS_AREA_NOT_FOUND
+    if (row.area_code, row.forecast_at) in current_index:
+        return MATCH_STATUS_EXACT_MATCH
+    forecast_at = datetime.fromisoformat(row.forecast_at)
+    area_min, area_max = area_observed_range[row.area_code]
+    if forecast_at < area_min:
+        return MATCH_STATUS_BEFORE_DATASET_START
+    if forecast_at > area_max:
+        return MATCH_STATUS_AFTER_DATASET_END
+    return MATCH_STATUS_CURRENT_TARGET_MISSING
+
+
 def build_forecast_match_summary(bundle: DatasetBundle) -> dict[str, object]:
     current_index = _build_current_index(bundle)
-    current_observed_ats = [datetime.fromisoformat(row.observed_at) for row in bundle.current_rows]
-    max_current_observed_at = max(current_observed_ats) if current_observed_ats else None
+    area_observed_range = _area_observed_range(bundle)
 
-    exact_match = 0
-    no_match_boundary = 0
-    no_match_other = 0
+    status_counts: Counter = Counter({status: 0 for status in MATCH_STATUSES})
     match_by_area: Counter = Counter()
     match_total_by_area: Counter = Counter()
     horizon_histogram: Counter = Counter()
@@ -567,30 +775,42 @@ def build_forecast_match_summary(bundle: DatasetBundle) -> dict[str, object]:
     unique_targets: set[tuple[str, str]] = set()
 
     for row in bundle.forecast_rows:
-        key = (row.area_code, row.forecast_at)
-        unique_targets.add(key)
+        unique_targets.add((row.area_code, row.forecast_at))
         match_total_by_area[row.area_code] += 1
         horizon_minutes = _forecast_horizon_minutes(row)
         horizon_histogram[horizon_minutes] += 1
-        if key in current_index:
-            exact_match += 1
+
+        status = _classify_forecast_row(
+            row, current_index=current_index, area_observed_range=area_observed_range
+        )
+        status_counts[status] += 1
+        if status == MATCH_STATUS_EXACT_MATCH:
             match_by_area[row.area_code] += 1
             matched_horizon_histogram[horizon_minutes] += 1
-        elif max_current_observed_at is not None and datetime.fromisoformat(row.forecast_at) > max_current_observed_at:
-            no_match_boundary += 1
-        else:
-            no_match_other += 1
 
     total = len(bundle.forecast_rows)
+    exact_match = status_counts[MATCH_STATUS_EXACT_MATCH]
+    # Backward-compatible derived fields (kept for existing consumers):
+    # Boundary Miss = BEFORE_DATASET_START + AFTER_DATASET_END,
+    # Other Miss = CURRENT_TARGET_MISSING + AREA_NOT_FOUND.
+    boundary_miss = (
+        status_counts[MATCH_STATUS_BEFORE_DATASET_START] + status_counts[MATCH_STATUS_AFTER_DATASET_END]
+    )
+    other_miss = (
+        status_counts[MATCH_STATUS_CURRENT_TARGET_MISSING] + status_counts[MATCH_STATUS_AREA_NOT_FOUND]
+    )
+
     return {
         "schema_version": FORECAST_MATCH_SUMMARY_SCHEMA_VERSION,
         "dataset_id": bundle.dataset_id,
         "total_forecast_rows": total,
         "unique_forecast_targets": len(unique_targets),
+        "status_counts": {status: status_counts[status] for status in MATCH_STATUSES},
         "exact_match_rows": exact_match,
-        "no_match_dataset_boundary_rows": no_match_boundary,
-        "no_match_other_rows": no_match_other,
+        "match_failure_rows": total - exact_match,
         "exact_match_rate": (exact_match / total) if total else None,
+        "no_match_dataset_boundary_rows": boundary_miss,
+        "no_match_other_rows": other_miss,
         "match_by_area": dict(sorted(match_by_area.items())),
         "match_total_by_area": dict(sorted(match_total_by_area.items())),
         "horizon_minutes_present": sorted(horizon_histogram),
@@ -780,7 +1000,12 @@ def run_phase1(
     *,
     eg8b_output_root: Path,
     expected_dataset_id: str | None = None,
+    generated_at: datetime | None = None,
 ) -> Eg8bAnalysisResult:
-    """Validate an EG-8A dataset directory and write the B1 analysis artifacts."""
+    """Validate an EG-8A dataset directory and write the B1 analysis artifacts.
+
+    `generated_at` is normally left unset (defaults to the real current
+    time); tests inject a fixed value to make repeated runs byte-comparable.
+    """
     bundle = load_dataset_bundle(dataset_dir, expected_dataset_id=expected_dataset_id)
-    return analyze_dataset(bundle, eg8b_output_root=eg8b_output_root)
+    return analyze_dataset(bundle, eg8b_output_root=eg8b_output_root, generated_at=generated_at)
