@@ -753,6 +753,7 @@ Codex는 코드, 테스트, 설정 또는 Project Guard 작업을 시작하기 �
 
 - `docs/rules/CODING_RULES.md`
 - `docs/rules/GIT_WORKFLOW.md`
+- `docs/engineering/DEVELOPMENT_WORKFLOW.md`
 - `docs/rules/SECURITY_RULES.md`
 - `docs/testing/PROJECT_GUARD_SPEC.md`
 - `docs/testing/QUALITY_GATES.md`
@@ -763,7 +764,8 @@ Codex는 코드, 테스트, 설정 또는 Project Guard 작업을 시작하기 �
 | 문서 | 역할 |
 |---|---|
 | `CODING_RULES.md` | 코드 구조, 오류처리, 보안, 저장 및 테스트 작성 규칙 |
-| `GIT_WORKFLOW.md` | Issue, Branch, Worktree, Commit, Pull Request, Review, Merge 운영 규칙 |
+| `GIT_WORKFLOW.md` | Issue, Branch, Worktree, Commit, Pull Request, Review, Merge 운영 규칙(단독 작업 기준, v1) |
+| `DEVELOPMENT_WORKFLOW.md` | Parent Issue·Checklist·Worktree 병렬 구현·Integration Branch/PR 실무 절차(v2) |
 | `SECURITY_RULES.md` | API 키, 로그, 민감정보, GitHub 및 외부 공유 보안 규칙 |
 | `PROJECT_GUARD_SPEC.md` | 자동검사 항목과 검사 ID, PASS·FAIL·WARN·SKIP 판정, 종료 코드의 유일한 기준 |
 | `QUALITY_GATES.md` | EG-0~EG-8의 순서, 단계별 통과조건과 다음 단계 진입조건 |
@@ -850,11 +852,15 @@ Issue·외부 실행 상태에는 적용하지 않으며, 그 네 상태는 `PRO
 
 ## 25. GitHub Issue·Pull Request 템플릿
 
-- `.github/ISSUE_TEMPLATE/task.md`: 모든 변경 작업의 Issue 작성에 사용한다.
-- `.github/pull_request_template.md`: 모든 Pull Request 작성과 검토에 사용한다.
+- `.github/ISSUE_TEMPLATE/task.md`: 단독·단일 변경 작업의 Issue 작성에 사용한다.
+- `.github/ISSUE_TEMPLATE/parent_task.md`: 여러 Checklist 항목을 담는 Parent
+  Issue 작성에 사용한다(`docs/engineering/DEVELOPMENT_WORKFLOW.md`).
+- `.github/pull_request_template.md`: 모든 Pull Request(단독 PR과 Integration
+  PR 포함) 작성과 검토에 사용한다.
 
-변경 작업은 Issue에서 PM의 구현계획 승인을 받은 뒤 시작하고,
-Pull Request는 해당 Issue를 연결하며 PM의 최종 Merge 승인을 받는다.
+변경 작업은 Issue에서 PM의 구현계획 승인(Parent Issue는 Gate 1)을 받은 뒤
+시작하고, Pull Request는 해당 Issue를 연결하며 PM의 최종 Merge 승인(Parent
+Issue 흐름은 Gate 2)을 받는다.
 
 ## 26. 저장소 작업일지 폐기 정책
 

@@ -2,9 +2,27 @@
 
 ## 연결 Issue
 
-<!-- 필수: Closes #이슈번호 형식으로 연결합니다. -->
+<!-- 필수: Closes #이슈번호(Parent Issue의 Checklist가 이 PR로 전부
+     끝나는 경우) 또는 Part of #이슈번호(배치 중 일부만 담당하는 경우)
+     형식으로 연결합니다. -->
 
 Closes #
+
+## Integration PR 여부
+
+<!-- docs/engineering/DEVELOPMENT_WORKFLOW.md v2 Parent Issue/Integration
+     PR 흐름이면 체크합니다. 단독 Issue/PR(v1)이면 체크하지 않습니다. -->
+
+- [ ] Integration PR(Parent Issue의 Checklist 배치를 담당)
+- [ ] 단독 PR
+
+### 포함된 Parent Checklist
+
+<!-- Integration PR인 경우에만 작성합니다. 각 항목은 Parent Issue의
+     Worker 완료 코멘트(DEVELOPMENT_WORKFLOW.md §8)를 링크합니다.
+     단독 PR이면 "해당 없음"으로 기록합니다. -->
+
+-
 
 ## 작업 목적
 
@@ -22,7 +40,32 @@ Closes #
 
 ## 검증 결과
 
-### 실행한 검사
+CI 결과를 공식 증거로 인용한다. 로컬 실행 결과 상세는 CI가 다루지 않는
+항목(실제 외부 실행, 실 Dataset Smoke 등)만 기록하되, PR 생성 직전
+로컬 Full-check 자체의 실행 여부·PASS/FAIL은 아래에 한 줄로 남긴다
+(`docs/engineering/DEVELOPMENT_WORKFLOW.md` §9).
+
+### PR 전 로컬 Full-check
+
+<!-- Project Guard 전체 + 전체 테스트 전체 + Repository Safety + 필요한
+     Smoke(DEVELOPMENT_WORKFLOW.md §3 Full-check 정의). 상세 표를
+     반복하지 않고 상태만 기록한다. -->
+
+- 상태:
+  - [ ] PASS
+  - [ ] FAIL
+  - [ ] NOT_RUN
+- 미실행 또는 실패 사유:
+
+### GitHub Actions CI
+
+- 상태(PASS/FAIL):
+- 링크:
+- FAIL인 경우 원인 요약:
+
+### CI가 다루지 않는 검증
+
+<!-- 실제 외부 실행, 실 Dataset Smoke 등. 없으면 "해당 없음". -->
 
 | 검사 또는 명령 | 결과 |
 |---|---|
@@ -35,8 +78,18 @@ Closes #
 |  |  |  |
 
 - Project Guard 결과 또는 미실행 사유:
-- GitHub Actions 결과 또는 미구현·미적용 사유:
 - Codex 리뷰 결과:
+
+### WARN·SKIP 분류
+
+<!-- docs/engineering/DEVELOPMENT_WORKFLOW.md §11·§12. 각 WARN·SKIP을
+     "비차단"(현재 PR 범위와 무관 AND Gate 1에서 사전에 예상됨)과
+     "차단"(그 외 전부, PM 확인 전 병합하지 않음)으로 분류합니다.
+     없으면 "해당 없음". -->
+
+| 검사 ID | 상태 | 분류(차단/비차단) | 근거 |
+|---|---|---|---|
+|  |  |  |  |
 
 ## 보안 확인
 
@@ -62,6 +115,13 @@ Closes #
 
 - 현재 게이트:
 - 다음 게이트 진입 가능 여부와 근거:
+
+## PM 확인사항
+
+<!-- PM이 직접 확인·승인해야 할 내용만 구분해 짧게 기록합니다.
+     없으면 "없음". -->
+
+-
 
 ## PROJECT_STATUS 영향 판정
 
