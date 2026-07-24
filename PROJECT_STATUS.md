@@ -80,8 +80,8 @@ PM이 장기 기준으로 확정한 5분 주기의 EG-7 1시간 파일럿 Contro
 
 - Python Loader: `IN_PROGRESS`
   - Source Reader·Schema Validation·Normalization: `IMPLEMENTATION_AVAILABLE_ON_MAIN`(PR #84)
-  - Quality Report·Dataset Manifest·최종 Output Writer: `NOT_STARTED`
-  - 실제 오류 응답 기반 검증: `NOT_COMPLETED`(합성 Fixture 오류 경로만 테스트 통과)
+  - Duplicate Detector·Quality Report·Dataset Manifest·최종 Output Writer: `IMPLEMENTATION_AVAILABLE_ON_MAIN`(PR #86, Issue #85)
+  - 실제 오류 응답 기반 검증: `NOT_COMPLETED`(합성 Fixture 오류 경로만 테스트 통과, 실 v3 CSV Smoke는 정상 경로만 확인)
 - ML-ready Dataset: `NOT_IMPLEMENTED`
 - EDA: `NOT_STARTED`
 - Forecast Evaluation: `NOT_STARTED`
@@ -109,7 +109,7 @@ PM이 장기 기준으로 확정한 5분 주기의 EG-7 1시간 파일럿 Contro
 | EG-6B | PASS | 첫 실제 13 Area 13/13, 품질·백업·원격 동기화 확인과 Closeout |
 | EG-7 | IMPLEMENTATION_AVAILABLE_ON_MAIN | PR #71 병합, Issue #70 종료; 첫 Live 미시작 |
 | EG-8(상위) | NOT_STARTED | 데이터 분석·예측·추천 준비 상위 Gate; EG-8A~8E로 세분화(§2.2) |
-| EG-8A | `IN_PROGRESS` | Source Reader·Schema Validation·Normalization `IMPLEMENTATION_AVAILABLE_ON_MAIN`(PR #84); Quality Report·Manifest·Output Writer `NOT_STARTED` |
+| EG-8A | `IN_PROGRESS` | Source Reader·Schema Validation·Normalization `IMPLEMENTATION_AVAILABLE_ON_MAIN`(PR #84); Duplicate Detector·Quality Report·Manifest·Output Writer `IMPLEMENTATION_AVAILABLE_ON_MAIN`(PR #86); 실제 오류 응답 기반 검증 `NOT_COMPLETED` |
 | EG-8B | `PLANNED` | EDA·Forecast 평가·Baseline·Feature Dataset |
 | EG-8C | `PLANNED` | 미래 Area 인구·피크 예측 모델 |
 | EG-8D | `PLANNED` | Area Ranking·선택적 S-DoT·Spot Candidate Evaluation(기존 EG-8 정의 계승) |
