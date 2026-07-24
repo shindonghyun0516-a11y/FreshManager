@@ -1,7 +1,7 @@
 # ML-ready Dataset Spec
 
 - 문서 상태: Draft
-- 버전: v0.3.0
+- 버전: v0.4.0
 - 작성자: 신동현
 - 최종 승인자: 신동현
 - 최초 작성일: 2026-07-24
@@ -138,56 +138,122 @@ Forecast 평가에서 다음을 금지한다.
 동일한 원칙을 데이터셋 스키마 수준에서 반복한 것이며, 서로 다른 규칙을
 정의하지 않는다.
 
+### 5.1 시간 표현 규칙과 검증(실 데이터 확인)
+
+- Raw 계층(`raw_log_v3`)과 Normalized Source(`population_current_v3`/
+  `population_forecast_v3`)는 원본 시간 표현을 그대로 유지한다. 실제 v3
+  sheets 샘플에서 `observed_at`/`forecast_at`는 시(hour)가 한 자리일 때
+  0-padding이 없는 형태(예: `2026-07-24 0:35`)로 관측됐다 — Loader가 이
+  표현을 임의로 통일하지 않고 그대로 반출한다.
+- Loader가 만드는 Normalized(§12.1 산출물) 계층에서만 ISO 8601 형식으로
+  표준화한다.
+- 검증 규칙: `forecast_at`는 반드시 `observed_at`보다 이후여야 한다
+  (`forecast_at > observed_at`). 위반 시 Data Quality Error로 분류한다
+  (§11 "시간 순서 위반").
+- 실제 v3 sheets 샘플(Forecast 19,032행)에서는 이 조건을 100% 충족했다.
+  이 확인은 2026-07-24 하루·122회차 표본 기준이며, 장기간 반복 관측에서도
+  항상 성립한다고 확정하지 않는다.
+
 ## 6. 데이터 계층
 
-| 계층 | 정의 |
-|---|---|
-| Raw | Apps Script가 v3 source sheets에 기록한 원본 응답과 상태를 그대로 반영한 계층 |
-| Normalized | Area·관측시각·인구값·Forecast를 표준화한 계층(필드명 통일, 자료형 변환) |
-| Feature | 시간·시계열·변화율·Baseline 비교용 Feature가 추가된 계층(EG-8B 산출물) |
+실제 v3 sheets CSV Export(2026-07-24, 122회차)로 확인한 결과, 세 시트는
+균등한 Raw가 아니다. `raw_log_v3`만 순수 Raw이며, `population_current_v3`/
+`population_forecast_v3`는 Apps Script가 이미 1차 파싱해 필드명을 통일한
+**Normalized Source**다.
 
-Raw 계층은 v3 source sheets의 읽기 전용 반출본이며 원본 셀 값을 변형하지
-않는다. Normalized와 Feature 계층만 분석·모델 입력으로 사용한다.
+| 계층 | 정의 | 대응 시트 |
+|---|---|---|
+| Raw | Apps Script가 서울시 API 원본 응답 전문을 그대로 기록한 계층. 셀 값을 변형하지 않는다 | `raw_log_v3`(원본 JSON 전문 포함) |
+| Normalized Source | Apps Script가 원본 응답에서 1차 파싱해 필드명을 통일한 계층. Python Loader의 **입력**이며 Python이 만든 산출물이 아니다 | `population_current_v3`·`population_forecast_v3` |
+| Feature | 시간·시계열·변화율·Baseline 비교용 Feature가 추가된 계층(EG-8B 산출물) | 후속 EG-8B |
+
+Python Loader의 책임은 CSV Schema Validation·Quality Validation·Dataset
+생성이다(출력 구성은 §12.1). Normalized Source를 새로 파싱하지 않고 검증·
+정렬해 Loader 출력을 만들며, 필요하면 `raw_log_v3`(Raw)와 대조해 정합성을
+확인할 수 있다. 세 시트 모두 읽기 전용으로만 접근하며 원본 셀 값을 변형하지
+않는다.
 
 ## 7. Current Population 필드 후보
 
-| 필드 | 의미 |
+| 필드 | 의미 | 실제 상태 |
+|---|---|---|
+| `collection_run_id` | Apps Script 실행 단위 식별자(D-014 근거) | `CONFIRMED_SOURCE_FIELD` |
+| `called_at` | API 호출시각 | `CONFIRMED_SOURCE_FIELD` |
+| `observed_at` | 관측 기준시각 | `CONFIRMED_SOURCE_FIELD`(§5.1 포맷 주의) |
+| `area_code_requested` | 요청한 공식 `AREA_CD`(POI 코드) | `CONFIRMED_SOURCE_FIELD`(§7.1) |
+| `area_code_returned` | 응답이 실제로 반환한 공식 `AREA_CD` | `CONFIRMED_SOURCE_FIELD`(§7.1) |
+| `area_name` | 공식 `AREA_NM` | `CONFIRMED_SOURCE_FIELD` |
+| `congestion_level` | 혼잡도 | `CONFIRMED_SOURCE_FIELD` |
+| `population_min` | 추정 인구 하한 | `CONFIRMED_SOURCE_FIELD` |
+| `population_max` | 추정 인구 상한 | `CONFIRMED_SOURCE_FIELD` |
+| `population_mid` | §9 정의의 파생 대표값 | `DERIVED_FIELD`(원본에 없음, Loader 산출) |
+| `duplicate_flag` | 동일 관측의 중복 여부 | `NOT_AVAILABLE`(원본에 없음, Loader 산출) |
+| `error_flag` | 오류행 여부 | `NOT_AVAILABLE`(원본에 없음, Loader 산출) |
+| `source_status` | 원본 응답 상태(success/오류 분류) | `NOT_AVAILABLE`(Current 파일에는 없음. `raw_log_v3`의 `result_status`/`http_code`가 이 역할을 대체) |
+
+이 상태는 PM이 제공한 실제 v3 sheets CSV Export(2026-07-24, 122회차·13개
+Area·약 10시간 12분 구간)를 기준으로 확인했다. 이 표본에는 `result_status`가
+`SUCCESS`가 아닌 행이 하나도 없어, 오류·실패 응답에서 각 필드가 실제로 어떻게
+나타나는지는 이 표본만으로 확인하지 못했다. 표본 기간·시나리오가 제한적이므로
+장기 안정성이나 오류 경로까지 확정됐다고 표현하지 않는다.
+
+### 7.1 `area_code` 이중 컬럼 구조(실 데이터 확인)
+
+v3 source sheets는 `area_code`를 단일 필드로 기록하지 않는다. Current·
+Forecast 두 시트 모두 다음 두 컬럼으로 분리돼 있다.
+
+| 컬럼 | 정의 |
 |---|---|
-| `collection_run_id` | Apps Script 실행 단위 식별자(D-014 근거) |
-| `called_at` | API 호출시각 |
-| `observed_at` | 관측 기준시각 |
-| `area_code` | 공식 `AREA_CD`(POI 코드) |
-| `area_name` | 공식 `AREA_NM` |
-| `congestion_level` | 혼잡도 |
-| `population_min` | 추정 인구 하한 |
-| `population_max` | 추정 인구 상한 |
-| `population_mid` | §9 정의의 파생 대표값 |
-| `duplicate_flag` | 동일 관측의 중복 여부 |
-| `error_flag` | 오류행 여부 |
-| `source_status` | 원본 응답 상태(success/오류 분류) |
+| `area_code_requested` | Apps Script가 API에 요청한 대상 Area 코드 |
+| `area_code_returned` | API 응답이 실제로 반환한 Area 코드 |
+
+정합성 규칙:
+
+```text
+area_code_requested == area_code_returned
+```
+
+이 등식이 성립하지 않으면 Data Quality Error로 분류한다(§11 "Area 코드
+불일치"). 실제 v3 sheets 샘플(Current 1,586행·Forecast 19,032행)에서는
+불일치가 0건이었다. 후속 조인 키(§8.1)는 `area_code_returned`를 기준으로
+한다.
 
 ## 8. Forecast 필드 후보
 
-| 필드 | 의미 |
-|---|---|
-| `collection_run_id` | Apps Script 실행 단위 식별자 |
-| `called_at` | API 호출시각 |
-| `observed_at` | 예측 스냅샷을 확보한 시점의 관측 기준시각 |
-| `forecast_at` | 예측 대상시각 |
-| `area_code` | 공식 `AREA_CD` |
-| `area_name` | 공식 `AREA_NM` |
-| `forecast_congestion_level` | 예측 혼잡도 |
-| `forecast_population_min` | 예측 인구 하한 |
-| `forecast_population_max` | 예측 인구 상한 |
-| `forecast_population_mid` | 예측 대표값(§9와 동일 계산식) |
-| `duplicate_flag` | 동일 대상시각 예측의 중복 여부 |
-| `error_flag` | 오류행 여부 |
-| `source_status` | 원본 응답 상태 |
+| 필드 | 의미 | 실제 상태 |
+|---|---|---|
+| `collection_run_id` | Apps Script 실행 단위 식별자 | `CONFIRMED_SOURCE_FIELD` |
+| `called_at` | API 호출시각 | `CONFIRMED_SOURCE_FIELD` |
+| `observed_at` | 예측 스냅샷을 확보한 시점의 관측 기준시각 | `CONFIRMED_SOURCE_FIELD`(§5.1 포맷 주의) |
+| `forecast_at` | 예측 대상시각 | `CONFIRMED_SOURCE_FIELD`(§5.1 포맷 주의·검증 규칙) |
+| `area_code_requested` | 요청한 공식 `AREA_CD` | `CONFIRMED_SOURCE_FIELD`(§7.1) |
+| `area_code_returned` | 응답이 실제로 반환한 공식 `AREA_CD`. Join Key 기준(§8.1) | `CONFIRMED_SOURCE_FIELD`(§7.1) |
+| `area_name` | 공식 `AREA_NM` | `CONFIRMED_SOURCE_FIELD` |
+| `forecast_congestion_level` | 예측 혼잡도 | `CONFIRMED_SOURCE_FIELD` |
+| `forecast_population_min` | 예측 인구 하한 | `CONFIRMED_SOURCE_FIELD` |
+| `forecast_population_max` | 예측 인구 상한 | `CONFIRMED_SOURCE_FIELD` |
+| `forecast_population_mid` | 예측 대표값(§9와 동일 계산식) | `DERIVED_FIELD`(원본에 없음, Loader 산출) |
+| `duplicate_flag` | 동일 대상시각 예측의 중복 여부 | `NOT_AVAILABLE`(원본에 없음, Loader 산출) |
+| `error_flag` | 오류행 여부 | `NOT_AVAILABLE`(원본에 없음, Loader 산출) |
+| `source_status` | 원본 응답 상태 | `NOT_AVAILABLE`(Forecast 파일에는 없음. `raw_log_v3`의 `result_status`/`http_code`가 이 역할을 대체) |
 
-이 두 필드 후보 목록은 목표 계약이며, 실제 v3 source sheets 컬럼과의 정확한
-매핑은 EG-8A 구현 착수 시 실제 응답을 확인한 뒤 확정한다. 확인 전 필드명을
-`Confirmed`로 표시하지 않는다(`docs/data/FIELD_DICTIONARY.md` §2의 검증 상태
-관례를 따른다).
+상태 확인 근거와 표본 한계는 §7의 확인 문단과 동일하다(중복 서술하지
+않는다).
+
+### 8.1 Current-Forecast Join Key(실 데이터 확인)
+
+`population_current_v3`와 `population_forecast_v3`를 연결하는 정식 Key는
+다음과 같다.
+
+```text
+collection_run_id + area_code_returned
+```
+
+실제 v3 sheets 샘플(122회차·13개 Area)에서 이 Key로 조인한 결과, Forecast
+쪽에서 매칭되지 않는 키 0건, Current 쪽에서 매칭되지 않는 키 0건이었고,
+`(collection_run_id, area_code_returned)` 조합마다 Forecast 행이 정확히
+12건씩 존재했다(19,032 = 1,586 × 12). 이 Key는 문서가 아니라 실 데이터로
+검증된 결과다.
 
 ## 9. `population_mid` 정의
 
@@ -203,7 +269,7 @@ population_mid = (population_min + population_max) / 2
 
 - 필수 컬럼 존재 여부
 - 13개 Area 코드 정합성(공식 CSV 대비)
-- 요청 Area 코드와 반환 코드 일치 여부
+- 요청 Area 코드와 반환 코드 일치 여부(`area_code_requested`/`area_code_returned`, §7.1)
 - 시간 파싱 성공률
 - 숫자형 변환 성공률
 - 결측률
@@ -222,10 +288,11 @@ population_mid = (population_min + population_max) / 2
 - HTTP 오류
 - JSON 파싱 오류
 - Schema 오류
-- Area 코드 불일치
+- Area 코드 불일치(`area_code_requested` ≠ `area_code_returned`, §7.1)
 - 필수값 결측
 - 숫자 변환 실패
 - 시간 변환 실패
+- 시간 순서 위반(`forecast_at` ≤ `observed_at`, §5.1)
 
 오류행을 정상 데이터에 조용히 포함하지 않는다. 오류·결측 레코드는 `error_flag`로
 표시해 보존하며, `docs/analysis/ANALYSIS_PLAN.md` §14의 결측 처리 원칙(결측을
@@ -359,6 +426,7 @@ Spot은 위치 식별 정보는 `Confirmed`이지만 전부 `field_verified=fals
 
 | 버전 | 날짜 | 변경내용 | 작성자 | 승인상태 |
 |---|---|---|---|---|
+| v0.4.0 | 2026-07-24 | PM이 제공한 실제 v3 sheets CSV Export(122회차)로 §7/§8 필드 후보 상태를 `CONFIRMED_SOURCE_FIELD`/`DERIVED_FIELD`/`NOT_AVAILABLE`로 갱신. `area_code`를 `area_code_requested`/`area_code_returned` 이중 컬럼으로 정정(§7.1). Current-Forecast Join Key `collection_run_id`+`area_code_returned` 확정(§8.1). §6 데이터 계층을 Raw(`raw_log_v3`)/Normalized Source(`population_current_v3`·`population_forecast_v3`)로 재정의. 시간 표현·검증 규칙 추가(§5.1). 오류 분류에 "시간 순서 위반" 추가(§11). 장기 자동화 방식·최종 정본 형식·품질 임계값은 계속 `OPEN_DECISION` | 신동현 | PM 결정 |
 | v0.3.0 | 2026-07-24 | EG-8A Loader V0 입력 방식(수동 CSV Export, §3.1)·V0 실행 방식(§4.1)·V0 출력 형식과 산출물 구성(§12/§12.1)·품질 항목 반드시산출/권장 분류(§13) PM 결정 반영. 장기 자동화 방식·최종 정본 형식·품질 임계값은 계속 `OPEN_DECISION` | 신동현 | PM 결정 |
 | v0.2.1 | 2026-07-24 | 검증된 Spot Master(위치 식별)와 미검증 Spot Proxy(추천 가능 여부)를 구분(§14.1), Spot Recommendation/Forecast eligibility는 RECOMMENDATION_OUTPUT_CONTRACT.md §9.1/§9.2 소유임을 명시 | 신동현 | PM 결정 |
 | v0.2.0 | 2026-07-24 | Area-Spot-Sensor 데이터 관계(§14) 추가 — Spot 정적 마스터·S-DoT 시계열·Area-Spot·Spot-Sensor 관계 분리, `spatial_support_type` 후보 필드와 S-DoT 동적 수집 미구현 상태 명시 | 신동현 | PM 결정 |
