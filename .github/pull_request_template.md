@@ -40,9 +40,22 @@ Closes #
 
 ## 검증 결과
 
-CI 결과를 공식 증거로 인용한다. 로컬 실행 결과는 CI가 다루지 않는
-항목(실제 외부 실행, 실 Dataset Smoke 등)만 기록한다
+CI 결과를 공식 증거로 인용한다. 로컬 실행 결과 상세는 CI가 다루지 않는
+항목(실제 외부 실행, 실 Dataset Smoke 등)만 기록하되, PR 생성 직전
+로컬 Full-check 자체의 실행 여부·PASS/FAIL은 아래에 한 줄로 남긴다
 (`docs/engineering/DEVELOPMENT_WORKFLOW.md` §9).
+
+### PR 전 로컬 Full-check
+
+<!-- Project Guard 전체 + 전체 테스트 전체 + Repository Safety + 필요한
+     Smoke(DEVELOPMENT_WORKFLOW.md §3 Full-check 정의). 상세 표를
+     반복하지 않고 상태만 기록한다. -->
+
+- 상태:
+  - [ ] PASS
+  - [ ] FAIL
+  - [ ] NOT_RUN
+- 미실행 또는 실패 사유:
 
 ### GitHub Actions CI
 
