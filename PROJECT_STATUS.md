@@ -87,8 +87,7 @@ PM이 장기 기준으로 확정한 5분 주기의 EG-7 1시간 파일럿 Contro
 - ML-ready Dataset: `NOT_IMPLEMENTED`
 - EDA: `NOT_STARTED`
 - EG-8B B2a(B0 Persistence Baseline·서울시 Forecast 단일 일자 잠정 Backtest): `IMPLEMENTATION_AVAILABLE_ON_MAIN`(PR #92, Issue #89) — 단일 일자 잠정 결과이며 공식 성공 임계값·EG-8B Gate PASS/FAIL 판정이 아님
-- EG-8B B2b 1차 범위(2026-07-24T01:00~2026-07-25T07:00 단기 다일자 B0 Persistence·서울시 Forecast Backtest): `IN_PROGRESS`(Parent Issue #93, Integration Branch `feat/issue-93-eg8b-b2b-short-window-multiday-backtest`, Integration PR 준비 중) — 잠정 결과이며 공식 성공 임계값·EG-8B Gate PASS/FAIL 판정이 아님. 같은 요일·시간 Baseline(B1)·4주 평균 Baseline(B2)은 포함하지 않음(반복되는 같은 요일 데이터 필요)
-- EG-8B B2b 2차 범위(장기 다일자·5영업일·4주 기준선·5주차 Held-out 공식 Gate 평가): `WAITING_FOR_MORE_DATA`(데이터 추가 축적 후 별도 검토, B2b 1차 범위와 별개로 착수)
+- EG-8B B2b — 2026-07-24 01:00~2026-07-25 07:00 단기 다일자 Baseline·Forecast 검증: `IN_PROGRESS`(Parent Issue #93, PR #94 OPEN·CI PASS, PM Gate 2 Merge 승인 대기) — 잠정 결과이며 공식 성공 임계값·EG-8B Gate PASS/FAIL 판정이 아님. 장기 다일자·5영업일·4주·공식 Gate 평가는 데이터 추가 축적 후 별도 검토한다.
 - ML Model: `NOT_STARTED`
 - Area Ranking: `NOT_STARTED`
 - Spot Ranking: `NOT_STARTED`
@@ -114,7 +113,7 @@ PM이 장기 기준으로 확정한 5분 주기의 EG-7 1시간 파일럿 Contro
 | EG-7 | IMPLEMENTATION_AVAILABLE_ON_MAIN | PR #71 병합, Issue #70 종료; 첫 Live 미시작 |
 | EG-8(상위) | NOT_STARTED | 데이터 분석·예측·추천 준비 상위 Gate; EG-8A~8E로 세분화(§2.2) |
 | EG-8A | `IN_PROGRESS` | Source Reader·Schema Validation·Normalization `IMPLEMENTATION_AVAILABLE_ON_MAIN`(PR #84); Duplicate Detector·Quality Report·Manifest·Output Writer `IMPLEMENTATION_AVAILABLE_ON_MAIN`(PR #86); 실제 오류 응답 기반 검증 `NOT_COMPLETED` |
-| EG-8B | `IN_PROGRESS` | Dataset Profile·시간 커버리지·Forecast Exact Join(B1) `IMPLEMENTATION_AVAILABLE_ON_MAIN`(PR #88); EDA·B0 Baseline·서울시 Forecast 오차 지표(B2a) `NOT_STARTED` |
+| EG-8B | `IN_PROGRESS` | Dataset Profile·시간 커버리지·Forecast Exact Join(B1) `IMPLEMENTATION_AVAILABLE_ON_MAIN`(PR #88); B0 Baseline·서울시 Forecast 오차 지표(B2a) `IMPLEMENTATION_AVAILABLE_ON_MAIN`(PR #92); B2b 단기 다일자 검증 `IN_PROGRESS`(PR #94) |
 | EG-8C | `PLANNED` | 미래 Area 인구·피크 예측 모델 |
 | EG-8D | `PLANNED` | Area Ranking·선택적 S-DoT·Spot Candidate Evaluation(기존 EG-8 정의 계승) |
 | EG-8E | `PLANNED` | Recommendation Output Contract·UI/UX Readiness(Recommendation MVP 구현 Gate 아님) |
