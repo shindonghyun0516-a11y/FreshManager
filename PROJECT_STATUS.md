@@ -88,7 +88,7 @@ PM이 장기 기준으로 확정한 5분 주기의 EG-7 1시간 파일럿 Contro
 - EDA: `NOT_STARTED`
 - EG-8B B2a(B0 Persistence Baseline·서울시 Forecast 단일 일자 잠정 Backtest): `IMPLEMENTATION_AVAILABLE_ON_MAIN`(PR #92, Issue #89) — 단일 일자 잠정 결과이며 공식 성공 임계값·EG-8B Gate PASS/FAIL 판정이 아님
 - EG-8B B2b — 2026-07-24 01:00~2026-07-25 07:00 단기 다일자 Baseline·Forecast 검증: `IMPLEMENTATION_AVAILABLE_ON_MAIN`(Parent Issue #93, PR #94) — 단기 다일자 잠정 검증 결과이며 evaluation_status=PROVISIONAL, coverage_status=SHORT_WINDOW_MULTI_DAY_PARTIAL_COVERAGE, gate_judgment=null. 공식 성공 임계값·EG-8B Gate PASS/FAIL 판정이 아님. 장기 다일자·5영업일·4주·공식 Gate 평가는 데이터 추가 축적 후 별도 검토한다.
-- EG-8C 1차(Feature·Label·Provisional Train/Validation Split): `IN_PROGRESS`(Parent Issue #95, PR 준비 중) — evaluation_status=PROVISIONAL, data_sufficiency_status=PROVISIONAL_SPLIT_ONLY, test_split_created=false, 지원 Horizon 60·180분만. 모델 학습·공식 Test 평가·Peak 예측·EG-8D·EG-8E·UI·E2E는 이번 범위에 포함하지 않음
+- EG-8C 1차(Feature·Label·Provisional Train/Validation Split): `IMPLEMENTATION_AVAILABLE_ON_MAIN`(Parent Issue #95, PR #96) — evaluation_status=PROVISIONAL, data_sufficiency_status=PROVISIONAL_SPLIT_ONLY, test_split_created=false, official_model_gate_judgment=null, Leakage 12종 위반 0, 지원 Horizon 60·180분만. 모델 학습·공식 Test 평가·Peak 예측·EG-8D·EG-8E·UI·E2E는 이번 범위에 포함하지 않음. 장기 다일자·5영업일·4주·공식 Gate 평가는 데이터 추가 축적 후 별도 검토한다.
 - ML Model: `NOT_STARTED`
 - Area Ranking: `NOT_STARTED`
 - Spot Ranking: `NOT_STARTED`
