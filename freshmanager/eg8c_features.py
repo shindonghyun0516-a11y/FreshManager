@@ -33,6 +33,7 @@ import math
 import os
 import shutil
 import statistics
+import stat
 import sys
 import tempfile
 import uuid
@@ -66,6 +67,7 @@ FEATURE_DICTIONARY_SCHEMA_VERSION = "eg8c-feature-dictionary-v1"
 LABEL_CONTRACT_SCHEMA_VERSION = "eg8c-label-contract-v1"
 LEAKAGE_REPORT_SCHEMA_VERSION = "eg8c-leakage-report-v1"
 OUTPUT_MANIFEST_SCHEMA_VERSION = "eg8c-output-manifest-v1"
+OFFICIAL_RUN_ACCEPTANCE_CONTRACT_VERSION = "eg8c-official-run-acceptance-v1"
 
 FEATURE_DATASET_FILENAME = "feature_dataset.csv"
 LABEL_DATASET_FILENAME = "label_dataset.csv"
@@ -145,6 +147,43 @@ SPLIT_ASSIGNMENT_FIELDNAMES = (
     "split_boundary_version",
 )
 
+OFFICIAL_LEAKAGE_CHECK_IDS = (
+    "feature_timestamp_after_origin",
+    "lag_timestamp_not_before_origin",
+    "rolling_window_end_after_origin",
+    "label_target_before_origin",
+    "label_target_wrong_area",
+    "duplicate_row_id",
+    "same_origin_split_across_boundary",
+    "train_origin_not_earlier_than_validation",
+    "validation_statistics_used_in_train",
+    "future_actual_used_as_feature",
+    "missing_value_silently_filled",
+    "post_cutoff_forecast_used",
+)
+ACCEPTANCE_DATASET_COUNT_FIELDS = (
+    "candidate_row_count",
+    "feature_valid_row_count",
+    "label_valid_row_count",
+    "training_eligible_row_count",
+)
+ACCEPTANCE_SPLIT_COUNT_FIELDS = (SPLIT_TRAIN, SPLIT_VALIDATION, SPLIT_EXCLUDED)
+ACCEPTANCE_HORIZON_COUNT_FIELDS = tuple(str(value) for value in SUPPORTED_HORIZON_MINUTES)
+ACCEPTANCE_TOP_LEVEL_FIELDS = (
+    "contract_version",
+    "expected_dataset_counts",
+    "expected_split_counts",
+    "expected_area_count",
+    "expected_horizon_counts",
+    "required_leakage_check_ids",
+    "required_leakage_violation_count",
+    "required_final_verdict",
+    "required_evaluation_status",
+    "required_data_sufficiency_status",
+    "required_test_split_created",
+    "required_official_model_gate_judgment",
+)
+
 
 class EvidenceWriteError(OSError):
     """Raised when an EG-8C output file or directory cannot be written safely."""
@@ -152,6 +191,54 @@ class EvidenceWriteError(OSError):
 
 class OutputRootConfigurationError(EvidenceWriteError):
     """Raised when FRESHMANAGER_EG8B_OUTPUT_ROOT is unset or invalid."""
+
+
+@dataclass(frozen=True)
+class AcceptanceIssue:
+    field: str
+    lines: tuple[str, ...]
+
+
+class OfficialRunAcceptanceError(EvidenceWriteError):
+    """Fail-closed official-run acceptance failure with safe diagnostics."""
+
+    def __init__(self, issues: Sequence[AcceptanceIssue]):
+        self.issues = tuple(sorted(issues, key=lambda issue: (issue.field, issue.lines)))
+        super().__init__(self._format())
+
+    def _format(self) -> str:
+        shown = self.issues[:10]
+        blocks = ["\n".join(issue.lines) for issue in shown]
+        if len(self.issues) > len(shown):
+            blocks.append(
+                "\n".join(
+                    (
+                        f"전체 불일치 수={len(self.issues)}",
+                        f"표시한 불일치 수={len(shown)}",
+                        f"표시하지 않은 불일치 수={len(self.issues) - len(shown)}",
+                    )
+                )
+            )
+        return "\n".join(blocks)
+
+
+@dataclass(frozen=True)
+class OfficialRunAcceptanceContract:
+    path: Path
+    snapshot: InputSnapshot
+    sha256: str
+    contract_version: str
+    expected_dataset_counts: Mapping[str, int]
+    expected_split_counts: Mapping[str, int]
+    expected_area_count: int
+    expected_horizon_counts: Mapping[str, int]
+    required_leakage_check_ids: tuple[str, ...]
+    required_leakage_violation_count: int
+    required_final_verdict: str
+    required_evaluation_status: str
+    required_data_sufficiency_status: str
+    required_test_split_created: bool
+    required_official_model_gate_judgment: None
 
 
 @dataclass(frozen=True)
@@ -218,6 +305,7 @@ class Eg8cDatasetResult:
     phase_dir: Path
     dataset_coverage: Mapping[str, object]
     leakage_report: Mapping[str, object]
+    acceptance_contract_sha256: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -897,6 +985,586 @@ def _snapshot_input_artifacts(paths: Sequence[tuple[str, Path]]) -> InputSnapsho
     return artifacts, identities
 
 
+def _json_type_name(value: object) -> str:
+    if value is None:
+        return "null"
+    if type(value) is bool:
+        return "boolean"
+    if type(value) is int:
+        return "integer"
+    if type(value) is str:
+        return "string"
+    if type(value) is list:
+        return "array"
+    if type(value) is dict:
+        return "object"
+    return "unsupported"
+
+
+def _contract_structure_issue(field: str, reason: str) -> AcceptanceIssue:
+    return AcceptanceIssue(
+        field=field,
+        lines=("승인 기준 정의서 오류:", f"항목={field}", f"오류={reason}"),
+    )
+
+
+def _contract_type_issue(field: str, expected_type: str, actual: object) -> AcceptanceIssue:
+    return AcceptanceIssue(
+        field=field,
+        lines=(
+            "승인 기준 정의서 오류:",
+            f"항목={field}",
+            f"기대 자료형={expected_type}",
+            f"실제 자료형={_json_type_name(actual)}",
+        ),
+    )
+
+
+def _exact_object_fields(
+    value: object, *, field: str, expected_fields: Sequence[str], issues: list[AcceptanceIssue]
+) -> dict[str, object] | None:
+    if type(value) is not dict:
+        issues.append(_contract_type_issue(field, "object", value))
+        return None
+    document = value
+    expected = set(expected_fields)
+    actual = set(document)
+    for missing in sorted(expected - actual):
+        issues.append(_contract_structure_issue(f"{field}.{missing}" if field else missing, "missing_key"))
+    for unknown in sorted(actual - expected):
+        issues.append(_contract_structure_issue(f"{field}.{unknown}" if field else unknown, "unknown_key"))
+    return document
+
+
+def _nonnegative_integer(
+    document: Mapping[str, object], field: str, *, prefix: str, issues: list[AcceptanceIssue]
+) -> int | None:
+    value = document.get(field)
+    full_field = f"{prefix}.{field}" if prefix else field
+    if type(value) is not int:
+        issues.append(_contract_type_issue(full_field, "integer", value))
+        return None
+    if value < 0:
+        issues.append(_contract_structure_issue(full_field, "negative_count"))
+        return None
+    return value
+
+
+def load_official_run_acceptance_contract(path: Path) -> OfficialRunAcceptanceContract:
+    contract_path = Path(path)
+    try:
+        if not stat.S_ISREG(contract_path.lstat().st_mode) or contract_path.is_symlink():
+            raise OSError
+        snapshot_before = _snapshot_input_artifacts((("acceptance_contract", contract_path),))
+        payload = contract_path.read_bytes()
+        snapshot_after = _snapshot_input_artifacts((("acceptance_contract", contract_path),))
+        if not stat.S_ISREG(contract_path.lstat().st_mode) or contract_path.is_symlink():
+            raise OSError
+    except (OSError, ValueError, EvidenceWriteError) as error:
+        raise OfficialRunAcceptanceError(
+            (_contract_structure_issue("acceptance_contract", "missing_or_not_regular_file"),)
+        ) from error
+    if snapshot_after != snapshot_before:
+        raise OfficialRunAcceptanceError(
+            (_contract_structure_issue("acceptance_contract", "changed_while_reading"),)
+        )
+    try:
+        parsed = json.loads(payload.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise OfficialRunAcceptanceError(
+            (_contract_structure_issue("acceptance_contract", "invalid_json"),)
+        ) from error
+
+    issues: list[AcceptanceIssue] = []
+    document = _exact_object_fields(
+        parsed, field="", expected_fields=ACCEPTANCE_TOP_LEVEL_FIELDS, issues=issues
+    )
+    if document is None:
+        raise OfficialRunAcceptanceError(tuple(issues))
+
+    version = document.get("contract_version")
+    if type(version) is not str:
+        issues.append(_contract_type_issue("contract_version", "string", version))
+    elif version != OFFICIAL_RUN_ACCEPTANCE_CONTRACT_VERSION:
+        issues.append(_contract_structure_issue("contract_version", "unsupported_value"))
+
+    dataset_counts = _exact_object_fields(
+        document.get("expected_dataset_counts"),
+        field="expected_dataset_counts",
+        expected_fields=ACCEPTANCE_DATASET_COUNT_FIELDS,
+        issues=issues,
+    )
+    split_counts = _exact_object_fields(
+        document.get("expected_split_counts"),
+        field="expected_split_counts",
+        expected_fields=ACCEPTANCE_SPLIT_COUNT_FIELDS,
+        issues=issues,
+    )
+    horizon_counts = _exact_object_fields(
+        document.get("expected_horizon_counts"),
+        field="expected_horizon_counts",
+        expected_fields=ACCEPTANCE_HORIZON_COUNT_FIELDS,
+        issues=issues,
+    )
+
+    validated_dataset_counts = {
+        field: value
+        for field in ACCEPTANCE_DATASET_COUNT_FIELDS
+        if dataset_counts is not None
+        and (value := _nonnegative_integer(dataset_counts, field, prefix="expected_dataset_counts", issues=issues))
+        is not None
+    }
+    validated_split_counts = {
+        field: value
+        for field in ACCEPTANCE_SPLIT_COUNT_FIELDS
+        if split_counts is not None
+        and (value := _nonnegative_integer(split_counts, field, prefix="expected_split_counts", issues=issues))
+        is not None
+    }
+    validated_horizon_counts = {
+        field: value
+        for field in ACCEPTANCE_HORIZON_COUNT_FIELDS
+        if horizon_counts is not None
+        and (value := _nonnegative_integer(horizon_counts, field, prefix="expected_horizon_counts", issues=issues))
+        is not None
+    }
+    area_count = _nonnegative_integer(document, "expected_area_count", prefix="", issues=issues)
+    violation_count = _nonnegative_integer(
+        document, "required_leakage_violation_count", prefix="", issues=issues
+    )
+
+    leakage_ids_value = document.get("required_leakage_check_ids")
+    validated_leakage_ids: tuple[str, ...] = ()
+    if type(leakage_ids_value) is not list:
+        issues.append(_contract_type_issue("required_leakage_check_ids", "array", leakage_ids_value))
+    elif any(type(item) is not str for item in leakage_ids_value):
+        issues.append(_contract_structure_issue("required_leakage_check_ids", "invalid_item_type"))
+    else:
+        validated_leakage_ids = tuple(leakage_ids_value)
+        if len(set(validated_leakage_ids)) != len(validated_leakage_ids):
+            issues.append(_contract_structure_issue("required_leakage_check_ids", "duplicate_id"))
+        if set(validated_leakage_ids) != set(OFFICIAL_LEAKAGE_CHECK_IDS):
+            issues.append(_contract_structure_issue("required_leakage_check_ids", "official_id_set_mismatch"))
+
+    fixed_values = (
+        ("required_final_verdict", "PASS"),
+        ("required_evaluation_status", EVALUATION_STATUS_PROVISIONAL),
+        (
+            "required_data_sufficiency_status",
+            DATA_SUFFICIENCY_STATUS_PROVISIONAL_SPLIT_ONLY,
+        ),
+    )
+    for field, required_value in fixed_values:
+        value = document.get(field)
+        if type(value) is not str:
+            issues.append(_contract_type_issue(field, "string", value))
+        elif value != required_value:
+            issues.append(_contract_structure_issue(field, "unsupported_value"))
+
+    test_split_created = document.get("required_test_split_created")
+    if type(test_split_created) is not bool:
+        issues.append(_contract_type_issue("required_test_split_created", "boolean", test_split_created))
+    elif test_split_created:
+        issues.append(_contract_structure_issue("required_test_split_created", "unsupported_value"))
+
+    model_gate_judgment = document.get("required_official_model_gate_judgment")
+    if model_gate_judgment is not None:
+        if type(model_gate_judgment) is not str:
+            issues.append(
+                _contract_type_issue("required_official_model_gate_judgment", "null", model_gate_judgment)
+            )
+        else:
+            issues.append(
+                _contract_structure_issue("required_official_model_gate_judgment", "unsupported_value")
+            )
+
+    if violation_count is not None and violation_count != 0:
+        issues.append(
+            _contract_structure_issue("required_leakage_violation_count", "must_be_zero")
+        )
+    if issues:
+        raise OfficialRunAcceptanceError(tuple(issues))
+
+    return OfficialRunAcceptanceContract(
+        path=contract_path,
+        snapshot=snapshot_before,
+        sha256=str(snapshot_before[0][0]["sha256"]),
+        contract_version=str(version),
+        expected_dataset_counts=validated_dataset_counts,
+        expected_split_counts=validated_split_counts,
+        expected_area_count=int(area_count),
+        expected_horizon_counts=validated_horizon_counts,
+        required_leakage_check_ids=validated_leakage_ids,
+        required_leakage_violation_count=int(violation_count),
+        required_final_verdict=str(document["required_final_verdict"]),
+        required_evaluation_status=str(document["required_evaluation_status"]),
+        required_data_sufficiency_status=str(document["required_data_sufficiency_status"]),
+        required_test_split_created=bool(test_split_created),
+        required_official_model_gate_judgment=None,
+    )
+
+
+_SAFE_ACCEPTANCE_STRINGS = {
+    "PASS",
+    "FAIL",
+    EVALUATION_STATUS_PROVISIONAL,
+    DATA_SUFFICIENCY_STATUS_PROVISIONAL_SPLIT_ONLY,
+}
+
+
+def _display_safe_acceptance_scalar(value: object) -> str | None:
+    if value is None:
+        return "null"
+    if type(value) is bool:
+        return "true" if value else "false"
+    if type(value) is int:
+        return str(value)
+    if type(value) is str and value in _SAFE_ACCEPTANCE_STRINGS:
+        return value
+    return None
+
+
+def _acceptance_mismatch_issue(field: str, expected: object, actual: object) -> AcceptanceIssue:
+    expected_display = _display_safe_acceptance_scalar(expected)
+    actual_display = _display_safe_acceptance_scalar(actual)
+    lines = ["승인 기준 불일치:", f"항목={field}"]
+    if expected_display is not None:
+        lines.append(f"기대값={expected_display}")
+    else:
+        lines.append(f"기대 자료형={_json_type_name(expected)}")
+    if actual_display is not None:
+        lines.append(f"실제값={actual_display}")
+    else:
+        lines.append(f"실제 자료형={_json_type_name(actual)}")
+    return AcceptanceIssue(field=field, lines=tuple(lines))
+
+
+def _acceptance_structure_issue(field: str, reason: str) -> AcceptanceIssue:
+    return AcceptanceIssue(
+        field=field,
+        lines=("승인 기준 불일치:", f"항목={field}", f"오류={reason}"),
+    )
+
+
+def _verify_official_run_acceptance_contract_unchanged(
+    contract: OfficialRunAcceptanceContract,
+) -> None:
+    try:
+        current = _snapshot_input_artifacts((("acceptance_contract", contract.path),))
+    except EvidenceWriteError as error:
+        raise OfficialRunAcceptanceError(
+            (_contract_structure_issue("acceptance_contract", "missing_or_unreadable"),)
+        ) from error
+    if current != contract.snapshot:
+        raise OfficialRunAcceptanceError(
+            (_contract_structure_issue("acceptance_contract", "changed_during_build"),)
+        )
+
+
+def _leakage_acceptance_issues(
+    contract: OfficialRunAcceptanceContract, leakage_report: Mapping[str, object]
+) -> list[AcceptanceIssue]:
+    issues: list[AcceptanceIssue] = []
+    checks_value = leakage_report.get("checks")
+    if type(checks_value) is not dict:
+        return [_acceptance_structure_issue("required_leakage_check_ids", "invalid_checks_object")]
+    checks = checks_value
+    expected_ids = set(contract.required_leakage_check_ids)
+    actual_ids = set(checks)
+    missing = sorted(expected_ids - actual_ids)
+    extra = sorted(actual_ids - expected_ids)
+    if missing or extra:
+        lines = [
+            "승인 기준 불일치:",
+            "항목=required_leakage_check_ids",
+            f"기대 검사 수={len(expected_ids)}",
+            f"실제 검사 수={len(actual_ids)}",
+            f"누락 검사 수={len(missing)}",
+            f"추가 검사 수={len(extra)}",
+            "중복 검사 수=0",
+        ]
+        visible_missing = missing[:5]
+        if visible_missing:
+            lines.append(f"누락 검사 식별자={','.join(visible_missing)}")
+        if len(missing) > len(visible_missing):
+            lines.append(f"추가 누락 식별자 {len(missing) - len(visible_missing)}개는 표시하지 않음")
+        issues.append(AcceptanceIssue("required_leakage_check_ids", tuple(lines)))
+
+    violation_sum = 0
+    for check_id in sorted(actual_ids & expected_ids):
+        result = checks[check_id]
+        field = f"leakage_checks.{check_id}"
+        if type(result) is not dict:
+            issues.append(_acceptance_structure_issue(field, "invalid_result_object"))
+            continue
+        allowed_fields = {"violation_count", "violation_row_ids"}
+        if check_id == "post_cutoff_forecast_used":
+            allowed_fields.add("applicable")
+        if set(result) != allowed_fields:
+            issues.append(_acceptance_structure_issue(field, "invalid_result_fields"))
+            continue
+        count = result.get("violation_count")
+        row_ids = result.get("violation_row_ids")
+        if type(count) is not int or count < 0:
+            issues.append(_acceptance_structure_issue(field, "invalid_violation_count"))
+            continue
+        if type(row_ids) is not list or any(type(row_id) is not str for row_id in row_ids):
+            issues.append(_acceptance_structure_issue(field, "invalid_violation_row_ids"))
+            continue
+        if "applicable" in result and type(result["applicable"]) is not bool:
+            issues.append(_acceptance_structure_issue(field, "invalid_applicable_flag"))
+            continue
+        violation_sum += count
+
+    actual_total = leakage_report.get("total_violation_count")
+    if type(actual_total) is not int or actual_total < 0:
+        issues.append(
+            _acceptance_structure_issue("required_leakage_violation_count", "invalid_actual_count")
+        )
+    else:
+        if actual_total != violation_sum:
+            issues.append(
+                _acceptance_structure_issue(
+                    "required_leakage_violation_count", "check_total_mismatch"
+                )
+            )
+        if actual_total != contract.required_leakage_violation_count:
+            issues.append(
+                _acceptance_mismatch_issue(
+                    "required_leakage_violation_count",
+                    contract.required_leakage_violation_count,
+                    actual_total,
+                )
+            )
+
+    actual_verdict = leakage_report.get("final_verdict")
+    if actual_verdict != contract.required_final_verdict:
+        issues.append(
+            _acceptance_mismatch_issue(
+                "required_final_verdict", contract.required_final_verdict, actual_verdict
+            )
+        )
+    if actual_verdict != "PASS":
+        if not any(issue.field == "required_final_verdict" for issue in issues):
+            issues.append(
+                _acceptance_mismatch_issue("required_final_verdict", "PASS", actual_verdict)
+            )
+    return issues
+
+
+def _manifest_acceptance_issues(
+    phase_dir: Path, manifest: Mapping[str, object]
+) -> list[AcceptanceIssue]:
+    invalid = [_acceptance_structure_issue("output_manifest", "invalid_staged_manifest")]
+    expected_fields = {
+        "schema_version",
+        "eg8c_run_id",
+        "generated_at",
+        "evaluation_status",
+        "data_sufficiency_status",
+        "supported_horizons_minutes",
+        "test_split_created",
+        "official_model_gate_judgment",
+        "hash_algorithm",
+        "input_artifacts",
+        "output_artifacts",
+    }
+    expected_inputs = {"raw_log_v3", "population_current_v3", "population_forecast_v3"}
+    expected_outputs = {
+        FEATURE_DATASET_FILENAME,
+        LABEL_DATASET_FILENAME,
+        SPLIT_ASSIGNMENT_FILENAME,
+        FEATURE_DICTIONARY_FILENAME,
+        LABEL_CONTRACT_FILENAME,
+        LEAKAGE_REPORT_FILENAME,
+        DATASET_COVERAGE_FILENAME,
+    }
+    try:
+        stored_manifest = json.loads(
+            (phase_dir / DATASET_MANIFEST_FILENAME).read_bytes().decode("utf-8")
+        )
+        if stored_manifest != manifest or set(manifest) != expected_fields:
+            return invalid
+        if (
+            manifest.get("schema_version") != OUTPUT_MANIFEST_SCHEMA_VERSION
+            or manifest.get("supported_horizons_minutes") != list(SUPPORTED_HORIZON_MINUTES)
+            or manifest.get("hash_algorithm") != "sha256"
+        ):
+            return invalid
+        inputs = manifest.get("input_artifacts")
+        outputs = manifest.get("output_artifacts")
+        if type(inputs) is not list or type(outputs) is not list:
+            return invalid
+        if len(inputs) != len(expected_inputs) or len(outputs) != len(expected_outputs):
+            return invalid
+        if any(type(item) is not dict or set(item) != {"logical_name", "sha256", "byte_size"} for item in inputs):
+            return invalid
+        if {item["logical_name"] for item in inputs} != expected_inputs:
+            return invalid
+        if any(type(item) is not dict or set(item) != {"relative_path", "sha256", "byte_size"} for item in outputs):
+            return invalid
+        if {item["relative_path"] for item in outputs} != expected_outputs:
+            return invalid
+        for item in (*inputs, *outputs):
+            if (
+                type(item["sha256"]) is not str
+                or len(item["sha256"]) != 64
+                or type(item["byte_size"]) is not int
+                or item["byte_size"] < 0
+            ):
+                return invalid
+        for item in outputs:
+            payload = (phase_dir / item["relative_path"]).read_bytes()
+            if len(payload) != item["byte_size"] or _sha256_bytes(payload) != item["sha256"]:
+                return invalid
+    except (KeyError, OSError, UnicodeDecodeError, json.JSONDecodeError, TypeError):
+        return invalid
+    return []
+
+
+def _validate_pre_publish_acceptance(
+    contract: OfficialRunAcceptanceContract,
+    *,
+    phase_dir: Path,
+    candidate_rows: Sequence[CandidateRow],
+    split_assignment: Mapping[str, Mapping[str, str]],
+    dataset_coverage: Mapping[str, object],
+    leakage_report: Mapping[str, object],
+    manifest: Mapping[str, object],
+) -> None:
+    issues = _manifest_acceptance_issues(phase_dir, manifest)
+    issues.extend(_leakage_acceptance_issues(contract, leakage_report))
+
+    for field in ACCEPTANCE_DATASET_COUNT_FIELDS:
+        actual = dataset_coverage.get(field)
+        expected = contract.expected_dataset_counts[field]
+        if actual != expected:
+            issues.append(
+                _acceptance_mismatch_issue(f"expected_dataset_counts.{field}", expected, actual)
+            )
+
+    split_counts_value = dataset_coverage.get("split_row_counts")
+    if type(split_counts_value) is not dict:
+        issues.append(_acceptance_structure_issue("expected_split_counts", "invalid_actual_object"))
+        actual_split_counts: Mapping[str, object] = {}
+    else:
+        actual_split_counts = split_counts_value
+    for field in ACCEPTANCE_SPLIT_COUNT_FIELDS:
+        actual = actual_split_counts.get(field)
+        expected = contract.expected_split_counts[field]
+        if actual != expected:
+            issues.append(
+                _acceptance_mismatch_issue(f"expected_split_counts.{field}", expected, actual)
+            )
+
+    area_coverage = dataset_coverage.get("area_coverage")
+    actual_area_count = area_coverage.get("observed_area_count") if type(area_coverage) is dict else None
+    if actual_area_count != contract.expected_area_count:
+        issues.append(
+            _acceptance_mismatch_issue(
+                "expected_area_count", contract.expected_area_count, actual_area_count
+            )
+        )
+
+    horizon_coverage = dataset_coverage.get("horizon_coverage")
+    actual_horizon_counts = horizon_coverage if type(horizon_coverage) is dict else {}
+    if set(actual_horizon_counts) - set(ACCEPTANCE_HORIZON_COUNT_FIELDS):
+        issues.append(
+            _acceptance_structure_issue("expected_horizon_counts", "unexpected_actual_horizon")
+        )
+    for field in ACCEPTANCE_HORIZON_COUNT_FIELDS:
+        actual = actual_horizon_counts.get(field, 0)
+        expected = contract.expected_horizon_counts[field]
+        if actual != expected:
+            issues.append(
+                _acceptance_mismatch_issue(f"expected_horizon_counts.{field}", expected, actual)
+            )
+
+    actual_intersection = sum(row.feature_valid and row.label_valid for row in candidate_rows)
+    actual_dataset_counts = {
+        "candidate_row_count": len(candidate_rows),
+        "feature_valid_row_count": sum(row.feature_valid for row in candidate_rows),
+        "label_valid_row_count": sum(row.label_valid for row in candidate_rows),
+        "training_eligible_row_count": actual_intersection,
+    }
+    actual_split_counts_from_rows = {
+        split: sum(
+            split_assignment[row.row_id]["split"] == split for row in candidate_rows
+        )
+        for split in ACCEPTANCE_SPLIT_COUNT_FIELDS
+    }
+    candidate_count = len(candidate_rows)
+    for field, actual in actual_dataset_counts.items():
+        if dataset_coverage.get(field) != actual:
+            issues.append(
+                _acceptance_structure_issue(
+                    f"dataset_coverage.{field}", "candidate_rows_mismatch"
+                )
+            )
+    for field, actual in actual_split_counts_from_rows.items():
+        if actual_split_counts.get(field) != actual:
+            issues.append(
+                _acceptance_structure_issue(
+                    f"dataset_coverage.split_row_counts.{field}", "candidate_rows_mismatch"
+                )
+            )
+    actual_area_count_from_rows = len({row.area_code for row in candidate_rows})
+    if actual_area_count != actual_area_count_from_rows:
+        issues.append(
+            _acceptance_structure_issue(
+                "dataset_coverage.area_coverage.observed_area_count", "candidate_rows_mismatch"
+            )
+        )
+    actual_horizons_from_rows = {
+        str(horizon): sum(row.horizon_minutes == horizon for row in candidate_rows)
+        for horizon in SUPPORTED_HORIZON_MINUTES
+    }
+    for field, actual in actual_horizons_from_rows.items():
+        if actual_horizon_counts.get(field, 0) != actual:
+            issues.append(
+                _acceptance_structure_issue(
+                    f"dataset_coverage.horizon_coverage.{field}", "candidate_rows_mismatch"
+                )
+            )
+    if dataset_coverage.get("training_eligible_row_count") != actual_intersection:
+        issues.append(
+            _acceptance_structure_issue(
+                "dataset_relation.feature_valid_intersection_label_valid", "eligible_mismatch"
+            )
+        )
+    if candidate_count - actual_intersection != actual_split_counts_from_rows[SPLIT_EXCLUDED]:
+        issues.append(
+            _acceptance_structure_issue(
+                "dataset_relation.candidate_minus_eligible", "excluded_mismatch"
+            )
+        )
+    if (
+        actual_split_counts_from_rows[SPLIT_TRAIN]
+        + actual_split_counts_from_rows[SPLIT_VALIDATION]
+        != actual_intersection
+    ):
+        issues.append(
+            _acceptance_structure_issue(
+                "dataset_relation.train_plus_validation", "eligible_mismatch"
+            )
+        )
+
+    status_fields = (
+        ("required_evaluation_status", "evaluation_status"),
+        ("required_data_sufficiency_status", "data_sufficiency_status"),
+        ("required_test_split_created", "test_split_created"),
+        ("required_official_model_gate_judgment", "official_model_gate_judgment"),
+    )
+    for contract_field, manifest_field in status_fields:
+        expected = getattr(contract, contract_field)
+        actual = manifest.get(manifest_field)
+        if actual != expected:
+            issues.append(_acceptance_mismatch_issue(contract_field, expected, actual))
+
+    if issues:
+        raise OfficialRunAcceptanceError(tuple(issues))
+
+
 def _sha256_bytes(payload: bytes) -> str:
     return hashlib.sha256(payload).hexdigest()
 
@@ -1076,6 +1744,7 @@ def analyze_and_write_dataset(
     eg8c_run_id: str | None = None,
     generated_at: datetime | None = None,
     input_snapshot_before: InputSnapshot | None = None,
+    acceptance_contract: OfficialRunAcceptanceContract | None = None,
 ) -> Eg8cDatasetResult:
     resolved_root = eg8c_output_root.expanduser().resolve(strict=True)
     if not resolved_root.is_dir():
@@ -1201,12 +1870,27 @@ def analyze_and_write_dataset(
         if {path.name for path in phase_dir.iterdir()} != expected_outputs:
             raise EvidenceWriteError("eg8c_write_error: staged output set is incomplete")
 
+        if acceptance_contract is not None:
+            _verify_official_run_acceptance_contract_unchanged(acceptance_contract)
+            _validate_pre_publish_acceptance(
+                acceptance_contract,
+                phase_dir=phase_dir,
+                candidate_rows=candidate_rows,
+                split_assignment=split_assignment,
+                dataset_coverage=dataset_coverage,
+                leakage_report=leakage_report,
+                manifest=manifest,
+            )
+
         final_phase_dir = final_run_dir / PHASE_EG8C_VERSION
         result = Eg8cDatasetResult(
             eg8c_run_id=resolved_run_id,
             phase_dir=final_phase_dir,
             dataset_coverage=dataset_coverage,
             leakage_report=leakage_report,
+            acceptance_contract_sha256=(
+                acceptance_contract.sha256 if acceptance_contract is not None else None
+            ),
         )
         _publish_staged_run(staging_dir, final_run_dir)
         published = True
@@ -1225,6 +1909,7 @@ def run_eg8c_dataset_build(
     eg8c_output_root: Path,
     eg8c_run_id: str | None = None,
     generated_at: datetime | None = None,
+    acceptance_contract_path: Path | None = None,
 ) -> Eg8cDatasetResult:
     """Load the full current v3 Snapshot (no Analysis Window/Snapshot
     Cutoff -- EG-8C 1st scope, unlike eg8b_b2b), then build and persist
@@ -1235,6 +1920,11 @@ def run_eg8c_dataset_build(
         ("population_forecast_v3", forecast_path),
     )
     input_snapshot_before = _snapshot_input_artifacts(input_paths)
+    acceptance_contract = (
+        load_official_run_acceptance_contract(acceptance_contract_path)
+        if acceptance_contract_path is not None
+        else None
+    )
     result = eg8a.normalize_v3_sources(
         raw_log_path=raw_log_path, current_path=current_path, forecast_path=forecast_path
     )
@@ -1248,6 +1938,7 @@ def run_eg8c_dataset_build(
         eg8c_run_id=eg8c_run_id,
         generated_at=generated_at,
         input_snapshot_before=input_snapshot_before,
+        acceptance_contract=acceptance_contract,
     )
 
 
@@ -1258,6 +1949,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--error-path", type=Path, required=True)
     parser.add_argument("--output-root", type=Path, required=True)
     parser.add_argument("--run-id", required=True)
+    parser.add_argument("--acceptance-contract", type=Path, required=True)
     return parser
 
 
@@ -1270,16 +1962,21 @@ def main(argv: list[str] | None = None) -> int:
             forecast_path=arguments.forecast_path,
             eg8c_output_root=arguments.output_root,
             eg8c_run_id=arguments.run_id,
+            acceptance_contract_path=arguments.acceptance_contract,
         )
     except KeyboardInterrupt:
         print("eg8c_run_interrupted", file=sys.stderr)
         return 130
+    except OfficialRunAcceptanceError as error:
+        print(str(error), file=sys.stderr)
+        return 1
     except Exception:
         print("eg8c_run_failed: input_or_output_validation_error", file=sys.stderr)
         return 1
     print("eg8c_run_completed")
     print(f"run_id={result.eg8c_run_id}")
     print("output_count=8")
+    print(f"acceptance_contract_sha256={result.acceptance_contract_sha256}")
     return 0
 
 

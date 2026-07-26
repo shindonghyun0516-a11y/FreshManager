@@ -397,7 +397,9 @@ PM이 승인한다.
 ### 12.2 EG-8C 공식 Output Run 실행 경계
 
 EG-8C 1차 Output은 다음 표준 라이브러리 CLI로만 발행한다. 세 입력과 기존
-외부 Output Root, 비어 있지 않은 단일 경로 구간 Run ID를 모두 명시해야 한다.
+외부 Output Root, 비어 있지 않은 단일 경로 구간 Run ID, PM이 승인한 외부
+Acceptance Contract를 모두 명시해야 한다. `--error-path`는 오류 메시지 파일이
+아니라 입력 Source인 `raw_log_v3.csv`를 받는다.
 
 ```bash
 python3 -m freshmanager.eg8c_features \
@@ -405,19 +407,57 @@ python3 -m freshmanager.eg8c_features \
   --forecast-path path/to/population_forecast_v3.csv \
   --error-path path/to/raw_log_v3.csv \
   --output-root path/to/existing-output-root \
-  --run-id eg8c-20260726T190000-kst
+  --run-id eg8c-20260726T190000-kst \
+  --acceptance-contract path/to/pm-approved-acceptance.json
 ```
 
-CLI는 서울시 API나 Secret을 사용하지 않는다. 실행 전후 세 입력의 SHA-256·크기·
-파일 identity가 같고 숨김 Staging Run Root에 기존 8개 Output이 모두 생성된 경우에만
-Run Root 전체를 배타적 Rename으로 `<output-root>/<run-id>/`에 한 번에 공개한다.
-실패 또는 기존 Run 충돌 시 미공개 Staging만 정리하고 Final Run이나 기존 Run을
-삭제·덮어쓰지 않는다. 사용자 중단은 고정된 비민감 메시지와 종료코드 `130`으로
+Acceptance Contract의 목적은 Dataset별 승인 수치를 제품 코드에 하드코딩하지 않고
+실행마다 PM 승인값과 Staging 결과를 비교하는 것이다. 실제 Contract는 저장소에
+Commit하지 않는 외부 JSON 파일이며 다음 필드를 정확히 한 번씩 포함한다.
+
+- `contract_version`
+- `expected_dataset_counts`: `candidate_row_count`, `feature_valid_row_count`,
+  `label_valid_row_count`, `training_eligible_row_count`
+- `expected_split_counts`: `TRAIN`, `VALIDATION`, `EXCLUDED`
+- `expected_area_count`
+- `expected_horizon_counts`: `60`, `180`
+- `required_leakage_check_ids`, `required_leakage_violation_count`,
+  `required_final_verdict`
+- `required_evaluation_status`, `required_data_sufficiency_status`,
+  `required_test_split_created`, `required_official_model_gate_judgment`
+
+Contract는 Version·필수/알 수 없는 Key·자료형·음수·12개 누수검사 식별자 집합·
+`PASS`·위반 0·지원 상태값을 엄격히 검사한다. Dataset별 개수는 외부 Contract가
+소유하며 Production 상수로 두지 않는다.
+
+공식 Pre-publish 순서는 다음과 같다.
+
+1. 입력 3개의 SHA-256·크기·파일 identity 기록
+2. Acceptance Contract의 SHA-256·크기·파일 identity 기록
+3. 숨김 Staging Run Root 생성과 Output 7개 작성
+4. 입력 3개 불변 재검증과 Manifest 작성
+5. 정확한 Output 8개 확인
+6. Acceptance Contract 불변 재검증
+7. Manifest·Staging 파일 무결성, 누수검사, Dataset·Split·Area·Horizon 수치,
+   집합 관계와 평가 상태를 Contract와 대조
+8. 모두 통과한 Run Root만 배타적 Rename으로 Final 공개
+
+Leakage 최종판정이 `PASS`가 아니거나 위반이 0이 아니거나 기존 12개 검사 집합이
+다르면 Contract가 이를 완화할 수 없다. Candidate·Feature-valid·Label-valid·Eligible·
+TRAIN·VALIDATION·EXCLUDED·Area·60/180분 Horizon 수치 또는 평가 상태가 다를 때도
+Final을 공개하지 않는다. 실패 시 현재 실행의 미공개 Staging만 정리하고 기존 Final
+Run은 삭제·덮어쓰지 않으며, CLI는 제한된 불일치 요약만 stderr에 출력하고 0이 아닌
+종료값으로 끝난다. 사용자 중단은 고정된 비민감 메시지와 종료코드 `130`으로
 보고하며 전체 Traceback을 출력하지 않는다.
+
+성공한 CLI는 실행 Evidence에 기록할 수 있도록 Acceptance Contract SHA-256을
+제공한다. 이 Hash를 기존 `dataset_manifest.json`에 추가하지 않으며, 공개 산출물 8개와
+각 공개 Schema는 변경하지 않는다.
 
 이 명령의 문서화는 실제 운영 Dataset 실행 승인이 아니다. 공개 상태는 계속
 `PROVISIONAL`·`PROVISIONAL_SPLIT_ONLY`·`test_split_created=false`·
-`official_model_gate_judgment=null`을 유지한다.
+`official_model_gate_judgment=null`을 유지하며, Output 발행은 공식 Model Gate 통과를
+뜻하지 않는다.
 
 ## 13. 품질 Gate(EG-8A 통과 조건 연결)
 
@@ -507,6 +547,7 @@ Spot은 위치 식별 정보는 `Confirmed`이지만 전부 `field_verified=fals
 
 | 버전 | 날짜 | 변경내용 | 작성자 | 승인상태 |
 |---|---|---|---|---|
+| v0.7.0 | 2026-07-26 | EG-8C 공식 CLI의 외부 PM 승인 Acceptance Contract 필수화, Contract 엄격 검증·실행 전후 불변, Leakage·Dataset 회귀·평가 상태의 Final Publish 전 Gate, 실패 시 미공개 Staging 전용 정리와 기존 8개 공개 Schema 불변 계약을 §12.2에 추가. 실제 Contract·Dataset·Output은 미포함 | 신동현 | PM 결정 |
 | v0.6.0 | 2026-07-26 | EG-8C 공식 Output Run의 명시적 CLI, 단일 구간 Run ID, Input Hash·크기·파일 identity 전후 불변, 숨김 Run Root 전체의 배타적 Rename 공개, 미공개 Staging 전용 Cleanup, 사용자 중단 종료코드 130 계약을 §12.2에 추가. 실제 운영 Dataset Run·모델·Dependency는 미포함 | 신동현 | PM 결정 |
 | v0.5.0 | 2026-07-24 | Source Correlation Key를 `area_code_returned`에서 `area_code_requested`로 정정(§8.1) — `raw_log_v3`에 `area_code_returned` 컬럼이 없어 세 시트 전체를 연결할 수 없었던 오류를 실 데이터 3-way 키 비교로 확인·수정. Response Integrity Check와 canonical `area_code` 정규화 규칙·불일치 행 Error Rows 격리 규칙을 §7.1에 추가. `duplicate_flag`/`error_flag`를 `LOADER_DERIVED_FIELD`, `source_status`를 `JOINED_FROM_RAW_LOG`로 세분화. §5.1에 KST 소스 해석·ISO 8601 명시적 Offset 출력 계약·`strptime` 기반 파싱 원칙·수집 지연이 오류가 아님을 추가 | 신동현 | PM 결정 |
 | v0.4.0 | 2026-07-24 | PM이 제공한 실제 v3 sheets CSV Export(122회차)로 §7/§8 필드 후보 상태를 `CONFIRMED_SOURCE_FIELD`/`DERIVED_FIELD`/`NOT_AVAILABLE`로 갱신. `area_code`를 `area_code_requested`/`area_code_returned` 이중 컬럼으로 정정(§7.1). Current-Forecast Join Key `collection_run_id`+`area_code_returned` 확정(§8.1). §6 데이터 계층을 Raw(`raw_log_v3`)/Normalized Source(`population_current_v3`·`population_forecast_v3`)로 재정의. 시간 표현·검증 규칙 추가(§5.1). 오류 분류에 "시간 순서 위반" 추가(§11). 장기 자동화 방식·최종 정본 형식·품질 임계값은 계속 `OPEN_DECISION` | 신동현 | PM 결정 |
