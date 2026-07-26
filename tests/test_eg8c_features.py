@@ -136,6 +136,20 @@ def build_full_current_history(*, origin: datetime, area: str = AREA, minutes_ba
     return tuple(records)
 
 
+def matching_label_provenance(*, target_at: str, area_code: str) -> eg8c_features.FeatureProvenance:
+    """Minimal FeatureProvenance carrying only a correct Label source, for
+    hand-built CandidateRow Fixtures whose actual test target is unrelated
+    to Label Provenance -- so check 5 (label_target_wrong_area) doesn't
+    misfire as an unintended side effect on a Fixture testing something
+    else entirely."""
+    return eg8c_features.FeatureProvenance(
+        current_source_at=None, current_source_area=None,
+        lag_source_at={}, lag_source_area={},
+        rolling_source_at={}, rolling_source_area={},
+        label_source_at=target_at, label_source_area=area_code,
+    )
+
+
 class TimeFeatureAndHorizonTests(unittest.TestCase):
     def test_exact_60_and_180_are_supported_no_tolerance(self) -> None:
         current = build_full_current_history(origin=datetime.fromisoformat("2026-07-24T08:00:00+09:00"))
@@ -359,6 +373,10 @@ class LeakageReportTests(unittest.TestCase):
         )
         report = eg8c_features.build_leakage_report([row, row], {"dup": {"split": "EXCLUDED", "split_reason": "x"}})
         self.assertEqual(report["checks"]["duplicate_row_id"]["violation_count"], 1)
+        # Already isolated: this row's label_valid=False, so check 5 skips
+        # it entirely (nothing to verify without a valid Label). Asserted
+        # explicitly rather than assumed.
+        self.assertEqual(report["checks"]["label_target_wrong_area"]["violation_count"], 0)
         self.assertEqual(report["final_verdict"], "FAIL")
 
     def test_same_origin_split_conflict_detected(self) -> None:
@@ -367,12 +385,14 @@ class LeakageReportTests(unittest.TestCase):
             prediction_target_at="2026-07-24T09:00:00+09:00", horizon_minutes=60,
             source_collection_run_id=RUN_A, feature={}, feature_valid=True,
             feature_missing_reason=None, label_value=1.0, label_valid=True, label_missing_reason=None,
+            feature_provenance=matching_label_provenance(target_at="2026-07-24T09:00:00+09:00", area_code=AREA),
         )
         row_b = eg8c_features.CandidateRow(
             row_id="b", area_code="POI019", prediction_origin_at="2026-07-24T08:00:00+09:00",
             prediction_target_at="2026-07-24T09:00:00+09:00", horizon_minutes=60,
             source_collection_run_id=RUN_A, feature={}, feature_valid=True,
             feature_missing_reason=None, label_value=1.0, label_valid=True, label_missing_reason=None,
+            feature_provenance=matching_label_provenance(target_at="2026-07-24T09:00:00+09:00", area_code="POI019"),
         )
         assignment = {
             "a": {"split": eg8c_features.SPLIT_TRAIN, "split_reason": "x"},
@@ -380,6 +400,7 @@ class LeakageReportTests(unittest.TestCase):
         }
         report = eg8c_features.build_leakage_report([row_a, row_b], assignment)
         self.assertEqual(report["checks"]["same_origin_split_across_boundary"]["violation_count"], 1)
+        self.assertEqual(report["checks"]["label_target_wrong_area"]["violation_count"], 0)
         self.assertEqual(report["final_verdict"], "FAIL")
 
     def test_cutoff_not_applicable_when_none_supplied(self) -> None:
@@ -437,17 +458,25 @@ class LeakageNegativeFixtureTests(unittest.TestCase):
             horizon_minutes=60, source_collection_run_id=RUN_A,
             feature={}, feature_valid=False, feature_missing_reason="x",
             label_value=1.0, label_valid=True, label_missing_reason=None,
+            # Label Provenance matches this row's own (broken) target, so
+            # only label_target_before_origin fires here, not check 5.
+            feature_provenance=matching_label_provenance(target_at="2026-07-24T09:00:00+09:00", area_code=AREA),
         )
         report = eg8c_features.build_leakage_report([row], {row.row_id: {"split": "EXCLUDED", "split_reason": "x"}})
         self.assertGreater(report["checks"]["label_target_before_origin"]["violation_count"], 0)
         self.assertIn(row.row_id, report["checks"]["label_target_before_origin"]["violation_row_ids"])
+        self.assertEqual(report["checks"]["label_target_wrong_area"]["violation_count"], 0)
         self.assertEqual(report["final_verdict"], "FAIL")
 
-        clean_row = dataclasses.replace(row, row_id="nt2-clean", prediction_target_at="2026-07-24T10:00:00+09:00")
+        clean_row = dataclasses.replace(
+            row, row_id="nt2-clean", prediction_target_at="2026-07-24T10:00:00+09:00",
+            feature_provenance=matching_label_provenance(target_at="2026-07-24T10:00:00+09:00", area_code=AREA),
+        )
         clean_report = eg8c_features.build_leakage_report(
             [clean_row], {clean_row.row_id: {"split": "EXCLUDED", "split_reason": "x"}}
         )
         self.assertEqual(clean_report["checks"]["label_target_before_origin"]["violation_count"], 0)
+        self.assertEqual(clean_report["checks"]["label_target_wrong_area"]["violation_count"], 0)
 
     def test_nt3_feature_provenance_sourced_from_target_is_flagged(self) -> None:
         origin = datetime.fromisoformat("2026-07-24T09:00:00+09:00")
@@ -489,10 +518,12 @@ class LeakageNegativeFixtureTests(unittest.TestCase):
             feature_valid=True,  # contract violation: claims valid while every mandatory field is None
             feature_missing_reason=None,
             label_value=1.0, label_valid=True, label_missing_reason=None,
+            feature_provenance=matching_label_provenance(target_at="2026-07-24T10:00:00+09:00", area_code=AREA),
         )
         report = eg8c_features.build_leakage_report([row], {row.row_id: {"split": "TRAIN", "split_reason": "x"}})
         self.assertGreater(report["checks"]["missing_value_silently_filled"]["violation_count"], 0)
         self.assertIn(row.row_id, report["checks"]["missing_value_silently_filled"]["violation_row_ids"])
+        self.assertEqual(report["checks"]["label_target_wrong_area"]["violation_count"], 0)
         self.assertEqual(report["final_verdict"], "FAIL")
 
         # The honest outcome for the same missing fields is EXCLUDED
@@ -504,6 +535,7 @@ class LeakageNegativeFixtureTests(unittest.TestCase):
             [honest_row], {honest_row.row_id: {"split": "EXCLUDED", "split_reason": "feature_invalid"}}
         )
         self.assertEqual(honest_report["checks"]["missing_value_silently_filled"]["violation_count"], 0)
+        self.assertEqual(honest_report["checks"]["label_target_wrong_area"]["violation_count"], 0)
 
     def test_nt5_origin_after_cutoff_is_flagged(self) -> None:
         cutoff = datetime.fromisoformat("2026-07-24T12:00:00+09:00")
