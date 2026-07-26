@@ -194,6 +194,33 @@ class OutputRootConfigurationError(EvidenceWriteError):
     """Raised when FRESHMANAGER_EG8B_OUTPUT_ROOT is unset or invalid."""
 
 
+class OfficialRunPathError(EvidenceWriteError):
+    """Safe, structured path failure from the supported official Builder."""
+
+    def __init__(self, field: str, reason: str):
+        self.field = field
+        self.reason = reason
+        super().__init__(
+            "\n".join(("공식 실행 경로 오류:", f"항목={field}", f"오류={reason}"))
+        )
+
+
+def _path_error_reason(error: BaseException) -> str:
+    if isinstance(error, PermissionError):
+        return "permission_denied"
+    if isinstance(error, FileNotFoundError):
+        return "not_found"
+    if isinstance(error, NotADirectoryError):
+        return "not_directory"
+    if isinstance(error, IsADirectoryError):
+        return "expected_file"
+    if isinstance(error, RuntimeError):
+        return "resolution_failed"
+    if isinstance(error, OSError) and error.errno == errno.ELOOP:
+        return "symlink_error"
+    return "file_operation_failed"
+
+
 @dataclass(frozen=True)
 class AcceptanceIssue:
     field: str
@@ -1083,12 +1110,27 @@ def _nonnegative_integer(
     return value
 
 
+def _acceptance_file_error(reason: str) -> OfficialRunAcceptanceError:
+    return OfficialRunAcceptanceError(
+        (_contract_structure_issue("acceptance_contract", reason),)
+    )
+
+
 def _read_acceptance_file_snapshot(path: Path) -> _AcceptanceFileSnapshot:
     contract_path = Path(path)
     try:
         link_before = contract_path.lstat()
-        if not stat.S_ISREG(link_before.st_mode) or contract_path.is_symlink():
-            raise OSError
+    except FileNotFoundError:
+        raise _acceptance_file_error("not_found") from None
+    except PermissionError:
+        raise _acceptance_file_error("permission_denied") from None
+    except (OSError, ValueError):
+        raise _acceptance_file_error("read_failed") from None
+    if stat.S_ISLNK(link_before.st_mode):
+        raise _acceptance_file_error("symlink_not_allowed") from None
+    if not stat.S_ISREG(link_before.st_mode):
+        raise _acceptance_file_error("not_regular_file") from None
+    try:
         with contract_path.open("rb") as source:
             file_before = os.fstat(source.fileno())
             if not stat.S_ISREG(file_before.st_mode):
@@ -1097,12 +1139,16 @@ def _read_acceptance_file_snapshot(path: Path) -> _AcceptanceFileSnapshot:
             file_after = os.fstat(source.fileno())
             digest = _sha256_bytes(payload)
         link_after = contract_path.lstat()
-        if not stat.S_ISREG(link_after.st_mode) or contract_path.is_symlink():
-            raise OSError
+    except FileNotFoundError:
+        raise _acceptance_file_error("not_found") from None
+    except PermissionError:
+        raise _acceptance_file_error("permission_denied") from None
     except (OSError, ValueError, EvidenceWriteError):
-        raise OfficialRunAcceptanceError(
-            (_contract_structure_issue("acceptance_contract", "missing_or_not_regular_file"),)
-        ) from None
+        raise _acceptance_file_error("read_failed") from None
+    if stat.S_ISLNK(link_after.st_mode):
+        raise _acceptance_file_error("symlink_not_allowed") from None
+    if not stat.S_ISREG(link_after.st_mode):
+        raise _acceptance_file_error("not_regular_file") from None
     identity_before = (
         link_before.st_dev,
         link_before.st_ino,
@@ -1930,6 +1976,23 @@ def _write_unpublished_dataset(
     )
 
 
+def _resolve_official_output_root(path: Path) -> Path:
+    try:
+        expanded = path.expanduser()
+        link_status = expanded.lstat()
+    except (OSError, RuntimeError, ValueError) as error:
+        raise OfficialRunPathError("output_root", _path_error_reason(error)) from None
+    if stat.S_ISLNK(link_status.st_mode):
+        raise OfficialRunPathError("output_root", "symlink_not_allowed")
+    if not stat.S_ISDIR(link_status.st_mode):
+        raise OfficialRunPathError("output_root", "not_directory")
+    try:
+        resolved = expanded.resolve(strict=True)
+    except (OSError, RuntimeError, ValueError) as error:
+        raise OfficialRunPathError("output_root", _path_error_reason(error)) from None
+    return resolved
+
+
 def run_eg8c_dataset_build(
     *,
     raw_log_path: Path,
@@ -1954,12 +2017,13 @@ def run_eg8c_dataset_build(
         ("population_forecast_v3", forecast_path),
     )
     input_snapshot_before = _snapshot_input_artifacts(input_paths)
-    normalized = eg8a.normalize_v3_sources(
-        raw_log_path=raw_log_path, current_path=current_path, forecast_path=forecast_path
-    )
-    resolved_root = eg8c_output_root.expanduser().resolve(strict=True)
-    if not resolved_root.is_dir():
-        raise EvidenceWriteError("eg8c_write_error: output root is not a directory")
+    try:
+        normalized = eg8a.normalize_v3_sources(
+            raw_log_path=raw_log_path, current_path=current_path, forecast_path=forecast_path
+        )
+    except OSError as error:
+        raise OfficialRunPathError("input_source", _path_error_reason(error)) from None
+    resolved_root = _resolve_official_output_root(eg8c_output_root)
     resolved_run_id = _validated_run_id(
         eg8c_run_id if eg8c_run_id is not None else str(uuid.uuid4())
     )
@@ -1975,7 +2039,10 @@ def run_eg8c_dataset_build(
     if resolved_run_dir.parent != resolved_root:
         raise EvidenceWriteError("eg8c_write_error: run path must stay inside output root")
 
-    staging_dir = Path(tempfile.mkdtemp(prefix=".eg8c-staging-", dir=resolved_root))
+    try:
+        staging_dir = Path(tempfile.mkdtemp(prefix=".eg8c-staging-", dir=resolved_root))
+    except OSError as error:
+        raise OfficialRunPathError("output_root", _path_error_reason(error)) from None
     phase_dir = staging_dir / PHASE_EG8C_VERSION
     published = False
     try:
@@ -2016,9 +2083,17 @@ def run_eg8c_dataset_build(
         published = True
         return result
     except BaseException as primary_error:
+        safe_error = (
+            OfficialRunPathError("input_or_output", _path_error_reason(primary_error))
+            if isinstance(primary_error, OSError)
+            and not isinstance(primary_error, EvidenceWriteError)
+            else primary_error
+        )
         if not published and (staging_dir.exists() or staging_dir.is_symlink()):
-            _cleanup_unpublished_staging(staging_dir, primary_error)
-        raise
+            _cleanup_unpublished_staging(staging_dir, safe_error)
+        if safe_error is primary_error:
+            raise
+        raise safe_error from None
 
 
 class _CliArgumentError(Exception):
