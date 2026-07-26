@@ -523,10 +523,29 @@ def build_leakage_report(
     target_before_origin = [row.row_id for row in rows if targets[row.row_id] <= origins[row.row_id]]
     _record("label_target_before_origin", target_before_origin)
 
-    # 5. Target Actual must be looked up under the row's own area_code
-    # (structurally guaranteed by build_candidate_rows' lookup key;
-    # re-verified by recomputation here rather than trusted).
+    # 5. Target Actual must be looked up under the row's own area_code and
+    # at exactly prediction_target_at -- verified against the row's own
+    # recorded Label Provenance (what the Label lookup actually used), not
+    # merely trusted from build_candidate_rows' own bookkeeping. A valid
+    # Label with no recorded source (fail-closed), a source from the wrong
+    # Area, or a source timestamp that disagrees with prediction_target_at
+    # are all violations. A row whose Label is not valid has nothing to
+    # verify here (its own missing-ness is label_valid's concern, not
+    # this check's).
     wrong_area_label: list[str] = []
+    for row in rows:
+        if not row.label_valid:
+            continue
+        target = targets[row.row_id]
+        provenance = row.feature_provenance
+        if provenance.label_source_at is None or provenance.label_source_area is None:
+            wrong_area_label.append(row.row_id)
+            continue
+        if provenance.label_source_area != row.area_code:
+            wrong_area_label.append(row.row_id)
+            continue
+        if datetime.fromisoformat(provenance.label_source_at) != target:
+            wrong_area_label.append(row.row_id)
     _record("label_target_wrong_area", wrong_area_label)
 
     # 6. No duplicate row_id.
@@ -611,7 +630,11 @@ def build_leakage_report(
                 mean_value = row.feature.get(f"rolling_mean_{window_min}m")
                 std_value = row.feature.get(f"rolling_std_{window_min}m")
                 sources = provenance.rolling_source_at.get(window_min, ())
+                source_area = provenance.rolling_source_area.get(window_min)
                 if (mean_value is not None or std_value is not None) and not sources:
+                    violated = True
+                    break
+                if sources and source_area != row.area_code:
                     violated = True
                     break
                 if any(datetime.fromisoformat(source_at) > origin for source_at in sources):

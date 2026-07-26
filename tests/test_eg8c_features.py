@@ -417,6 +417,11 @@ class LeakageNegativeFixtureTests(unittest.TestCase):
         report = eg8c_features.build_leakage_report([poisoned_row], assignment)
         self.assertGreater(report["checks"]["lag_timestamp_not_before_origin"]["violation_count"], 0)
         self.assertIn(poisoned_row.row_id, report["checks"]["lag_timestamp_not_before_origin"]["violation_row_ids"])
+        # Independence: poisoning only the Lag Provenance must not also
+        # trip check 10, which never inspects lag_source_at's exact value
+        # against origin - lag_minutes (that precision is check 2's own
+        # duty; check 10 only bounds Lag Source by Origin).
+        self.assertEqual(report["checks"]["future_actual_used_as_feature"]["violation_count"], 0)
         self.assertEqual(report["final_verdict"], "FAIL")
 
         clean_assignment = eg8c_features.build_split_assignment([clean_row])
@@ -600,6 +605,79 @@ class LeakageNegativeFixtureTests(unittest.TestCase):
         report = eg8c_features.build_leakage_report([clean_row], assignment)
         self.assertEqual(report["checks"]["future_actual_used_as_feature"]["violation_count"], 0)
         self.assertEqual(report["final_verdict"], "PASS")
+
+    def test_nt10_rolling_source_area_mismatch_is_flagged(self) -> None:
+        origin = datetime.fromisoformat("2026-07-24T10:00:00+09:00")
+        clean_row = self._build_single_clean_row(origin=origin)
+        self.assertIsNotNone(clean_row.feature["rolling_mean_15m"])
+        other_area = "POI019"
+        self.assertNotEqual(clean_row.area_code, other_area)
+
+        # Poison: the 15-minute Rolling window's recorded Source Timestamps
+        # stay valid (still before Origin), but its recorded Source Area
+        # now claims a different Area than the Candidate's own.
+        poisoned_rolling_source_area = dict(clean_row.feature_provenance.rolling_source_area)
+        poisoned_rolling_source_area[15] = other_area
+        poisoned_provenance = dataclasses.replace(clean_row.feature_provenance, rolling_source_area=poisoned_rolling_source_area)
+        poisoned_row = dataclasses.replace(clean_row, feature_provenance=poisoned_provenance)
+
+        assignment = eg8c_features.build_split_assignment([poisoned_row])
+        report = eg8c_features.build_leakage_report([poisoned_row], assignment)
+        self.assertGreater(report["checks"]["future_actual_used_as_feature"]["violation_count"], 0)
+        self.assertIn(poisoned_row.row_id, report["checks"]["future_actual_used_as_feature"]["violation_row_ids"])
+        self.assertEqual(report["checks"]["label_target_before_origin"]["violation_count"], 0)
+        self.assertEqual(report["final_verdict"], "FAIL")
+
+    def test_nt11_label_provenance_missing_is_flagged(self) -> None:
+        origin = datetime.fromisoformat("2026-07-24T10:00:00+09:00")
+        clean_row = self._build_single_clean_row(origin=origin)
+        self.assertTrue(clean_row.label_valid)
+        self.assertIsNotNone(clean_row.label_value)
+
+        # Poison: the Label value/valid flag stay real, but its recorded
+        # Provenance is wiped -- fail-closed, must not silently PASS.
+        poisoned_provenance = dataclasses.replace(
+            clean_row.feature_provenance, label_source_at=None, label_source_area=None
+        )
+        poisoned_row = dataclasses.replace(clean_row, feature_provenance=poisoned_provenance)
+
+        assignment = eg8c_features.build_split_assignment([poisoned_row])
+        report = eg8c_features.build_leakage_report([poisoned_row], assignment)
+        self.assertGreater(report["checks"]["label_target_wrong_area"]["violation_count"], 0)
+        self.assertIn(poisoned_row.row_id, report["checks"]["label_target_wrong_area"]["violation_row_ids"])
+        self.assertEqual(report["checks"]["label_target_before_origin"]["violation_count"], 0)
+        self.assertEqual(report["final_verdict"], "FAIL")
+
+    def test_nt12_label_source_timestamp_mismatch_is_flagged(self) -> None:
+        origin = datetime.fromisoformat("2026-07-24T10:00:00+09:00")
+        clean_row = self._build_single_clean_row(origin=origin)
+        target_at = datetime.fromisoformat(clean_row.prediction_target_at)
+        poisoned_at = target_at - timedelta(minutes=5)
+
+        poisoned_provenance = dataclasses.replace(clean_row.feature_provenance, label_source_at=poisoned_at.isoformat())
+        poisoned_row = dataclasses.replace(clean_row, feature_provenance=poisoned_provenance)
+
+        assignment = eg8c_features.build_split_assignment([poisoned_row])
+        report = eg8c_features.build_leakage_report([poisoned_row], assignment)
+        self.assertGreater(report["checks"]["label_target_wrong_area"]["violation_count"], 0)
+        self.assertIn(poisoned_row.row_id, report["checks"]["label_target_wrong_area"]["violation_row_ids"])
+        self.assertEqual(report["checks"]["label_target_before_origin"]["violation_count"], 0)
+        self.assertEqual(report["final_verdict"], "FAIL")
+
+    def test_nt13_label_source_area_mismatch_is_flagged(self) -> None:
+        origin = datetime.fromisoformat("2026-07-24T10:00:00+09:00")
+        clean_row = self._build_single_clean_row(origin=origin)
+        other_area = "POI019"
+        self.assertNotEqual(clean_row.area_code, other_area)
+
+        poisoned_provenance = dataclasses.replace(clean_row.feature_provenance, label_source_area=other_area)
+        poisoned_row = dataclasses.replace(clean_row, feature_provenance=poisoned_provenance)
+
+        assignment = eg8c_features.build_split_assignment([poisoned_row])
+        report = eg8c_features.build_leakage_report([poisoned_row], assignment)
+        self.assertGreater(report["checks"]["label_target_wrong_area"]["violation_count"], 0)
+        self.assertIn(poisoned_row.row_id, report["checks"]["label_target_wrong_area"]["violation_row_ids"])
+        self.assertEqual(report["final_verdict"], "FAIL")
 
 
 class OutputWriterTests(unittest.TestCase):
