@@ -564,27 +564,69 @@ def build_leakage_report(
     # structural non-issue, not silently omitted.
     _record("validation_statistics_used_in_train", [])
 
-    # 10. No Feature may be built from a Current record observed at or
-    # after this row's own Prediction Target (future Actual used as
-    # Feature) -- verified from the row's own recorded Feature Provenance
-    # (current/Lag/Rolling source timestamps), independently of check 4
-    # (which only compares the row's own origin/target metadata and says
-    # nothing about what a Feature was actually built from). Also flags a
-    # Feature source timestamp that coincides with the row's own recorded
-    # Label source -- the Target Actual reused as if it were a Feature.
+    # 10. No Feature may be built from an Actual observed after this row's
+    # own Prediction Origin (future Actual used as Feature) -- verified
+    # from the row's own recorded Feature Provenance, independently of
+    # check 4 (which only compares the row's own origin/target metadata
+    # and says nothing about what a Feature was actually built from). The
+    # boundary is Origin, not Target: a source strictly between Origin and
+    # Target is still a leak even though it predates Target. Current must
+    # match Origin exactly (its lookup is always a single fixed instant,
+    # never a range); Lag/Rolling must not be after Origin (their exact
+    # formula is check 2's/an intentionally-undefined-here duty for
+    # Rolling -- this check only enforces the Origin boundary). A Feature
+    # value present with no recorded source at all is also a violation
+    # (fail-closed: Provenance must never silently go missing under a real
+    # value), and a Feature source that coincides with the row's own
+    # recorded Label source is flagged too -- the Target Actual reused as
+    # if it were a Feature.
     future_actual_as_feature: list[str] = []
     for row in rows:
-        target = targets[row.row_id]
+        origin = origins[row.row_id]
         provenance = row.feature_provenance
-        feature_sources = [source_at for source_at in provenance.lag_source_at.values() if source_at is not None]
-        for window_sources in provenance.rolling_source_at.values():
-            feature_sources.extend(window_sources)
-        if provenance.current_source_at is not None:
-            feature_sources.append(provenance.current_source_at)
+        violated = False
 
-        violated = any(datetime.fromisoformat(source_at) >= target for source_at in feature_sources)
-        if not violated and provenance.label_source_at is not None and provenance.label_source_at in feature_sources:
+        current_value = row.feature.get("current_population_midpoint")
+        if current_value is not None and provenance.current_source_at is None:
             violated = True
+        elif provenance.current_source_at is not None:
+            if provenance.current_source_area != row.area_code:
+                violated = True
+            elif datetime.fromisoformat(provenance.current_source_at) != origin:
+                violated = True
+
+        if not violated:
+            for lag_min in LAG_MINUTES:
+                feature_value = row.feature.get(f"population_lag_{lag_min}m")
+                source_at = provenance.lag_source_at.get(lag_min)
+                if feature_value is not None and source_at is None:
+                    violated = True
+                    break
+                if source_at is not None and datetime.fromisoformat(source_at) > origin:
+                    violated = True
+                    break
+
+        if not violated:
+            for window_min in sorted(set(ROLLING_MEAN_WINDOW_MINUTES) | set(ROLLING_STD_WINDOW_MINUTES)):
+                mean_value = row.feature.get(f"rolling_mean_{window_min}m")
+                std_value = row.feature.get(f"rolling_std_{window_min}m")
+                sources = provenance.rolling_source_at.get(window_min, ())
+                if (mean_value is not None or std_value is not None) and not sources:
+                    violated = True
+                    break
+                if any(datetime.fromisoformat(source_at) > origin for source_at in sources):
+                    violated = True
+                    break
+
+        if not violated and provenance.label_source_at is not None:
+            feature_sources = [s for s in provenance.lag_source_at.values() if s is not None]
+            for window_sources in provenance.rolling_source_at.values():
+                feature_sources.extend(window_sources)
+            if provenance.current_source_at is not None:
+                feature_sources.append(provenance.current_source_at)
+            if provenance.label_source_at in feature_sources:
+                violated = True
+
         if violated:
             future_actual_as_feature.append(row.row_id)
     _record("future_actual_used_as_feature", future_actual_as_feature)

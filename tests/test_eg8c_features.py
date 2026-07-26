@@ -526,6 +526,81 @@ class LeakageNegativeFixtureTests(unittest.TestCase):
         )
         self.assertEqual(clean_report["checks"]["post_cutoff_forecast_used"]["violation_count"], 0)
 
+    def _build_single_clean_row(self, *, origin: datetime, horizon_minutes: int = 60) -> eg8c_features.CandidateRow:
+        target_at = origin + timedelta(minutes=horizon_minutes)
+        current = build_full_current_history(origin=origin, minutes_back=65)
+        target_actual = make_current_record(observed_at=target_at.isoformat())
+        forecast = make_forecast_record(observed_at=origin.isoformat(), forecast_at=target_at.isoformat())
+        rows = eg8c_features.build_candidate_rows(current + (target_actual,), (forecast,))
+        self.assertEqual(len(rows), 1)
+        return rows[0]
+
+    def test_nt6_rolling_source_between_origin_and_target_is_flagged(self) -> None:
+        origin = datetime.fromisoformat("2026-07-24T10:00:00+09:00")
+        clean_row = self._build_single_clean_row(origin=origin)
+        self.assertIsNotNone(clean_row.feature["rolling_mean_15m"])
+
+        # Poison: one of rolling_mean_15m's recorded source points now
+        # claims 10:10 -- strictly after Origin (10:00) but still before
+        # Target (11:00). The pre-fix check (bounded by Target) would have
+        # missed this; the Origin-bounded check must not.
+        poisoned_at = origin + timedelta(minutes=10)
+        original_sources = clean_row.feature_provenance.rolling_source_at[15]
+        poisoned_rolling_source_at = dict(clean_row.feature_provenance.rolling_source_at)
+        poisoned_rolling_source_at[15] = (poisoned_at.isoformat(),) + original_sources[1:]
+        poisoned_provenance = dataclasses.replace(clean_row.feature_provenance, rolling_source_at=poisoned_rolling_source_at)
+        poisoned_row = dataclasses.replace(clean_row, feature_provenance=poisoned_provenance)
+
+        assignment = eg8c_features.build_split_assignment([poisoned_row])
+        report = eg8c_features.build_leakage_report([poisoned_row], assignment)
+        self.assertGreater(report["checks"]["future_actual_used_as_feature"]["violation_count"], 0)
+        self.assertIn(poisoned_row.row_id, report["checks"]["future_actual_used_as_feature"]["violation_row_ids"])
+        self.assertEqual(report["checks"]["label_target_before_origin"]["violation_count"], 0)
+        self.assertEqual(report["final_verdict"], "FAIL")
+
+    def test_nt7_missing_rolling_provenance_with_value_present_is_flagged(self) -> None:
+        origin = datetime.fromisoformat("2026-07-24T10:00:00+09:00")
+        clean_row = self._build_single_clean_row(origin=origin)
+        self.assertIsNotNone(clean_row.feature["rolling_mean_30m"])
+
+        # Poison: the Rolling Mean value is still real, but its recorded
+        # Provenance is wiped -- a value must never exist without a
+        # recorded source (fail-closed).
+        poisoned_rolling_source_at = dict(clean_row.feature_provenance.rolling_source_at)
+        poisoned_rolling_source_at[30] = ()
+        poisoned_provenance = dataclasses.replace(clean_row.feature_provenance, rolling_source_at=poisoned_rolling_source_at)
+        poisoned_row = dataclasses.replace(clean_row, feature_provenance=poisoned_provenance)
+
+        assignment = eg8c_features.build_split_assignment([poisoned_row])
+        report = eg8c_features.build_leakage_report([poisoned_row], assignment)
+        self.assertGreater(report["checks"]["future_actual_used_as_feature"]["violation_count"], 0)
+        self.assertIn(poisoned_row.row_id, report["checks"]["future_actual_used_as_feature"]["violation_row_ids"])
+        self.assertEqual(report["final_verdict"], "FAIL")
+
+    def test_nt8_current_source_after_origin_is_flagged(self) -> None:
+        origin = datetime.fromisoformat("2026-07-24T10:00:00+09:00")
+        clean_row = self._build_single_clean_row(origin=origin)
+
+        poisoned_at = origin + timedelta(minutes=5)
+        poisoned_provenance = dataclasses.replace(clean_row.feature_provenance, current_source_at=poisoned_at.isoformat())
+        poisoned_row = dataclasses.replace(clean_row, feature_provenance=poisoned_provenance)
+
+        assignment = eg8c_features.build_split_assignment([poisoned_row])
+        report = eg8c_features.build_leakage_report([poisoned_row], assignment)
+        self.assertGreater(report["checks"]["future_actual_used_as_feature"]["violation_count"], 0)
+        self.assertIn(poisoned_row.row_id, report["checks"]["future_actual_used_as_feature"]["violation_row_ids"])
+        self.assertEqual(report["final_verdict"], "FAIL")
+
+    def test_nt9_current_source_equal_to_origin_is_clean(self) -> None:
+        origin = datetime.fromisoformat("2026-07-24T10:00:00+09:00")
+        clean_row = self._build_single_clean_row(origin=origin)
+        self.assertEqual(clean_row.feature_provenance.current_source_at, origin.isoformat())
+
+        assignment = eg8c_features.build_split_assignment([clean_row])
+        report = eg8c_features.build_leakage_report([clean_row], assignment)
+        self.assertEqual(report["checks"]["future_actual_used_as_feature"]["violation_count"], 0)
+        self.assertEqual(report["final_verdict"], "PASS")
+
 
 class OutputWriterTests(unittest.TestCase):
     def test_run_eg8c_dataset_build_creates_eight_files(self) -> None:
