@@ -150,6 +150,40 @@ class OutputRootConfigurationError(EvidenceWriteError):
 
 
 @dataclass(frozen=True)
+class FeatureProvenance:
+    """Internal-only record of the actual (area_code, timestamp) source
+    each Feature/Label value was looked up from -- never serialized to
+    feature_dataset.csv (that file is built from FEATURE_DATASET_FIELDNAMES
+    + CandidateRow.feature only, which this is not part of).
+
+    Exists so Leakage checks can compare what was ACTUALLY looked up
+    against an independently re-derived expectation, instead of
+    recomputing the same lookup formula a second time and trivially
+    agreeing with itself."""
+
+    current_source_at: str | None
+    current_source_area: str | None
+    lag_source_at: Mapping[int, str | None]
+    lag_source_area: Mapping[int, str | None]
+    rolling_source_at: Mapping[int, tuple[str, ...]]
+    rolling_source_area: Mapping[int, str | None]
+    label_source_at: str | None
+    label_source_area: str | None
+
+
+_EMPTY_FEATURE_PROVENANCE = FeatureProvenance(
+    current_source_at=None,
+    current_source_area=None,
+    lag_source_at={},
+    lag_source_area={},
+    rolling_source_at={},
+    rolling_source_area={},
+    label_source_at=None,
+    label_source_area=None,
+)
+
+
+@dataclass(frozen=True)
 class CandidateRow:
     """One (area, prediction_origin, horizon) candidate -- always built,
     regardless of validity; validity is a field, not an exclusion filter,
@@ -167,6 +201,10 @@ class CandidateRow:
     label_value: float | None
     label_valid: bool
     label_missing_reason: str | None
+    feature_provenance: FeatureProvenance = _EMPTY_FEATURE_PROVENANCE
+    """Defaults to empty so existing hand-built CandidateRow fixtures (that
+    predate Provenance and only exercise unrelated Leakage checks) keep
+    constructing without change."""
 
 
 @dataclass(frozen=True)
@@ -208,15 +246,27 @@ def _time_features(origin: datetime) -> dict[str, object]:
 
 def _lag_and_rolling_features(
     *, area_code: str, origin: datetime, current_index: Mapping[tuple[str, datetime], eg8a.NormalizedCurrentRecord]
-) -> dict[str, object]:
+) -> tuple[dict[str, object], dict[str, object]]:
     """Exact-timestamp Lag lookups and backward-only, full-window-only
     Rolling statistics. No nearest/as-of/interpolation anywhere -- a
     missing exact point makes that Lag (and any Rolling window that needs
-    it) None, never estimated."""
+    it) None, never estimated.
+
+    Returns (features, provenance). provenance records the actual
+    (area_code, timestamp) each Lag/Rolling value was sourced from, captured
+    at this real lookup site -- not a formula re-derived a second time
+    elsewhere -- so a Leakage check comparing recorded provenance against an
+    independently computed expectation can actually disagree if this
+    function's own lookup ever diverges from that expectation."""
     lags: dict[int, float | None] = {}
+    lag_source_at: dict[int, str | None] = {}
+    lag_source_area: dict[int, str | None] = {}
     for lag_min in LAG_MINUTES:
-        record = current_index.get((area_code, origin - timedelta(minutes=lag_min)))
+        source_at = origin - timedelta(minutes=lag_min)
+        record = current_index.get((area_code, source_at))
         lags[lag_min] = _population_mid(record.population_min, record.population_max) if record else None
+        lag_source_at[lag_min] = source_at.isoformat() if record else None
+        lag_source_area[lag_min] = area_code if record else None
 
     features: dict[str, object] = {
         "population_lag_5m": lags[5],
@@ -233,16 +283,23 @@ def _lag_and_rolling_features(
             delta = current_mid - lags[lag_min]
         features[f"population_delta_{lag_min}m"] = delta
 
+    rolling_source_at: dict[int, tuple[str, ...]] = {}
+    rolling_source_area: dict[int, str | None] = {}
     for window_min in sorted(set(ROLLING_MEAN_WINDOW_MINUTES) | set(ROLLING_STD_WINDOW_MINUTES)):
         expected_points = window_min // FIVE_MINUTE_GRID_MINUTES
         points: list[float] = []
+        source_timestamps: list[str] = []
         complete = True
         for k in range(1, expected_points + 1):
-            record = current_index.get((area_code, origin - timedelta(minutes=FIVE_MINUTE_GRID_MINUTES * k)))
+            point_at = origin - timedelta(minutes=FIVE_MINUTE_GRID_MINUTES * k)
+            record = current_index.get((area_code, point_at))
             if record is None:
                 complete = False
                 break
             points.append(_population_mid(record.population_min, record.population_max))
+            source_timestamps.append(point_at.isoformat())
+        rolling_source_at[window_min] = tuple(source_timestamps) if complete else ()
+        rolling_source_area[window_min] = area_code if complete else None
         if window_min in ROLLING_MEAN_WINDOW_MINUTES:
             features[f"rolling_mean_{window_min}m"] = statistics.mean(points) if complete and points else None
         if window_min in ROLLING_STD_WINDOW_MINUTES:
@@ -250,7 +307,13 @@ def _lag_and_rolling_features(
                 statistics.pstdev(points) if complete and len(points) > 1 else None
             )
 
-    return features
+    provenance = {
+        "lag_source_at": lag_source_at,
+        "lag_source_area": lag_source_area,
+        "rolling_source_at": rolling_source_at,
+        "rolling_source_area": rolling_source_area,
+    }
+    return features, provenance
 
 
 def build_candidate_rows(
@@ -296,9 +359,10 @@ def build_candidate_rows(
                     "current_congestion_level": None,
                 }
             )
-        feature.update(
-            _lag_and_rolling_features(area_code=forecast.area_code, origin=origin, current_index=current_index)
+        lag_rolling_features, lag_rolling_provenance = _lag_and_rolling_features(
+            area_code=forecast.area_code, origin=origin, current_index=current_index
         )
+        feature.update(lag_rolling_features)
 
         missing_mandatory = [name for name in MANDATORY_FEATURE_FIELDS if feature.get(name) is None]
         feature_valid = not missing_mandatory
@@ -315,6 +379,17 @@ def build_candidate_rows(
         label_valid = actual_record is not None
         label_missing_reason = None if label_valid else "target_actual_not_found_in_snapshot"
 
+        feature_provenance = FeatureProvenance(
+            current_source_at=origin.isoformat() if current_record is not None else None,
+            current_source_area=forecast.area_code if current_record is not None else None,
+            lag_source_at=lag_rolling_provenance["lag_source_at"],
+            lag_source_area=lag_rolling_provenance["lag_source_area"],
+            rolling_source_at=lag_rolling_provenance["rolling_source_at"],
+            rolling_source_area=lag_rolling_provenance["rolling_source_area"],
+            label_source_at=target.isoformat() if actual_record is not None else None,
+            label_source_area=forecast.area_code if actual_record is not None else None,
+        )
+
         rows.append(
             CandidateRow(
                 row_id=_row_id(forecast.area_code, forecast.observed_at, horizon_minutes),
@@ -329,6 +404,7 @@ def build_candidate_rows(
                 label_value=label_value,
                 label_valid=label_valid,
                 label_missing_reason=label_missing_reason,
+                feature_provenance=feature_provenance,
             )
         )
     return rows
@@ -406,14 +482,34 @@ def build_leakage_report(
     feature_after_origin: list[str] = []
     _record("feature_timestamp_after_origin", feature_after_origin)
 
-    # 2. Lag timestamp must be strictly before Origin.
-    lag_not_before_origin = []
+    # 2. Lag timestamp must be strictly before Origin -- verified against
+    # the row's own recorded Feature Provenance (what was actually looked
+    # up when the Feature was built), not by recomputing
+    # origin - lag_minutes a second time here (that would always trivially
+    # agree with itself and could never detect a real lookup bug). A Lag
+    # value present with no recorded source, a source from the wrong Area,
+    # or a recorded source timestamp that disagrees with
+    # origin - lag_minutes (including being at or after Origin) are all
+    # violations.
+    lag_not_before_origin: list[str] = []
     for row in rows:
         origin = origins[row.row_id]
+        provenance = row.feature_provenance
         for lag_min in LAG_MINUTES:
-            if row.feature.get(f"population_lag_{lag_min}m") is not None:
-                if origin - timedelta(minutes=lag_min) >= origin:
-                    lag_not_before_origin.append(row.row_id)
+            feature_value = row.feature.get(f"population_lag_{lag_min}m")
+            recorded_at = provenance.lag_source_at.get(lag_min)
+            recorded_area = provenance.lag_source_area.get(lag_min)
+            if feature_value is None and recorded_at is None:
+                continue
+            if feature_value is None or recorded_at is None:
+                lag_not_before_origin.append(row.row_id)
+                continue
+            if recorded_area != row.area_code:
+                lag_not_before_origin.append(row.row_id)
+                continue
+            recorded_dt = datetime.fromisoformat(recorded_at)
+            if recorded_dt != origin - timedelta(minutes=lag_min) or recorded_dt >= origin:
+                lag_not_before_origin.append(row.row_id)
     _record("lag_timestamp_not_before_origin", lag_not_before_origin)
 
     # 3. Rolling window end must not be after Origin (by construction the
@@ -470,8 +566,27 @@ def build_leakage_report(
 
     # 10. No Feature may be built from a Current record observed at or
     # after this row's own Prediction Target (future Actual used as
-    # Feature).
-    future_actual_as_feature = [row.row_id for row in rows if origins[row.row_id] >= targets[row.row_id]]
+    # Feature) -- verified from the row's own recorded Feature Provenance
+    # (current/Lag/Rolling source timestamps), independently of check 4
+    # (which only compares the row's own origin/target metadata and says
+    # nothing about what a Feature was actually built from). Also flags a
+    # Feature source timestamp that coincides with the row's own recorded
+    # Label source -- the Target Actual reused as if it were a Feature.
+    future_actual_as_feature: list[str] = []
+    for row in rows:
+        target = targets[row.row_id]
+        provenance = row.feature_provenance
+        feature_sources = [source_at for source_at in provenance.lag_source_at.values() if source_at is not None]
+        for window_sources in provenance.rolling_source_at.values():
+            feature_sources.extend(window_sources)
+        if provenance.current_source_at is not None:
+            feature_sources.append(provenance.current_source_at)
+
+        violated = any(datetime.fromisoformat(source_at) >= target for source_at in feature_sources)
+        if not violated and provenance.label_source_at is not None and provenance.label_source_at in feature_sources:
+            violated = True
+        if violated:
+            future_actual_as_feature.append(row.row_id)
     _record("future_actual_used_as_feature", future_actual_as_feature)
 
     # 11. Backfill/Forward-fill/Interpolation: verified by code path, not

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import dataclasses
 import math
 import tempfile
 import unittest
@@ -385,6 +386,145 @@ class LeakageReportTests(unittest.TestCase):
         report = eg8c_features.build_leakage_report([], {})
         self.assertFalse(report["checks"]["post_cutoff_forecast_used"]["applicable"])
         self.assertEqual(report["checks"]["post_cutoff_forecast_used"]["violation_count"], 0)
+
+
+class LeakageNegativeFixtureTests(unittest.TestCase):
+    """PM-specified violation-inducing Negative Tests, one per named
+    Leakage check. Each poisons exactly one thing a real bug could poison
+    and asserts: the target check fails, a clean counterpart passes, and
+    (for NT-1/NT-3) no unrelated check fails for the same reason."""
+
+    def test_nt1_lag_source_timestamp_equals_origin_is_flagged(self) -> None:
+        origin = datetime.fromisoformat("2026-07-24T09:00:00+09:00")
+        current = build_full_current_history(origin=origin, minutes_back=65)
+        target_actual = make_current_record(observed_at=(origin + timedelta(minutes=60)).isoformat())
+        forecast = make_forecast_record(observed_at=origin.isoformat(), forecast_at=(origin + timedelta(minutes=60)).isoformat())
+        rows = eg8c_features.build_candidate_rows(current + (target_actual,), (forecast,))
+        self.assertEqual(len(rows), 1)
+        clean_row = rows[0]
+        self.assertIsNotNone(clean_row.feature["population_lag_5m"])
+
+        # Poison: the 5-minute Lag value stays as-is, but its recorded
+        # Provenance now (falsely) claims it was sourced from Origin
+        # itself -- a same-Area, same-instant leak the feature value alone
+        # would never reveal.
+        poisoned_lag_source_at = dict(clean_row.feature_provenance.lag_source_at)
+        poisoned_lag_source_at[5] = origin.isoformat()
+        poisoned_provenance = dataclasses.replace(clean_row.feature_provenance, lag_source_at=poisoned_lag_source_at)
+        poisoned_row = dataclasses.replace(clean_row, feature_provenance=poisoned_provenance)
+
+        assignment = eg8c_features.build_split_assignment([poisoned_row])
+        report = eg8c_features.build_leakage_report([poisoned_row], assignment)
+        self.assertGreater(report["checks"]["lag_timestamp_not_before_origin"]["violation_count"], 0)
+        self.assertIn(poisoned_row.row_id, report["checks"]["lag_timestamp_not_before_origin"]["violation_row_ids"])
+        self.assertEqual(report["final_verdict"], "FAIL")
+
+        clean_assignment = eg8c_features.build_split_assignment([clean_row])
+        clean_report = eg8c_features.build_leakage_report([clean_row], clean_assignment)
+        self.assertEqual(clean_report["checks"]["lag_timestamp_not_before_origin"]["violation_count"], 0)
+        self.assertEqual(clean_report["final_verdict"], "PASS")
+
+    def test_nt2_target_at_or_before_origin_is_flagged(self) -> None:
+        row = eg8c_features.CandidateRow(
+            row_id="nt2", area_code=AREA,
+            prediction_origin_at="2026-07-24T09:00:00+09:00",
+            prediction_target_at="2026-07-24T09:00:00+09:00",  # target == origin
+            horizon_minutes=60, source_collection_run_id=RUN_A,
+            feature={}, feature_valid=False, feature_missing_reason="x",
+            label_value=1.0, label_valid=True, label_missing_reason=None,
+        )
+        report = eg8c_features.build_leakage_report([row], {row.row_id: {"split": "EXCLUDED", "split_reason": "x"}})
+        self.assertGreater(report["checks"]["label_target_before_origin"]["violation_count"], 0)
+        self.assertIn(row.row_id, report["checks"]["label_target_before_origin"]["violation_row_ids"])
+        self.assertEqual(report["final_verdict"], "FAIL")
+
+        clean_row = dataclasses.replace(row, row_id="nt2-clean", prediction_target_at="2026-07-24T10:00:00+09:00")
+        clean_report = eg8c_features.build_leakage_report(
+            [clean_row], {clean_row.row_id: {"split": "EXCLUDED", "split_reason": "x"}}
+        )
+        self.assertEqual(clean_report["checks"]["label_target_before_origin"]["violation_count"], 0)
+
+    def test_nt3_feature_provenance_sourced_from_target_is_flagged(self) -> None:
+        origin = datetime.fromisoformat("2026-07-24T09:00:00+09:00")
+        target_at = origin + timedelta(minutes=60)
+        current = build_full_current_history(origin=origin, minutes_back=65)
+        target_actual = make_current_record(observed_at=target_at.isoformat())
+        forecast = make_forecast_record(observed_at=origin.isoformat(), forecast_at=target_at.isoformat())
+        rows = eg8c_features.build_candidate_rows(current + (target_actual,), (forecast,))
+        self.assertEqual(len(rows), 1)
+        clean_row = rows[0]
+
+        # Poison: claim the current-state Feature was actually sourced at
+        # the row's own Prediction Target -- i.e. the Target Actual leaked
+        # into a Feature. Origin/Target themselves are untouched.
+        poisoned_provenance = dataclasses.replace(clean_row.feature_provenance, current_source_at=target_at.isoformat())
+        poisoned_row = dataclasses.replace(clean_row, feature_provenance=poisoned_provenance)
+
+        assignment = eg8c_features.build_split_assignment([poisoned_row])
+        report = eg8c_features.build_leakage_report([poisoned_row], assignment)
+        self.assertGreater(report["checks"]["future_actual_used_as_feature"]["violation_count"], 0)
+        self.assertIn(poisoned_row.row_id, report["checks"]["future_actual_used_as_feature"]["violation_row_ids"])
+        # Must not also trip label_target_before_origin -- that check only
+        # looks at origin/target metadata, which this fixture never touches.
+        self.assertEqual(report["checks"]["label_target_before_origin"]["violation_count"], 0)
+        self.assertEqual(report["final_verdict"], "FAIL")
+
+        clean_assignment = eg8c_features.build_split_assignment([clean_row])
+        clean_report = eg8c_features.build_leakage_report([clean_row], clean_assignment)
+        self.assertEqual(clean_report["checks"]["future_actual_used_as_feature"]["violation_count"], 0)
+        self.assertEqual(clean_report["final_verdict"], "PASS")
+
+    def test_nt4_feature_valid_true_with_missing_mandatory_field_is_flagged(self) -> None:
+        row = eg8c_features.CandidateRow(
+            row_id="nt4", area_code=AREA,
+            prediction_origin_at="2026-07-24T09:00:00+09:00",
+            prediction_target_at="2026-07-24T10:00:00+09:00",
+            horizon_minutes=60, source_collection_run_id=RUN_A,
+            feature={name: None for name in eg8c_features.MANDATORY_FEATURE_FIELDS},
+            feature_valid=True,  # contract violation: claims valid while every mandatory field is None
+            feature_missing_reason=None,
+            label_value=1.0, label_valid=True, label_missing_reason=None,
+        )
+        report = eg8c_features.build_leakage_report([row], {row.row_id: {"split": "TRAIN", "split_reason": "x"}})
+        self.assertGreater(report["checks"]["missing_value_silently_filled"]["violation_count"], 0)
+        self.assertIn(row.row_id, report["checks"]["missing_value_silently_filled"]["violation_row_ids"])
+        self.assertEqual(report["final_verdict"], "FAIL")
+
+        # The honest outcome for the same missing fields is EXCLUDED
+        # (feature_valid=False), not a silent fill -- must not be flagged.
+        honest_row = dataclasses.replace(
+            row, row_id="nt4-honest", feature_valid=False, feature_missing_reason="missing_mandatory_fields:x"
+        )
+        honest_report = eg8c_features.build_leakage_report(
+            [honest_row], {honest_row.row_id: {"split": "EXCLUDED", "split_reason": "feature_invalid"}}
+        )
+        self.assertEqual(honest_report["checks"]["missing_value_silently_filled"]["violation_count"], 0)
+
+    def test_nt5_origin_after_cutoff_is_flagged(self) -> None:
+        cutoff = datetime.fromisoformat("2026-07-24T12:00:00+09:00")
+        row = eg8c_features.CandidateRow(
+            row_id="nt5", area_code=AREA,
+            prediction_origin_at="2026-07-24T13:00:00+09:00",  # after cutoff
+            prediction_target_at="2026-07-24T14:00:00+09:00",
+            horizon_minutes=60, source_collection_run_id=RUN_A,
+            feature={}, feature_valid=False, feature_missing_reason="x",
+            label_value=None, label_valid=False, label_missing_reason="x",
+        )
+        report = eg8c_features.build_leakage_report(
+            [row], {row.row_id: {"split": "EXCLUDED", "split_reason": "x"}}, snapshot_cutoff=cutoff
+        )
+        self.assertTrue(report["checks"]["post_cutoff_forecast_used"]["applicable"])
+        self.assertGreater(report["checks"]["post_cutoff_forecast_used"]["violation_count"], 0)
+        self.assertIn(row.row_id, report["checks"]["post_cutoff_forecast_used"]["violation_row_ids"])
+        self.assertEqual(report["final_verdict"], "FAIL")
+
+        before_cutoff_row = dataclasses.replace(
+            row, row_id="nt5-clean", prediction_origin_at="2026-07-24T11:00:00+09:00"
+        )
+        clean_report = eg8c_features.build_leakage_report(
+            [before_cutoff_row], {before_cutoff_row.row_id: {"split": "EXCLUDED", "split_reason": "x"}}, snapshot_cutoff=cutoff
+        )
+        self.assertEqual(clean_report["checks"]["post_cutoff_forecast_used"]["violation_count"], 0)
 
 
 class OutputWriterTests(unittest.TestCase):
