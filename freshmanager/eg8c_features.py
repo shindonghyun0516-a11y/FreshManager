@@ -224,10 +224,20 @@ class OfficialRunAcceptanceError(EvidenceWriteError):
 
 
 @dataclass(frozen=True)
-class OfficialRunAcceptanceContract:
+class _AcceptanceFileSnapshot:
+    path: Path
+    identity: tuple[int, int, int, int, int, int]
+    payload: bytes
+    sha256: str
+    byte_size: int
+
+
+@dataclass(frozen=True)
+class _OfficialRunAcceptanceContract:
     path: Path
     identity: tuple[int, int, int, int, int, int]
     sha256: str
+    byte_size: int
     contract_version: str
     expected_dataset_counts: Mapping[str, int]
     expected_split_counts: Mapping[str, int]
@@ -307,6 +317,15 @@ class Eg8cDatasetResult:
     dataset_coverage: Mapping[str, object]
     leakage_report: Mapping[str, object]
     acceptance_contract_sha256: str | None = None
+
+
+@dataclass(frozen=True)
+class _UnpublishedDataset:
+    candidate_rows: tuple[CandidateRow, ...]
+    split_assignment: Mapping[str, Mapping[str, str]]
+    dataset_coverage: Mapping[str, object]
+    leakage_report: Mapping[str, object]
+    manifest: Mapping[str, object]
 
 
 # ---------------------------------------------------------------------------
@@ -1064,27 +1083,60 @@ def _nonnegative_integer(
     return value
 
 
-def load_official_run_acceptance_contract(path: Path) -> OfficialRunAcceptanceContract:
+def _read_acceptance_file_snapshot(path: Path) -> _AcceptanceFileSnapshot:
     contract_path = Path(path)
     try:
-        if not stat.S_ISREG(contract_path.lstat().st_mode) or contract_path.is_symlink():
+        link_before = contract_path.lstat()
+        if not stat.S_ISREG(link_before.st_mode) or contract_path.is_symlink():
             raise OSError
-        snapshot_before = _snapshot_input_artifacts((("acceptance_contract", contract_path),))
-        payload = contract_path.read_bytes()
-        snapshot_after = _snapshot_input_artifacts((("acceptance_contract", contract_path),))
-        if not stat.S_ISREG(contract_path.lstat().st_mode) or contract_path.is_symlink():
+        with contract_path.open("rb") as source:
+            file_before = os.fstat(source.fileno())
+            if not stat.S_ISREG(file_before.st_mode):
+                raise OSError
+            payload = source.read()
+            file_after = os.fstat(source.fileno())
+            digest = _sha256_bytes(payload)
+        link_after = contract_path.lstat()
+        if not stat.S_ISREG(link_after.st_mode) or contract_path.is_symlink():
             raise OSError
     except (OSError, ValueError, EvidenceWriteError):
         raise OfficialRunAcceptanceError(
             (_contract_structure_issue("acceptance_contract", "missing_or_not_regular_file"),)
         ) from None
-    if snapshot_after != snapshot_before:
+    identity_before = (
+        link_before.st_dev,
+        link_before.st_ino,
+        file_before.st_dev,
+        file_before.st_ino,
+        file_before.st_size,
+        file_before.st_mtime_ns,
+    )
+    identity_after = (
+        link_after.st_dev,
+        link_after.st_ino,
+        file_after.st_dev,
+        file_after.st_ino,
+        file_after.st_size,
+        file_after.st_mtime_ns,
+    )
+    if identity_after != identity_before or file_after.st_size != len(payload):
         raise OfficialRunAcceptanceError(
             (_contract_structure_issue("acceptance_contract", "changed_while_reading"),)
         )
+    return _AcceptanceFileSnapshot(
+        path=contract_path,
+        identity=identity_after,
+        payload=payload,
+        sha256=digest,
+        byte_size=len(payload),
+    )
+
+
+def _load_official_run_acceptance_contract(path: Path) -> _OfficialRunAcceptanceContract:
+    snapshot = _read_acceptance_file_snapshot(path)
     try:
         parsed = json.loads(
-            payload.decode("utf-8"), object_pairs_hook=_reject_duplicate_json_keys
+            snapshot.payload.decode("utf-8"), object_pairs_hook=_reject_duplicate_json_keys
         )
     except _DuplicateJsonKeyError:
         raise OfficialRunAcceptanceError(
@@ -1205,10 +1257,11 @@ def load_official_run_acceptance_contract(path: Path) -> OfficialRunAcceptanceCo
     if issues:
         raise OfficialRunAcceptanceError(tuple(issues))
 
-    return OfficialRunAcceptanceContract(
-        path=contract_path,
-        identity=snapshot_before[1]["acceptance_contract"],
-        sha256=str(snapshot_before[0][0]["sha256"]),
+    return _OfficialRunAcceptanceContract(
+        path=snapshot.path,
+        identity=snapshot.identity,
+        sha256=snapshot.sha256,
+        byte_size=snapshot.byte_size,
         contract_version=str(version),
         expected_dataset_counts=MappingProxyType(validated_dataset_counts),
         expected_split_counts=MappingProxyType(validated_split_counts),
@@ -1267,17 +1320,18 @@ def _acceptance_structure_issue(field: str, reason: str) -> AcceptanceIssue:
 
 
 def _verify_official_run_acceptance_contract_unchanged(
-    contract: OfficialRunAcceptanceContract,
+    contract: _OfficialRunAcceptanceContract,
 ) -> None:
     try:
-        current = _snapshot_input_artifacts((("acceptance_contract", contract.path),))
-    except EvidenceWriteError:
+        current = _read_acceptance_file_snapshot(contract.path)
+    except OfficialRunAcceptanceError:
         raise OfficialRunAcceptanceError(
             (_contract_structure_issue("acceptance_contract", "missing_or_unreadable"),)
         ) from None
     if (
-        current[0][0]["sha256"] != contract.sha256
-        or current[1]["acceptance_contract"] != contract.identity
+        current.sha256 != contract.sha256
+        or current.byte_size != contract.byte_size
+        or current.identity != contract.identity
     ):
         raise OfficialRunAcceptanceError(
             (_contract_structure_issue("acceptance_contract", "changed_during_build"),)
@@ -1285,7 +1339,7 @@ def _verify_official_run_acceptance_contract_unchanged(
 
 
 def _leakage_acceptance_issues(
-    contract: OfficialRunAcceptanceContract, leakage_report: Mapping[str, object]
+    contract: _OfficialRunAcceptanceContract, leakage_report: Mapping[str, object]
 ) -> list[AcceptanceIssue]:
     issues: list[AcceptanceIssue] = []
     checks_value = leakage_report.get("checks")
@@ -1446,7 +1500,7 @@ def _manifest_acceptance_issues(
 
 
 def _validate_pre_publish_acceptance(
-    contract: OfficialRunAcceptanceContract,
+    contract: _OfficialRunAcceptanceContract,
     *,
     phase_dir: Path,
     candidate_rows: Sequence[CandidateRow],
@@ -1654,22 +1708,6 @@ def _rename_run_root_exclusive(staging_run: Path, final_run: Path) -> None:
     raise OSError(error_number, "exclusive directory rename failed")
 
 
-def _publish_staged_run(
-    staging_run: Path,
-    final_run: Path,
-    acceptance_contract: OfficialRunAcceptanceContract,
-) -> None:
-    _verify_official_run_acceptance_contract_unchanged(acceptance_contract)
-    if final_run.exists() or final_run.is_symlink():
-        raise EvidenceWriteError("eg8c_write_error: run already exists")
-    try:
-        _rename_run_root_exclusive(staging_run, final_run)
-    except FileExistsError as error:
-        raise EvidenceWriteError("eg8c_write_error: run already exists") from error
-    except OSError as error:
-        raise EvidenceWriteError("eg8c_write_error: failed to publish run") from error
-
-
 def _cleanup_unpublished_staging(staging_run: Path, primary_error: BaseException) -> None:
     if not staging_run.exists() and not staging_run.is_symlink():
         return
@@ -1772,173 +1810,124 @@ def _split_assignment_rows(
     ]
 
 
-def analyze_and_write_dataset(
+def _write_unpublished_dataset(
     current_records: Sequence[eg8a.NormalizedCurrentRecord],
     forecast_records: Sequence[eg8a.NormalizedForecastRecord],
     *,
-    eg8c_output_root: Path,
+    phase_dir: Path,
     raw_log_path: Path,
     current_path: Path,
     forecast_path: Path,
-    eg8c_run_id: str | None = None,
-    generated_at: datetime | None = None,
-    input_snapshot_before: InputSnapshot | None = None,
-    acceptance_contract: OfficialRunAcceptanceContract | None = None,
-) -> Eg8cDatasetResult:
-    if acceptance_contract is None:
-        raise OfficialRunAcceptanceError(
-            (_contract_structure_issue("acceptance_contract", "required"),)
-        )
-    resolved_root = eg8c_output_root.expanduser().resolve(strict=True)
-    if not resolved_root.is_dir():
-        raise EvidenceWriteError("eg8c_write_error: output root is not a directory")
-
-    resolved_run_id = _validated_run_id(
-        eg8c_run_id if eg8c_run_id is not None else str(uuid.uuid4())
-    )
-    resolved_generated_at = generated_at if generated_at is not None else datetime.now(eg8a.SEOUL)
-
-    final_run_dir = resolved_root / resolved_run_id
-    if final_run_dir.exists() or final_run_dir.is_symlink():
-        raise EvidenceWriteError(f"eg8c_write_error: run {resolved_run_id} already exists")
-    try:
-        resolved_run_dir = final_run_dir.resolve(strict=False)
-        resolved_run_dir.relative_to(resolved_root)
-    except (OSError, RuntimeError, ValueError) as error:
-        raise EvidenceWriteError("eg8c_write_error: run path must stay inside output root") from error
-    if resolved_run_dir.parent != resolved_root:
-        raise EvidenceWriteError("eg8c_write_error: run path must stay inside output root")
+    run_id: str,
+    generated_at: datetime,
+    input_snapshot_before: InputSnapshot,
+) -> _UnpublishedDataset:
     input_paths = (
         ("raw_log_v3", raw_log_path),
         ("population_current_v3", current_path),
         ("population_forecast_v3", forecast_path),
     )
-    verified_input_before = input_snapshot_before or _snapshot_input_artifacts(input_paths)
-    staging_dir = Path(tempfile.mkdtemp(prefix=".eg8c-staging-", dir=resolved_root))
-    phase_dir = staging_dir / PHASE_EG8C_VERSION
-    published = False
-    try:
-        phase_dir.mkdir(exist_ok=False)
-        candidate_rows = build_candidate_rows(current_records, forecast_records)
-        split_assignment = build_split_assignment(candidate_rows)
-        leakage_report = build_leakage_report(candidate_rows, split_assignment)
-        dataset_coverage = build_dataset_coverage(
-            candidate_rows,
-            split_assignment,
-            eg8c_run_id=resolved_run_id,
-            generated_at=resolved_generated_at,
-        )
-        feature_dictionary = build_feature_dictionary()
-        label_contract = build_label_contract()
+    phase_dir.mkdir(exist_ok=False)
+    candidate_rows = build_candidate_rows(current_records, forecast_records)
+    split_assignment = build_split_assignment(candidate_rows)
+    leakage_report = build_leakage_report(candidate_rows, split_assignment)
+    dataset_coverage = build_dataset_coverage(
+        candidate_rows,
+        split_assignment,
+        eg8c_run_id=run_id,
+        generated_at=generated_at,
+    )
+    feature_dictionary = build_feature_dictionary()
+    label_contract = build_label_contract()
 
-        train_origins = sorted(
-            {
-                row.prediction_origin_at
-                for row in candidate_rows
-                if split_assignment[row.row_id]["split"] == SPLIT_TRAIN
-            }
-        )
-        validation_origins = sorted(
-            {
-                row.prediction_origin_at
-                for row in candidate_rows
-                if split_assignment[row.row_id]["split"] == SPLIT_VALIDATION
-            }
-        )
-        split_status = {
-            "split_status": DATA_SUFFICIENCY_STATUS_PROVISIONAL_SPLIT_ONLY,
-            "test_split_created": False,
-            "train_origin_range": {
-                "min": train_origins[0] if train_origins else None,
-                "max": train_origins[-1] if train_origins else None,
-            },
-            "validation_origin_range": {
-                "min": validation_origins[0] if validation_origins else None,
-                "max": validation_origins[-1] if validation_origins else None,
-            },
+    train_origins = sorted(
+        {
+            row.prediction_origin_at
+            for row in candidate_rows
+            if split_assignment[row.row_id]["split"] == SPLIT_TRAIN
         }
-        dataset_coverage = {**dataset_coverage, "split": split_status}
-
-        payloads: list[tuple[str, bytes]] = [
-            (
-                FEATURE_DATASET_FILENAME,
-                _write_csv_rows(FEATURE_DATASET_FIELDNAMES, _feature_dataset_rows(candidate_rows)),
-            ),
-            (
-                LABEL_DATASET_FILENAME,
-                _write_csv_rows(LABEL_DATASET_FIELDNAMES, _label_dataset_rows(candidate_rows)),
-            ),
-            (
-                SPLIT_ASSIGNMENT_FILENAME,
-                _write_csv_rows(
-                    SPLIT_ASSIGNMENT_FIELDNAMES,
-                    _split_assignment_rows(candidate_rows, split_assignment),
-                ),
-            ),
-            (FEATURE_DICTIONARY_FILENAME, _write_json_document(feature_dictionary)),
-            (LABEL_CONTRACT_FILENAME, _write_json_document(label_contract)),
-            (LEAKAGE_REPORT_FILENAME, _write_json_document(leakage_report)),
-            (DATASET_COVERAGE_FILENAME, _write_json_document(dataset_coverage)),
-        ]
-        for filename, payload in payloads:
-            _write_exclusive(phase_dir / filename, payload)
-
-        input_snapshot_after = _snapshot_input_artifacts(input_paths)
-        if input_snapshot_after != verified_input_before:
-            raise EvidenceWriteError("eg8c_input_error: input changed during build")
-        output_artifacts = [
-            {
-                "relative_path": filename,
-                "sha256": _sha256_bytes(payload),
-                "byte_size": len(payload),
-            }
-            for filename, payload in payloads
-        ]
-        manifest = {
-            "schema_version": OUTPUT_MANIFEST_SCHEMA_VERSION,
-            "eg8c_run_id": resolved_run_id,
-            "generated_at": eg8a.to_iso8601(resolved_generated_at),
-            "evaluation_status": EVALUATION_STATUS_PROVISIONAL,
-            "data_sufficiency_status": DATA_SUFFICIENCY_STATUS_PROVISIONAL_SPLIT_ONLY,
-            "supported_horizons_minutes": list(SUPPORTED_HORIZON_MINUTES),
-            "test_split_created": False,
-            "official_model_gate_judgment": None,
-            "hash_algorithm": "sha256",
-            "input_artifacts": verified_input_before[0],
-            "output_artifacts": output_artifacts,
+    )
+    validation_origins = sorted(
+        {
+            row.prediction_origin_at
+            for row in candidate_rows
+            if split_assignment[row.row_id]["split"] == SPLIT_VALIDATION
         }
-        _write_exclusive(phase_dir / DATASET_MANIFEST_FILENAME, _write_json_document(manifest))
+    )
+    split_status = {
+        "split_status": DATA_SUFFICIENCY_STATUS_PROVISIONAL_SPLIT_ONLY,
+        "test_split_created": False,
+        "train_origin_range": {
+            "min": train_origins[0] if train_origins else None,
+            "max": train_origins[-1] if train_origins else None,
+        },
+        "validation_origin_range": {
+            "min": validation_origins[0] if validation_origins else None,
+            "max": validation_origins[-1] if validation_origins else None,
+        },
+    }
+    dataset_coverage = {**dataset_coverage, "split": split_status}
 
-        expected_outputs = {filename for filename, _ in payloads} | {DATASET_MANIFEST_FILENAME}
-        if {path.name for path in phase_dir.iterdir()} != expected_outputs:
-            raise EvidenceWriteError("eg8c_write_error: staged output set is incomplete")
+    payloads: list[tuple[str, bytes]] = [
+        (
+            FEATURE_DATASET_FILENAME,
+            _write_csv_rows(FEATURE_DATASET_FIELDNAMES, _feature_dataset_rows(candidate_rows)),
+        ),
+        (
+            LABEL_DATASET_FILENAME,
+            _write_csv_rows(LABEL_DATASET_FIELDNAMES, _label_dataset_rows(candidate_rows)),
+        ),
+        (
+            SPLIT_ASSIGNMENT_FILENAME,
+            _write_csv_rows(
+                SPLIT_ASSIGNMENT_FIELDNAMES,
+                _split_assignment_rows(candidate_rows, split_assignment),
+            ),
+        ),
+        (FEATURE_DICTIONARY_FILENAME, _write_json_document(feature_dictionary)),
+        (LABEL_CONTRACT_FILENAME, _write_json_document(label_contract)),
+        (LEAKAGE_REPORT_FILENAME, _write_json_document(leakage_report)),
+        (DATASET_COVERAGE_FILENAME, _write_json_document(dataset_coverage)),
+    ]
+    for filename, payload in payloads:
+        _write_exclusive(phase_dir / filename, payload)
 
-        _verify_official_run_acceptance_contract_unchanged(acceptance_contract)
-        _validate_pre_publish_acceptance(
-            acceptance_contract,
-            phase_dir=phase_dir,
-            candidate_rows=candidate_rows,
-            split_assignment=split_assignment,
-            dataset_coverage=dataset_coverage,
-            leakage_report=leakage_report,
-            manifest=manifest,
-        )
+    input_snapshot_after = _snapshot_input_artifacts(input_paths)
+    if input_snapshot_after != input_snapshot_before:
+        raise EvidenceWriteError("eg8c_input_error: input changed during build")
+    output_artifacts = [
+        {
+            "relative_path": filename,
+            "sha256": _sha256_bytes(payload),
+            "byte_size": len(payload),
+        }
+        for filename, payload in payloads
+    ]
+    manifest = {
+        "schema_version": OUTPUT_MANIFEST_SCHEMA_VERSION,
+        "eg8c_run_id": run_id,
+        "generated_at": eg8a.to_iso8601(generated_at),
+        "evaluation_status": EVALUATION_STATUS_PROVISIONAL,
+        "data_sufficiency_status": DATA_SUFFICIENCY_STATUS_PROVISIONAL_SPLIT_ONLY,
+        "supported_horizons_minutes": list(SUPPORTED_HORIZON_MINUTES),
+        "test_split_created": False,
+        "official_model_gate_judgment": None,
+        "hash_algorithm": "sha256",
+        "input_artifacts": input_snapshot_before[0],
+        "output_artifacts": output_artifacts,
+    }
+    _write_exclusive(phase_dir / DATASET_MANIFEST_FILENAME, _write_json_document(manifest))
 
-        final_phase_dir = final_run_dir / PHASE_EG8C_VERSION
-        result = Eg8cDatasetResult(
-            eg8c_run_id=resolved_run_id,
-            phase_dir=final_phase_dir,
-            dataset_coverage=dataset_coverage,
-            leakage_report=leakage_report,
-            acceptance_contract_sha256=acceptance_contract.sha256,
-        )
-        _publish_staged_run(staging_dir, final_run_dir, acceptance_contract)
-        published = True
-        return result
-    except BaseException as primary_error:
-        if not published and (staging_dir.exists() or staging_dir.is_symlink()):
-            _cleanup_unpublished_staging(staging_dir, primary_error)
-        raise
+    expected_outputs = {filename for filename, _ in payloads} | {DATASET_MANIFEST_FILENAME}
+    if {path.name for path in phase_dir.iterdir()} != expected_outputs:
+        raise EvidenceWriteError("eg8c_write_error: staged output set is incomplete")
+    return _UnpublishedDataset(
+        candidate_rows=tuple(candidate_rows),
+        split_assignment=split_assignment,
+        dataset_coverage=dataset_coverage,
+        leakage_report=leakage_report,
+        manifest=manifest,
+    )
 
 
 def run_eg8c_dataset_build(
@@ -1958,28 +1947,78 @@ def run_eg8c_dataset_build(
         raise OfficialRunAcceptanceError(
             (_contract_structure_issue("acceptance_contract", "required"),)
         )
+    acceptance_contract = _load_official_run_acceptance_contract(acceptance_contract_path)
     input_paths = (
         ("raw_log_v3", raw_log_path),
         ("population_current_v3", current_path),
         ("population_forecast_v3", forecast_path),
     )
     input_snapshot_before = _snapshot_input_artifacts(input_paths)
-    acceptance_contract = load_official_run_acceptance_contract(acceptance_contract_path)
-    result = eg8a.normalize_v3_sources(
+    normalized = eg8a.normalize_v3_sources(
         raw_log_path=raw_log_path, current_path=current_path, forecast_path=forecast_path
     )
-    return analyze_and_write_dataset(
-        result.current_records,
-        result.forecast_records,
-        eg8c_output_root=eg8c_output_root,
-        raw_log_path=raw_log_path,
-        current_path=current_path,
-        forecast_path=forecast_path,
-        eg8c_run_id=eg8c_run_id,
-        generated_at=generated_at,
-        input_snapshot_before=input_snapshot_before,
-        acceptance_contract=acceptance_contract,
+    resolved_root = eg8c_output_root.expanduser().resolve(strict=True)
+    if not resolved_root.is_dir():
+        raise EvidenceWriteError("eg8c_write_error: output root is not a directory")
+    resolved_run_id = _validated_run_id(
+        eg8c_run_id if eg8c_run_id is not None else str(uuid.uuid4())
     )
+    resolved_generated_at = generated_at if generated_at is not None else datetime.now(eg8a.SEOUL)
+    final_run_dir = resolved_root / resolved_run_id
+    if final_run_dir.exists() or final_run_dir.is_symlink():
+        raise EvidenceWriteError(f"eg8c_write_error: run {resolved_run_id} already exists")
+    try:
+        resolved_run_dir = final_run_dir.resolve(strict=False)
+        resolved_run_dir.relative_to(resolved_root)
+    except (OSError, RuntimeError, ValueError) as error:
+        raise EvidenceWriteError("eg8c_write_error: run path must stay inside output root") from error
+    if resolved_run_dir.parent != resolved_root:
+        raise EvidenceWriteError("eg8c_write_error: run path must stay inside output root")
+
+    staging_dir = Path(tempfile.mkdtemp(prefix=".eg8c-staging-", dir=resolved_root))
+    phase_dir = staging_dir / PHASE_EG8C_VERSION
+    published = False
+    try:
+        unpublished = _write_unpublished_dataset(
+            normalized.current_records,
+            normalized.forecast_records,
+            phase_dir=phase_dir,
+            raw_log_path=raw_log_path,
+            current_path=current_path,
+            forecast_path=forecast_path,
+            run_id=resolved_run_id,
+            generated_at=resolved_generated_at,
+            input_snapshot_before=input_snapshot_before,
+        )
+        _validate_pre_publish_acceptance(
+            acceptance_contract,
+            phase_dir=phase_dir,
+            candidate_rows=unpublished.candidate_rows,
+            split_assignment=unpublished.split_assignment,
+            dataset_coverage=unpublished.dataset_coverage,
+            leakage_report=unpublished.leakage_report,
+            manifest=unpublished.manifest,
+        )
+        result = Eg8cDatasetResult(
+            eg8c_run_id=resolved_run_id,
+            phase_dir=final_run_dir / PHASE_EG8C_VERSION,
+            dataset_coverage=unpublished.dataset_coverage,
+            leakage_report=unpublished.leakage_report,
+            acceptance_contract_sha256=acceptance_contract.sha256,
+        )
+        _verify_official_run_acceptance_contract_unchanged(acceptance_contract)
+        try:
+            _rename_run_root_exclusive(staging_dir, final_run_dir)
+        except FileExistsError as error:
+            raise EvidenceWriteError("eg8c_write_error: run already exists") from error
+        except OSError as error:
+            raise EvidenceWriteError("eg8c_write_error: failed to publish run") from error
+        published = True
+        return result
+    except BaseException as primary_error:
+        if not published and (staging_dir.exists() or staging_dir.is_symlink()):
+            _cleanup_unpublished_staging(staging_dir, primary_error)
+        raise
 
 
 class _CliArgumentError(Exception):

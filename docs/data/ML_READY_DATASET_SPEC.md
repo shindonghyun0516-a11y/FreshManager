@@ -1,7 +1,7 @@
 # ML-ready Dataset Spec
 
 - 문서 상태: Draft
-- 버전: v0.7.1
+- 버전: v0.7.2
 - 작성자: 신동현
 - 최종 승인자: 신동현
 - 최초 작성일: 2026-07-24
@@ -396,8 +396,9 @@ PM이 승인한다.
 
 ### 12.2 EG-8C 공식 Output Run 실행 경계
 
-EG-8C 1차 Output은 다음 표준 CLI 또는 같은 공개 Builder
-`run_eg8c_dataset_build`로만 발행한다. CLI와 Library 호출 모두 세 입력과 기존
+EG-8C 1차 Output의 공식 공개 진입점은 공개 Builder
+`run_eg8c_dataset_build` 하나다. 다음 표준 CLI는 이 Builder를 호출하는 어댑터이며
+별도 공개 생명주기를 구현하지 않는다. CLI와 Library 호출 모두 세 입력과 기존
 외부 Output Root, 비어 있지 않은 단일 경로 구간 Run ID, PM이 승인한 외부
 Acceptance Contract를 모두 명시해야 하며, Contract가 없으면 Final 공개 전에
 전용 승인 오류로 중단한다. `--error-path`는 오류 메시지 파일이
@@ -431,22 +432,34 @@ Commit하지 않는 외부 JSON 파일이며 다음 필드를 정확히 한 번�
 Contract는 모든 JSON Object 계층의 중복 Key, Version·필수/알 수 없는 Key·자료형·
 음수·12개 누수검사 식별자 집합·`PASS`·위반 0·지원 상태값을 엄격히 검사한다.
 정수와 Boolean은 서로 대체할 수 없다. Dataset별 개수는 외부 Contract가 소유하며
-Production 상수로 두지 않는다. 승인 판단은 최초에 읽어 불변 형태로 보존한 Contract
-내용에만 연결한다.
+Production 상수로 두지 않는다. Builder는 Contract 파일을 이진 모드로 한 번 열어
+확보한 동일 바이트로 SHA-256·크기를 계산하고 JSON을 해석한다. 따라서 Hash 계산
+바이트, JSON 해석 바이트, 승인 판단 바이트는 항상 동일하다. 승인 판단은 이 불변
+Snapshot에서 생성한 내부 전용 승인자료에만 연결한다.
+
+기존 공개 Writer와 외부 호출자가 승인 완료 객체를 직접 전달하던 방식은 제거한다.
+내부 Writer는 Builder가 만든 미공개 Staging 디렉터리에 8개 산출물을 작성·검증할
+뿐이며 Acceptance Contract, 승인 표식, 외부 Output Root 또는 Final Run 경로를 받지
+않고 Rename도 수행하지 않는다. 승인자료는 Boolean·Token·Sentinel 또는 호출자가
+생성할 수 있는 객체 인자로 대체할 수 없다. 승인 정의서 없는 계산은 메모리·임시
+디렉터리·미공개 Staging으로만 허용하며 공식 Run Root 공개와 기존 Final 접근은
+금지한다. 이 변경은 공식 공개 안전성을 위한 의도된 Library 호환성 변경이다.
 
 공식 Pre-publish 순서는 다음과 같다.
 
-1. 입력 3개의 SHA-256·크기·파일 identity 기록
-2. Acceptance Contract의 SHA-256·크기·파일 identity 기록
-3. 숨김 Staging Run Root 생성과 Output 7개 작성
-4. 입력 3개 불변 재검증과 Manifest 작성
-5. 정확한 Output 8개 확인
-6. Acceptance Contract 불변 재검증
+1. Acceptance Contract를 일반 파일·Symlink 금지 정책으로 확인하고 한 번 연 파일의
+   동일 바이트, SHA-256, 크기와 파일 identity를 불변 Snapshot으로 확보
+2. 동일 Snapshot 바이트의 JSON 중복 Key·자료형·상태 검증과 내부 승인자료 생성
+3. 입력 3개의 SHA-256·크기·파일 identity 기록
+4. 숨김 Staging Run Root 생성과 내부 Writer의 Output 7개 작성
+5. 입력 3개 불변 재검증과 Manifest 작성
+6. 정확한 Output 8개 확인
 7. Manifest·Staging 파일 무결성, 누수검사, Dataset·Split·Area·Horizon 수치,
    Candidate·Eligible·Excluded·Train·Validation 행 식별자 집합 관계와 평가 상태를
    Contract와 대조
-8. Final 공개 함수 안에서 Acceptance Contract Hash와 파일 identity를 마지막 재검증
-9. 모두 통과한 Run Root만 배타적 Rename으로 Final 공개
+8. Builder의 Final 공개 경계 안에서 Acceptance Contract 존재·일반 파일·Symlink 정책·
+   SHA-256·크기·파일 identity를 마지막 재검증
+9. 재검증 뒤 추가 파일 읽기·쓰기·해석 없이 즉시 Run Root를 배타적 Rename으로 공개
 
 Leakage 최종판정이 `PASS`가 아니거나 위반이 0이 아니거나 기존 12개 검사 집합이
 다르면 Contract가 이를 완화할 수 없다. Candidate·Feature-valid·Label-valid·Eligible·
@@ -557,6 +570,7 @@ Spot은 위치 식별 정보는 `Confirmed`이지만 전부 `field_verified=fals
 
 | 버전 | 날짜 | 변경내용 | 작성자 | 승인상태 |
 |---|---|---|---|---|
+| v0.7.2 | 2026-07-27 | 공식 공개 진입점을 `run_eg8c_dataset_build` 하나로 단일화하고 기존 공개 Writer·외부 승인 객체 전달을 제거. 같은 이진 Snapshot 바이트의 Hash·크기·JSON 해석 계약, 내부 Writer의 미공개 Staging 전용 책임, Final 직전 존재·파일형식·Symlink·Hash·크기·identity 재검증 후 즉시 배타적 Rename을 §12.2에 명시. 기존 공개 산출물 8개와 Schema는 불변 | 신동현 | PM 결정 |
 | v0.7.1 | 2026-07-27 | 공식 Builder의 Acceptance Contract 필수화, 전 계층 JSON 중복 Key 거부, 불변 Contract 내용과 승인 판단 연결, 행 식별자 집합 검증, Publish 경계 최종 무결성 재검증, 단일 제한 CLI 오류 경계를 §12.2에 보강. 기존 공개 산출물 8개와 Schema는 불변 | 신동현 | PM 결정 |
 | v0.7.0 | 2026-07-26 | EG-8C 공식 CLI의 외부 PM 승인 Acceptance Contract 필수화, Contract 엄격 검증·실행 전후 불변, Leakage·Dataset 회귀·평가 상태의 Final Publish 전 Gate, 실패 시 미공개 Staging 전용 정리와 기존 8개 공개 Schema 불변 계약을 §12.2에 추가. 실제 Contract·Dataset·Output은 미포함 | 신동현 | PM 결정 |
 | v0.6.0 | 2026-07-26 | EG-8C 공식 Output Run의 명시적 CLI, 단일 구간 Run ID, Input Hash·크기·파일 identity 전후 불변, 숨김 Run Root 전체의 배타적 Rename 공개, 미공개 Staging 전용 Cleanup, 사용자 중단 종료코드 130 계약을 §12.2에 추가. 실제 운영 Dataset Run·모델·Dependency는 미포함 | 신동현 | PM 결정 |
