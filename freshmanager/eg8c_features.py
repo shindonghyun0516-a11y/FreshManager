@@ -41,6 +41,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
+from types import MappingProxyType
 from typing import Mapping, Sequence
 
 from . import eg8a
@@ -225,7 +226,7 @@ class OfficialRunAcceptanceError(EvidenceWriteError):
 @dataclass(frozen=True)
 class OfficialRunAcceptanceContract:
     path: Path
-    snapshot: InputSnapshot
+    identity: tuple[int, int, int, int, int, int]
     sha256: str
     contract_version: str
     expected_dataset_counts: Mapping[str, int]
@@ -1031,8 +1032,21 @@ def _exact_object_fields(
     actual = set(document)
     for missing in sorted(expected - actual):
         issues.append(_contract_structure_issue(f"{field}.{missing}" if field else missing, "missing_key"))
-    for unknown in sorted(actual - expected):
-        issues.append(_contract_structure_issue(f"{field}.{unknown}" if field else unknown, "unknown_key"))
+    if actual - expected:
+        issues.append(_contract_structure_issue(field or "acceptance_contract", "unknown_key"))
+    return document
+
+
+class _DuplicateJsonKeyError(ValueError):
+    pass
+
+
+def _reject_duplicate_json_keys(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    document: dict[str, object] = {}
+    for key, value in pairs:
+        if key in document:
+            raise _DuplicateJsonKeyError
+        document[key] = value
     return document
 
 
@@ -1060,20 +1074,26 @@ def load_official_run_acceptance_contract(path: Path) -> OfficialRunAcceptanceCo
         snapshot_after = _snapshot_input_artifacts((("acceptance_contract", contract_path),))
         if not stat.S_ISREG(contract_path.lstat().st_mode) or contract_path.is_symlink():
             raise OSError
-    except (OSError, ValueError, EvidenceWriteError) as error:
+    except (OSError, ValueError, EvidenceWriteError):
         raise OfficialRunAcceptanceError(
             (_contract_structure_issue("acceptance_contract", "missing_or_not_regular_file"),)
-        ) from error
+        ) from None
     if snapshot_after != snapshot_before:
         raise OfficialRunAcceptanceError(
             (_contract_structure_issue("acceptance_contract", "changed_while_reading"),)
         )
     try:
-        parsed = json.loads(payload.decode("utf-8"))
-    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        parsed = json.loads(
+            payload.decode("utf-8"), object_pairs_hook=_reject_duplicate_json_keys
+        )
+    except _DuplicateJsonKeyError:
+        raise OfficialRunAcceptanceError(
+            (_contract_structure_issue("acceptance_contract", "duplicate_key"),)
+        ) from None
+    except (UnicodeDecodeError, json.JSONDecodeError):
         raise OfficialRunAcceptanceError(
             (_contract_structure_issue("acceptance_contract", "invalid_json"),)
-        ) from error
+        ) from None
 
     issues: list[AcceptanceIssue] = []
     document = _exact_object_fields(
@@ -1187,13 +1207,13 @@ def load_official_run_acceptance_contract(path: Path) -> OfficialRunAcceptanceCo
 
     return OfficialRunAcceptanceContract(
         path=contract_path,
-        snapshot=snapshot_before,
+        identity=snapshot_before[1]["acceptance_contract"],
         sha256=str(snapshot_before[0][0]["sha256"]),
         contract_version=str(version),
-        expected_dataset_counts=validated_dataset_counts,
-        expected_split_counts=validated_split_counts,
+        expected_dataset_counts=MappingProxyType(validated_dataset_counts),
+        expected_split_counts=MappingProxyType(validated_split_counts),
         expected_area_count=int(area_count),
-        expected_horizon_counts=validated_horizon_counts,
+        expected_horizon_counts=MappingProxyType(validated_horizon_counts),
         required_leakage_check_ids=validated_leakage_ids,
         required_leakage_violation_count=int(violation_count),
         required_final_verdict=str(document["required_final_verdict"]),
@@ -1251,11 +1271,14 @@ def _verify_official_run_acceptance_contract_unchanged(
 ) -> None:
     try:
         current = _snapshot_input_artifacts((("acceptance_contract", contract.path),))
-    except EvidenceWriteError as error:
+    except EvidenceWriteError:
         raise OfficialRunAcceptanceError(
             (_contract_structure_issue("acceptance_contract", "missing_or_unreadable"),)
-        ) from error
-    if current != contract.snapshot:
+        ) from None
+    if (
+        current[0][0]["sha256"] != contract.sha256
+        or current[1]["acceptance_contract"] != contract.identity
+    ):
         raise OfficialRunAcceptanceError(
             (_contract_structure_issue("acceptance_contract", "changed_during_build"),)
         )
@@ -1480,7 +1503,38 @@ def _validate_pre_publish_acceptance(
                 _acceptance_mismatch_issue(f"expected_horizon_counts.{field}", expected, actual)
             )
 
-    actual_intersection = sum(row.feature_valid and row.label_valid for row in candidate_rows)
+    candidate_row_ids = [row.row_id for row in candidate_rows]
+    candidate_ids = set(candidate_row_ids)
+    feature_valid_ids = {row.row_id for row in candidate_rows if row.feature_valid}
+    label_valid_ids = {row.row_id for row in candidate_rows if row.label_valid}
+    eligible_ids = feature_valid_ids & label_valid_ids
+    assignment_ids = set(split_assignment)
+    split_ids = {
+        split: {
+            row_id
+            for row_id, assignment in split_assignment.items()
+            if type(assignment) is dict and assignment.get("split") == split
+        }
+        for split in ACCEPTANCE_SPLIT_COUNT_FIELDS
+    }
+    if any(
+        type(assignment) is not dict
+        or assignment.get("split") not in ACCEPTANCE_SPLIT_COUNT_FIELDS
+        for assignment in split_assignment.values()
+    ):
+        issues.append(_acceptance_structure_issue("dataset_relation.split_assignment", "invalid_value"))
+    if len(candidate_row_ids) != len(candidate_ids):
+        issues.append(_acceptance_structure_issue("dataset_relation.candidate_row_ids", "duplicate_id"))
+    if assignment_ids != candidate_ids:
+        issues.append(_acceptance_structure_issue("dataset_relation.split_assignment_row_ids", "set_mismatch"))
+    if split_ids[SPLIT_EXCLUDED] != candidate_ids - eligible_ids:
+        issues.append(_acceptance_structure_issue("dataset_relation.excluded_row_ids", "set_mismatch"))
+    if split_ids[SPLIT_TRAIN] | split_ids[SPLIT_VALIDATION] != eligible_ids:
+        issues.append(_acceptance_structure_issue("dataset_relation.eligible_row_ids", "set_mismatch"))
+    if split_ids[SPLIT_TRAIN] & split_ids[SPLIT_VALIDATION]:
+        issues.append(_acceptance_structure_issue("dataset_relation.train_validation_row_ids", "overlap"))
+
+    actual_intersection = len(eligible_ids)
     actual_dataset_counts = {
         "candidate_row_count": len(candidate_rows),
         "feature_valid_row_count": sum(row.feature_valid for row in candidate_rows),
@@ -1488,12 +1542,8 @@ def _validate_pre_publish_acceptance(
         "training_eligible_row_count": actual_intersection,
     }
     actual_split_counts_from_rows = {
-        split: sum(
-            split_assignment[row.row_id]["split"] == split for row in candidate_rows
-        )
-        for split in ACCEPTANCE_SPLIT_COUNT_FIELDS
+        split: len(row_ids) for split, row_ids in split_ids.items()
     }
-    candidate_count = len(candidate_rows)
     for field, actual in actual_dataset_counts.items():
         if dataset_coverage.get(field) != actual:
             issues.append(
@@ -1530,22 +1580,6 @@ def _validate_pre_publish_acceptance(
         issues.append(
             _acceptance_structure_issue(
                 "dataset_relation.feature_valid_intersection_label_valid", "eligible_mismatch"
-            )
-        )
-    if candidate_count - actual_intersection != actual_split_counts_from_rows[SPLIT_EXCLUDED]:
-        issues.append(
-            _acceptance_structure_issue(
-                "dataset_relation.candidate_minus_eligible", "excluded_mismatch"
-            )
-        )
-    if (
-        actual_split_counts_from_rows[SPLIT_TRAIN]
-        + actual_split_counts_from_rows[SPLIT_VALIDATION]
-        != actual_intersection
-    ):
-        issues.append(
-            _acceptance_structure_issue(
-                "dataset_relation.train_plus_validation", "eligible_mismatch"
             )
         )
 
@@ -1620,7 +1654,12 @@ def _rename_run_root_exclusive(staging_run: Path, final_run: Path) -> None:
     raise OSError(error_number, "exclusive directory rename failed")
 
 
-def _publish_staged_run(staging_run: Path, final_run: Path) -> None:
+def _publish_staged_run(
+    staging_run: Path,
+    final_run: Path,
+    acceptance_contract: OfficialRunAcceptanceContract,
+) -> None:
+    _verify_official_run_acceptance_contract_unchanged(acceptance_contract)
     if final_run.exists() or final_run.is_symlink():
         raise EvidenceWriteError("eg8c_write_error: run already exists")
     try:
@@ -1746,6 +1785,10 @@ def analyze_and_write_dataset(
     input_snapshot_before: InputSnapshot | None = None,
     acceptance_contract: OfficialRunAcceptanceContract | None = None,
 ) -> Eg8cDatasetResult:
+    if acceptance_contract is None:
+        raise OfficialRunAcceptanceError(
+            (_contract_structure_issue("acceptance_contract", "required"),)
+        )
     resolved_root = eg8c_output_root.expanduser().resolve(strict=True)
     if not resolved_root.is_dir():
         raise EvidenceWriteError("eg8c_write_error: output root is not a directory")
@@ -1870,17 +1913,16 @@ def analyze_and_write_dataset(
         if {path.name for path in phase_dir.iterdir()} != expected_outputs:
             raise EvidenceWriteError("eg8c_write_error: staged output set is incomplete")
 
-        if acceptance_contract is not None:
-            _verify_official_run_acceptance_contract_unchanged(acceptance_contract)
-            _validate_pre_publish_acceptance(
-                acceptance_contract,
-                phase_dir=phase_dir,
-                candidate_rows=candidate_rows,
-                split_assignment=split_assignment,
-                dataset_coverage=dataset_coverage,
-                leakage_report=leakage_report,
-                manifest=manifest,
-            )
+        _verify_official_run_acceptance_contract_unchanged(acceptance_contract)
+        _validate_pre_publish_acceptance(
+            acceptance_contract,
+            phase_dir=phase_dir,
+            candidate_rows=candidate_rows,
+            split_assignment=split_assignment,
+            dataset_coverage=dataset_coverage,
+            leakage_report=leakage_report,
+            manifest=manifest,
+        )
 
         final_phase_dir = final_run_dir / PHASE_EG8C_VERSION
         result = Eg8cDatasetResult(
@@ -1888,11 +1930,9 @@ def analyze_and_write_dataset(
             phase_dir=final_phase_dir,
             dataset_coverage=dataset_coverage,
             leakage_report=leakage_report,
-            acceptance_contract_sha256=(
-                acceptance_contract.sha256 if acceptance_contract is not None else None
-            ),
+            acceptance_contract_sha256=acceptance_contract.sha256,
         )
-        _publish_staged_run(staging_dir, final_run_dir)
+        _publish_staged_run(staging_dir, final_run_dir, acceptance_contract)
         published = True
         return result
     except BaseException as primary_error:
@@ -1914,17 +1954,17 @@ def run_eg8c_dataset_build(
     """Load the full current v3 Snapshot (no Analysis Window/Snapshot
     Cutoff -- EG-8C 1st scope, unlike eg8b_b2b), then build and persist
     the EG-8C Feature/Label/Split/Leakage Output set."""
+    if acceptance_contract_path is None:
+        raise OfficialRunAcceptanceError(
+            (_contract_structure_issue("acceptance_contract", "required"),)
+        )
     input_paths = (
         ("raw_log_v3", raw_log_path),
         ("population_current_v3", current_path),
         ("population_forecast_v3", forecast_path),
     )
     input_snapshot_before = _snapshot_input_artifacts(input_paths)
-    acceptance_contract = (
-        load_official_run_acceptance_contract(acceptance_contract_path)
-        if acceptance_contract_path is not None
-        else None
-    )
+    acceptance_contract = load_official_run_acceptance_contract(acceptance_contract_path)
     result = eg8a.normalize_v3_sources(
         raw_log_path=raw_log_path, current_path=current_path, forecast_path=forecast_path
     )
@@ -1942,8 +1982,17 @@ def run_eg8c_dataset_build(
     )
 
 
+class _CliArgumentError(Exception):
+    pass
+
+
+class _SafeArgumentParser(argparse.ArgumentParser):
+    def error(self, message: str) -> None:
+        raise _CliArgumentError from None
+
+
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="EG-8C provisional dataset output build")
+    parser = _SafeArgumentParser(description="EG-8C provisional dataset output build")
     parser.add_argument("--current-path", type=Path, required=True)
     parser.add_argument("--forecast-path", type=Path, required=True)
     parser.add_argument("--error-path", type=Path, required=True)
@@ -1954,8 +2003,8 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
-    arguments = build_parser().parse_args(argv)
     try:
+        arguments = build_parser().parse_args(argv)
         result = run_eg8c_dataset_build(
             raw_log_path=arguments.error_path,
             current_path=arguments.current_path,
@@ -1964,6 +2013,9 @@ def main(argv: list[str] | None = None) -> int:
             eg8c_run_id=arguments.run_id,
             acceptance_contract_path=arguments.acceptance_contract,
         )
+    except _CliArgumentError:
+        print("eg8c_run_failed: invalid_arguments", file=sys.stderr)
+        return 2
     except KeyboardInterrupt:
         print("eg8c_run_interrupted", file=sys.stderr)
         return 130

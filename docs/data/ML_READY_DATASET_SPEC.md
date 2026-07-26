@@ -1,11 +1,11 @@
 # ML-ready Dataset Spec
 
 - 문서 상태: Draft
-- 버전: v0.6.0
+- 버전: v0.7.1
 - 작성자: 신동현
 - 최종 승인자: 신동현
 - 최초 작성일: 2026-07-24
-- 최종 수정일: 2026-07-26
+- 최종 수정일: 2026-07-27
 - 적용 프로젝트: Freshmanager Data PoC
 - 관련 문서:
   - `AGENTS.md`
@@ -396,9 +396,11 @@ PM이 승인한다.
 
 ### 12.2 EG-8C 공식 Output Run 실행 경계
 
-EG-8C 1차 Output은 다음 표준 라이브러리 CLI로만 발행한다. 세 입력과 기존
+EG-8C 1차 Output은 다음 표준 CLI 또는 같은 공개 Builder
+`run_eg8c_dataset_build`로만 발행한다. CLI와 Library 호출 모두 세 입력과 기존
 외부 Output Root, 비어 있지 않은 단일 경로 구간 Run ID, PM이 승인한 외부
-Acceptance Contract를 모두 명시해야 한다. `--error-path`는 오류 메시지 파일이
+Acceptance Contract를 모두 명시해야 하며, Contract가 없으면 Final 공개 전에
+전용 승인 오류로 중단한다. `--error-path`는 오류 메시지 파일이
 아니라 입력 Source인 `raw_log_v3.csv`를 받는다.
 
 ```bash
@@ -426,9 +428,11 @@ Commit하지 않는 외부 JSON 파일이며 다음 필드를 정확히 한 번�
 - `required_evaluation_status`, `required_data_sufficiency_status`,
   `required_test_split_created`, `required_official_model_gate_judgment`
 
-Contract는 Version·필수/알 수 없는 Key·자료형·음수·12개 누수검사 식별자 집합·
-`PASS`·위반 0·지원 상태값을 엄격히 검사한다. Dataset별 개수는 외부 Contract가
-소유하며 Production 상수로 두지 않는다.
+Contract는 모든 JSON Object 계층의 중복 Key, Version·필수/알 수 없는 Key·자료형·
+음수·12개 누수검사 식별자 집합·`PASS`·위반 0·지원 상태값을 엄격히 검사한다.
+정수와 Boolean은 서로 대체할 수 없다. Dataset별 개수는 외부 Contract가 소유하며
+Production 상수로 두지 않는다. 승인 판단은 최초에 읽어 불변 형태로 보존한 Contract
+내용에만 연결한다.
 
 공식 Pre-publish 순서는 다음과 같다.
 
@@ -439,16 +443,22 @@ Contract는 Version·필수/알 수 없는 Key·자료형·음수·12개 누수�
 5. 정확한 Output 8개 확인
 6. Acceptance Contract 불변 재검증
 7. Manifest·Staging 파일 무결성, 누수검사, Dataset·Split·Area·Horizon 수치,
-   집합 관계와 평가 상태를 Contract와 대조
-8. 모두 통과한 Run Root만 배타적 Rename으로 Final 공개
+   Candidate·Eligible·Excluded·Train·Validation 행 식별자 집합 관계와 평가 상태를
+   Contract와 대조
+8. Final 공개 함수 안에서 Acceptance Contract Hash와 파일 identity를 마지막 재검증
+9. 모두 통과한 Run Root만 배타적 Rename으로 Final 공개
 
 Leakage 최종판정이 `PASS`가 아니거나 위반이 0이 아니거나 기존 12개 검사 집합이
 다르면 Contract가 이를 완화할 수 없다. Candidate·Feature-valid·Label-valid·Eligible·
 TRAIN·VALIDATION·EXCLUDED·Area·60/180분 Horizon 수치 또는 평가 상태가 다를 때도
 Final을 공개하지 않는다. 실패 시 현재 실행의 미공개 Staging만 정리하고 기존 Final
 Run은 삭제·덮어쓰지 않으며, CLI는 제한된 불일치 요약만 stderr에 출력하고 0이 아닌
-종료값으로 끝난다. 사용자 중단은 고정된 비민감 메시지와 종료코드 `130`으로
-보고하며 전체 Traceback을 출력하지 않는다.
+종료값으로 끝난다. 한 실행에서 불일치는 정렬된 최대 10건만 표시한다. 표시 가능한
+값은 정수, Boolean, `null`, 사전 정의 상태·최종판정, 공개 누수검사 식별자뿐이다.
+원문 행·JSON·임의 Key/문자열·전체 경로·환경값·비밀정보·중첩 객체·배열·전체 Hash는
+표시하지 않는다. 누수검사 집합 차이는 수량과 공개 식별자 최대 5개만 표시한다.
+CLI 인수 오류를 포함한 모든 실패는 단일 제한 stderr 경계를 통과한다. 사용자 중단은
+고정된 비민감 메시지와 종료코드 `130`으로 보고하며 전체 Traceback을 출력하지 않는다.
 
 성공한 CLI는 실행 Evidence에 기록할 수 있도록 Acceptance Contract SHA-256을
 제공한다. 이 Hash를 기존 `dataset_manifest.json`에 추가하지 않으며, 공개 산출물 8개와
@@ -547,6 +557,7 @@ Spot은 위치 식별 정보는 `Confirmed`이지만 전부 `field_verified=fals
 
 | 버전 | 날짜 | 변경내용 | 작성자 | 승인상태 |
 |---|---|---|---|---|
+| v0.7.1 | 2026-07-27 | 공식 Builder의 Acceptance Contract 필수화, 전 계층 JSON 중복 Key 거부, 불변 Contract 내용과 승인 판단 연결, 행 식별자 집합 검증, Publish 경계 최종 무결성 재검증, 단일 제한 CLI 오류 경계를 §12.2에 보강. 기존 공개 산출물 8개와 Schema는 불변 | 신동현 | PM 결정 |
 | v0.7.0 | 2026-07-26 | EG-8C 공식 CLI의 외부 PM 승인 Acceptance Contract 필수화, Contract 엄격 검증·실행 전후 불변, Leakage·Dataset 회귀·평가 상태의 Final Publish 전 Gate, 실패 시 미공개 Staging 전용 정리와 기존 8개 공개 Schema 불변 계약을 §12.2에 추가. 실제 Contract·Dataset·Output은 미포함 | 신동현 | PM 결정 |
 | v0.6.0 | 2026-07-26 | EG-8C 공식 Output Run의 명시적 CLI, 단일 구간 Run ID, Input Hash·크기·파일 identity 전후 불변, 숨김 Run Root 전체의 배타적 Rename 공개, 미공개 Staging 전용 Cleanup, 사용자 중단 종료코드 130 계약을 §12.2에 추가. 실제 운영 Dataset Run·모델·Dependency는 미포함 | 신동현 | PM 결정 |
 | v0.5.0 | 2026-07-24 | Source Correlation Key를 `area_code_returned`에서 `area_code_requested`로 정정(§8.1) — `raw_log_v3`에 `area_code_returned` 컬럼이 없어 세 시트 전체를 연결할 수 없었던 오류를 실 데이터 3-way 키 비교로 확인·수정. Response Integrity Check와 canonical `area_code` 정규화 규칙·불일치 행 Error Rows 격리 규칙을 §7.1에 추가. `duplicate_flag`/`error_flag`를 `LOADER_DERIVED_FIELD`, `source_status`를 `JOINED_FROM_RAW_LOG`로 세분화. §5.1에 KST 소스 해석·ISO 8601 명시적 Offset 출력 계약·`strptime` 기반 파싱 원칙·수집 지연이 오류가 아님을 추가 | 신동현 | PM 결정 |

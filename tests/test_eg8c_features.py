@@ -160,6 +160,51 @@ def write_one_candidate_sources(directory: Path) -> tuple[Path, Path, Path]:
     )
 
 
+_RAW_EG8C_DATASET_BUILD = eg8c_features.run_eg8c_dataset_build
+
+
+def run_official_dataset_build(**kwargs: object) -> eg8c_features.Eg8cDatasetResult:
+    if kwargs.get("acceptance_contract_path") is not None:
+        return _RAW_EG8C_DATASET_BUILD(**kwargs)
+
+    normalized = eg8a.normalize_v3_sources(
+        raw_log_path=kwargs["raw_log_path"],
+        current_path=kwargs["current_path"],
+        forecast_path=kwargs["forecast_path"],
+    )
+    rows = eg8c_features.build_candidate_rows(
+        normalized.current_records, normalized.forecast_records
+    )
+    assignment = eg8c_features.build_split_assignment(rows)
+    document = acceptance_contract_document()
+    document["expected_dataset_counts"] = {
+        "candidate_row_count": len(rows),
+        "feature_valid_row_count": sum(row.feature_valid for row in rows),
+        "label_valid_row_count": sum(row.label_valid for row in rows),
+        "training_eligible_row_count": sum(
+            row.feature_valid and row.label_valid for row in rows
+        ),
+    }
+    document["expected_split_counts"] = {
+        split: sum(
+            assignment[row.row_id]["split"] == split for row in rows
+        )
+        for split in ("TRAIN", "VALIDATION", "EXCLUDED")
+    }
+    document["expected_area_count"] = len({row.area_code for row in rows})
+    document["expected_horizon_counts"] = {
+        str(horizon): sum(row.horizon_minutes == horizon for row in rows)
+        for horizon in eg8c_features.SUPPORTED_HORIZON_MINUTES
+    }
+    contract_path = Path(kwargs["raw_log_path"]).parent / ".acceptance-test.json"
+    contract_path.write_text(json.dumps(document), encoding="utf-8")
+    kwargs["acceptance_contract_path"] = contract_path
+    try:
+        return _RAW_EG8C_DATASET_BUILD(**kwargs)
+    finally:
+        contract_path.unlink(missing_ok=True)
+
+
 def make_current_record(**overrides: object) -> eg8a.NormalizedCurrentRecord:
     base: dict[str, object] = dict(
         collection_run_id=RUN_A,
@@ -255,7 +300,7 @@ class OfficialRunAcceptanceContractTests(unittest.TestCase):
 
         unknown_key = acceptance_contract_document()
         unknown_key["unexpected"] = 1
-        invalid_cases.append(("unknown key", unknown_key, "unexpected", None))
+        invalid_cases.append(("unknown key", unknown_key, "acceptance_contract", "unexpected"))
 
         wrong_type = acceptance_contract_document()
         wrong_type["expected_dataset_counts"]["candidate_row_count"] = "private-value"
@@ -297,9 +342,13 @@ class OfficialRunAcceptanceContractTests(unittest.TestCase):
         boolean_count["expected_dataset_counts"]["candidate_row_count"] = True
         invalid_cases.append(("boolean count", boolean_count, "expected_dataset_counts.candidate_row_count", None))
 
+        float_count = acceptance_contract_document()
+        float_count["expected_dataset_counts"]["candidate_row_count"] = 1.0
+        invalid_cases.append(("float count", float_count, "expected_dataset_counts.candidate_row_count", None))
+
         nested_unknown = acceptance_contract_document()
         nested_unknown["expected_split_counts"]["OTHER"] = 0
-        invalid_cases.append(("nested unknown", nested_unknown, "expected_split_counts.OTHER", None))
+        invalid_cases.append(("nested unknown", nested_unknown, "expected_split_counts", "OTHER"))
 
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -317,6 +366,29 @@ class OfficialRunAcceptanceContractTests(unittest.TestCase):
                         self.assertIn("실제 자료형=string", summary)
                     if forbidden is not None:
                         self.assertNotIn(forbidden, summary)
+
+    def test_duplicate_json_keys_are_rejected_at_every_object_level(self) -> None:
+        valid = acceptance_contract_document()
+        nested = json.dumps(valid).replace(
+            '"candidate_row_count": 1',
+            '"candidate_row_count": 1, "candidate_row_count": 1',
+            1,
+        )
+        root = json.dumps(valid)[:-1] + ', "contract_version": "eg8c-official-run-acceptance-v1"}'
+
+        with tempfile.TemporaryDirectory() as directory:
+            for index, payload in enumerate((root, nested)):
+                with self.subTest(index=index):
+                    path = Path(directory) / f"duplicate-{index}.json"
+                    path.write_text(payload, encoding="utf-8")
+                    with self.assertRaises(eg8c_features.OfficialRunAcceptanceError) as raised:
+                        eg8c_features.load_official_run_acceptance_contract(path)
+
+                    summary = str(raised.exception)
+                    self.assertIn("오류=duplicate_key", summary)
+                    self.assertNotIn("candidate_row_count", summary)
+                    self.assertNotIn("contract_version", summary)
+                    self.assertIsNone(raised.exception.__cause__)
 
     def test_missing_nonregular_invalid_json_and_nonobject_contract_are_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -932,7 +1004,7 @@ class OfficialRunAcceptanceGateTests(unittest.TestCase):
         contract_path = write_acceptance_contract(
             root, acceptance_contract_document() if contract_document is None else contract_document
         )
-        return eg8c_features.run_eg8c_dataset_build(
+        return run_official_dataset_build(
             raw_log_path=raw_path,
             current_path=current_path,
             forecast_path=forecast_path,
@@ -959,7 +1031,7 @@ class OfficialRunAcceptanceGateTests(unittest.TestCase):
             normalized.current_records, normalized.forecast_records
         )
         split_assignment = eg8c_features.build_split_assignment(rows)
-        result = eg8c_features.run_eg8c_dataset_build(
+        result = run_official_dataset_build(
             raw_log_path=raw_path,
             current_path=current_path,
             forecast_path=forecast_path,
@@ -1008,6 +1080,42 @@ class OfficialRunAcceptanceGateTests(unittest.TestCase):
                 },
             )
             self.assertNotIn("acceptance_contract", manifest)
+
+    def test_public_builder_rejects_missing_acceptance_contract_before_publication(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "source"
+            output = root / "output"
+            source.mkdir()
+            output.mkdir()
+            raw_path, current_path, forecast_path = write_one_candidate_sources(source)
+
+            with self.assertRaises(eg8c_features.OfficialRunAcceptanceError) as raised:
+                _RAW_EG8C_DATASET_BUILD(
+                    raw_log_path=raw_path,
+                    current_path=current_path,
+                    forecast_path=forecast_path,
+                    eg8c_output_root=output,
+                    eg8c_run_id="missing-contract",
+                )
+
+            self.assertIn("항목=acceptance_contract", str(raised.exception))
+            self.assertEqual(list(output.iterdir()), [])
+
+    def test_direct_dataset_writer_rejects_missing_acceptance_contract(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            with self.assertRaises(eg8c_features.OfficialRunAcceptanceError):
+                eg8c_features.analyze_and_write_dataset(
+                    (),
+                    (),
+                    eg8c_output_root=root,
+                    raw_log_path=root / "raw.csv",
+                    current_path=root / "current.csv",
+                    forecast_path=root / "forecast.csv",
+                )
+
+            self.assertEqual(list(root.iterdir()), [])
 
     def test_each_approved_count_mismatch_is_rejected_independently(self) -> None:
         fields = (
@@ -1113,7 +1221,7 @@ class OfficialRunAcceptanceGateTests(unittest.TestCase):
             with mock.patch.object(
                 eg8c_features, "build_leakage_report", side_effect=failing_report
             ), self.assertRaises(eg8c_features.OfficialRunAcceptanceError) as raised:
-                eg8c_features.run_eg8c_dataset_build(
+                run_official_dataset_build(
                     raw_log_path=raw_path,
                     current_path=current_path,
                     forecast_path=forecast_path,
@@ -1153,7 +1261,7 @@ class OfficialRunAcceptanceGateTests(unittest.TestCase):
             with mock.patch.object(
                 eg8c_features, "build_leakage_report", side_effect=violating_report
             ), self.assertRaises(eg8c_features.OfficialRunAcceptanceError) as raised:
-                eg8c_features.run_eg8c_dataset_build(
+                run_official_dataset_build(
                     raw_log_path=raw_path,
                     current_path=current_path,
                     forecast_path=forecast_path,
@@ -1197,7 +1305,7 @@ class OfficialRunAcceptanceGateTests(unittest.TestCase):
                 with mock.patch.object(
                     eg8c_features, "build_leakage_report", side_effect=altered_report
                 ), self.assertRaises(eg8c_features.OfficialRunAcceptanceError) as raised:
-                    eg8c_features.run_eg8c_dataset_build(
+                    run_official_dataset_build(
                         raw_log_path=raw_path,
                         current_path=current_path,
                         forecast_path=forecast_path,
@@ -1233,20 +1341,94 @@ class OfficialRunAcceptanceGateTests(unittest.TestCase):
             self.assertIsInstance(raised.exception.__cause__, eg8c_features.EvidenceWriteError)
             self.assertNotIn("private-cleanup-detail", str(raised.exception))
 
-    def test_dataset_set_relations_are_checked_against_candidate_rows(self) -> None:
+    def test_public_builder_checks_row_identifier_sets_not_only_counts(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            inputs = self._gate_inputs(Path(directory))
-            inputs["candidate_rows"] = [
-                dataclasses.replace(inputs["candidate_rows"][0], feature_valid=False)
-            ]
+            root = Path(directory)
+            source = root / "source"
+            output = root / "output"
+            source.mkdir()
+            output.mkdir()
+            raw_path, current_path, forecast_path = write_one_candidate_sources(source)
+            normalized = eg8a.normalize_v3_sources(
+                raw_log_path=raw_path,
+                current_path=current_path,
+                forecast_path=forecast_path,
+            )
+            eligible = eg8c_features.build_candidate_rows(
+                normalized.current_records, normalized.forecast_records
+            )[0]
+            excluded = dataclasses.replace(
+                eligible,
+                row_id=f"{eligible.row_id}-excluded",
+                feature_valid=False,
+                feature_missing_reason="synthetic_missing_feature",
+            )
+            rows = [eligible, excluded]
+            wrong_assignment = {
+                eligible.row_id: {"split": "EXCLUDED", "split_reason": "synthetic"},
+                excluded.row_id: {"split": "TRAIN", "split_reason": "synthetic"},
+            }
+            document = acceptance_contract_document()
+            document["expected_dataset_counts"] = {
+                "candidate_row_count": 2,
+                "feature_valid_row_count": 1,
+                "label_valid_row_count": 2,
+                "training_eligible_row_count": 1,
+            }
+            document["expected_split_counts"] = {"TRAIN": 1, "VALIDATION": 0, "EXCLUDED": 1}
+            document["expected_horizon_counts"] = {"60": 2, "180": 0}
+            contract_path = write_acceptance_contract(root, document)
 
-            with self.assertRaises(eg8c_features.OfficialRunAcceptanceError) as raised:
-                eg8c_features._validate_pre_publish_acceptance(**inputs)
+            with mock.patch.object(
+                eg8c_features, "build_candidate_rows", return_value=rows
+            ), mock.patch.object(
+                eg8c_features, "build_split_assignment", return_value=wrong_assignment
+            ), self.assertRaises(eg8c_features.OfficialRunAcceptanceError) as raised:
+                run_official_dataset_build(
+                    raw_log_path=raw_path,
+                    current_path=current_path,
+                    forecast_path=forecast_path,
+                    eg8c_output_root=output,
+                    eg8c_run_id="wrong-membership",
+                    acceptance_contract_path=contract_path,
+                )
 
             summary = str(raised.exception)
-            self.assertIn("dataset_relation.feature_valid_intersection_label_valid", summary)
-            self.assertIn("dataset_relation.candidate_minus_eligible", summary)
-            self.assertIn("dataset_relation.train_plus_validation", summary)
+            self.assertIn("dataset_relation.excluded_row_ids", summary)
+            self.assertIn("dataset_relation.eligible_row_ids", summary)
+            self.assertEqual(list(output.iterdir()), [])
+
+    def test_contract_change_after_final_validation_blocks_publication(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "source"
+            output = root / "output"
+            source.mkdir()
+            output.mkdir()
+            raw_path, current_path, forecast_path = write_one_candidate_sources(source)
+            contract_path = write_acceptance_contract(root)
+            real_validate = eg8c_features._validate_pre_publish_acceptance
+
+            def validate_then_change(*args: object, **kwargs: object) -> None:
+                real_validate(*args, **kwargs)
+                contract_path.write_bytes(contract_path.read_bytes() + b" ")
+
+            with mock.patch.object(
+                eg8c_features,
+                "_validate_pre_publish_acceptance",
+                side_effect=validate_then_change,
+            ), self.assertRaises(eg8c_features.OfficialRunAcceptanceError) as raised:
+                run_official_dataset_build(
+                    raw_log_path=raw_path,
+                    current_path=current_path,
+                    forecast_path=forecast_path,
+                    eg8c_output_root=output,
+                    eg8c_run_id="late-contract-change",
+                    acceptance_contract_path=contract_path,
+                )
+
+            self.assertIn("acceptance_contract", str(raised.exception))
+            self.assertEqual(list(output.iterdir()), [])
 
     def test_each_evaluation_state_mismatch_is_rejected(self) -> None:
         cases = (
@@ -1302,7 +1484,7 @@ class OfficialRunAcceptanceGateTests(unittest.TestCase):
             with mock.patch.object(
                 eg8c_features, "_write_exclusive", side_effect=write_then_corrupt
             ), self.assertRaises(eg8c_features.OfficialRunAcceptanceError) as raised:
-                eg8c_features.run_eg8c_dataset_build(
+                run_official_dataset_build(
                     raw_log_path=raw_path,
                     current_path=current_path,
                     forecast_path=forecast_path,
@@ -1343,7 +1525,7 @@ class OfficialRunAcceptanceGateTests(unittest.TestCase):
                 with mock.patch.object(
                     eg8c_features, "_write_exclusive", side_effect=write_then_replace
                 ), self.assertRaises(eg8c_features.OfficialRunAcceptanceError) as raised:
-                    eg8c_features.run_eg8c_dataset_build(
+                    run_official_dataset_build(
                         raw_log_path=raw_path,
                         current_path=current_path,
                         forecast_path=forecast_path,
@@ -1377,13 +1559,13 @@ class OutputWriterTests(unittest.TestCase):
             raw_path, current_path, forecast_path = write_source_csvs(
                 Path(staging), current_rows=current_rows, forecast_rows=forecast_rows
             )
-            result = eg8c_features.run_eg8c_dataset_build(
+            result = run_official_dataset_build(
                 raw_log_path=raw_path, current_path=current_path, forecast_path=forecast_path,
                 eg8c_output_root=Path(output_root), eg8c_run_id="unit-test-run",
             )
             self.assertEqual(result.eg8c_run_id, "unit-test-run")
             self.assertEqual(result.phase_dir.name, eg8c_features.PHASE_EG8C_VERSION)
-            self.assertIsNone(result.acceptance_contract_sha256)
+            self.assertIsNotNone(result.acceptance_contract_sha256)
             created = sorted(p.name for p in result.phase_dir.iterdir())
             expected = sorted(
                 [
@@ -1441,7 +1623,7 @@ class OutputWriterTests(unittest.TestCase):
                 )
 
                 with self.assertRaises(eg8c_features.EvidenceWriteError):
-                    eg8c_features.run_eg8c_dataset_build(
+                    run_official_dataset_build(
                         raw_log_path=raw_path,
                         current_path=current_path,
                         forecast_path=forecast_path,
@@ -1463,7 +1645,7 @@ class OutputWriterTests(unittest.TestCase):
             )
 
             with self.assertRaises(eg8c_features.EvidenceWriteError):
-                eg8c_features.run_eg8c_dataset_build(
+                run_official_dataset_build(
                     raw_log_path=raw_path,
                     current_path=current_path,
                     forecast_path=forecast_path,
@@ -1483,7 +1665,7 @@ class OutputWriterTests(unittest.TestCase):
             existing.write_bytes(b"sentinel")
 
             with self.assertRaises(eg8c_features.EvidenceWriteError):
-                eg8c_features.run_eg8c_dataset_build(
+                run_official_dataset_build(
                     raw_log_path=raw_path,
                     current_path=current_path,
                     forecast_path=forecast_path,
@@ -1504,7 +1686,7 @@ class OutputWriterTests(unittest.TestCase):
             marker.write_bytes(b"sentinel")
 
             with self.assertRaises(eg8c_features.EvidenceWriteError):
-                eg8c_features.run_eg8c_dataset_build(
+                run_official_dataset_build(
                     raw_log_path=raw_path,
                     current_path=current_path,
                     forecast_path=forecast_path,
@@ -1531,7 +1713,7 @@ class OutputWriterTests(unittest.TestCase):
                 self.skipTest(f"symlink unavailable: {type(error).__name__}")
 
             with self.assertRaises(eg8c_features.EvidenceWriteError):
-                eg8c_features.run_eg8c_dataset_build(
+                run_official_dataset_build(
                     raw_log_path=raw_path,
                     current_path=current_path,
                     forecast_path=forecast_path,
@@ -1562,7 +1744,7 @@ class OutputWriterTests(unittest.TestCase):
             with mock.patch.object(
                 eg8c_features, "_write_exclusive", side_effect=write_then_change_input
             ), self.assertRaises(eg8c_features.EvidenceWriteError):
-                eg8c_features.run_eg8c_dataset_build(
+                run_official_dataset_build(
                     raw_log_path=raw_path,
                     current_path=current_path,
                     forecast_path=forecast_path,
@@ -1593,7 +1775,7 @@ class OutputWriterTests(unittest.TestCase):
             with mock.patch.object(
                 eg8c_features, "_write_exclusive", side_effect=write_then_replace_input
             ), self.assertRaises(eg8c_features.EvidenceWriteError):
-                eg8c_features.run_eg8c_dataset_build(
+                run_official_dataset_build(
                     raw_log_path=raw_path,
                     current_path=current_path,
                     forecast_path=forecast_path,
@@ -1618,7 +1800,7 @@ class OutputWriterTests(unittest.TestCase):
             with mock.patch.object(
                 eg8c_features, "_write_exclusive", side_effect=fail_after_first_output
             ), self.assertRaises(eg8c_features.EvidenceWriteError):
-                eg8c_features.run_eg8c_dataset_build(
+                run_official_dataset_build(
                     raw_log_path=raw_path,
                     current_path=current_path,
                     forecast_path=forecast_path,
@@ -1637,7 +1819,11 @@ class OutputWriterTests(unittest.TestCase):
             real_publish = eg8c_features._publish_staged_run
             observed = False
 
-            def inspect_then_publish(staging_run: Path, final_run: Path) -> None:
+            def inspect_then_publish(
+                staging_run: Path,
+                final_run: Path,
+                contract: eg8c_features.OfficialRunAcceptanceContract,
+            ) -> None:
                 nonlocal observed
                 observed = True
                 self.assertEqual(staging_run.parent, root)
@@ -1646,12 +1832,12 @@ class OutputWriterTests(unittest.TestCase):
                 phase_dir = staging_run / eg8c_features.PHASE_EG8C_VERSION
                 self.assertTrue(phase_dir.is_dir())
                 self.assertEqual(len(list(phase_dir.iterdir())), 8)
-                real_publish(staging_run, final_run)
+                real_publish(staging_run, final_run, contract)
 
             with mock.patch.object(
                 eg8c_features, "_publish_staged_run", side_effect=inspect_then_publish
             ):
-                result = eg8c_features.run_eg8c_dataset_build(
+                result = run_official_dataset_build(
                     raw_log_path=raw_path,
                     current_path=current_path,
                     forecast_path=forecast_path,
@@ -1669,7 +1855,7 @@ class OutputWriterTests(unittest.TestCase):
                 Path(source), current_rows=[current_row()], forecast_rows=[]
             )
 
-            result = eg8c_features.run_eg8c_dataset_build(
+            result = run_official_dataset_build(
                 raw_log_path=raw_path,
                 current_path=current_path,
                 forecast_path=forecast_path,
@@ -1698,7 +1884,7 @@ class OutputWriterTests(unittest.TestCase):
             with mock.patch.object(
                 eg8c_features, "_write_exclusive", side_effect=fail_manifest
             ), self.assertRaises(RuntimeError) as raised:
-                eg8c_features.run_eg8c_dataset_build(
+                run_official_dataset_build(
                     raw_log_path=raw_path,
                     current_path=current_path,
                     forecast_path=forecast_path,
@@ -1724,7 +1910,7 @@ class OutputWriterTests(unittest.TestCase):
             with mock.patch.object(
                 eg8c_features, "_publish_staged_run", side_effect=primary
             ), self.assertRaises(OSError) as raised:
-                eg8c_features.run_eg8c_dataset_build(
+                run_official_dataset_build(
                     raw_log_path=raw_path,
                     current_path=current_path,
                     forecast_path=forecast_path,
@@ -1750,7 +1936,7 @@ class OutputWriterTests(unittest.TestCase):
             ), mock.patch.object(eg8c_features.shutil, "rmtree", side_effect=cleanup), self.assertRaises(
                 RuntimeError
             ) as raised:
-                eg8c_features.run_eg8c_dataset_build(
+                run_official_dataset_build(
                     raw_log_path=raw_path,
                     current_path=current_path,
                     forecast_path=forecast_path,
@@ -1775,7 +1961,7 @@ class OutputWriterTests(unittest.TestCase):
                 "_cleanup_unpublished_staging",
                 side_effect=AssertionError("post-publish cleanup must not run"),
             ):
-                result = eg8c_features.run_eg8c_dataset_build(
+                result = run_official_dataset_build(
                     raw_log_path=raw_path,
                     current_path=current_path,
                     forecast_path=forecast_path,
@@ -1795,8 +1981,12 @@ class OutputWriterTests(unittest.TestCase):
             )
             real_publish = eg8c_features._publish_staged_run
 
-            def publish_then_interrupt(staging_run: Path, destination: Path) -> None:
-                real_publish(staging_run, destination)
+            def publish_then_interrupt(
+                staging_run: Path,
+                destination: Path,
+                contract: eg8c_features.OfficialRunAcceptanceContract,
+            ) -> None:
+                real_publish(staging_run, destination, contract)
                 raise KeyboardInterrupt()
 
             with mock.patch.object(
@@ -1806,7 +1996,7 @@ class OutputWriterTests(unittest.TestCase):
                 "_cleanup_unpublished_staging",
                 side_effect=AssertionError("published run must not enter cleanup"),
             ), self.assertRaises(KeyboardInterrupt):
-                eg8c_features.run_eg8c_dataset_build(
+                run_official_dataset_build(
                     raw_log_path=raw_path,
                     current_path=current_path,
                     forecast_path=forecast_path,
@@ -1828,7 +2018,7 @@ class OutputWriterTests(unittest.TestCase):
             with mock.patch.object(
                 eg8c_features, "_write_exclusive", side_effect=KeyboardInterrupt()
             ), self.assertRaises(KeyboardInterrupt):
-                eg8c_features.run_eg8c_dataset_build(
+                run_official_dataset_build(
                     raw_log_path=raw_path,
                     current_path=current_path,
                     forecast_path=forecast_path,
@@ -1851,7 +2041,7 @@ class OutputWriterTests(unittest.TestCase):
             ), mock.patch.object(
                 eg8c_features.shutil, "rmtree", side_effect=OSError("synthetic cleanup failure")
             ), self.assertRaises(KeyboardInterrupt) as raised:
-                eg8c_features.run_eg8c_dataset_build(
+                run_official_dataset_build(
                     raw_log_path=raw_path,
                     current_path=current_path,
                     forecast_path=forecast_path,
@@ -1882,7 +2072,7 @@ class OutputWriterTests(unittest.TestCase):
                 "_rename_run_root_exclusive",
                 side_effect=create_competitor_then_publish,
             ), self.assertRaises(eg8c_features.EvidenceWriteError):
-                eg8c_features.run_eg8c_dataset_build(
+                run_official_dataset_build(
                     raw_log_path=raw_path,
                     current_path=current_path,
                     forecast_path=forecast_path,
@@ -1898,13 +2088,13 @@ class OutputWriterTests(unittest.TestCase):
             raw_path, current_path, forecast_path = write_source_csvs(
                 Path(staging), current_rows=[current_row()], forecast_rows=[]
             )
-            first = eg8c_features.run_eg8c_dataset_build(
+            first = run_official_dataset_build(
                 raw_log_path=raw_path, current_path=current_path, forecast_path=forecast_path,
                 eg8c_output_root=Path(output_root), eg8c_run_id="fixed-run",
             )
             manifest_before = (first.phase_dir / eg8c_features.DATASET_MANIFEST_FILENAME).read_bytes()
             with self.assertRaises(eg8c_features.EvidenceWriteError):
-                eg8c_features.run_eg8c_dataset_build(
+                run_official_dataset_build(
                     raw_log_path=raw_path, current_path=current_path, forecast_path=forecast_path,
                     eg8c_output_root=Path(output_root), eg8c_run_id="fixed-run",
                 )
@@ -1920,7 +2110,7 @@ class OutputWriterTests(unittest.TestCase):
                 return hashlib.sha256(p.read_bytes()).hexdigest()
 
             before = {p: sha256_of(p) for p in (raw_path, current_path, forecast_path)}
-            eg8c_features.run_eg8c_dataset_build(
+            run_official_dataset_build(
                 raw_log_path=raw_path, current_path=current_path, forecast_path=forecast_path,
                 eg8c_output_root=Path(output_root), eg8c_run_id="hash-check-run",
             )
@@ -1935,11 +2125,11 @@ class DeterminismTests(unittest.TestCase):
             raw_path, current_path, forecast_path = write_source_csvs(
                 Path(staging), current_rows=[current_row()], forecast_rows=[]
             )
-            result_1 = eg8c_features.run_eg8c_dataset_build(
+            result_1 = run_official_dataset_build(
                 raw_log_path=raw_path, current_path=current_path, forecast_path=forecast_path,
                 eg8c_output_root=Path(root_1), eg8c_run_id="fixed-run", generated_at=fixed_time,
             )
-            result_2 = eg8c_features.run_eg8c_dataset_build(
+            result_2 = run_official_dataset_build(
                 raw_log_path=raw_path, current_path=current_path, forecast_path=forecast_path,
                 eg8c_output_root=Path(root_2), eg8c_run_id="fixed-run", generated_at=fixed_time,
             )
@@ -1964,16 +2154,16 @@ class CliTests(unittest.TestCase):
 
     def test_missing_required_arguments_exits_nonzero(self) -> None:
         stderr = io.StringIO()
-        with contextlib.redirect_stderr(stderr), self.assertRaises(SystemExit) as raised:
-            eg8c_features.main([])
+        with contextlib.redirect_stderr(stderr):
+            exit_code = eg8c_features.main([])
 
-        self.assertNotEqual(raised.exception.code, 0)
-        self.assertNotIn("Traceback", stderr.getvalue())
+        self.assertNotEqual(exit_code, 0)
+        self.assertEqual(stderr.getvalue(), "eg8c_run_failed: invalid_arguments\n")
 
     def test_acceptance_contract_is_required_even_when_other_cli_arguments_exist(self) -> None:
         stderr = io.StringIO()
-        with contextlib.redirect_stderr(stderr), self.assertRaises(SystemExit) as raised:
-            eg8c_features.main(
+        with contextlib.redirect_stderr(stderr):
+            exit_code = eg8c_features.main(
                 [
                     "--current-path",
                     "current.csv",
@@ -1988,9 +2178,17 @@ class CliTests(unittest.TestCase):
                 ]
             )
 
-        self.assertNotEqual(raised.exception.code, 0)
-        self.assertIn("--acceptance-contract", stderr.getvalue())
-        self.assertNotIn("Traceback", stderr.getvalue())
+        self.assertNotEqual(exit_code, 0)
+        self.assertEqual(stderr.getvalue(), "eg8c_run_failed: invalid_arguments\n")
+
+    def test_unknown_cli_argument_value_is_not_echoed(self) -> None:
+        stderr = io.StringIO()
+        with contextlib.redirect_stderr(stderr):
+            exit_code = eg8c_features.main(["--private-option", "private-value"])
+
+        self.assertNotEqual(exit_code, 0)
+        self.assertEqual(stderr.getvalue(), "eg8c_run_failed: invalid_arguments\n")
+        self.assertNotIn("private-value", stderr.getvalue())
 
     def test_invalid_run_id_returns_nonzero_without_traceback(self) -> None:
         with tempfile.TemporaryDirectory() as staging, tempfile.TemporaryDirectory() as output_root:
