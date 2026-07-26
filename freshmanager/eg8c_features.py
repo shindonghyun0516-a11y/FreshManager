@@ -24,6 +24,8 @@ from __future__ import annotations
 
 import argparse
 import csv
+import ctypes
+import errno
 import hashlib
 import io
 import json
@@ -914,6 +916,65 @@ def _validated_run_id(value: str) -> str:
     return value
 
 
+def _rename_run_root_exclusive(staging_run: Path, final_run: Path) -> None:
+    source = os.fsencode(staging_run)
+    destination = os.fsencode(final_run)
+    libc = ctypes.CDLL(None, use_errno=True)
+    try:
+        if sys.platform == "darwin":
+            rename = libc.renamex_np
+            rename.argtypes = (ctypes.c_char_p, ctypes.c_char_p, ctypes.c_uint)
+            rename.restype = ctypes.c_int
+            result = rename(source, destination, 0x00000004)  # RENAME_EXCL
+        elif sys.platform.startswith("linux"):
+            rename = libc.renameat2
+            rename.argtypes = (
+                ctypes.c_int,
+                ctypes.c_char_p,
+                ctypes.c_int,
+                ctypes.c_char_p,
+                ctypes.c_uint,
+            )
+            rename.restype = ctypes.c_int
+            result = rename(-100, source, -100, destination, 1)  # RENAME_NOREPLACE
+        elif os.name == "nt":
+            staging_run.rename(final_run)
+            return
+        else:
+            raise OSError(errno.ENOTSUP, "exclusive directory rename is unavailable")
+    except AttributeError as error:
+        raise OSError(errno.ENOTSUP, "exclusive directory rename is unavailable") from error
+    if result == 0:
+        return
+    error_number = ctypes.get_errno()
+    if error_number in {errno.EEXIST, errno.ENOTEMPTY}:
+        raise FileExistsError(error_number, "destination already exists")
+    raise OSError(error_number, "exclusive directory rename failed")
+
+
+def _publish_staged_run(staging_run: Path, final_run: Path) -> None:
+    if final_run.exists() or final_run.is_symlink():
+        raise EvidenceWriteError("eg8c_write_error: run already exists")
+    try:
+        _rename_run_root_exclusive(staging_run, final_run)
+    except FileExistsError as error:
+        raise EvidenceWriteError("eg8c_write_error: run already exists") from error
+    except OSError as error:
+        raise EvidenceWriteError("eg8c_write_error: failed to publish run") from error
+
+
+def _cleanup_unpublished_staging(staging_run: Path, primary_error: BaseException) -> None:
+    if not staging_run.exists() and not staging_run.is_symlink():
+        return
+    try:
+        shutil.rmtree(staging_run)
+    except BaseException:
+        diagnostic = EvidenceWriteError(
+            "eg8c_cleanup_error: unpublished staging cleanup failed"
+        )
+        raise primary_error from diagnostic
+
+
 def _write_exclusive(path: Path, payload: bytes) -> None:
     partial_path: Path | None = None
     try:
@@ -1043,7 +1104,7 @@ def analyze_and_write_dataset(
     verified_input_before = input_snapshot_before or _snapshot_input_artifacts(input_paths)
     staging_dir = Path(tempfile.mkdtemp(prefix=".eg8c-staging-", dir=resolved_root))
     phase_dir = staging_dir / PHASE_EG8C_VERSION
-    final_created = False
+    published = False
     try:
         phase_dir.mkdir(exist_ok=False)
         candidate_rows = build_candidate_rows(current_records, forecast_records)
@@ -1140,26 +1201,19 @@ def analyze_and_write_dataset(
         if {path.name for path in phase_dir.iterdir()} != expected_outputs:
             raise EvidenceWriteError("eg8c_write_error: staged output set is incomplete")
 
-        try:
-            final_run_dir.mkdir(exist_ok=False)
-        except FileExistsError as error:
-            raise EvidenceWriteError(f"eg8c_write_error: run {resolved_run_id} already exists") from error
-        final_created = True
         final_phase_dir = final_run_dir / PHASE_EG8C_VERSION
-        phase_dir.rename(final_phase_dir)
-        staging_dir.rmdir()
-        final_created = False
-        return Eg8cDatasetResult(
+        result = Eg8cDatasetResult(
             eg8c_run_id=resolved_run_id,
             phase_dir=final_phase_dir,
             dataset_coverage=dataset_coverage,
             leakage_report=leakage_report,
         )
-    except BaseException:
-        if final_created:
-            shutil.rmtree(final_run_dir)
-        if staging_dir.exists():
-            shutil.rmtree(staging_dir)
+        _publish_staged_run(staging_dir, final_run_dir)
+        published = True
+        return result
+    except BaseException as primary_error:
+        if not published and (staging_dir.exists() or staging_dir.is_symlink()):
+            _cleanup_unpublished_staging(staging_dir, primary_error)
         raise
 
 
@@ -1217,6 +1271,9 @@ def main(argv: list[str] | None = None) -> int:
             eg8c_output_root=arguments.output_root,
             eg8c_run_id=arguments.run_id,
         )
+    except KeyboardInterrupt:
+        print("eg8c_run_interrupted", file=sys.stderr)
+        return 130
     except Exception:
         print("eg8c_run_failed: input_or_output_validation_error", file=sys.stderr)
         return 1

@@ -987,6 +987,271 @@ class OutputWriterTests(unittest.TestCase):
 
             self.assertEqual(list(Path(output_root).iterdir()), [])
 
+    def test_final_run_is_absent_until_complete_staging_run_is_published(self) -> None:
+        with tempfile.TemporaryDirectory() as source, tempfile.TemporaryDirectory() as output_root:
+            root = Path(output_root).resolve()
+            raw_path, current_path, forecast_path = write_source_csvs(
+                Path(source), current_rows=[current_row()], forecast_rows=[]
+            )
+            real_publish = eg8c_features._publish_staged_run
+            observed = False
+
+            def inspect_then_publish(staging_run: Path, final_run: Path) -> None:
+                nonlocal observed
+                observed = True
+                self.assertEqual(staging_run.parent, root)
+                self.assertTrue(staging_run.name.startswith(".eg8c-staging-"))
+                self.assertFalse(final_run.exists())
+                phase_dir = staging_run / eg8c_features.PHASE_EG8C_VERSION
+                self.assertTrue(phase_dir.is_dir())
+                self.assertEqual(len(list(phase_dir.iterdir())), 8)
+                real_publish(staging_run, final_run)
+
+            with mock.patch.object(
+                eg8c_features, "_publish_staged_run", side_effect=inspect_then_publish
+            ):
+                result = eg8c_features.run_eg8c_dataset_build(
+                    raw_log_path=raw_path,
+                    current_path=current_path,
+                    forecast_path=forecast_path,
+                    eg8c_output_root=root,
+                    eg8c_run_id="atomic-run",
+                )
+
+            self.assertTrue(observed)
+            self.assertEqual(result.phase_dir.parent, root / "atomic-run")
+
+    def test_success_publishes_whole_run_root_without_staging_remnant(self) -> None:
+        with tempfile.TemporaryDirectory() as source, tempfile.TemporaryDirectory() as output_root:
+            root = Path(output_root).resolve()
+            raw_path, current_path, forecast_path = write_source_csvs(
+                Path(source), current_rows=[current_row()], forecast_rows=[]
+            )
+
+            result = eg8c_features.run_eg8c_dataset_build(
+                raw_log_path=raw_path,
+                current_path=current_path,
+                forecast_path=forecast_path,
+                eg8c_output_root=root,
+                eg8c_run_id="whole-run",
+            )
+
+            self.assertEqual(list(root.iterdir()), [root / "whole-run"])
+            self.assertEqual(result.phase_dir, root / "whole-run" / eg8c_features.PHASE_EG8C_VERSION)
+            self.assertEqual(len(list(result.phase_dir.iterdir())), 8)
+
+    def test_manifest_failure_preserves_primary_and_cleans_unpublished_staging(self) -> None:
+        with tempfile.TemporaryDirectory() as source, tempfile.TemporaryDirectory() as output_root:
+            root = Path(output_root).resolve()
+            raw_path, current_path, forecast_path = write_source_csvs(
+                Path(source), current_rows=[current_row()], forecast_rows=[]
+            )
+            primary = RuntimeError("synthetic manifest failure")
+            real_write = eg8c_features._write_exclusive
+
+            def fail_manifest(path: Path, payload: bytes) -> None:
+                if path.name == eg8c_features.DATASET_MANIFEST_FILENAME:
+                    raise primary
+                real_write(path, payload)
+
+            with mock.patch.object(
+                eg8c_features, "_write_exclusive", side_effect=fail_manifest
+            ), self.assertRaises(RuntimeError) as raised:
+                eg8c_features.run_eg8c_dataset_build(
+                    raw_log_path=raw_path,
+                    current_path=current_path,
+                    forecast_path=forecast_path,
+                    eg8c_output_root=root,
+                    eg8c_run_id="manifest-failure-run",
+                )
+
+            self.assertIs(raised.exception, primary)
+            self.assertEqual(list(root.iterdir()), [])
+
+    def test_publish_failure_preserves_existing_run_and_cleans_staging(self) -> None:
+        with tempfile.TemporaryDirectory() as source, tempfile.TemporaryDirectory() as output_root:
+            root = Path(output_root).resolve()
+            existing = root / "existing-run"
+            existing.mkdir()
+            marker = existing / "sentinel"
+            marker.write_bytes(b"sentinel")
+            raw_path, current_path, forecast_path = write_source_csvs(
+                Path(source), current_rows=[current_row()], forecast_rows=[]
+            )
+            primary = OSError("synthetic publish failure")
+
+            with mock.patch.object(
+                eg8c_features, "_publish_staged_run", side_effect=primary
+            ), self.assertRaises(OSError) as raised:
+                eg8c_features.run_eg8c_dataset_build(
+                    raw_log_path=raw_path,
+                    current_path=current_path,
+                    forecast_path=forecast_path,
+                    eg8c_output_root=root,
+                    eg8c_run_id="publish-failure-run",
+                )
+
+            self.assertIs(raised.exception, primary)
+            self.assertEqual(list(root.iterdir()), [existing])
+            self.assertEqual(marker.read_bytes(), b"sentinel")
+
+    def test_cleanup_failure_does_not_replace_primary_failure(self) -> None:
+        with tempfile.TemporaryDirectory() as source, tempfile.TemporaryDirectory() as output_root:
+            root = Path(output_root).resolve()
+            raw_path, current_path, forecast_path = write_source_csvs(
+                Path(source), current_rows=[current_row()], forecast_rows=[]
+            )
+            primary = RuntimeError("synthetic primary failure")
+            cleanup = OSError("synthetic cleanup failure")
+
+            with mock.patch.object(
+                eg8c_features, "_write_exclusive", side_effect=primary
+            ), mock.patch.object(eg8c_features.shutil, "rmtree", side_effect=cleanup), self.assertRaises(
+                RuntimeError
+            ) as raised:
+                eg8c_features.run_eg8c_dataset_build(
+                    raw_log_path=raw_path,
+                    current_path=current_path,
+                    forecast_path=forecast_path,
+                    eg8c_output_root=root,
+                    eg8c_run_id="cleanup-failure-run",
+                )
+
+            self.assertIs(raised.exception, primary)
+            self.assertIsInstance(primary.__cause__, eg8c_features.EvidenceWriteError)
+            self.assertIn("eg8c_cleanup_error", str(primary.__cause__))
+            self.assertFalse((root / "cleanup-failure-run").exists())
+
+    def test_success_does_not_run_post_publish_cleanup(self) -> None:
+        with tempfile.TemporaryDirectory() as source, tempfile.TemporaryDirectory() as output_root:
+            root = Path(output_root).resolve()
+            raw_path, current_path, forecast_path = write_source_csvs(
+                Path(source), current_rows=[current_row()], forecast_rows=[]
+            )
+
+            with mock.patch.object(
+                eg8c_features,
+                "_cleanup_unpublished_staging",
+                side_effect=AssertionError("post-publish cleanup must not run"),
+            ):
+                result = eg8c_features.run_eg8c_dataset_build(
+                    raw_log_path=raw_path,
+                    current_path=current_path,
+                    forecast_path=forecast_path,
+                    eg8c_output_root=root,
+                    eg8c_run_id="no-post-publish-cleanup-run",
+                )
+
+            self.assertTrue(result.phase_dir.is_dir())
+            self.assertEqual(len(list(result.phase_dir.iterdir())), 8)
+
+    def test_interrupt_after_publish_keeps_final_without_cleanup(self) -> None:
+        with tempfile.TemporaryDirectory() as source, tempfile.TemporaryDirectory() as output_root:
+            root = Path(output_root).resolve()
+            final_run = root / "published-interrupt-run"
+            raw_path, current_path, forecast_path = write_source_csvs(
+                Path(source), current_rows=[current_row()], forecast_rows=[]
+            )
+            real_publish = eg8c_features._publish_staged_run
+
+            def publish_then_interrupt(staging_run: Path, destination: Path) -> None:
+                real_publish(staging_run, destination)
+                raise KeyboardInterrupt()
+
+            with mock.patch.object(
+                eg8c_features, "_publish_staged_run", side_effect=publish_then_interrupt
+            ), mock.patch.object(
+                eg8c_features,
+                "_cleanup_unpublished_staging",
+                side_effect=AssertionError("published run must not enter cleanup"),
+            ), self.assertRaises(KeyboardInterrupt):
+                eg8c_features.run_eg8c_dataset_build(
+                    raw_log_path=raw_path,
+                    current_path=current_path,
+                    forecast_path=forecast_path,
+                    eg8c_output_root=root,
+                    eg8c_run_id="published-interrupt-run",
+                )
+
+            phase_dir = final_run / eg8c_features.PHASE_EG8C_VERSION
+            self.assertTrue(phase_dir.is_dir())
+            self.assertEqual(len(list(phase_dir.iterdir())), 8)
+
+    def test_keyboard_interrupt_cleans_unpublished_staging_and_propagates(self) -> None:
+        with tempfile.TemporaryDirectory() as source, tempfile.TemporaryDirectory() as output_root:
+            root = Path(output_root).resolve()
+            raw_path, current_path, forecast_path = write_source_csvs(
+                Path(source), current_rows=[current_row()], forecast_rows=[]
+            )
+
+            with mock.patch.object(
+                eg8c_features, "_write_exclusive", side_effect=KeyboardInterrupt()
+            ), self.assertRaises(KeyboardInterrupt):
+                eg8c_features.run_eg8c_dataset_build(
+                    raw_log_path=raw_path,
+                    current_path=current_path,
+                    forecast_path=forecast_path,
+                    eg8c_output_root=root,
+                    eg8c_run_id="keyboard-interrupt-run",
+                )
+
+            self.assertEqual(list(root.iterdir()), [])
+
+    def test_cleanup_failure_does_not_replace_keyboard_interrupt(self) -> None:
+        with tempfile.TemporaryDirectory() as source, tempfile.TemporaryDirectory() as output_root:
+            root = Path(output_root).resolve()
+            raw_path, current_path, forecast_path = write_source_csvs(
+                Path(source), current_rows=[current_row()], forecast_rows=[]
+            )
+            primary = KeyboardInterrupt()
+
+            with mock.patch.object(
+                eg8c_features, "_write_exclusive", side_effect=primary
+            ), mock.patch.object(
+                eg8c_features.shutil, "rmtree", side_effect=OSError("synthetic cleanup failure")
+            ), self.assertRaises(KeyboardInterrupt) as raised:
+                eg8c_features.run_eg8c_dataset_build(
+                    raw_log_path=raw_path,
+                    current_path=current_path,
+                    forecast_path=forecast_path,
+                    eg8c_output_root=root,
+                    eg8c_run_id="interrupt-cleanup-failure-run",
+                )
+
+            self.assertIs(raised.exception, primary)
+            self.assertIsInstance(primary.__cause__, eg8c_features.EvidenceWriteError)
+            self.assertIn("eg8c_cleanup_error", str(primary.__cause__))
+            self.assertFalse((root / "interrupt-cleanup-failure-run").exists())
+
+    def test_destination_competition_never_overwrites_competing_run(self) -> None:
+        with tempfile.TemporaryDirectory() as source, tempfile.TemporaryDirectory() as output_root:
+            root = Path(output_root).resolve()
+            final_run = root / "competing-run"
+            raw_path, current_path, forecast_path = write_source_csvs(
+                Path(source), current_rows=[current_row()], forecast_rows=[]
+            )
+            real_publish = eg8c_features._rename_run_root_exclusive
+
+            def create_competitor_then_publish(staging_run: Path, destination: Path) -> None:
+                final_run.mkdir()
+                real_publish(staging_run, destination)
+
+            with mock.patch.object(
+                eg8c_features,
+                "_rename_run_root_exclusive",
+                side_effect=create_competitor_then_publish,
+            ), self.assertRaises(eg8c_features.EvidenceWriteError):
+                eg8c_features.run_eg8c_dataset_build(
+                    raw_log_path=raw_path,
+                    current_path=current_path,
+                    forecast_path=forecast_path,
+                    eg8c_output_root=root,
+                    eg8c_run_id="competing-run",
+                )
+
+            self.assertEqual(list(final_run.iterdir()), [])
+            self.assertEqual(list(root.iterdir()), [final_run])
+
     def test_phase_directory_collision_raises_without_overwriting(self) -> None:
         with tempfile.TemporaryDirectory() as staging, tempfile.TemporaryDirectory() as output_root:
             raw_path, current_path, forecast_path = write_source_csvs(
@@ -1088,6 +1353,30 @@ class CliTests(unittest.TestCase):
             self.assertNotEqual(exit_code, 0)
             self.assertNotIn("Traceback", stderr.getvalue())
             self.assertEqual(list(Path(output_root).iterdir()), [])
+
+    def test_keyboard_interrupt_returns_130_without_traceback(self) -> None:
+        stderr = io.StringIO()
+        with mock.patch.object(
+            eg8c_features, "run_eg8c_dataset_build", side_effect=KeyboardInterrupt()
+        ), contextlib.redirect_stderr(stderr):
+            exit_code = eg8c_features.main(
+                [
+                    "--current-path",
+                    "current.csv",
+                    "--forecast-path",
+                    "forecast.csv",
+                    "--error-path",
+                    "raw.csv",
+                    "--output-root",
+                    "output",
+                    "--run-id",
+                    "interrupted-run",
+                ]
+            )
+
+        self.assertEqual(exit_code, 130)
+        self.assertEqual(stderr.getvalue(), "eg8c_run_interrupted\n")
+        self.assertNotIn("Traceback", stderr.getvalue())
 
     def test_synthetic_run_creates_exactly_eight_outputs(self) -> None:
         with tempfile.TemporaryDirectory() as staging, tempfile.TemporaryDirectory() as output_root:
