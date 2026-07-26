@@ -1132,6 +1132,9 @@ class OfficialRunAcceptanceGateTests(unittest.TestCase):
             self.assertIn("항목=acceptance_contract", str(raised.exception))
             self.assertEqual(list(output.iterdir()), [])
 
+    def test_direct_dataset_writer_rejects_missing_acceptance_contract(self) -> None:
+        self.assertFalse(hasattr(eg8c_features, "analyze_and_write_dataset"))
+
     def test_only_public_builder_accepts_contract_path(self) -> None:
         self.assertFalse(hasattr(eg8c_features, "OfficialRunAcceptanceContract"))
         self.assertFalse(hasattr(eg8c_features, "load_official_run_acceptance_contract"))
