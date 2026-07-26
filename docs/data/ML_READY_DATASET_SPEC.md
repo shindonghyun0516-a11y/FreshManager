@@ -1,11 +1,11 @@
 # ML-ready Dataset Spec
 
 - 문서 상태: Draft
-- 버전: v0.5.0
+- 버전: v0.6.0
 - 작성자: 신동현
 - 최종 승인자: 신동현
 - 최초 작성일: 2026-07-24
-- 최종 수정일: 2026-07-24
+- 최종 수정일: 2026-07-26
 - 적용 프로젝트: Freshmanager Data PoC
 - 관련 문서:
   - `AGENTS.md`
@@ -394,6 +394,29 @@ Loader V0은 다음 다섯 파일을 산출한다. 전부 Python 표준 라이�
 Output을 분리된 하위 경로로 유지해야 한다. 최종 경로는 실제 구현 Issue에서
 PM이 승인한다.
 
+### 12.2 EG-8C 공식 Output Run 실행 경계
+
+EG-8C 1차 Output은 다음 표준 라이브러리 CLI로만 발행한다. 세 입력과 기존
+외부 Output Root, 비어 있지 않은 단일 경로 구간 Run ID를 모두 명시해야 한다.
+
+```bash
+python3 -m freshmanager.eg8c_features \
+  --current-path path/to/population_current_v3.csv \
+  --forecast-path path/to/population_forecast_v3.csv \
+  --error-path path/to/raw_log_v3.csv \
+  --output-root path/to/existing-output-root \
+  --run-id eg8c-20260726T190000-kst
+```
+
+CLI는 서울시 API나 Secret을 사용하지 않는다. 실행 전후 세 입력의 SHA-256·크기·
+파일 identity가 같고 Staging에 기존 8개 Output이 모두 생성된 경우에만
+`<output-root>/<run-id>/phase-eg8c-v1/`을 공개한다. 실패 또는 기존 Run 충돌 시
+종료 코드는 0이 아니며 Final Run을 남기거나 기존 Run을 덮어쓰지 않는다.
+
+이 명령의 문서화는 실제 운영 Dataset 실행 승인이 아니다. 공개 상태는 계속
+`PROVISIONAL`·`PROVISIONAL_SPLIT_ONLY`·`test_split_created=false`·
+`official_model_gate_judgment=null`을 유지한다.
+
 ## 13. 품질 Gate(EG-8A 통과 조건 연결)
 
 EG-8A Quality Report(§12.1)가 반드시 산출해야 하는 항목과 권장 항목을
@@ -482,6 +505,7 @@ Spot은 위치 식별 정보는 `Confirmed`이지만 전부 `field_verified=fals
 
 | 버전 | 날짜 | 변경내용 | 작성자 | 승인상태 |
 |---|---|---|---|---|
+| v0.6.0 | 2026-07-26 | EG-8C 공식 Output Run의 명시적 CLI, 단일 구간 Run ID, Input Hash·크기·파일 identity 전후 불변, Staging 후 8개 Output 공개, 실패·충돌 시 Non-overwrite 계약을 §12.2에 추가. 실제 운영 Dataset Run·모델·Dependency는 미포함 | 신동현 | PM 결정 |
 | v0.5.0 | 2026-07-24 | Source Correlation Key를 `area_code_returned`에서 `area_code_requested`로 정정(§8.1) — `raw_log_v3`에 `area_code_returned` 컬럼이 없어 세 시트 전체를 연결할 수 없었던 오류를 실 데이터 3-way 키 비교로 확인·수정. Response Integrity Check와 canonical `area_code` 정규화 규칙·불일치 행 Error Rows 격리 규칙을 §7.1에 추가. `duplicate_flag`/`error_flag`를 `LOADER_DERIVED_FIELD`, `source_status`를 `JOINED_FROM_RAW_LOG`로 세분화. §5.1에 KST 소스 해석·ISO 8601 명시적 Offset 출력 계약·`strptime` 기반 파싱 원칙·수집 지연이 오류가 아님을 추가 | 신동현 | PM 결정 |
 | v0.4.0 | 2026-07-24 | PM이 제공한 실제 v3 sheets CSV Export(122회차)로 §7/§8 필드 후보 상태를 `CONFIRMED_SOURCE_FIELD`/`DERIVED_FIELD`/`NOT_AVAILABLE`로 갱신. `area_code`를 `area_code_requested`/`area_code_returned` 이중 컬럼으로 정정(§7.1). Current-Forecast Join Key `collection_run_id`+`area_code_returned` 확정(§8.1). §6 데이터 계층을 Raw(`raw_log_v3`)/Normalized Source(`population_current_v3`·`population_forecast_v3`)로 재정의. 시간 표현·검증 규칙 추가(§5.1). 오류 분류에 "시간 순서 위반" 추가(§11). 장기 자동화 방식·최종 정본 형식·품질 임계값은 계속 `OPEN_DECISION` | 신동현 | PM 결정 |
 | v0.3.0 | 2026-07-24 | EG-8A Loader V0 입력 방식(수동 CSV Export, §3.1)·V0 실행 방식(§4.1)·V0 출력 형식과 산출물 구성(§12/§12.1)·품질 항목 반드시산출/권장 분류(§13) PM 결정 반영. 장기 자동화 방식·최종 정본 형식·품질 임계값은 계속 `OPEN_DECISION` | 신동현 | PM 결정 |
