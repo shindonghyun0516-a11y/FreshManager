@@ -8,6 +8,7 @@ on:
       - docs/superpowers/plans/2026-07-27-eg8c-ml-modeling.md
       - freshmanager/eg8c_modeling.py
       - tests/test_eg8c_modeling.py
+      - scripts/ml/**
   push:
     branches:
       - main
@@ -17,6 +18,7 @@ on:
       - docs/superpowers/plans/2026-07-27-eg8c-ml-modeling.md
       - freshmanager/eg8c_modeling.py
       - tests/test_eg8c_modeling.py
+      - scripts/ml/**
 
 permissions:
   contents: read
