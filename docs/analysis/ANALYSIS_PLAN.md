@@ -1,11 +1,11 @@
 # Analysis Plan
 
 - 문서 상태: Draft
-- 버전: v0.1.6
+- 버전: v0.1.7
 - 작성자: 신동현
 - 최종 승인자: 신동현
 - 최초 작성일: 2026-07-17
-- 최종 수정일: 2026-07-27
+- 최종 수정일: 2026-07-28
 - 적용 프로젝트: Freshmanager Data PoC
 - 관련 문서:
   - `AGENTS.md`
@@ -915,6 +915,49 @@ Ridge 모두 잠정 통과 조건을 충족하지 못했다. 따라서 서울시
 
 **상태: `PROVISIONAL_BASELINE_RETAINED`**
 
+### 29.2 EG-8D Area 예상 유동인구 변화 순서
+
+EG-8C에서 잠정 유지한 서울시 Forecast와 잠긴 EG-8C Run #2 입력 Snapshot으로
+승인된 13개 Area의 60분·180분 후 예상 유동인구 변화 순서를 각각 계산한다. 현재와
+미래 인구 대표값은 범위의 중간값을 사용하고, 예상 증가 인구는 미래 중간값에서
+현재 중간값을 뺀 값, 예상 증가율은 예상 증가 인구를 현재 중간값으로 나눈 값이다.
+현재 중간값이 0이면 증가율을 0으로 대체하지 않고 계산 불가로 기록한다.
+
+서울시 Forecast는 `collection_run_id`·Area 코드·예측 기준시각·예측 대상시각이
+모두 같은 행만 정확히 연결한다. 각 시간간격은 양의 증가를 먼저 두고, 예상 증가
+인구 내림차순, 미래 중간값 내림차순, Area 코드 오름차순으로 정렬한다. 미래 예상
+인구 규모 순위는 별도로 계산하며 두 순위를 가중치로 합치지 않는다.
+
+입력 회차는 호출자가 지정하지 않는다. `LATEST_COMPLETE_LOCKED_SNAPSHOT` 정책이
+잠긴 Dataset의 각 `collection_run_id`를 순위 계산 전에 검사하고, 승인된 13개 Area의
+유효 Current가 하나씩 있으며 같은 `observed_at`에서 각 Area의 정확한 60분·180분
+유효 Forecast가 하나씩 있는 완전 회차만 후보로 삼는다. `observed_at`을 Prediction
+Origin과 같은 정본 시각으로 사용해 가장 최신인 회차를 선택하며, 최신 시각이
+동률이면 임의 선택하지 않고 실패한다.
+
+2026-07-28 결정적 선택 보완 후 오프라인 결과 Run
+`eg8d-area-priority-20260728T074335-kst`는 잠긴 Dataset의 전체 1,027회 중 완전한
+86회를 확인하고 기존과 같은 회차 `6ebf1dab-8494-44e0-b598-80248f7f6ff0`을 자동
+선택했다. 기존 Run `eg8d-area-priority-20260728T003701-kst`는 변경 없이 보존했다.
+새 Run에서 60분·180분 각각 13개 Area가 처리됐고
+제외 Area는 없었다. 60분은 양의 증가 1개·중간값 변화 0인 Area 8개·감소 4개이며,
+예상 변화 순서 1위는 잠실역(예상 +2,000명), 최하위는 서울역(예상 -2,000명)이었다.
+180분은 양의 증가 0개·중간값 변화 0인 Area 3개·감소 10개이므로 양의 증가 후보가
+없다. 정렬 규칙상 잠실역(변화 0명)이 1위, 명동 관광특구(예상 -12,000명)가
+최하위지만, 이 1위는 전체 표시·우선 검토 순서일 뿐 판매 추천 1위가 아니다.
+
+변화 0은 현재·미래 인구 범위의 중간값 차이가 0이라는 뜻이며 실제 변화가 전혀
+없거나 예측범위의 불확실성이 제거됐다는 뜻이 아니다. 이 결과는 한 번의 수집 회차
+Snapshot만 사용하므로 장기 반복성과 사용자 가치를 검증하지 않는다.
+
+이 결과는 `PROVISIONAL` Area 분석 산출물이며 공식 Recommendation Output이 아니다.
+실제 방문이나 판매 성공을 보장하지 않는다.
+Spot·S-DoT·이동시간·담당구역·판매량·매출·구매전환·추천효과는 포함하지 않고,
+EG-8D의 Spot Candidate Evaluation과 EG-8E 공식 출력 계약 적용은 별도 PM 승인 후
+진행한다.
+
+**상태: `LOCAL_IMPLEMENTATION_COMPLETE_PENDING_PM_REVIEW`**
+
 ---
 
 ## 30. Gate B 판정
@@ -1117,6 +1160,7 @@ ANALYSIS_PLAN은 다음 조건을 만족해야 Approved 상태로 전환할 수 
 
 | 버전 | 날짜 | 변경내용 | 작성자 | 승인상태 |
 |---|---|---|---|---|
+| v0.1.7 | 2026-07-28 | EG-8D 서울시 Forecast 기반 60분·180분 Area 예상 유동인구 변화·미래 인구 규모 독립 순위와 Horizon별 변화 요약을 §29.2에 반영; 양의 증가가 없는 180분 결과, 중간값·단일 Snapshot 한계와 공식 Recommendation Output·Spot·판매효과 제외 명시 | 신동현 | PM 변경내용 검토 전 |
 | v0.1.6 | 2026-07-27 | EG-8C 잠정 인구 중간값 회귀의 승인 입력·두 Baseline·Linear/Ridge·TRAIN 전용 전처리·Validation 판단과 1회 실행 결과를 §29.1에 반영; 서울시 Forecast 잠정 유지, 공식 Model Gate 미판정, 피크 예측 제외 | 신동현 | PM 변경내용 검토 전 |
 | v0.1.5 | 2026-07-24 | Spot Forecast 착수 전 사전조건 체크리스트(§6.6.1) 추가 — Spot 좌표·명칭 검증, 센서 좌표·거리·대표성 확인, Spot별 시계열·Ground Truth 확보, 최소 데이터기간, DIRECT/NEARBY 분리평가를 실행 전 확인 항목으로 정리 | 신동현 | PM 결정 |
 | v0.1.4 | 2026-07-24 | Spot Forecast 분석 가능성 조건(§6.6) 추가 — DIRECT_SENSOR/NEARBY_SENSOR/AREA_INFERENCE/UNSUPPORTED 평가 원칙, Area 예측값의 Spot Ground Truth 사용 금지, 모델·성능기준 OPEN_DECISION | 신동현 | PM 결정 |
