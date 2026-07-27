@@ -6,7 +6,7 @@
 단일 운영 기준이다. 제품 목적은 PRD, 기술 계약은 TRD, 검사 ID와 판정은
 `docs/testing/PROJECT_GUARD_SPEC.md`를 따른다.
 
-마지막 동기화 시각: `2026-07-24` (Asia/Seoul)
+마지막 동기화 시각: `2026-07-27` (Asia/Seoul)
 
 ## 2. 현재 요약
 
@@ -32,7 +32,7 @@
 - S-DoT 동적 수집: `NOT_STARTED`
 - Spot 자동 추천: `NOT_STARTED`
 - 24시간 Scheduler(로컬 EG-7 Live 파일럿 확대 기준): `NOT_IMPLEMENTED`
-- ML 학습: `NOT_STARTED`
+- ML 학습: `PROVISIONAL_COMPARISON_COMPLETED`
 - PoC 상시 13개 Area 반복수집 Runtime: **Apps Script** `ACTIVE`(§2.1 참조)
 
 PM이 장기 기준으로 확정한 5분 주기의 EG-7 1시간 파일럿 Controller와 파생
@@ -69,7 +69,7 @@ PM이 장기 기준으로 확정한 5분 주기의 EG-7 1시간 파일럿 Contro
 - EG-8(상위): `NOT_STARTED` — 데이터 분석·예측·추천 준비 상위 Gate, EG-8A~8E로 세분화
 - EG-8A(Python Loader·정규화·데이터 품질): `IN_PROGRESS`
 - EG-8B(EDA·서울시 Forecast 평가·Baseline·Feature Dataset): `IN_PROGRESS`
-- EG-8C(미래 Area 인구·피크 예측 모델): `PLANNED`
+- EG-8C(미래 Area 인구·피크 예측 모델): `IN_PROGRESS`
 - EG-8D(Area Ranking·선택적 S-DoT·Spot Candidate Evaluation): `PLANNED` — 기존
   EG-8 정의(Area Feature+선택적 S-DoT Feature+Spot Candidate Evaluation)를 그대로 계승
 - EG-8E(Recommendation Output Contract·UI/UX Readiness): `PLANNED` — Recommendation
@@ -84,12 +84,21 @@ PM이 장기 기준으로 확정한 5분 주기의 EG-7 1시간 파일럿 Contro
   - 실제 오류 응답 기반 검증: `NOT_COMPLETED`(합성 Fixture 오류 경로만 테스트 통과, 실 v3 CSV Smoke는 정상 경로만 확인)
 - EG-8B Dataset Profile·시간 커버리지·Forecast-Current Exact Join(B1): `IMPLEMENTATION_AVAILABLE_ON_MAIN`(PR #88, Issue #87)
 - EG-8B Phase 1 Read-only 준비도 분석(ML-ready Dataset·EDA·Forecast 평가·Baseline 가능성): `COMPLETED`
-- ML-ready Dataset: `NOT_IMPLEMENTED`
+- ML-ready Dataset: `LOCKED_OFFICIAL_RUN_2` — Run ID `eg8c-20260727T153257-kst`,
+  Manifest SHA-256 `388a5e6649e6e23d05a442ae9b4f8d0857f8ea382011c2ff07c0af64aae42771`
 - EDA: `NOT_STARTED`
 - EG-8B B2a(B0 Persistence Baseline·서울시 Forecast 단일 일자 잠정 Backtest): `IMPLEMENTATION_AVAILABLE_ON_MAIN`(PR #92, Issue #89) — 단일 일자 잠정 결과이며 공식 성공 임계값·EG-8B Gate PASS/FAIL 판정이 아님
 - EG-8B B2b — 2026-07-24 01:00~2026-07-25 07:00 단기 다일자 Baseline·Forecast 검증: `IMPLEMENTATION_AVAILABLE_ON_MAIN`(Parent Issue #93, PR #94) — 단기 다일자 잠정 검증 결과이며 evaluation_status=PROVISIONAL, coverage_status=SHORT_WINDOW_MULTI_DAY_PARTIAL_COVERAGE, gate_judgment=null. 공식 성공 임계값·EG-8B Gate PASS/FAIL 판정이 아님. 장기 다일자·5영업일·4주·공식 Gate 평가는 데이터 추가 축적 후 별도 검토한다.
 - EG-8C 1차(Feature·Label·Provisional Train/Validation Split): `IMPLEMENTATION_AVAILABLE_ON_MAIN`(Parent Issue #95, PR #96) — evaluation_status=PROVISIONAL, data_sufficiency_status=PROVISIONAL_SPLIT_ONLY, test_split_created=false, official_model_gate_judgment=null, Leakage 12종 위반 0, 지원 Horizon 60·180분만. 모델 학습·공식 Test 평가·Peak 예측·EG-8D·EG-8E·UI·E2E는 이번 범위에 포함하지 않음. 장기 다일자·5영업일·4주·공식 Gate 평가는 데이터 추가 축적 후 별도 검토한다.
-- ML Model: `NOT_STARTED`
+- EG-8C 잠정 Modeling Run: `LOCAL_IMPLEMENTATION_COMPLETE_PENDING_PM_REVIEW` — Run ID
+  `eg8c-ml-20260727T202447-kst`, Modeling Manifest SHA-256
+  `7a1748102fc2b079084ace8bcdb539f99535eab7ffc696e8a04b2b2c2d42df13`,
+  Training Matrix 2,158행(TRAIN 1,742 /
+  VALIDATION 416), Current·서울시 Forecast Baseline과 Linear·Ridge를 동일 Validation
+  행에서 비교. 서울시 Forecast가 가장 강한 Baseline이며 두 모델 모두 승인된
+  MAE/RMSE 통과조건을 충족하지 못해 `BASELINE_RETAINED`. 평가상태는
+  `PROVISIONAL`, Test Split 미생성, 공식 Model Gate 판단 `null`, 피크 예측 미구현.
+- ML Model: `BASELINE_RETAINED_PROVISIONAL`
 - Area Ranking: `NOT_STARTED`
 - Spot Ranking: `NOT_STARTED`
 - Recommendation Contract: `NOT_STARTED`
@@ -115,7 +124,7 @@ PM이 장기 기준으로 확정한 5분 주기의 EG-7 1시간 파일럿 Contro
 | EG-8(상위) | NOT_STARTED | 데이터 분석·예측·추천 준비 상위 Gate; EG-8A~8E로 세분화(§2.2) |
 | EG-8A | `IN_PROGRESS` | Source Reader·Schema Validation·Normalization `IMPLEMENTATION_AVAILABLE_ON_MAIN`(PR #84); Duplicate Detector·Quality Report·Manifest·Output Writer `IMPLEMENTATION_AVAILABLE_ON_MAIN`(PR #86); 실제 오류 응답 기반 검증 `NOT_COMPLETED` |
 | EG-8B | `IN_PROGRESS` | Dataset Profile·시간 커버리지·Forecast Exact Join(B1) `IMPLEMENTATION_AVAILABLE_ON_MAIN`(PR #88); B0 Baseline·서울시 Forecast 오차 지표(B2a) `IMPLEMENTATION_AVAILABLE_ON_MAIN`(PR #92); B2b 단기 다일자 검증 `IMPLEMENTATION_AVAILABLE_ON_MAIN`(PR #94) |
-| EG-8C | `PLANNED` | 미래 Area 인구·피크 예측 모델 |
+| EG-8C | `IN_PROGRESS` | 잠정 인구 중간값 회귀 로컬 구현·1회 비교 완료, 서울시 Forecast Baseline 유지; PM Diff 검토·Git 공식화와 공식 Model Gate는 미완료, 피크 예측 미구현 |
 | EG-8D | `PLANNED` | Area Ranking·선택적 S-DoT·Spot Candidate Evaluation(기존 EG-8 정의 계승) |
 | EG-8E | `PLANNED` | Recommendation Output Contract·UI/UX Readiness(Recommendation MVP 구현 Gate 아님) |
 | Recommendation MVP | PLANNED | Gate number `NOT_ASSIGNED` |
@@ -249,7 +258,7 @@ live_approval_status=NOT_APPROVED
 - Google Drive 접근: `0`
 - S-DoT 동적 수집: `NOT_STARTED`
 - Spot 자동 추천: `NOT_STARTED`
-- ML 학습·성능평가: `NOT_STARTED`
+- ML 학습·성능평가: `PROVISIONAL_COMPARISON_COMPLETED` — 공식 모델 채택·Test Gate 미실행
 - production Scheduler(로컬 EG-7 기준): `NOT_IMPLEMENTED` — PoC 상시 Runtime은 Apps Script(§2.1)
 - 로컬 EG-7 Live 파일럿의 자동 24시간 확대: `NOT_APPROVED`
 - 자동 재시도: 금지
@@ -374,6 +383,6 @@ Issue #69와 현재 Diff → 관련 Rule·Quality·Data 문서 → Decision Log�
 `562f984d7f84203196b34f8d1d827310405d3cc3`다. EG-7 구현과 고정 5분 장기 주기는
 `main`에 있지만 Live 수집은 시작하지 않았다. API 할당량은 `UNCONFIRMED`, 운영
 Plan·`pilot_run_id`·Batch ID·Plan fingerprint는 아직 존재하지 않는다. S-DoT
-동적 수집·ML 학습·Spot 실행도 시작하지 않았다. 다음 작업은 첫 Live 파일럿
+동적 S-DoT 수집·Spot 실행은 시작하지 않았고, ML은 잠정 비교까지만 완료했다. 다음 작업은 첫 Live 파일럿
 preflight와 정확한 Plan에 대한 한정된 PM 승인이다. EG-7 구현 Branch를 다시
 만들지 않는다.

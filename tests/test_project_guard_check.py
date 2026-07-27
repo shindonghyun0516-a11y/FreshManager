@@ -953,6 +953,8 @@ class CiWorkflowContractTests(unittest.TestCase):
     CHECKOUT_ACTION = "actions/checkout@v6"
     PYTHON_ACTION = "actions/setup-python@v6"
     PROJECT_GUARD_COMMAND = "python3 scripts/project_guard_check.py"
+    INSTALL_ML_REQUIREMENTS_NAME = "Install machine learning requirements"
+    INSTALL_ML_REQUIREMENTS_COMMAND = "python -m pip install -r requirements-ml.txt"
     UNIT_TEST_COMMAND = 'python3 -B -m unittest discover -s tests -p "test_*.py" -v'
     BASE_CONTEXT = "${{ github.event.pull_request.base.sha || github.event.before }}"
     HEAD_CONTEXT = "${{ github.event.pull_request.head.sha || github.sha }}"
@@ -1163,6 +1165,7 @@ class CiWorkflowContractTests(unittest.TestCase):
             run_value = self.normalize_yaml_scalar(run[0])
             return {
                 self.PROJECT_GUARD_COMMAND: "project_guard",
+                self.INSTALL_ML_REQUIREMENTS_COMMAND: "install_ml_requirements",
                 self.UNIT_TEST_COMMAND: "unit_tests",
             }.get(run_value, "unknown")
         return "unknown"
@@ -1257,9 +1260,15 @@ class CiWorkflowContractTests(unittest.TestCase):
         steps = self.step_blocks(lines, job_settings["steps"][1])
         self.assertEqual(
             [self.identify_step_semantics(block) for block in steps],
-            ["checkout", "python_setup", "project_guard", "unit_tests"],
+            [
+                "checkout",
+                "python_setup",
+                "project_guard",
+                "install_ml_requirements",
+                "unit_tests",
+            ],
         )
-        checkout_step, python_step, guard_step, unit_test_step = steps
+        checkout_step, python_step, guard_step, install_step, unit_test_step = steps
 
         checkout_settings = self.direct_mapping(checkout_step, 0)
         self.assertEqual(set(checkout_settings), {"uses", "with"})
@@ -1301,6 +1310,17 @@ class CiWorkflowContractTests(unittest.TestCase):
             self.HEAD_CONTEXT,
         )
 
+        self.assertEqual(
+            self.values_for_key(install_step, "name"),
+            [self.INSTALL_ML_REQUIREMENTS_NAME],
+        )
+        install_settings = self.direct_mapping(install_step, 0)
+        self.assertEqual(set(install_settings), {"run"})
+        self.assertEqual(
+            self.normalize_yaml_scalar(install_settings["run"][0]),
+            self.INSTALL_ML_REQUIREMENTS_COMMAND,
+        )
+
         unit_test_settings = self.direct_mapping(unit_test_step, 0)
         self.assertEqual(set(unit_test_settings), {"run"})
         self.assertEqual(
@@ -1338,10 +1358,12 @@ class CiWorkflowContractTests(unittest.TestCase):
         python_uses: str = PYTHON_ACTION,
         python_version: str = "3.12",
         guard_run: str = PROJECT_GUARD_COMMAND,
+        install_ml_requirements_run: str = INSTALL_ML_REQUIREMENTS_COMMAND,
         unit_test_run: str = UNIT_TEST_COMMAND,
         include_checkout: bool = True,
         include_python: bool = True,
         include_guard: bool = True,
+        include_install_ml_requirements: bool = True,
         include_unit_tests: bool = True,
         extra_action: str | None = None,
         fetch_depth: str = "0",
@@ -1356,6 +1378,7 @@ class CiWorkflowContractTests(unittest.TestCase):
             "checkout": "Checkout repository",
             "python_setup": "Set up Python",
             "project_guard": "Run Project Guard",
+            "install_ml_requirements": self.INSTALL_ML_REQUIREMENTS_NAME,
             "unit_tests": "Run unit tests",
         }
         if step_names is not None:
@@ -1456,6 +1479,11 @@ class CiWorkflowContractTests(unittest.TestCase):
                 guard_body.append(f'{indent(1)}"CI_TOKEN": ${{{{ secrets.CI_TOKEN }}}}')
             guard_body.append(f"run: {guard_run}")
             add_step(names["project_guard"], guard_body)
+        if include_install_ml_requirements:
+            add_step(
+                names["install_ml_requirements"],
+                [f"run: {install_ml_requirements_run}"],
+            )
         if include_unit_tests:
             add_step(names["unit_tests"], [f"run: {unit_test_run}"])
         return "\n".join(lines) + "\n"
@@ -1641,11 +1669,18 @@ class CiWorkflowContractTests(unittest.TestCase):
             "checkout_removed": {"include_checkout": False},
             "python_removed": {"include_python": False},
             "guard_removed": {"include_guard": False},
+            "install_ml_requirements_removed": {"include_install_ml_requirements": False},
             "unit_tests_removed": {"include_unit_tests": False},
             "checkout_action_changed": {"checkout_uses": "actions/cache@v4"},
             "python_action_changed": {"python_uses": "actions/cache@v4"},
             "python_version_changed": {"python_version": "3.11"},
             "guard_run_removed": {"guard_run": ""},
+            "install_ml_requirements_run_changed": {
+                "install_ml_requirements_run": "python -m pip install requirements-ml.txt"
+            },
+            "install_ml_requirements_name_changed": {
+                "step_names": {"install_ml_requirements": "Install dependencies"}
+            },
             "unit_test_run_changed": {"unit_test_run": "python3 -B -m unittest"},
             "same_name_fake_guard": {"guard_run": "python3 harmless.py"},
             "external_action_added": {"extra_action": "actions/cache@v4"},
@@ -1671,6 +1706,7 @@ class CiWorkflowContractTests(unittest.TestCase):
             {"permission_value": "write"},
             {"secret_expression": True},
             {"include_guard": False},
+            {"include_install_ml_requirements": False},
             {"include_unit_tests": False},
         )
         for kwargs in unsafe_mutations:
@@ -1684,6 +1720,9 @@ class CiWorkflowContractTests(unittest.TestCase):
             "workflow_dispatch": {"extra_event_key": "workflow_dispatch"},
             "push_all_branches": {"push_branch_key": None},
             "project_guard_step_removed": {"include_guard": False},
+            "install_ml_requirements_step_removed": {
+                "include_install_ml_requirements": False
+            },
             "unit_test_step_removed": {"include_unit_tests": False},
             "fetch_depth_reduced": {"fetch_depth": "1"},
             "credentials_protection_removed": {"persist_credentials": "true"},
