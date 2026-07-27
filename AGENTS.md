@@ -785,6 +785,8 @@ Codex는 코드, 테스트, 설정 또는 Project Guard 작업을 시작하기 �
 | `docs/analysis/ANALYSIS_PLAN.md` | 분석 질문, 기준선, 평가기간과 Gate A·B·C 판정 계획 |
 | `docs/data/CLOUD_BACKUP_AND_CSV_MANAGEMENT_PLAN.md` | 로컬 원본과 Google Drive 복사본, Backup Worker·CSV 도입 목표 계약 |
 
+ML Experiment 작업에서는 승인된 Modeling Plan과 `docs/rules/ML_EXPERIMENT_RULES.md`를 확인한다.
+
 네 문서의 Project Guard 자동검사 대상 편입은 별도 Issue와 PM 승인으로만 반영한다.
 
 Codex는 작업 시작 전에 다음을 확인한다.
