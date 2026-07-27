@@ -102,15 +102,20 @@ PM이 장기 기준으로 확정한 5분 주기의 EG-7 1시간 파일럿 Contro
   `PROVISIONAL`, Test Split 미생성, 공식 Model Gate 판단 `null`, 피크 예측 미구현.
 - ML Model: `BASELINE_RETAINED_PROVISIONAL`
 - Area Ranking: `LOCAL_IMPLEMENTATION_COMPLETE_PENDING_PM_REVIEW`(Issue #109) — 서울시
-  Forecast 기반 60분·180분 예상 유동인구 변화·미래 인구 규모 순위를 각각 계산. 오프라인
-  Result Run `eg8d-area-priority-20260728T003701-kst`, 각 시간간격 13개 Area,
+  Forecast 기반 60분·180분 예상 유동인구 변화·미래 인구 규모 순위를 각각 계산.
+  `LATEST_COMPLETE_LOCKED_SNAPSHOT` 정책으로 잠긴 Dataset의 전체 1,027회 중 승인된
+  13개 Area Current와 정확한 60분·180분 Forecast가 완전한 86회를 판별하고,
+  Prediction Origin 정본 필드 `observed_at`이 가장 최신인 회차를 순위 계산 전에 자동
+  선택한다. 동률이면 실패하며 호출자가 회차를 지정하지 않는다. 결정적 선택 보완
+  Result Run `eg8d-area-priority-20260728T074335-kst`는 기존과 같은 회차
+  `6ebf1dab-8494-44e0-b598-80248f7f6ff0`을 선택했고, 각 시간간격 13개 Area,
   제외 0개. 60분은 양의 증가 1개·중간값 변화 0인 Area 8개·감소 4개이고 1위는
   잠실역(+2,000명)이다. 180분은 양의 증가 0개·중간값 변화 0인 Area 3개·감소
   10개로 증가 후보가 없다. 180분 1위는 전체 표시 순서일 뿐 판매 추천이 아니다.
   변화 0은 범위 중간값 차이 0만 뜻하고 예측 불확실성을 제거하지 않는다. 한 수집
   회차 Snapshot의 `PROVISIONAL` 내부 Area 분석이며 공식 Recommendation Output·
   실제 방문·판매 성공 보장이 아니다. 가중치·Spot·S-DoT·판매량·매출·구매전환은
-  포함하지 않음.
+  포함하지 않음. 기존 Result Run `eg8d-area-priority-20260728T003701-kst`는 보존됨.
 - Spot Ranking: `NOT_STARTED`
 - Recommendation Contract: `NOT_STARTED`
 - UI/UX Detailed Design: `NOT_STARTED`

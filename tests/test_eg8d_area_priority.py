@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import csv
 import hashlib
+import inspect
 import json
 import tempfile
 import unittest
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from unittest import mock
 
@@ -57,11 +58,35 @@ def forecast_rows() -> list[dict[str, str]]:
     return rows
 
 
+def source_run_rows(
+    run_id: str,
+    origin: datetime,
+    *,
+    forecast_adjustment: int = 0,
+) -> tuple[list[dict[str, str]], list[dict[str, str]]]:
+    observed_at = origin.strftime("%Y-%m-%d %H:%M")
+    current = current_rows()
+    forecasts = forecast_rows()
+    for row in current:
+        row["collection_run_id"] = run_id
+        row["called_at"] = observed_at
+        row["observed_at"] = observed_at
+    for index, row in enumerate(forecasts):
+        horizon = 60 if index % 2 == 0 else 180
+        row["collection_run_id"] = run_id
+        row["called_at"] = observed_at
+        row["observed_at"] = observed_at
+        row["forecast_at"] = (origin + timedelta(minutes=horizon)).strftime("%Y-%m-%d %H:%M")
+        row["forecast_population_min"] = str(int(row["forecast_population_min"]) + forecast_adjustment)
+        row["forecast_population_max"] = str(int(row["forecast_population_max"]) + forecast_adjustment)
+    return current, forecasts
+
+
 def build_rows(
     current: list[dict[str, str]] | None = None,
     forecast: list[dict[str, str]] | None = None,
 ) -> tuple[eg8d_area_priority.AreaPriorityRow, ...]:
-    return eg8d_area_priority.build_area_priority_rows(
+    return eg8d_area_priority._build_area_priority_rows(
         current or current_rows(),
         forecast or forecast_rows(),
         source_collection_run_id=SOURCE_RUN_ID,
@@ -108,6 +133,124 @@ def write_locked_inputs(root: Path) -> tuple[Path, Path, Path, dict[str, str]]:
     return manifest_path, current_path, forecast_path, hashes
 
 
+class AreaPrioritySourceSelectionTests(unittest.TestCase):
+    def test_public_builder_does_not_accept_arbitrary_source_run_id(self) -> None:
+        self.assertNotIn(
+            "source_collection_run_id",
+            inspect.signature(eg8d_area_priority.run_eg8d_area_priority).parameters,
+        )
+
+    def test_cli_does_not_accept_arbitrary_source_run_id(self) -> None:
+        options = {
+            option
+            for action in eg8d_area_priority.build_parser()._actions
+            for option in action.option_strings
+        }
+        self.assertNotIn("--source-collection-run-id", options)
+
+    def test_single_complete_run_is_selected(self) -> None:
+        current, forecasts = source_run_rows(SOURCE_RUN_ID, GENERATED_AT)
+
+        selection = eg8d_area_priority._select_latest_complete_run(current, forecasts)
+
+        self.assertEqual(selection.source_collection_run_id, SOURCE_RUN_ID)
+        self.assertEqual(selection.canonical_timestamp, GENERATED_AT)
+        self.assertEqual(selection.total_collection_run_count, 1)
+        self.assertEqual(selection.complete_collection_run_count, 1)
+
+    def test_latest_complete_run_is_selected_independent_of_input_order(self) -> None:
+        old_current, old_forecasts = source_run_rows("old-run", GENERATED_AT - timedelta(minutes=5))
+        new_current, new_forecasts = source_run_rows("new-run", GENERATED_AT)
+        current = old_current + new_current
+        forecasts = old_forecasts + new_forecasts
+
+        forward = eg8d_area_priority._select_latest_complete_run(current, forecasts)
+        reversed_input = eg8d_area_priority._select_latest_complete_run(
+            list(reversed(current)), list(reversed(forecasts))
+        )
+
+        self.assertEqual(forward.source_collection_run_id, "new-run")
+        self.assertEqual(reversed_input, forward)
+        self.assertEqual(forward.total_collection_run_count, 2)
+        self.assertEqual(forward.complete_collection_run_count, 2)
+
+    def test_newer_incomplete_runs_are_excluded(self) -> None:
+        old_current, old_forecasts = source_run_rows("old-complete", GENERATED_AT)
+        for defect in ("area", "60", "180"):
+            with self.subTest(defect=defect):
+                new_current, new_forecasts = source_run_rows(
+                    "new-incomplete", GENERATED_AT + timedelta(minutes=5)
+                )
+                if defect == "area":
+                    new_current = new_current[1:]
+                else:
+                    target = (GENERATED_AT + timedelta(minutes=5, hours=int(defect) // 60)).strftime(
+                        "%Y-%m-%d %H:%M"
+                    )
+                    new_forecasts = [row for row in new_forecasts if not (
+                        row["area_code_requested"] == eg6b.EG6B_AREA_CODES[0]
+                        and row["forecast_at"] == target
+                    )]
+
+                selection = eg8d_area_priority._select_latest_complete_run(
+                    old_current + new_current, old_forecasts + new_forecasts
+                )
+
+                self.assertEqual(selection.source_collection_run_id, "old-complete")
+                self.assertEqual(selection.complete_collection_run_count, 1)
+
+    def test_duplicate_rows_make_the_newer_run_incomplete(self) -> None:
+        old_current, old_forecasts = source_run_rows("old-complete", GENERATED_AT)
+        for duplicate_kind in ("current", "forecast"):
+            with self.subTest(duplicate_kind=duplicate_kind):
+                new_current, new_forecasts = source_run_rows(
+                    "new-duplicate", GENERATED_AT + timedelta(minutes=5)
+                )
+                if duplicate_kind == "current":
+                    new_current.append(dict(new_current[0]))
+                else:
+                    new_forecasts.append(dict(new_forecasts[0]))
+
+                selection = eg8d_area_priority._select_latest_complete_run(
+                    old_current + new_current, old_forecasts + new_forecasts
+                )
+
+                self.assertEqual(selection.source_collection_run_id, "old-complete")
+
+    def test_selection_is_independent_of_area_ranking_values(self) -> None:
+        old_current, old_forecasts = source_run_rows(
+            "old-better-result", GENERATED_AT, forecast_adjustment=10_000
+        )
+        new_current, new_forecasts = source_run_rows(
+            "new-worse-result", GENERATED_AT + timedelta(minutes=5), forecast_adjustment=-50
+        )
+
+        selection = eg8d_area_priority._select_latest_complete_run(
+            old_current + new_current, old_forecasts + new_forecasts
+        )
+
+        self.assertEqual(selection.source_collection_run_id, "new-worse-result")
+
+    def test_no_complete_run_fails(self) -> None:
+        current, forecasts = source_run_rows(SOURCE_RUN_ID, GENERATED_AT)
+
+        with self.assertRaisesRegex(
+            eg8d_area_priority.AreaPriorityContractError, "complete_run_not_found"
+        ):
+            eg8d_area_priority._select_latest_complete_run(current[1:], forecasts)
+
+    def test_latest_canonical_timestamp_tie_fails(self) -> None:
+        first_current, first_forecasts = source_run_rows("first-run", GENERATED_AT)
+        second_current, second_forecasts = source_run_rows("second-run", GENERATED_AT)
+
+        with self.assertRaisesRegex(
+            eg8d_area_priority.AreaPriorityContractError, "latest_complete_run_tie"
+        ):
+            eg8d_area_priority._select_latest_complete_run(
+                first_current + second_current, first_forecasts + second_forecasts
+            )
+
+
 class AreaPriorityCalculationTests(unittest.TestCase):
     def test_only_the_approved_thirteen_areas_are_processed(self) -> None:
         rows = build_rows()
@@ -136,7 +279,9 @@ class AreaPriorityCalculationTests(unittest.TestCase):
     def test_join_requires_the_prediction_origin(self) -> None:
         forecasts = forecast_rows()
         forecasts[0]["observed_at"] = "2026-07-27 14:05"
-        with self.assertRaisesRegex(eg8d_area_priority.AreaPriorityContractError, "forecast_missing"):
+        with self.assertRaisesRegex(
+            eg8d_area_priority.AreaPriorityContractError, "forecast_origin_mismatch"
+        ):
             build_rows(forecast=forecasts)
 
     def test_join_requires_the_prediction_target(self) -> None:
@@ -273,7 +418,6 @@ class AreaPriorityPublicationTests(unittest.TestCase):
                 forecast_path=forecast_path,
                 output_root=output_root,
                 run_id=RESULT_RUN_ID,
-                source_collection_run_id=SOURCE_RUN_ID,
                 generated_at=GENERATED_AT,
             )
         return result, (manifest_path, current_path, forecast_path)
@@ -313,7 +457,6 @@ class AreaPriorityPublicationTests(unittest.TestCase):
                     forecast_path=forecast_path,
                     output_root=output_root,
                     run_id=RESULT_RUN_ID,
-                    source_collection_run_id=SOURCE_RUN_ID,
                     generated_at=GENERATED_AT,
                 )
             self.assertEqual(before, {path: sha256(path) for path in before})
@@ -335,7 +478,6 @@ class AreaPriorityPublicationTests(unittest.TestCase):
                         forecast_path=forecast_path,
                         output_root=root / "area-priority-results",
                         run_id=RESULT_RUN_ID,
-                        source_collection_run_id=SOURCE_RUN_ID,
                         generated_at=GENERATED_AT,
                     )
 
@@ -357,7 +499,6 @@ class AreaPriorityPublicationTests(unittest.TestCase):
                         forecast_path=forecast_path,
                         output_root=output_root,
                         run_id=RESULT_RUN_ID,
-                        source_collection_run_id=SOURCE_RUN_ID,
                         generated_at=GENERATED_AT,
                     )
             self.assertEqual(list(output_root.iterdir()), [])
@@ -376,6 +517,18 @@ class AreaPriorityPublicationTests(unittest.TestCase):
             self.assertIn("장기 반복성이나 사용자 가치", limitations)
             self.assertEqual(metadata["forecast_source"], "SEOUL_FORECAST")
             self.assertEqual(metadata["evaluation_status"], "PROVISIONAL")
+            self.assertEqual(metadata["selection_policy"], "LATEST_COMPLETE_LOCKED_SNAPSHOT")
+            self.assertEqual(metadata["source_collection_run_id"], SOURCE_RUN_ID)
+            self.assertEqual(metadata["total_collection_run_count"], 1)
+            self.assertEqual(metadata["complete_collection_run_count"], 1)
+            self.assertEqual(metadata["canonical_timestamp_field"], "observed_at")
+            self.assertEqual(
+                metadata["selected_run_canonical_timestamp"], "2026-07-27T14:00:00+09:00"
+            )
+            self.assertTrue(metadata["selection_performed_before_ranking"])
+            self.assertEqual(metadata["selection_tie_count"], 1)
+            self.assertEqual(metadata["selection_status"], "SELECTED")
+            self.assertEqual(metadata["dataset_manifest_sha256"], sha256(_inputs[0]))
 
     def test_metadata_marks_horizon_without_positive_increase_candidate(self) -> None:
         forecasts = forecast_rows()
@@ -390,7 +543,13 @@ class AreaPriorityPublicationTests(unittest.TestCase):
                     row["forecast_population_max"] = str(current_midpoint + 10)
         metadata = eg8d_area_priority._metadata(
             run_id=RESULT_RUN_ID,
-            source_collection_run_id=SOURCE_RUN_ID,
+            selection=eg8d_area_priority._SourceRunSelection(
+                source_collection_run_id=SOURCE_RUN_ID,
+                canonical_timestamp=datetime(2026, 7, 27, 14, 0, tzinfo=eg8a.SEOUL),
+                total_collection_run_count=1,
+                complete_collection_run_count=1,
+                selection_tie_count=1,
+            ),
             generated_at=GENERATED_AT,
             rows=build_rows(forecast=forecasts),
             inputs={

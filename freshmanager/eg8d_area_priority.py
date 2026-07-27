@@ -30,6 +30,8 @@ HORIZONS = (60, 180)
 FORECAST_SOURCE = "SEOUL_FORECAST"
 EVALUATION_STATUS = "PROVISIONAL"
 TARGET_LEVEL = "AREA"
+SELECTION_POLICY = "LATEST_COMPLETE_LOCKED_SNAPSHOT"
+CANONICAL_TIMESTAMP_FIELD = "observed_at"
 OUTPUT_FILES = {
     "area_priority.csv",
     "area_priority.json",
@@ -143,6 +145,15 @@ class _Forecast:
     midpoint: float
 
 
+@dataclass(frozen=True)
+class _SourceRunSelection:
+    source_collection_run_id: str
+    canonical_timestamp: datetime
+    total_collection_run_count: int
+    complete_collection_run_count: int
+    selection_tie_count: int
+
+
 def _fail(code: str) -> None:
     raise AreaPriorityContractError(f"eg8d_area_priority_contract_error: {code}")
 
@@ -180,18 +191,14 @@ def _change_state(change: float) -> tuple[str, str]:
     return "STABLE", "NO_EXPECTED_POPULATION_CHANGE"
 
 
-def build_area_priority_rows(
+def _validated_source_run(
     current_rows: Sequence[Mapping[str, str]],
     forecast_rows: Sequence[Mapping[str, str]],
     *,
     source_collection_run_id: str,
-    generated_at: datetime,
-) -> tuple[AreaPriorityRow, ...]:
-    """Build deterministic 60/180-minute rankings for one explicit source run."""
+) -> tuple[dict[str, _Current], dict[tuple[str, str, str, str], _Forecast], datetime]:
     if not source_collection_run_id:
         _fail("source_collection_run_id_missing")
-    if generated_at.tzinfo is None:
-        _fail("generated_at_naive")
     approved = set(eg6b.EG6B_AREA_CODES)
     current_by_area: dict[str, _Current] = {}
     for row in current_rows:
@@ -213,6 +220,10 @@ def build_area_priority_rows(
         )
     if set(current_by_area) != approved:
         _fail("current_area_set_mismatch")
+    canonical_timestamps = {current.origin for current in current_by_area.values()}
+    if len(canonical_timestamps) != 1:
+        _fail("canonical_timestamp_mismatch")
+    canonical_timestamp = next(iter(canonical_timestamps))
 
     forecast_index: dict[tuple[str, str, str, str], _Forecast] = {}
     for row in forecast_rows:
@@ -226,6 +237,8 @@ def build_area_priority_rows(
         if requested != returned:
             _fail("forecast_area_mismatch")
         origin = _time(_required(row, "observed_at"))
+        if origin != canonical_timestamp:
+            _fail("forecast_origin_mismatch")
         target = _time(_required(row, "forecast_at"))
         key = (
             run_id,
@@ -243,7 +256,6 @@ def build_area_priority_rows(
             midpoint=_midpoint(row, "forecast_population_min", "forecast_population_max"),
         )
 
-    drafts: list[dict[str, object]] = []
     for area_code in eg6b.EG6B_AREA_CODES:
         current = current_by_area[area_code]
         for horizon in HORIZONS:
@@ -259,6 +271,80 @@ def build_area_priority_rows(
                 _fail("forecast_missing")
             if forecast.area_name != current.area_name:
                 _fail("area_name_mismatch")
+    return current_by_area, forecast_index, canonical_timestamp
+
+
+def _select_latest_complete_run(
+    current_rows: Sequence[Mapping[str, str]],
+    forecast_rows: Sequence[Mapping[str, str]],
+) -> _SourceRunSelection:
+    current_by_run: dict[str, list[Mapping[str, str]]] = {}
+    forecast_by_run: dict[str, list[Mapping[str, str]]] = {}
+    for row in current_rows:
+        run_id = row.get("collection_run_id", "").strip()
+        if run_id:
+            current_by_run.setdefault(run_id, []).append(row)
+    for row in forecast_rows:
+        run_id = row.get("collection_run_id", "").strip()
+        if run_id:
+            forecast_by_run.setdefault(run_id, []).append(row)
+
+    run_ids = sorted(set(current_by_run) | set(forecast_by_run))
+    complete: list[tuple[datetime, str]] = []
+    for run_id in run_ids:
+        try:
+            _current, _forecast, timestamp = _validated_source_run(
+                current_by_run.get(run_id, ()),
+                forecast_by_run.get(run_id, ()),
+                source_collection_run_id=run_id,
+            )
+        except AreaPriorityContractError:
+            continue
+        complete.append((timestamp, run_id))
+
+    if not complete:
+        _fail("complete_run_not_found")
+    latest_timestamp = max(timestamp for timestamp, _run_id in complete)
+    latest = sorted(run_id for timestamp, run_id in complete if timestamp == latest_timestamp)
+    if len(latest) != 1:
+        _fail("latest_complete_run_tie")
+    return _SourceRunSelection(
+        source_collection_run_id=latest[0],
+        canonical_timestamp=latest_timestamp,
+        total_collection_run_count=len(run_ids),
+        complete_collection_run_count=len(complete),
+        selection_tie_count=len(latest),
+    )
+
+
+def _build_area_priority_rows(
+    current_rows: Sequence[Mapping[str, str]],
+    forecast_rows: Sequence[Mapping[str, str]],
+    *,
+    source_collection_run_id: str,
+    generated_at: datetime,
+) -> tuple[AreaPriorityRow, ...]:
+    """Build deterministic 60/180-minute rankings for one selected source run."""
+    if generated_at.tzinfo is None:
+        _fail("generated_at_naive")
+    current_by_area, forecast_index, _canonical_timestamp = _validated_source_run(
+        current_rows,
+        forecast_rows,
+        source_collection_run_id=source_collection_run_id,
+    )
+
+    drafts: list[dict[str, object]] = []
+    for area_code in eg6b.EG6B_AREA_CODES:
+        current = current_by_area[area_code]
+        for horizon in HORIZONS:
+            target = current.origin + timedelta(minutes=horizon)
+            key = (
+                source_collection_run_id,
+                area_code,
+                eg8a.to_iso8601(current.origin),
+                eg8a.to_iso8601(target),
+            )
+            forecast = forecast_index[key]
             change = forecast.midpoint - current.midpoint
             rate = change / current.midpoint if current.midpoint != 0 else None
             status, reason = _change_state(change)
@@ -386,7 +472,7 @@ def _csv_bytes(rows: Sequence[AreaPriorityRow]) -> bytes:
 def _metadata(
     *,
     run_id: str,
-    source_collection_run_id: str,
+    selection: _SourceRunSelection,
     generated_at: datetime,
     rows: tuple[AreaPriorityRow, ...],
     inputs: Mapping[str, Mapping[str, object]],
@@ -422,7 +508,16 @@ def _metadata(
         "area_priority_run_id": run_id,
         "generated_at": eg8a.to_iso8601(generated_at),
         "source_dataset_run_id": LOCKED_DATASET_RUN_ID,
-        "source_collection_run_id": source_collection_run_id,
+        "source_collection_run_id": selection.source_collection_run_id,
+        "selection_policy": SELECTION_POLICY,
+        "dataset_manifest_sha256": inputs["dataset_manifest"]["sha256"],
+        "total_collection_run_count": selection.total_collection_run_count,
+        "complete_collection_run_count": selection.complete_collection_run_count,
+        "selected_run_canonical_timestamp": eg8a.to_iso8601(selection.canonical_timestamp),
+        "canonical_timestamp_field": CANONICAL_TIMESTAMP_FIELD,
+        "selection_performed_before_ranking": True,
+        "selection_tie_count": selection.selection_tie_count,
+        "selection_status": "SELECTED",
         "input_artifacts": [
             {"logical_name": name, **dict(inputs[name])} for name in sorted(inputs)
         ],
@@ -565,7 +660,6 @@ def _run_eg8d_area_priority(
     forecast_path: Path,
     output_root: Path,
     run_id: str,
-    source_collection_run_id: str,
     generated_at: datetime | None = None,
 ) -> AreaPriorityResult:
     resolved_generated_at = generated_at or datetime.now(eg8a.SEOUL)
@@ -579,10 +673,11 @@ def _run_eg8d_area_priority(
     _validate_manifest(manifest_payload)
     current_rows = _csv_from_snapshot(current_payload, CURRENT_REQUIRED_COLUMNS, "current")
     forecast_rows = _csv_from_snapshot(forecast_payload, FORECAST_REQUIRED_COLUMNS, "forecast")
-    rows = build_area_priority_rows(
+    selection = _select_latest_complete_run(current_rows, forecast_rows)
+    rows = _build_area_priority_rows(
         current_rows,
         forecast_rows,
-        source_collection_run_id=source_collection_run_id,
+        source_collection_run_id=selection.source_collection_run_id,
         generated_at=resolved_generated_at,
     )
     inputs = {
@@ -592,7 +687,7 @@ def _run_eg8d_area_priority(
     }
     metadata = _metadata(
         run_id=run_id,
-        source_collection_run_id=source_collection_run_id,
+        selection=selection,
         generated_at=resolved_generated_at,
         rows=rows,
         inputs=inputs,
@@ -624,7 +719,6 @@ def run_eg8d_area_priority(
     forecast_path: Path,
     output_root: Path,
     run_id: str,
-    source_collection_run_id: str,
     generated_at: datetime | None = None,
 ) -> AreaPriorityResult:
     """Public bounded-error entry point for one offline EG-8D result run."""
@@ -635,7 +729,6 @@ def run_eg8d_area_priority(
             forecast_path=forecast_path,
             output_root=output_root,
             run_id=run_id,
-            source_collection_run_id=source_collection_run_id,
             generated_at=generated_at,
         )
     except (AreaPriorityContractError, AreaPriorityWriteError):
@@ -651,7 +744,6 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--forecast-path", type=Path, required=True)
     parser.add_argument("--output-root", type=Path, required=True)
     parser.add_argument("--run-id", required=True)
-    parser.add_argument("--source-collection-run-id", required=True)
     return parser
 
 
@@ -664,7 +756,6 @@ def main(argv: Sequence[str] | None = None) -> int:
             forecast_path=arguments.forecast_path,
             output_root=arguments.output_root,
             run_id=arguments.run_id,
-            source_collection_run_id=arguments.source_collection_run_id,
         )
     except (AreaPriorityContractError, AreaPriorityWriteError) as error:
         print(str(error), file=sys.stderr)
