@@ -1,11 +1,11 @@
 # Analysis Plan
 
 - 문서 상태: Draft
-- 버전: v0.1.5
+- 버전: v0.1.6
 - 작성자: 신동현
 - 최종 승인자: 신동현
 - 최초 작성일: 2026-07-17
-- 최종 수정일: 2026-07-24
+- 최종 수정일: 2026-07-27
 - 적용 프로젝트: Freshmanager Data PoC
 - 관련 문서:
   - `AGENTS.md`
@@ -892,23 +892,28 @@ Gate A는 기술적 데이터 타당성을 평가한다.
 
 ### 29.1 EG-8C 모델 검토
 
-EG-8C(미래 Area 인구·피크 예측 모델)의 모델 알고리즘은 이 시점까지도 확정하지
-않는다.
+잠긴 EG-8C Run #2 Dataset과 승인된 Modeling Plan으로 인구 중간값의 잠정 성능
+비교를 수행한다. 입력은 승인 Feature 28개, Label은 `label_value`, Split은 잠긴
+TRAIN·VALIDATION을 그대로 사용하며 Test Split은 만들지 않는다.
 
-**상태: `OPEN_DECISION`**
+구현 후보는 Linear Regression과 Ridge Regression 두 개다. Area와 혼잡도는
+One-hot Encoding, Boolean은 0/1, 나머지 수치는 Scaling하며 전처리 적합과 Ridge
+alpha 선택은 TRAIN에만 사용한다. Baseline과 모델은 동일 Validation 행에서
+MAE·RMSE·Median Absolute Error를 전체·60분·180분·Area별로 비교한다.
 
-원칙:
+잠정 통과 조건은 가장 강한 Baseline보다 전체 MAE가 낮고 RMSE가 악화되지 않는
+것이다. 충족 모델이 없으면 가장 강한 Baseline을 유지한다. 이 비교는 공식 모델
+채택이 아니며 추가 장기 데이터와 Test Split을 확보한 뒤 별도 Model Gate에서
+판단한다.
 
-- 자체 모델은 §18의 Baseline 비교(B0 → B1 → B2 → 서울시 공식 예측)가 끝난 뒤
-  필요성이 확인된 경우에만 검토한다(§18 원칙 그대로 적용).
-- 모델 후보를 기록하더라도 이를 채택 결정으로 표현하지 않는다.
-- 모델이 Baseline을 유의미하게 능가하지 못하면 채택하지 않고 Baseline을 잠정
-  사용한다.
-- 시계열 분할은 §10.1 원칙을 따른다.
-- 피크 예측 성능은 §21.1 지표를 따른다.
+2026-07-27 1회 실행 결과, 가장 강한 Baseline은 서울시 Forecast였고 Linear와
+Ridge 모두 잠정 통과 조건을 충족하지 못했다. 따라서 서울시 Forecast를 잠정
+유지한다. 전체 Validation MAE/RMSE는 현재 인구 유지 6,326.68/12,527.96,
+서울시 Forecast 1,917.91/3,749.82, Linear 4,808.54/8,210.75, Ridge
+4,694.37/8,666.90이었다. 평가는 계속 `PROVISIONAL`, 공식 Model Gate 판단은
+`null`이다. 현재 Label에 없는 피크 예측은 구현하지 않았다.
 
-이 절은 `docs/testing/QUALITY_GATES.md` §12.3(EG-8C)의 통과기준과 동일한
-원칙을 분석 방법론 수준에서 반복한 것이며 새로운 기준을 만들지 않는다.
+**상태: `PROVISIONAL_BASELINE_RETAINED`**
 
 ---
 
@@ -1112,6 +1117,7 @@ ANALYSIS_PLAN은 다음 조건을 만족해야 Approved 상태로 전환할 수 
 
 | 버전 | 날짜 | 변경내용 | 작성자 | 승인상태 |
 |---|---|---|---|---|
+| v0.1.6 | 2026-07-27 | EG-8C 잠정 인구 중간값 회귀의 승인 입력·두 Baseline·Linear/Ridge·TRAIN 전용 전처리·Validation 판단과 1회 실행 결과를 §29.1에 반영; 서울시 Forecast 잠정 유지, 공식 Model Gate 미판정, 피크 예측 제외 | 신동현 | PM 변경내용 검토 전 |
 | v0.1.5 | 2026-07-24 | Spot Forecast 착수 전 사전조건 체크리스트(§6.6.1) 추가 — Spot 좌표·명칭 검증, 센서 좌표·거리·대표성 확인, Spot별 시계열·Ground Truth 확보, 최소 데이터기간, DIRECT/NEARBY 분리평가를 실행 전 확인 항목으로 정리 | 신동현 | PM 결정 |
 | v0.1.4 | 2026-07-24 | Spot Forecast 분석 가능성 조건(§6.6) 추가 — DIRECT_SENSOR/NEARBY_SENSOR/AREA_INFERENCE/UNSUPPORTED 평가 원칙, Area 예측값의 Spot Ground Truth 사용 금지, 모델·성능기준 OPEN_DECISION | 신동현 | PM 결정 |
 | v0.1.3 | 2026-07-24 | EG-8B·EG-8C Gate 연결(§6.5), 시계열 분할 원칙(§10.1), 피크 탐지 성능 지표(§21.1), EG-8C 모델 OPEN_DECISION(§29.1) 추가; 기존 EG-8 표현을 EG-8B/EG-8D로 정렬 | 신동현 | PM 결정 |
