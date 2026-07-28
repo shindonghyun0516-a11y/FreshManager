@@ -71,8 +71,9 @@ PM이 장기 기준으로 확정한 5분 주기의 EG-7 1시간 파일럿 Contro
 - EG-8B(EDA·서울시 Forecast 평가·Baseline·Feature Dataset): `IN_PROGRESS`
 - EG-8C(미래 Area 인구·피크 예측 모델): `IN_PROGRESS`
 - EG-8D(Area Ranking·선택적 S-DoT·Spot Candidate Evaluation): `IN_PROGRESS` — 서울시
-  Forecast 기반 60분·180분 Area 예상 유동인구 변화 순서는 로컬 구현·의미 보완 후
-  오프라인 1회 재검증 완료,
+  Forecast 기반 60분·180분 Area 예상 유동인구 변화 순서는 PR #110으로 main 반영.
+  Horizon별 데이터 최신성 잠정 Gate는 Issue #111에서 로컬 구현·오프라인 검증 완료 후
+  PM 코드·임계값·결과 검토 대기이며,
   선택적 S-DoT·Spot Candidate Evaluation은 미착수
 - EG-8E(Recommendation Output Contract·UI/UX Readiness): `PLANNED` — Recommendation
   MVP 구현 Gate가 아니며, Recommendation MVP Workstream의 공식 Gate 번호는 계속
@@ -101,7 +102,7 @@ PM이 장기 기준으로 확정한 5분 주기의 EG-7 1시간 파일럿 Contro
   MAE/RMSE 통과조건을 충족하지 못해 `BASELINE_RETAINED`. 평가상태는
   `PROVISIONAL`, Test Split 미생성, 공식 Model Gate 판단 `null`, 피크 예측 미구현.
 - ML Model: `BASELINE_RETAINED_PROVISIONAL`
-- Area Ranking: `LOCAL_IMPLEMENTATION_COMPLETE_PENDING_PM_REVIEW`(Issue #109) — 서울시
+- Area Ranking: `IMPLEMENTATION_AVAILABLE_ON_MAIN`(PR #110, Issue #109) — 서울시
   Forecast 기반 60분·180분 예상 유동인구 변화·미래 인구 규모 순위를 각각 계산.
   `LATEST_COMPLETE_LOCKED_SNAPSHOT` 정책으로 잠긴 Dataset의 전체 1,027회 중 승인된
   13개 Area Current와 정확한 60분·180분 Forecast가 완전한 86회를 판별하고,
@@ -116,6 +117,41 @@ PM이 장기 기준으로 확정한 5분 주기의 EG-7 1시간 파일럿 Contro
   회차 Snapshot의 `PROVISIONAL` 내부 Area 분석이며 공식 Recommendation Output·
   실제 방문·판매 성공 보장이 아니다. 가중치·Spot·S-DoT·판매량·매출·구매전환은
   포함하지 않음. 기존 Result Run `eg8d-area-priority-20260728T003701-kst`는 보존됨.
+- Area Ranking Freshness Gate:
+  `LOCAL_IMPLEMENTATION_COMPLETE_PENDING_PM_REVIEW`(Issue #111) — 공개 Runtime은
+  평가시각·모드·게시 표식을 받지 않는 Runtime 전용 경로만 사용하고, 해당 경로가
+  실행 시작의 서울 시스템 현재시각과 운영 실행 맥락을 한 번만 확정한다. 공통 실행부는
+  이처럼 이미 확정된 내부 실행 맥락만 소비하며 원시 평가시각·모드·게시 표식을 받거나
+  시스템 시각을 읽어 Runtime을 시작할 수 없다. 평가시각 주입 내부 경로는
+  `HISTORICAL_AUDIT`·`SYNTHETIC_VALIDATION`만 허용하며 표식이 일관돼도 `RUNTIME`은
+  계약 오류로 차단한다. `evaluation_time`과 `Asia/Seoul` 시간 계약으로 Snapshot 경과시간·완전성 지연·
+  60분·180분 잔여시간을 계산하고 Horizon별 `FRESH`·`DEGRADED`·
+  `STALE_BLOCKED`를 독립 판정한다. `DEGRADED`는 경고가 있는 Area 참고정보만
+  허용하고 Spot 내부평가는 차단하며, 공식 Recommendation은 항상 차단한다. 완전
+  Snapshot 부재 시 생산 Builder가 최신 Current 회차의 13개 Area 완전성·중복·인구
+  범위·시각을 검증하고, `RUNTIME`의 15분 이내 Current만 전용 4파일 계약으로
+  표시한다. Forecast·변화·순위·Spot·추천 필드는 생성하지 않는다. 15분 초과와
+  `HISTORICAL_AUDIT`는 전용 계약에 차단 사유만 기록하며, Current 결함·미래 시각은
+  공개 전에 실패한다. 임계값은 PoC
+  잠정값이며 수집 스키마·기존 선택·순위 계산은 변경하지 않음. 잠긴 Dataset 사례
+  A/B/C는 별도 외부 Result Root의 새 Run 세 개로 검증했고 각각
+  `FRESH/FRESH`, `STALE_BLOCKED/DEGRADED`,
+  `STALE_BLOCKED/STALE_BLOCKED`였으며 기존 EG-8D Result Run은 변경하지 않음.
+  보완 전 합성 D(10분)·E(16분)는 그대로 보존했다. 합성 식별 보완 후 새 D2
+  `eg8d-area-priority-20260728T134259-kst`와 E2
+  `eg8d-area-priority-20260728T134301-kst`를 저장소 밖에서 각 1회 생성했으며 정책 결과는
+  각각 `CURRENT_ONLY_ALLOWED`·`CURRENT_ONLY_BLOCKED`다. 두 결과 모두 사용자 표시·
+  운영 게시·운영 통계 사용을 차단하고, Manifest SHA-256은 각각
+  `f743bc49955e7443e44ad7a331c7dbafae403093216d77d5fb8dc6db3970fa2b`,
+  `11d1ff201926a2a77a56559cb27ae06c6340144b2640815590b1077b8de946e9`다.
+  공개 `RUNTIME` Builder 통합시험과 주입시각의 `RUNTIME` 위조 차단시험에 더해,
+  공통 실행부가 과거시각 또는 `None`과 원시 `RUNTIME` 조합을 받을 수 없고 내부 시계를
+  읽지 않는 회귀시험을 추가해 마지막 내부 실행계약 문제를 해소했다. D2·E2 계약과
+  결과는 그대로 유효하다. 실제 고정 `+09:00` 입력 생성 경로는
+  확인되지 않아 입력 경계 정규화를 후속 과제로 남김. 승인 격리환경 Python 3.12.13·
+  scikit-learn 1.6.1에서 공통 실행부 직접차단 3개·Runtime 신뢰경계 13개·
+  Publication 18개·EG-8D 70개·EG-8C 머신러닝 24개·전체 707개
+  시험과 Project Guard `PASS=43, FAIL=0, WARN=0, SKIP=4` 통과.
 - Spot Ranking: `NOT_STARTED`
 - Recommendation Contract: `NOT_STARTED`
 - UI/UX Detailed Design: `NOT_STARTED`
@@ -141,7 +177,7 @@ PM이 장기 기준으로 확정한 5분 주기의 EG-7 1시간 파일럿 Contro
 | EG-8A | `IN_PROGRESS` | Source Reader·Schema Validation·Normalization `IMPLEMENTATION_AVAILABLE_ON_MAIN`(PR #84); Duplicate Detector·Quality Report·Manifest·Output Writer `IMPLEMENTATION_AVAILABLE_ON_MAIN`(PR #86); 실제 오류 응답 기반 검증 `NOT_COMPLETED` |
 | EG-8B | `IN_PROGRESS` | Dataset Profile·시간 커버리지·Forecast Exact Join(B1) `IMPLEMENTATION_AVAILABLE_ON_MAIN`(PR #88); B0 Baseline·서울시 Forecast 오차 지표(B2a) `IMPLEMENTATION_AVAILABLE_ON_MAIN`(PR #92); B2b 단기 다일자 검증 `IMPLEMENTATION_AVAILABLE_ON_MAIN`(PR #94) |
 | EG-8C | `IN_PROGRESS` | 잠정 인구 중간값 회귀 `IMPLEMENTATION_AVAILABLE_ON_MAIN`(PR #108), 서울시 Forecast Baseline 유지; 공식 Model Gate는 미완료, 피크 예측 미구현 |
-| EG-8D | `IN_PROGRESS` | Area 예상 유동인구 변화 순서 로컬 구현·의미 보완 후 오프라인 1회 재검증 완료(Issue #109), PM Diff·결과 검토 대기; 선택적 S-DoT·Spot Candidate Evaluation 미착수 |
+| EG-8D | `IN_PROGRESS` | Area 예상 유동인구 변화 순서 `IMPLEMENTATION_AVAILABLE_ON_MAIN`(PR #110); Horizon별 최신성 잠정 Gate 로컬 구현·오프라인 검증 완료 후 PM 검토 대기(Issue #111); 선택적 S-DoT·Spot Candidate Evaluation 미착수 |
 | EG-8E | `PLANNED` | Recommendation Output Contract·UI/UX Readiness(Recommendation MVP 구현 Gate 아님) |
 | Recommendation MVP | PLANNED | Gate number `NOT_ASSIGNED` |
 
