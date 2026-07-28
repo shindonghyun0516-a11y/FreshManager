@@ -15,6 +15,24 @@ from freshmanager import eg8c_modeling
 
 
 FEATURE_NAMES = eg8c_modeling.APPROVED_FEATURES
+OLD_PROFILE_ID = "eg8c-20260727T153257-kst"
+NEW_PROFILE_ID = "d5e888ef-7514-4f3a-83f5-7820dec58088"
+
+
+def _patched_profiles(
+    profile_id: str,
+    *,
+    manifest_sha256: str | None = None,
+    forecast_sha256: str | None = None,
+) -> dict[str, eg8c_modeling.OfficialDatasetProfile]:
+    profiles = dict(eg8c_modeling.OFFICIAL_DATASET_PROFILES)
+    profile = profiles[profile_id]
+    profiles[profile_id] = dataclasses.replace(
+        profile,
+        manifest_sha256=manifest_sha256 or profile.manifest_sha256,
+        forecast_sha256=forecast_sha256 or profile.forecast_sha256,
+    )
+    return profiles
 
 
 def _json_bytes(value: object) -> bytes:
@@ -146,7 +164,92 @@ def _training_rows(origin_count: int = 8) -> tuple[eg8c_modeling.ModelingRow, ..
     return tuple(rows)
 
 
-def _build_locked_dataset_fixture(root: Path) -> tuple[Path, str]:
+class OfficialDatasetProfileTests(unittest.TestCase):
+    def test_registry_contains_only_the_two_approved_official_datasets(self) -> None:
+        old_id = OLD_PROFILE_ID
+        new_id = NEW_PROFILE_ID
+        profiles = eg8c_modeling.OFFICIAL_DATASET_PROFILES
+
+        self.assertEqual(set(profiles), {old_id, new_id})
+        self.assertEqual(
+            dataclasses.asdict(profiles[old_id]),
+            {
+                "identifier": old_id,
+                "run_id": old_id,
+                "manifest_sha256": "388a5e6649e6e23d05a442ae9b4f8d0857f8ea382011c2ff07c0af64aae42771",
+                "forecast_sha256": "a5c4aaa7d711d289ee05d4ed6903b91f4ea725252ff3b6bc8890b62146441649",
+                "candidate_row_count": 2236,
+                "feature_valid_row_count": 2210,
+                "label_valid_row_count": 2184,
+                "training_eligible_row_count": 2158,
+                "train_row_count": 1742,
+                "validation_row_count": 416,
+                "excluded_row_count": 78,
+                "area_count": 13,
+                "horizon_60_row_count": 1118,
+                "horizon_180_row_count": 1118,
+            },
+        )
+        self.assertEqual(
+            dataclasses.asdict(profiles[new_id]),
+            {
+                "identifier": new_id,
+                "run_id": new_id,
+                "manifest_sha256": "2980db976dcfedb7631706cba0ad333295a7df2379f5a35a7281c0efc8f5116f",
+                "forecast_sha256": "756952169119e88e22f352a77678b9579bea8d37e20652a621c152957d3c3626",
+                "candidate_row_count": 3042,
+                "feature_valid_row_count": 2990,
+                "label_valid_row_count": 2990,
+                "training_eligible_row_count": 2938,
+                "train_row_count": 2366,
+                "validation_row_count": 572,
+                "excluded_row_count": 104,
+                "area_count": 13,
+                "horizon_60_row_count": 1521,
+                "horizon_180_row_count": 1521,
+            },
+        )
+
+    def test_public_run_requires_an_approved_profile_identifier(self) -> None:
+        arguments = {
+            "dataset_phase_dir": Path("unused-dataset"),
+            "forecast_path": Path("unused-forecast.csv"),
+            "output_root": Path("unused-output"),
+            "run_id": "eg8c-ml-20260729T120000-kst",
+        }
+        with self.assertRaisesRegex(
+            eg8c_modeling.ModelingContractError, "official_dataset_profile_required"
+        ):
+            eg8c_modeling.run_eg8c_modeling(**arguments)
+        with self.assertRaisesRegex(
+            eg8c_modeling.ModelingContractError, "official_dataset_profile_unknown"
+        ):
+            eg8c_modeling.run_eg8c_modeling(
+                **arguments,
+                official_dataset_profile_id="caller-supplied-contract",
+            )
+
+    def test_public_run_does_not_accept_caller_supplied_hashes_or_counts(self) -> None:
+        arguments = {
+            "dataset_phase_dir": Path("unused-dataset"),
+            "forecast_path": Path("unused-forecast.csv"),
+            "output_root": Path("unused-output"),
+            "run_id": "eg8c-ml-20260729T120000-kst",
+            "official_dataset_profile_id": OLD_PROFILE_ID,
+        }
+        for field, value in (
+            ("manifest_sha256", "caller-value"),
+            ("candidate_row_count", 1),
+        ):
+            with self.subTest(field=field), self.assertRaises(TypeError):
+                eg8c_modeling.run_eg8c_modeling(**arguments, **{field: value})
+
+
+def _build_locked_dataset_fixture(
+    root: Path,
+    profile_id: str = OLD_PROFILE_ID,
+) -> tuple[Path, str]:
+    profile = eg8c_modeling.OFFICIAL_DATASET_PROFILES[profile_id]
     phase_dir = root / "phase-eg8c-v1"
     phase_dir.mkdir()
     feature_fieldnames = [
@@ -163,14 +266,25 @@ def _build_locked_dataset_fixture(root: Path) -> tuple[Path, str]:
     feature_rows: list[dict[str, object]] = []
     label_rows: list[dict[str, object]] = []
     split_rows: list[dict[str, object]] = []
-    split_names = ["TRAIN"] * 1742 + ["VALIDATION"] * 416 + ["EXCLUDED"] * 78
+    split_names = (
+        ["TRAIN"] * profile.train_row_count
+        + ["VALIDATION"] * profile.validation_row_count
+        + ["EXCLUDED"] * profile.excluded_row_count
+    )
     first_origin = datetime.fromisoformat("2026-07-24T01:00:00+09:00")
     for index, split in enumerate(split_names):
-        horizon = 60 if index < 1118 else 180
-        area_code = f"POI{(index % 13) + 1:03d}"
+        horizon = 60 if index < profile.horizon_60_row_count else 180
+        area_code = f"POI{(index % profile.area_count) + 1:03d}"
         row_id = f"row-{index:04d}"
-        feature_valid = index < 2210
-        label_valid = index < 2158 or 2184 <= index < 2210
+        feature_valid = index < profile.feature_valid_row_count
+        label_valid = (
+            index < profile.training_eligible_row_count
+            or profile.feature_valid_row_count
+            <= index
+            < profile.feature_valid_row_count
+            + profile.label_valid_row_count
+            - profile.training_eligible_row_count
+        )
         origin = first_origin + timedelta(minutes=5 * (index // 26))
         target = origin + timedelta(minutes=horizon)
         feature_rows.append(
@@ -288,24 +402,31 @@ def _build_locked_dataset_fixture(root: Path) -> tuple[Path, str]:
         _json_bytes(
             {
                 "schema_version": "eg8c-dataset-coverage-v1",
-                "candidate_row_count": 2236,
-                "feature_valid_row_count": 2210,
-                "label_valid_row_count": 2184,
-                "training_eligible_row_count": 2158,
-                "split_row_counts": {"TRAIN": 1742, "VALIDATION": 416, "EXCLUDED": 78},
-                "area_coverage": {
-                    "areas": [f"POI{index:03d}" for index in range(1, 14)],
-                    "observed_area_count": 13,
+                "candidate_row_count": profile.candidate_row_count,
+                "feature_valid_row_count": profile.feature_valid_row_count,
+                "label_valid_row_count": profile.label_valid_row_count,
+                "training_eligible_row_count": profile.training_eligible_row_count,
+                "split_row_counts": {
+                    "TRAIN": profile.train_row_count,
+                    "VALIDATION": profile.validation_row_count,
+                    "EXCLUDED": profile.excluded_row_count,
                 },
-                "horizon_coverage": {"60": 1118, "180": 1118},
-                "eg8c_run_id": eg8c_modeling.LOCKED_DATASET_RUN_ID,
+                "area_coverage": {
+                    "areas": [f"POI{index:03d}" for index in range(1, profile.area_count + 1)],
+                    "observed_area_count": profile.area_count,
+                },
+                "horizon_coverage": {
+                    "60": profile.horizon_60_row_count,
+                    "180": profile.horizon_180_row_count,
+                },
+                "eg8c_run_id": profile.run_id,
             }
         )
     )
     artifact_names = sorted(eg8c_modeling.LOCKED_DATASET_FILES - {"dataset_manifest.json"})
     manifest = {
         "schema_version": "eg8c-output-manifest-v1",
-        "eg8c_run_id": eg8c_modeling.LOCKED_DATASET_RUN_ID,
+        "eg8c_run_id": profile.run_id,
         "evaluation_status": "PROVISIONAL",
         "data_sufficiency_status": "PROVISIONAL_SPLIT_ONLY",
         "supported_horizons_minutes": [60, 180],
@@ -335,12 +456,22 @@ class LockedDatasetContractTests(unittest.TestCase):
         self.temp.cleanup()
 
     def _load(self) -> eg8c_modeling.LockedDataset:
-        with mock.patch.object(eg8c_modeling, "LOCKED_MANIFEST_SHA256", self.manifest_sha):
-            return eg8c_modeling.load_locked_dataset(self.phase_dir)
+        with mock.patch.object(
+            eg8c_modeling,
+            "OFFICIAL_DATASET_PROFILES",
+            _patched_profiles(OLD_PROFILE_ID, manifest_sha256=self.manifest_sha),
+        ):
+            return eg8c_modeling.load_locked_dataset(
+                self.phase_dir,
+                official_dataset_profile_id=OLD_PROFILE_ID,
+            )
 
     def test_locked_manifest_sha_must_match(self) -> None:
         with self.assertRaisesRegex(eg8c_modeling.ModelingContractError, "manifest_sha_mismatch"):
-            eg8c_modeling.load_locked_dataset(self.phase_dir)
+            eg8c_modeling.load_locked_dataset(
+                self.phase_dir,
+                official_dataset_profile_id=OLD_PROFILE_ID,
+            )
 
     def test_locked_dataset_requires_exact_eight_files_and_hashes(self) -> None:
         self.assertEqual(len(self._load().feature_rows), 2236)
@@ -355,13 +486,20 @@ class LockedDatasetContractTests(unittest.TestCase):
                 else:
                     (copied / "feature_dictionary.json").write_text("{}\n", encoding="utf-8")
                 copied_sha = _sha256(copied / "dataset_manifest.json")
-                with mock.patch.object(eg8c_modeling, "LOCKED_MANIFEST_SHA256", copied_sha):
+                with mock.patch.object(
+                    eg8c_modeling,
+                    "OFFICIAL_DATASET_PROFILES",
+                    _patched_profiles(OLD_PROFILE_ID, manifest_sha256=copied_sha),
+                ):
                     with self.assertRaises(eg8c_modeling.ModelingContractError):
-                        eg8c_modeling.load_locked_dataset(copied)
+                        eg8c_modeling.load_locked_dataset(
+                            copied,
+                            official_dataset_profile_id=OLD_PROFILE_ID,
+                        )
 
     def test_locked_contract_requires_run_counts_and_statuses(self) -> None:
         loaded = self._load()
-        self.assertEqual(loaded.manifest["eg8c_run_id"], eg8c_modeling.LOCKED_DATASET_RUN_ID)
+        self.assertEqual(loaded.manifest["eg8c_run_id"], OLD_PROFILE_ID)
         self.assertEqual(loaded.split_counts, {"TRAIN": 1742, "VALIDATION": 416, "EXCLUDED": 78})
         self.assertEqual(tuple(loaded.approved_features), FEATURE_NAMES)
         self.assertEqual(loaded.label_name, "target_population_midpoint")
@@ -374,13 +512,110 @@ class LockedDatasetContractTests(unittest.TestCase):
         with self.assertRaisesRegex(eg8c_modeling.ModelingContractError, "candidate_count_mismatch"):
             self._load()
 
+    def test_each_approved_profile_validates_its_own_run_and_counts(self) -> None:
+        for profile_id, profile in eg8c_modeling.OFFICIAL_DATASET_PROFILES.items():
+            with self.subTest(profile_id=profile_id), tempfile.TemporaryDirectory() as directory:
+                phase_dir, manifest_sha = _build_locked_dataset_fixture(
+                    Path(directory), profile_id
+                )
+                profiles = dict(eg8c_modeling.OFFICIAL_DATASET_PROFILES)
+                profiles[profile_id] = dataclasses.replace(
+                    profile, manifest_sha256=manifest_sha
+                )
+                with mock.patch.object(
+                    eg8c_modeling, "OFFICIAL_DATASET_PROFILES", profiles
+                ):
+                    loaded = eg8c_modeling.load_locked_dataset(
+                        phase_dir,
+                        official_dataset_profile_id=profile_id,
+                    )
+            self.assertEqual(loaded.manifest["eg8c_run_id"], profile.run_id)
+            self.assertEqual(len(loaded.feature_rows), profile.candidate_row_count)
+            self.assertEqual(
+                loaded.split_counts,
+                {
+                    "TRAIN": profile.train_row_count,
+                    "VALIDATION": profile.validation_row_count,
+                    "EXCLUDED": profile.excluded_row_count,
+                },
+            )
+
+    def test_selected_profile_rejects_a_different_official_run(self) -> None:
+        new_id = NEW_PROFILE_ID
+        new_profile = eg8c_modeling.OFFICIAL_DATASET_PROFILES[new_id]
+        profiles = dict(eg8c_modeling.OFFICIAL_DATASET_PROFILES)
+        profiles[new_id] = dataclasses.replace(
+            new_profile, manifest_sha256=self.manifest_sha
+        )
+        with (
+            mock.patch.object(eg8c_modeling, "OFFICIAL_DATASET_PROFILES", profiles),
+            self.assertRaisesRegex(
+                eg8c_modeling.ModelingContractError,
+                "manifest_eg8c_run_id_mismatch",
+            ),
+        ):
+            eg8c_modeling.load_locked_dataset(
+                self.phase_dir,
+                official_dataset_profile_id=new_id,
+            )
+
+    def test_selected_profile_rejects_count_area_and_horizon_mismatches(self) -> None:
+        profile_id = OLD_PROFILE_ID
+        profile = eg8c_modeling.OFFICIAL_DATASET_PROFILES[profile_id]
+        mutations = {
+            "candidate_row_count": ("candidate_row_count", 2235, "candidate_count_mismatch"),
+            "split_row_counts": (
+                "split_row_counts",
+                {"TRAIN": 1741, "VALIDATION": 417, "EXCLUDED": 78},
+                "split_count_mismatch",
+            ),
+            "area_count": (
+                "area_coverage",
+                {"areas": ["POI001"], "observed_area_count": 1},
+                "area_count_mismatch",
+            ),
+            "horizon_coverage": (
+                "horizon_coverage",
+                {"60": 1117, "180": 1119},
+                "horizon_count_mismatch",
+            ),
+        }
+        for label, (field, value, reason) in mutations.items():
+            with self.subTest(label=label), tempfile.TemporaryDirectory() as directory:
+                copied = Path(directory) / "phase-eg8c-v1"
+                shutil.copytree(self.phase_dir, copied)
+                coverage_path = copied / "dataset_coverage.json"
+                coverage = json.loads(coverage_path.read_text(encoding="utf-8"))
+                coverage[field] = value
+                coverage_path.write_bytes(_json_bytes(coverage))
+                manifest_sha = _refresh_manifest(copied)
+                profiles = dict(eg8c_modeling.OFFICIAL_DATASET_PROFILES)
+                profiles[profile_id] = dataclasses.replace(
+                    profile, manifest_sha256=manifest_sha
+                )
+                with (
+                    mock.patch.object(eg8c_modeling, "OFFICIAL_DATASET_PROFILES", profiles),
+                    self.assertRaisesRegex(eg8c_modeling.ModelingContractError, reason),
+                ):
+                    eg8c_modeling.load_locked_dataset(
+                        copied,
+                        official_dataset_profile_id=profile_id,
+                    )
+
 
 class TrainingMatrixTests(unittest.TestCase):
     def setUp(self) -> None:
         self.temp = tempfile.TemporaryDirectory()
         phase_dir, manifest_sha = _build_locked_dataset_fixture(Path(self.temp.name))
-        with mock.patch.object(eg8c_modeling, "LOCKED_MANIFEST_SHA256", manifest_sha):
-            self.locked = eg8c_modeling.load_locked_dataset(phase_dir)
+        with mock.patch.object(
+            eg8c_modeling,
+            "OFFICIAL_DATASET_PROFILES",
+            _patched_profiles(OLD_PROFILE_ID, manifest_sha256=manifest_sha),
+        ):
+            self.locked = eg8c_modeling.load_locked_dataset(
+                phase_dir,
+                official_dataset_profile_id=OLD_PROFILE_ID,
+            )
 
     def tearDown(self) -> None:
         self.temp.cleanup()
@@ -487,19 +722,22 @@ class PreprocessingTests(unittest.TestCase):
 
 
 class ModelTrainingTests(unittest.TestCase):
-    def test_ridge_alpha_uses_three_expanding_origin_folds(self) -> None:
+    def test_ridge_uses_only_the_pm_fixed_alpha_without_search(self) -> None:
         rows = _training_rows()
-        folds = eg8c_modeling.build_expanding_origin_folds(rows)
-        self.assertEqual(len(folds), 3)
-        by_id = {row.row_id: row for row in rows}
-        for train_ids, holdout_ids in folds:
-            train_origins = {by_id[row_id].prediction_origin_at for row_id in train_ids}
-            holdout_origins = {by_id[row_id].prediction_origin_at for row_id in holdout_ids}
-            self.assertFalse(train_origins & holdout_origins)
-            self.assertLess(max(train_origins), min(holdout_origins))
-        bundle = eg8c_modeling.train_models(rows)
-        self.assertEqual(set(bundle.ridge_cv_mae), {0.1, 1.0, 10.0, 100.0})
-        self.assertIn(bundle.ridge_alpha, bundle.ridge_cv_mae)
+        real_ridge = eg8c_modeling.Ridge
+        created_alphas = []
+
+        def create_ridge(*args: object, **kwargs: object) -> object:
+            created_alphas.append(kwargs.get("alpha", args[0] if args else 1.0))
+            return real_ridge(*args, **kwargs)
+
+        with mock.patch.object(eg8c_modeling, "Ridge", side_effect=create_ridge):
+            bundle = eg8c_modeling.train_models(rows)
+
+        self.assertEqual(bundle.ridge_alpha, 100.0)
+        self.assertEqual(created_alphas, [100.0])
+        self.assertEqual(bundle.ridge.named_steps["model"].alpha, 100.0)
+        self.assertFalse(hasattr(eg8c_modeling, "build_expanding_origin_folds"))
 
 
 class EvaluationTests(unittest.TestCase):
@@ -575,8 +813,15 @@ class ModelingArtifactTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.root = Path(self.temp.name)
         self.phase_dir, self.manifest_sha = _build_locked_dataset_fixture(self.root)
-        with mock.patch.object(eg8c_modeling, "LOCKED_MANIFEST_SHA256", self.manifest_sha):
-            self.locked = eg8c_modeling.load_locked_dataset(self.phase_dir)
+        with mock.patch.object(
+            eg8c_modeling,
+            "OFFICIAL_DATASET_PROFILES",
+            _patched_profiles(OLD_PROFILE_ID, manifest_sha256=self.manifest_sha),
+        ):
+            self.locked = eg8c_modeling.load_locked_dataset(
+                self.phase_dir,
+                official_dataset_profile_id=OLD_PROFILE_ID,
+            )
         self.matrix = eg8c_modeling.build_training_matrix(self.locked)
 
     def tearDown(self) -> None:
@@ -606,15 +851,21 @@ class ModelingArtifactTests(unittest.TestCase):
         forecast_path, forecast_sha = self._forecast_path()
         output_root = self.root / "modeling-output"
         output_root.mkdir()
-        with (
-            mock.patch.object(eg8c_modeling, "LOCKED_MANIFEST_SHA256", self.manifest_sha),
-            mock.patch.object(eg8c_modeling, "LOCKED_FORECAST_SHA256", forecast_sha),
+        with mock.patch.object(
+            eg8c_modeling,
+            "OFFICIAL_DATASET_PROFILES",
+            _patched_profiles(
+                OLD_PROFILE_ID,
+                manifest_sha256=self.manifest_sha,
+                forecast_sha256=forecast_sha,
+            ),
         ):
             result = eg8c_modeling.run_eg8c_modeling(
                 dataset_phase_dir=self.phase_dir,
                 forecast_path=forecast_path,
                 output_root=output_root,
                 run_id="eg8c-ml-20260727T170000-kst",
+                official_dataset_profile_id=OLD_PROFILE_ID,
                 generated_at=datetime.fromisoformat("2026-07-27T17:00:00+09:00"),
             )
         self.assertEqual({path.name for path in result.run_dir.iterdir()}, eg8c_modeling.MODELING_OUTPUT_FILES)
@@ -625,6 +876,47 @@ class ModelingArtifactTests(unittest.TestCase):
             self.assertEqual(item["sha256"], _sha256(path))
             self.assertEqual(item["byte_size"], path.stat().st_size)
         self.assertEqual(result.evaluation_report["validation_row_count"], 416)
+        metadata = json.loads(
+            (result.run_dir / "model_metadata.json").read_text(encoding="utf-8")
+        )
+        self.assertEqual(metadata["schema_version"], "eg8c-model-metadata-v2")
+        self.assertEqual(metadata["dataset_run_id"], OLD_PROFILE_ID)
+        self.assertEqual(metadata["dataset_manifest_sha256"], self.manifest_sha)
+        self.assertEqual(metadata["source_forecast_sha256"], forecast_sha)
+        ridge_metadata = metadata["models"][eg8c_modeling.MODEL_RIDGE]
+        self.assertEqual(
+            ridge_metadata,
+            {
+                "alpha": 100.0,
+                "selection_method": "PM_FIXED",
+                "automatic_tuning_performed": False,
+                "alpha_candidates": [100.0],
+                "time_ordered_alpha_comparison_performed": False,
+            },
+        )
+
+    def test_selected_profile_rejects_a_different_forecast_sha(self) -> None:
+        forecast_path, _ = self._forecast_path()
+        output_root = self.root / "modeling-output"
+        output_root.mkdir()
+        with (
+            mock.patch.object(
+                eg8c_modeling,
+                "OFFICIAL_DATASET_PROFILES",
+                _patched_profiles(OLD_PROFILE_ID, manifest_sha256=self.manifest_sha),
+            ),
+            self.assertRaisesRegex(
+                eg8c_modeling.ModelingContractError,
+                "forecast_sha_mismatch",
+            ),
+        ):
+            eg8c_modeling.run_eg8c_modeling(
+                dataset_phase_dir=self.phase_dir,
+                forecast_path=forecast_path,
+                output_root=output_root,
+                run_id="eg8c-ml-20260729T120001-kst",
+                official_dataset_profile_id=OLD_PROFILE_ID,
+            )
 
     def test_existing_modeling_run_is_never_overwritten(self) -> None:
         output_root = self.root / "modeling-output"
@@ -662,8 +954,15 @@ class ModelingArtifactTests(unittest.TestCase):
 
     def test_source_dataset_hashes_are_unchanged(self) -> None:
         before = {path.name: _sha256(path) for path in self.phase_dir.iterdir()}
-        with mock.patch.object(eg8c_modeling, "LOCKED_MANIFEST_SHA256", self.manifest_sha):
-            loaded = eg8c_modeling.load_locked_dataset(self.phase_dir)
+        with mock.patch.object(
+            eg8c_modeling,
+            "OFFICIAL_DATASET_PROFILES",
+            _patched_profiles(OLD_PROFILE_ID, manifest_sha256=self.manifest_sha),
+        ):
+            loaded = eg8c_modeling.load_locked_dataset(
+                self.phase_dir,
+                official_dataset_profile_id=OLD_PROFILE_ID,
+            )
         eg8c_modeling.build_training_matrix(loaded)
         after = {path.name: _sha256(path) for path in self.phase_dir.iterdir()}
         self.assertEqual(before, after)
@@ -678,6 +977,7 @@ class ModelingArtifactTests(unittest.TestCase):
                 forecast_path=self.root / "forecast.csv",
                 output_root=self.root,
                 run_id="eg8c-ml-20260727T170002-kst",
+                official_dataset_profile_id=OLD_PROFILE_ID,
             )
         self.assertNotIn("/private/path", str(caught.exception))
 

@@ -18,13 +18,12 @@ from collections import Counter
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
+from types import MappingProxyType
 from typing import Mapping
 
 import sklearn
 from sklearn.compose import ColumnTransformer
 from sklearn.linear_model import LinearRegression, Ridge
-from sklearn.metrics import mean_absolute_error
-from sklearn.model_selection import TimeSeriesSplit
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
@@ -33,9 +32,6 @@ from . import eg8b_b2a
 from . import eg8c_features
 
 
-LOCKED_DATASET_RUN_ID = "eg8c-20260727T153257-kst"
-LOCKED_MANIFEST_SHA256 = "388a5e6649e6e23d05a442ae9b4f8d0857f8ea382011c2ff07c0af64aae42771"
-LOCKED_FORECAST_SHA256 = "a5c4aaa7d711d289ee05d4ed6903b91f4ea725252ff3b6bc8890b62146441649"
 LOCKED_DATASET_FILES = frozenset(
     {
         "feature_dataset.csv",
@@ -94,18 +90,11 @@ REQUIRED_LEAKAGE_CHECKS = frozenset(
         "validation_statistics_used_in_train",
     }
 )
-EXPECTED_COUNTS = {
-    "candidate_row_count": 2236,
-    "feature_valid_row_count": 2210,
-    "label_valid_row_count": 2184,
-    "training_eligible_row_count": 2158,
-}
-EXPECTED_SPLIT_COUNTS = {"TRAIN": 1742, "VALIDATION": 416, "EXCLUDED": 78}
 BASELINE_CURRENT = "current_population_baseline"
 BASELINE_SEOUL_FORECAST = "seoul_forecast_baseline"
 MODEL_LINEAR = "linear_regression"
 MODEL_RIDGE = "ridge_regression"
-RIDGE_ALPHAS = (0.1, 1.0, 10.0, 100.0)
+RIDGE_ALPHA = 100.0
 CATEGORICAL_FEATURES = ("area_code", "current_congestion_level")
 BOOLEAN_FEATURES = ("is_weekend",)
 NUMERIC_FEATURES = tuple(
@@ -129,6 +118,63 @@ class ModelingContractError(ValueError):
 
 class ModelingWriteError(OSError):
     """Raised when a Modeling Run cannot be published safely."""
+
+
+@dataclass(frozen=True)
+class OfficialDatasetProfile:
+    identifier: str
+    run_id: str
+    manifest_sha256: str
+    forecast_sha256: str
+    candidate_row_count: int
+    feature_valid_row_count: int
+    label_valid_row_count: int
+    training_eligible_row_count: int
+    train_row_count: int
+    validation_row_count: int
+    excluded_row_count: int
+    area_count: int
+    horizon_60_row_count: int
+    horizon_180_row_count: int
+
+
+_OFFICIAL_DATASET_PROFILE_VALUES = (
+    OfficialDatasetProfile(
+        identifier="eg8c-20260727T153257-kst",
+        run_id="eg8c-20260727T153257-kst",
+        manifest_sha256="388a5e6649e6e23d05a442ae9b4f8d0857f8ea382011c2ff07c0af64aae42771",
+        forecast_sha256="a5c4aaa7d711d289ee05d4ed6903b91f4ea725252ff3b6bc8890b62146441649",
+        candidate_row_count=2236,
+        feature_valid_row_count=2210,
+        label_valid_row_count=2184,
+        training_eligible_row_count=2158,
+        train_row_count=1742,
+        validation_row_count=416,
+        excluded_row_count=78,
+        area_count=13,
+        horizon_60_row_count=1118,
+        horizon_180_row_count=1118,
+    ),
+    OfficialDatasetProfile(
+        identifier="d5e888ef-7514-4f3a-83f5-7820dec58088",
+        run_id="d5e888ef-7514-4f3a-83f5-7820dec58088",
+        manifest_sha256="2980db976dcfedb7631706cba0ad333295a7df2379f5a35a7281c0efc8f5116f",
+        forecast_sha256="756952169119e88e22f352a77678b9579bea8d37e20652a621c152957d3c3626",
+        candidate_row_count=3042,
+        feature_valid_row_count=2990,
+        label_valid_row_count=2990,
+        training_eligible_row_count=2938,
+        train_row_count=2366,
+        validation_row_count=572,
+        excluded_row_count=104,
+        area_count=13,
+        horizon_60_row_count=1521,
+        horizon_180_row_count=1521,
+    ),
+)
+OFFICIAL_DATASET_PROFILES = MappingProxyType(
+    {profile.identifier: profile for profile in _OFFICIAL_DATASET_PROFILE_VALUES}
+)
 
 
 @dataclass(frozen=True)
@@ -169,7 +215,6 @@ class TrainedModels:
     linear: Pipeline
     ridge: Pipeline
     ridge_alpha: float
-    ridge_cv_mae: Mapping[float, float]
     training_row_ids: frozenset[str]
 
 
@@ -183,6 +228,15 @@ class ModelingResult:
 
 def _fail(reason: str) -> None:
     raise ModelingContractError(f"eg8c_modeling_contract_error: {reason}")
+
+
+def _official_dataset_profile(identifier: str | None) -> OfficialDatasetProfile:
+    if identifier is None:
+        _fail("official_dataset_profile_required")
+    try:
+        return OFFICIAL_DATASET_PROFILES[identifier]
+    except (KeyError, TypeError):
+        _fail("official_dataset_profile_unknown")
 
 
 def _sha256(path: Path) -> str:
@@ -237,15 +291,18 @@ def _require_regular_files(phase_dir: Path) -> None:
             _fail("dataset_file_type_invalid")
 
 
-def _validate_manifest(phase_dir: Path) -> tuple[dict[str, object], str]:
+def _validate_manifest(
+    phase_dir: Path,
+    profile: OfficialDatasetProfile,
+) -> tuple[dict[str, object], str]:
     manifest_path = phase_dir / "dataset_manifest.json"
     digest = _sha256(manifest_path)
-    if digest != LOCKED_MANIFEST_SHA256:
+    if digest != profile.manifest_sha256:
         _fail("manifest_sha_mismatch")
     manifest = _read_json(manifest_path)
     expected_state = {
         "schema_version": "eg8c-output-manifest-v1",
-        "eg8c_run_id": LOCKED_DATASET_RUN_ID,
+        "eg8c_run_id": profile.run_id,
         "evaluation_status": "PROVISIONAL",
         "data_sufficiency_status": "PROVISIONAL_SPLIT_ONLY",
         "supported_horizons_minutes": [60, 180],
@@ -285,23 +342,45 @@ def _unique_row_index(rows: tuple[dict[str, str], ...], label: str) -> dict[str,
     return index
 
 
-def load_locked_dataset(phase_dir: Path) -> LockedDataset:
-    """Load the approved Run #2 artifacts without modifying them."""
+def load_locked_dataset(
+    phase_dir: Path,
+    *,
+    official_dataset_profile_id: str | None = None,
+) -> LockedDataset:
+    """Load one explicitly selected official Dataset without modifying it."""
+    profile = _official_dataset_profile(official_dataset_profile_id)
     _require_regular_files(phase_dir)
-    manifest, manifest_sha = _validate_manifest(phase_dir)
+    manifest, manifest_sha = _validate_manifest(phase_dir, profile)
     coverage = _read_json(phase_dir / "dataset_coverage.json")
-    for field, expected in EXPECTED_COUNTS.items():
+    expected_counts = {
+        "candidate_row_count": profile.candidate_row_count,
+        "feature_valid_row_count": profile.feature_valid_row_count,
+        "label_valid_row_count": profile.label_valid_row_count,
+        "training_eligible_row_count": profile.training_eligible_row_count,
+    }
+    expected_split_counts = {
+        "TRAIN": profile.train_row_count,
+        "VALIDATION": profile.validation_row_count,
+        "EXCLUDED": profile.excluded_row_count,
+    }
+    for field, expected in expected_counts.items():
         if coverage.get(field) != expected:
             short = field.removesuffix("_row_count")
             _fail(f"{short}_count_mismatch")
-    if coverage.get("split_row_counts") != EXPECTED_SPLIT_COUNTS:
+    if coverage.get("split_row_counts") != expected_split_counts:
         _fail("split_count_mismatch")
     area_coverage = coverage.get("area_coverage")
-    if not isinstance(area_coverage, dict) or area_coverage.get("observed_area_count") != 13:
+    if (
+        not isinstance(area_coverage, dict)
+        or area_coverage.get("observed_area_count") != profile.area_count
+    ):
         _fail("area_count_mismatch")
-    if coverage.get("horizon_coverage") != {"60": 1118, "180": 1118}:
+    if coverage.get("horizon_coverage") != {
+        "60": profile.horizon_60_row_count,
+        "180": profile.horizon_180_row_count,
+    }:
         _fail("horizon_count_mismatch")
-    if coverage.get("eg8c_run_id") != LOCKED_DATASET_RUN_ID:
+    if coverage.get("eg8c_run_id") != profile.run_id:
         _fail("coverage_run_id_mismatch")
 
     feature_dictionary = _read_json(phase_dir / "feature_dictionary.json")
@@ -340,7 +419,10 @@ def load_locked_dataset(phase_dir: Path) -> LockedDataset:
     feature_rows = _read_csv(phase_dir / "feature_dataset.csv")
     label_rows = _read_csv(phase_dir / "label_dataset.csv")
     split_rows = _read_csv(phase_dir / "split_assignment.csv")
-    if not all(len(rows) == EXPECTED_COUNTS["candidate_row_count"] for rows in (feature_rows, label_rows, split_rows)):
+    if not all(
+        len(rows) == profile.candidate_row_count
+        for rows in (feature_rows, label_rows, split_rows)
+    ):
         _fail("candidate_count_mismatch")
     feature_index = _unique_row_index(feature_rows, "feature")
     label_index = _unique_row_index(label_rows, "label")
@@ -349,11 +431,17 @@ def load_locked_dataset(phase_dir: Path) -> LockedDataset:
         _fail("row_id_set_mismatch")
     split_by_row_id = {row_id: row.get("split", "") for row_id, row in split_index.items()}
     split_counts = dict(Counter(split_by_row_id.values()))
-    if split_counts != EXPECTED_SPLIT_COUNTS:
+    if split_counts != expected_split_counts:
         _fail("split_count_mismatch")
-    if sum(row.get("feature_valid") == "true" for row in feature_rows) != EXPECTED_COUNTS["feature_valid_row_count"]:
+    if (
+        sum(row.get("feature_valid") == "true" for row in feature_rows)
+        != profile.feature_valid_row_count
+    ):
         _fail("feature_valid_count_mismatch")
-    if sum(row.get("label_valid") == "true" for row in label_rows) != EXPECTED_COUNTS["label_valid_row_count"]:
+    if (
+        sum(row.get("label_valid") == "true" for row in label_rows)
+        != profile.label_valid_row_count
+    ):
         _fail("label_valid_count_mismatch")
     for row in feature_rows:
         for feature in APPROVED_FEATURES:
@@ -469,7 +557,10 @@ def build_training_matrix(dataset: LockedDataset) -> tuple[ModelingRow, ...]:
                 prediction_target_at=target,
             )
         )
-    if Counter(row.split for row in rows) != {"TRAIN": 1742, "VALIDATION": 416}:
+    if Counter(row.split for row in rows) != {
+        "TRAIN": dataset.split_counts["TRAIN"],
+        "VALIDATION": dataset.split_counts["VALIDATION"],
+    }:
         _fail("eligible_split_count_mismatch")
     return tuple(rows)
 
@@ -608,26 +699,6 @@ def _pipeline(model: LinearRegression | Ridge) -> Pipeline:
     return Pipeline((("preprocessor", preprocessor), ("model", model)))
 
 
-def build_expanding_origin_folds(
-    rows: tuple[ModelingRow, ...],
-) -> tuple[tuple[frozenset[str], frozenset[str]], ...]:
-    train_rows = tuple(row for row in rows if row.split == "TRAIN")
-    origins = sorted({row.prediction_origin_at for row in train_rows})
-    if len(origins) < 4:
-        _fail("ridge_origin_groups_insufficient")
-    folds = []
-    for train_indices, holdout_indices in TimeSeriesSplit(n_splits=3).split(origins):
-        train_origins = {origins[index] for index in train_indices}
-        holdout_origins = {origins[index] for index in holdout_indices}
-        folds.append(
-            (
-                frozenset(row.row_id for row in train_rows if row.prediction_origin_at in train_origins),
-                frozenset(row.row_id for row in train_rows if row.prediction_origin_at in holdout_origins),
-            )
-        )
-    return tuple(folds)
-
-
 def train_models(rows: tuple[ModelingRow, ...]) -> TrainedModels:
     """Fit approved preprocessing and models using TRAIN rows only."""
     if sklearn.__version__ != "1.6.1":
@@ -636,22 +707,8 @@ def train_models(rows: tuple[ModelingRow, ...]) -> TrainedModels:
     train_rows = tuple(row for row in rows if row.split == "TRAIN")
     if not train_rows:
         _fail("training_rows_missing")
-    by_id = {row.row_id: row for row in train_rows}
-    folds = build_expanding_origin_folds(rows)
-    cv_mae: dict[float, float] = {}
-    for alpha in RIDGE_ALPHAS:
-        scores = []
-        for train_ids, holdout_ids in folds:
-            fold_train = tuple(by_id[row_id] for row_id in sorted(train_ids))
-            fold_holdout = tuple(by_id[row_id] for row_id in sorted(holdout_ids))
-            pipeline = _pipeline(Ridge(alpha=alpha))
-            pipeline.fit(_x(fold_train), [row.label_value for row in fold_train])
-            predictions = pipeline.predict(_x(fold_holdout))
-            scores.append(float(mean_absolute_error([row.label_value for row in fold_holdout], predictions)))
-        cv_mae[alpha] = sum(scores) / len(scores)
-    selected_alpha = min(RIDGE_ALPHAS, key=lambda alpha: (cv_mae[alpha], alpha))
     linear = _pipeline(LinearRegression())
-    ridge = _pipeline(Ridge(alpha=selected_alpha))
+    ridge = _pipeline(Ridge(alpha=RIDGE_ALPHA))
     train_x = _x(train_rows)
     train_y = [row.label_value for row in train_rows]
     linear.fit(train_x, train_y)
@@ -659,8 +716,7 @@ def train_models(rows: tuple[ModelingRow, ...]) -> TrainedModels:
     return TrainedModels(
         linear=linear,
         ridge=ridge,
-        ridge_alpha=selected_alpha,
-        ridge_cv_mae=cv_mae,
+        ridge_alpha=RIDGE_ALPHA,
         training_row_ids=frozenset(row.row_id for row in train_rows),
     )
 
@@ -931,6 +987,7 @@ def _modeling_payloads(
     evaluation_report: Mapping[str, object],
     run_id: str,
     generated_at: datetime,
+    dataset_profile: OfficialDatasetProfile,
     dataset_hashes: Mapping[str, str],
     forecast_sha256: str,
 ) -> dict[str, bytes]:
@@ -957,11 +1014,11 @@ def _modeling_payloads(
         ],
     )
     metadata = {
-        "schema_version": "eg8c-model-metadata-v1",
+        "schema_version": "eg8c-model-metadata-v2",
         "modeling_run_id": run_id,
         "generated_at": eg8a.to_iso8601(generated_at),
-        "dataset_run_id": LOCKED_DATASET_RUN_ID,
-        "dataset_manifest_sha256": LOCKED_MANIFEST_SHA256,
+        "dataset_run_id": dataset_profile.run_id,
+        "dataset_manifest_sha256": dataset_profile.manifest_sha256,
         "source_dataset_artifact_sha256": dict(dataset_hashes),
         "source_forecast_sha256": forecast_sha256,
         "features": list(APPROVED_FEATURES),
@@ -979,9 +1036,10 @@ def _modeling_payloads(
             MODEL_LINEAR: {"parameters": {}},
             MODEL_RIDGE: {
                 "alpha": models.ridge_alpha,
-                "alpha_candidates": list(RIDGE_ALPHAS),
-                "cv_mean_mae": {str(key): value for key, value in models.ridge_cv_mae.items()},
-                "cv": "3_expanding_origin_folds_train_only",
+                "selection_method": "PM_FIXED",
+                "automatic_tuning_performed": False,
+                "alpha_candidates": [RIDGE_ALPHA],
+                "time_ordered_alpha_comparison_performed": False,
             },
         },
         "training_row_count": len(models.training_row_ids),
@@ -1003,15 +1061,19 @@ def _run_eg8c_modeling(
     forecast_path: Path,
     output_root: Path,
     run_id: str,
+    dataset_profile: OfficialDatasetProfile,
     generated_at: datetime | None = None,
 ) -> ModelingResult:
     """Run the approved provisional comparison once and publish five artifacts."""
     resolved_generated_at = generated_at or datetime.now(eg8a.SEOUL)
     dataset_before = _dataset_hashes(dataset_phase_dir)
     forecast_before = _sha256(forecast_path)
-    if forecast_before != LOCKED_FORECAST_SHA256:
+    if forecast_before != dataset_profile.forecast_sha256:
         _fail("forecast_sha_mismatch")
-    dataset = load_locked_dataset(dataset_phase_dir)
+    dataset = load_locked_dataset(
+        dataset_phase_dir,
+        official_dataset_profile_id=dataset_profile.identifier,
+    )
     try:
         dataset_phase_dir.resolve(strict=True).relative_to(output_root.resolve(strict=True))
     except ValueError:
@@ -1022,7 +1084,7 @@ def _run_eg8c_modeling(
     predictions = build_baseline_predictions(
         rows,
         forecast_path=forecast_path,
-        expected_forecast_sha256=LOCKED_FORECAST_SHA256,
+        expected_forecast_sha256=dataset_profile.forecast_sha256,
     )
     models = train_models(rows)
     predictions.update(predict_models(models, rows))
@@ -1034,6 +1096,7 @@ def _run_eg8c_modeling(
         evaluation_report=evaluation_report,
         run_id=run_id,
         generated_at=resolved_generated_at,
+        dataset_profile=dataset_profile,
         dataset_hashes=dataset_before,
         forecast_sha256=forecast_before,
     )
@@ -1060,15 +1123,18 @@ def run_eg8c_modeling(
     forecast_path: Path,
     output_root: Path,
     run_id: str,
+    official_dataset_profile_id: str | None = None,
     generated_at: datetime | None = None,
 ) -> ModelingResult:
     """Public bounded-error entry point for one approved provisional run."""
     try:
+        profile = _official_dataset_profile(official_dataset_profile_id)
         return _run_eg8c_modeling(
             dataset_phase_dir=dataset_phase_dir,
             forecast_path=forecast_path,
             output_root=output_root,
             run_id=run_id,
+            dataset_profile=profile,
             generated_at=generated_at,
         )
     except (ModelingContractError, ModelingWriteError):
