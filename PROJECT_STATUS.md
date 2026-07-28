@@ -6,7 +6,7 @@
 단일 운영 기준이다. 제품 목적은 PRD, 기술 계약은 TRD, 검사 ID와 판정은
 `docs/testing/PROJECT_GUARD_SPEC.md`를 따른다.
 
-마지막 동기화 시각: `2026-07-28` (Asia/Seoul)
+마지막 동기화 시각: `2026-07-29` (Asia/Seoul)
 
 ## 2. 현재 요약
 
@@ -91,11 +91,13 @@ PM이 장기 기준으로 확정한 5분 주기의 EG-7 1시간 파일럿 Contro
 - EG-8B Phase 1 Read-only 준비도 분석(ML-ready Dataset·EDA·Forecast 평가·Baseline 가능성): `COMPLETED`
 - ML-ready Dataset: `LOCKED_OFFICIAL_RUN_2` — Run ID `eg8c-20260727T153257-kst`,
   Manifest SHA-256 `388a5e6649e6e23d05a442ae9b4f8d0857f8ea382011c2ff07c0af64aae42771`
+- 신규 공식 데이터 묶음: Run ID `d5e888ef-7514-4f3a-83f5-7820dec58088` —
+  Issue #119 재평가에 사용했으며 기존 공식 데이터 묶음을 변경하거나 삭제하지 않음
 - EDA: `NOT_STARTED`
 - EG-8B B2a(B0 Persistence Baseline·서울시 Forecast 단일 일자 잠정 Backtest): `IMPLEMENTATION_AVAILABLE_ON_MAIN`(PR #92, Issue #89) — 단일 일자 잠정 결과이며 공식 성공 임계값·EG-8B Gate PASS/FAIL 판정이 아님
 - EG-8B B2b — 2026-07-24 01:00~2026-07-25 07:00 단기 다일자 Baseline·Forecast 검증: `IMPLEMENTATION_AVAILABLE_ON_MAIN`(Parent Issue #93, PR #94) — 단기 다일자 잠정 검증 결과이며 evaluation_status=PROVISIONAL, coverage_status=SHORT_WINDOW_MULTI_DAY_PARTIAL_COVERAGE, gate_judgment=null. 공식 성공 임계값·EG-8B Gate PASS/FAIL 판정이 아님. 장기 다일자·5영업일·4주·공식 Gate 평가는 데이터 추가 축적 후 별도 검토한다.
 - EG-8C 1차(Feature·Label·Provisional Train/Validation Split): `IMPLEMENTATION_AVAILABLE_ON_MAIN`(Parent Issue #95, PR #96) — evaluation_status=PROVISIONAL, data_sufficiency_status=PROVISIONAL_SPLIT_ONLY, test_split_created=false, official_model_gate_judgment=null, Leakage 12종 위반 0, 지원 Horizon 60·180분만. 모델 학습·공식 Test 평가·Peak 예측·EG-8D·EG-8E·UI·E2E는 이번 범위에 포함하지 않음. 장기 다일자·5영업일·4주·공식 Gate 평가는 데이터 추가 축적 후 별도 검토한다.
-- EG-8C 잠정 Modeling Run: `IMPLEMENTATION_AVAILABLE_ON_MAIN`(PR #108) — Run ID
+- EG-8C 이전 잠정 Modeling Run: `IMPLEMENTATION_AVAILABLE_ON_MAIN`(PR #108) — Run ID
   `eg8c-ml-20260727T202447-kst`, Modeling Manifest SHA-256
   `7a1748102fc2b079084ace8bcdb539f99535eab7ffc696e8a04b2b2c2d42df13`,
   Training Matrix 2,158행(TRAIN 1,742 /
@@ -103,7 +105,18 @@ PM이 장기 기준으로 확정한 5분 주기의 EG-7 1시간 파일럿 Contro
   행에서 비교. 서울시 Forecast가 가장 강한 Baseline이며 두 모델 모두 승인된
   MAE/RMSE 통과조건을 충족하지 못해 `BASELINE_RETAINED`. 평가상태는
   `PROVISIONAL`, Test Split 미생성, 공식 Model Gate 판단 `null`, 피크 예측 미구현.
+- EG-8C 신규 공식 데이터 재평가: `COMPLETED`(Issue #119, Issue #120, PR #121) —
+  모델 실행 Run ID `eg8c-ml-20260729T075003-kst`, 결과 명세 SHA-256
+  `e1447b534091a8dfdb5003a707abfb6f53caf68b549ffa952b760f83ed7f0a0d`.
+  Ridge는 PM 결정에 따라 `alpha=100.0`으로 고정하고 자동 탐색하지 않았다. 서울시
+  미래 예상값 기준 예측이 전체·60분·180분과 13개 Area 모두에서 가장 정확해
+  `BASELINE_RETAINED`로 확정했다. Linear·Ridge는 채택하지 않고 현재 PoC의 추가
+  모델 조정을 종료했다. 별도 최종 시험구간은 없고 평가는 `PROVISIONAL`, 공식
+  Model Gate 판단은 `null`이며 운영 사용·사용자 게시·공식 추천은 허용하지 않는다.
 - ML Model: `BASELINE_RETAINED_PROVISIONAL`
+- EG-8C 다음 작업: OPEN 상태인 Issue #118의 UI 정책 검토와 별도 승인을 받는 Spot
+  검증. 이번
+  결정으로 UI·Spot·EG-8D를 자동 실행하지 않음
 - Area Ranking: `IMPLEMENTATION_AVAILABLE_ON_MAIN`(PR #110, Issue #109) — 서울시
   Forecast 기반 60분·180분 예상 유동인구 변화·미래 인구 규모 순위를 각각 계산.
   `LATEST_COMPLETE_LOCKED_SNAPSHOT` 정책으로 잠긴 Dataset의 전체 1,027회 중 승인된
@@ -178,7 +191,7 @@ PM이 장기 기준으로 확정한 5분 주기의 EG-7 1시간 파일럿 Contro
 | EG-8(상위) | NOT_STARTED | 데이터 분석·예측·추천 준비 상위 Gate; EG-8A~8E로 세분화(§2.2) |
 | EG-8A | `IN_PROGRESS` | Source Reader·Schema Validation·Normalization `IMPLEMENTATION_AVAILABLE_ON_MAIN`(PR #84); Duplicate Detector·Quality Report·Manifest·Output Writer `IMPLEMENTATION_AVAILABLE_ON_MAIN`(PR #86); 실제 오류 응답 기반 검증 `NOT_COMPLETED` |
 | EG-8B | `IN_PROGRESS` | Dataset Profile·시간 커버리지·Forecast Exact Join(B1) `IMPLEMENTATION_AVAILABLE_ON_MAIN`(PR #88); B0 Baseline·서울시 Forecast 오차 지표(B2a) `IMPLEMENTATION_AVAILABLE_ON_MAIN`(PR #92); B2b 단기 다일자 검증 `IMPLEMENTATION_AVAILABLE_ON_MAIN`(PR #94) |
-| EG-8C | `IN_PROGRESS` | 잠정 인구 중간값 회귀 `IMPLEMENTATION_AVAILABLE_ON_MAIN`(PR #108), 서울시 Forecast Baseline 유지; 공식 Model Gate는 미완료, 피크 예측 미구현 |
+| EG-8C | `IN_PROGRESS` | 신규 공식 데이터 재평가 `COMPLETED`(Issue #119, Issue #120, PR #121), 서울시 미래 예상값 기준 예측 `BASELINE_RETAINED`; Linear·Ridge 미채택·PoC 추가 조정 종료, 공식 Model Gate 미완료, 피크 예측 미구현 |
 | EG-8D | `IN_PROGRESS` | Area 예상 유동인구 변화 순서 `IMPLEMENTATION_AVAILABLE_ON_MAIN`(PR #110); Horizon별 최신성 잠정 Gate `IMPLEMENTATION_AVAILABLE_ON_MAIN`(Issue #111, PR #112); 선택적 S-DoT·Spot Candidate Evaluation 미착수 |
 | EG-8E | `PLANNED` | Recommendation Output Contract·UI/UX Readiness(Recommendation MVP 구현 Gate 아님) |
 | Recommendation MVP | PLANNED | Gate number `NOT_ASSIGNED` |

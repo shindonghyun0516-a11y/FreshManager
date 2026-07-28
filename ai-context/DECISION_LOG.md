@@ -233,6 +233,31 @@ PM이 승인했거나 명시적으로 보류한 제품·운영 결정을 새 AI 
   Dynamic Spot 근거, 자동승격, 사용자 게시와 공식 Recommendation은 제외한다.
 - Evidence: Issue #113 PM 승인 댓글, `docs/data/MANUAL_V3_SNAPSHOT_INTAKE.md`.
 
+### D-017 — EG-8C 신규 공식 데이터 재평가는 서울시 미래 예상값 기준 예측 유지
+
+- Date: `2026-07-29`
+- Status: `ACCEPTED`
+- Decision: 신규 공식 데이터 Run `d5e888ef-7514-4f3a-83f5-7820dec58088`의 재평가
+  결과를 `BASELINE_RETAINED`로 확정한다. 현재 가장 신뢰할 수 있는 기준 예측은
+  `seoul_forecast_baseline`이며 Linear Regression과 Ridge Regression은 채택하지
+  않는다. 현재 PoC의 두 모델 추가 조정도 종료한다.
+- Ridge contract: Issue #120·PR #121의 최신 PM 결정에 따라 `alpha=100.0`을 고정하고
+  자동 탐색하지 않았다.
+- Reason: 모델 실행 Run `eg8c-ml-20260729T075003-kst`에서 서울시 미래 예상값 기준
+  예측이 전체·60분·180분과 승인된 13개 Area 모두에서 가장 정확했다. 결과 명세
+  SHA-256은 `e1447b534091a8dfdb5003a707abfb6f53caf68b549ffa952b760f83ed7f0a0d`다.
+- Gate boundary: 별도 최종 시험구간은 만들지 않았고 `evaluation_status=PROVISIONAL`,
+  `data_sufficiency_status=PROVISIONAL_SPLIT_ONLY`, `test_split_created=false`,
+  `official_model_gate_judgment=null`을 유지한다. 공식 모델 승격·운영 사용·사용자
+  게시·공식 추천을 승인하지 않는다.
+- Revisit conditions: 여러 주 또는 여러 달의 데이터, 별도 최종 시험구간, 날씨·행사
+  등 새 입력자료, 실제 방문·판매·매출 자료, 서울시 미래 예상값 오차보정 문제의 별도
+  정의가 생기고 PM이 새로 승인한 경우에만 자체 모델을 다시 검토한다.
+- Consequence: Issue #119의 재평가를 완료한다. 다음 주요 작업은 OPEN 상태인 Issue
+  #118의 UI 정책 검토와 별도 승인된 Spot 검증이며, 이번 결정으로 EG-8D를 다시
+  실행하거나 UI·Spot을 구현하지 않는다.
+- Evidence: Issue #119, Issue #120, PR #121.
+
 ## 4. 갱신 규칙
 
 새 PM 결정이 기존 결정을 대체하면 이전 항목을 삭제하지 않고 `SUPERSEDED`로 바꾸고

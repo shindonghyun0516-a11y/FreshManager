@@ -1,5 +1,10 @@
 # EG-8C ML Modeling Implementation Plan
 
+> **현재 상태 안내(2026-07-29):** 이 문서는 당시 승인된 구현 계획을 보존하는
+> 이력문서다. 아래 Ridge 자동 탐색 계획은 Issue #120·PR #121의 최신 PM 결정으로
+> 대체됐으며, 신규 공식 데이터 재평가는 `alpha=100.0` 고정·자동 탐색 없이 실행됐다.
+> 최종 판단은 `BASELINE_RETAINED`이며 상세 결과는 Issue #119를 따른다.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 잠긴 EG-8C Run #2 Dataset으로 현재 인구 Baseline, 서울시 Forecast Baseline, Linear Regression, Ridge Regression을 동일한 Validation 행에서 비교하는 잠정 인구 중간값 회귀를 구현한다.
