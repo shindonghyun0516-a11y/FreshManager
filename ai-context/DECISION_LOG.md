@@ -208,6 +208,31 @@ PM이 승인했거나 명시적으로 보류한 제품·운영 결정을 새 AI 
 - Related: [[D-008]](양립, 미대체), TRD ADR-16, `ARCHITECTURE_DECISIONS.md`
   ADR-011.
 
+### D-016 — Manual V3 Snapshot Intake Metadata 계약
+
+- Date: `2026-07-28`
+- Status: `ACCEPTED`
+- Decision: Apps Script와 기존 v3 수집동작은 변경하지 않고, 사용자가 수동 Export한
+  Raw·Current·Forecast v3 CSV와 `upload_manifest.csv`를 저장소 밖 불변 Snapshot으로
+  검증·보존한다. 실제 Snapshot 반입은 구현 병합 후 별도 승인한다.
+- Intake purpose: `DATA_QUALITY_VALIDATION`, `HISTORICAL_ANALYSIS`, `UI_PROTOTYPE`,
+  `MODEL_EVALUATION`, `PM_APPROVED_LIMITED_SNAPSHOT_REVIEW`만 허용한다. 어떤 값도
+  사용자 게시·Spot 추천·공식 Recommendation을 자동 허용하지 않는다.
+- Origin: `source_origin_confirmed_by_pm`은 현재 운영 v3 시트에서 반출한 출처 확인만
+  뜻한다. `false`는 검증보고서까지만 허용하고 Final 공개를 차단한다.
+- Identity: 역할명이 포함된 Raw·Current·Forecast SHA-256 조합을
+  `source_content_fingerprint`로, Source 지문과 정규화한 Upload Manifest를
+  `intake_metadata_fingerprint`로 사용한다. Snapshot ID는 Source 지문으로 결정한다.
+- Duplicate policy: 같은 Source·Metadata의 기존 Final은 중복으로 차단하고, 같은
+  Source의 Metadata 변경은 재분류로 차단한다. Final이 없는 실패 Staging은 재시도를
+  막지 않으며 내용이 달라 Source 지문이 바뀐 CSV만 신규 Snapshot으로 허용한다.
+- Data boundary: 누적 CSV 전체를 독립 보존하며 원본을 수정하지 않는다. 증분병합,
+  신규 행 영구추출, 실제 운영 CSV 반입, Apps Script 자동화, Dataset·ML·API·Backend·
+  Database 연결은 이번 결정의 구현 범위가 아니다.
+- Spot boundary: 좌표·서울 범위·Area 연결·출처·Proxy 상태·DESK 검증만 현재 허용하며
+  Dynamic Spot 근거, 자동승격, 사용자 게시와 공식 Recommendation은 제외한다.
+- Evidence: Issue #113 PM 승인 댓글, `docs/data/MANUAL_V3_SNAPSHOT_INTAKE.md`.
+
 ## 4. 갱신 규칙
 
 새 PM 결정이 기존 결정을 대체하면 이전 항목을 삭제하지 않고 `SUPERSEDED`로 바꾸고

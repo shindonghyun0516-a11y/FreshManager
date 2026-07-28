@@ -72,8 +72,7 @@ PM이 장기 기준으로 확정한 5분 주기의 EG-7 1시간 파일럿 Contro
 - EG-8C(미래 Area 인구·피크 예측 모델): `IN_PROGRESS`
 - EG-8D(Area Ranking·선택적 S-DoT·Spot Candidate Evaluation): `IN_PROGRESS` — 서울시
   Forecast 기반 60분·180분 Area 예상 유동인구 변화 순서는 PR #110으로 main 반영.
-  Horizon별 데이터 최신성 잠정 Gate는 Issue #111에서 로컬 구현·오프라인 검증 완료 후
-  PM 코드·임계값·결과 검토 대기이며,
+  Horizon별 데이터 최신성 잠정 Gate는 PR #112로 main 반영되고 Issue #111은 종료됐으며,
   선택적 S-DoT·Spot Candidate Evaluation은 미착수
 - EG-8E(Recommendation Output Contract·UI/UX Readiness): `PLANNED` — Recommendation
   MVP 구현 Gate가 아니며, Recommendation MVP Workstream의 공식 Gate 번호는 계속
@@ -85,6 +84,9 @@ PM이 장기 기준으로 확정한 5분 주기의 EG-7 1시간 파일럿 Contro
   - Source Reader·Schema Validation·Normalization: `IMPLEMENTATION_AVAILABLE_ON_MAIN`(PR #84)
   - Duplicate Detector·Quality Report·Dataset Manifest·최종 Output Writer: `IMPLEMENTATION_AVAILABLE_ON_MAIN`(PR #86, Issue #85)
   - 실제 오류 응답 기반 검증: `NOT_COMPLETED`(합성 Fixture 오류 경로만 테스트 통과, 실 v3 CSV Smoke는 정상 경로만 확인)
+- Manual V3 Snapshot Intake: `LOCAL_IMPLEMENTATION_COMPLETE_PENDING_PM_DIFF_REVIEW`
+  (Issue #113) — 합성 CSV로만 구현·검증했으며 실제 운영 CSV 반입, Commit·Push·PR,
+  Apps Script·Dataset·ML 실행은 하지 않음
 - EG-8B Dataset Profile·시간 커버리지·Forecast-Current Exact Join(B1): `IMPLEMENTATION_AVAILABLE_ON_MAIN`(PR #88, Issue #87)
 - EG-8B Phase 1 Read-only 준비도 분석(ML-ready Dataset·EDA·Forecast 평가·Baseline 가능성): `COMPLETED`
 - ML-ready Dataset: `LOCKED_OFFICIAL_RUN_2` — Run ID `eg8c-20260727T153257-kst`,
@@ -118,7 +120,7 @@ PM이 장기 기준으로 확정한 5분 주기의 EG-7 1시간 파일럿 Contro
   실제 방문·판매 성공 보장이 아니다. 가중치·Spot·S-DoT·판매량·매출·구매전환은
   포함하지 않음. 기존 Result Run `eg8d-area-priority-20260728T003701-kst`는 보존됨.
 - Area Ranking Freshness Gate:
-  `LOCAL_IMPLEMENTATION_COMPLETE_PENDING_PM_REVIEW`(Issue #111) — 공개 Runtime은
+  `IMPLEMENTATION_AVAILABLE_ON_MAIN`(Issue #111, PR #112) — 공개 Runtime은
   평가시각·모드·게시 표식을 받지 않는 Runtime 전용 경로만 사용하고, 해당 경로가
   실행 시작의 서울 시스템 현재시각과 운영 실행 맥락을 한 번만 확정한다. 공통 실행부는
   이처럼 이미 확정된 내부 실행 맥락만 소비하며 원시 평가시각·모드·게시 표식을 받거나
@@ -177,7 +179,7 @@ PM이 장기 기준으로 확정한 5분 주기의 EG-7 1시간 파일럿 Contro
 | EG-8A | `IN_PROGRESS` | Source Reader·Schema Validation·Normalization `IMPLEMENTATION_AVAILABLE_ON_MAIN`(PR #84); Duplicate Detector·Quality Report·Manifest·Output Writer `IMPLEMENTATION_AVAILABLE_ON_MAIN`(PR #86); 실제 오류 응답 기반 검증 `NOT_COMPLETED` |
 | EG-8B | `IN_PROGRESS` | Dataset Profile·시간 커버리지·Forecast Exact Join(B1) `IMPLEMENTATION_AVAILABLE_ON_MAIN`(PR #88); B0 Baseline·서울시 Forecast 오차 지표(B2a) `IMPLEMENTATION_AVAILABLE_ON_MAIN`(PR #92); B2b 단기 다일자 검증 `IMPLEMENTATION_AVAILABLE_ON_MAIN`(PR #94) |
 | EG-8C | `IN_PROGRESS` | 잠정 인구 중간값 회귀 `IMPLEMENTATION_AVAILABLE_ON_MAIN`(PR #108), 서울시 Forecast Baseline 유지; 공식 Model Gate는 미완료, 피크 예측 미구현 |
-| EG-8D | `IN_PROGRESS` | Area 예상 유동인구 변화 순서 `IMPLEMENTATION_AVAILABLE_ON_MAIN`(PR #110); Horizon별 최신성 잠정 Gate 로컬 구현·오프라인 검증 완료 후 PM 검토 대기(Issue #111); 선택적 S-DoT·Spot Candidate Evaluation 미착수 |
+| EG-8D | `IN_PROGRESS` | Area 예상 유동인구 변화 순서 `IMPLEMENTATION_AVAILABLE_ON_MAIN`(PR #110); Horizon별 최신성 잠정 Gate `IMPLEMENTATION_AVAILABLE_ON_MAIN`(Issue #111, PR #112); 선택적 S-DoT·Spot Candidate Evaluation 미착수 |
 | EG-8E | `PLANNED` | Recommendation Output Contract·UI/UX Readiness(Recommendation MVP 구현 Gate 아님) |
 | Recommendation MVP | PLANNED | Gate number `NOT_ASSIGNED` |
 
