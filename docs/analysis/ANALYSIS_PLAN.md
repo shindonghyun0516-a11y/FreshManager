@@ -1,11 +1,11 @@
 # Analysis Plan
 
 - 문서 상태: Draft
-- 버전: v0.1.8
+- 버전: v0.1.10
 - 작성자: 신동현
 - 최종 승인자: 신동현
 - 최초 작성일: 2026-07-17
-- 최종 수정일: 2026-07-28
+- 최종 수정일: 2026-07-29
 - 적용 프로젝트: Freshmanager Data PoC
 - 관련 문서:
   - `AGENTS.md`
@@ -913,6 +913,36 @@ Ridge 모두 잠정 통과 조건을 충족하지 못했다. 따라서 서울시
 4,694.37/8,666.90이었다. 평가는 계속 `PROVISIONAL`, 공식 Model Gate 판단은
 `null`이다. 현재 Label에 없는 피크 예측은 구현하지 않았다.
 
+위 Ridge `alpha` 자동 선택은 2026-07-27 실행의 이력이다. Issue #120·PR #121의
+최신 PM 결정에 따라 신규 공식 데이터 Run
+`d5e888ef-7514-4f3a-83f5-7820dec58088`의 재평가는 Ridge `alpha=100.0`을 고정하고
+자동 탐색 없이 수행했다. 모델 실행 Run은 `eg8c-ml-20260729T075003-kst`, 결과 명세
+SHA-256은 `e1447b534091a8dfdb5003a707abfb6f53caf68b549ffa952b760f83ed7f0a0d`다.
+
+2026-07-29 재평가의 평균 절대오차는 다음과 같다.
+
+| 비교 대상 | 전체 | 60분 | 180분 |
+|---|---:|---:|---:|
+| 현재값 유지 기준 예측 | 6,728.58 | 3,663.88 | 10,085.16 |
+| 서울시 미래 예상값 기준 예측 | 1,467.48 | 1,012.37 | 1,965.93 |
+| Linear Regression | 4,922.21 | 4,148.25 | 5,769.87 |
+| Ridge Regression | 4,875.42 | 3,864.94 | 5,982.12 |
+
+전체 평균 제곱근 오차는 현재값 유지 12,563.84, 서울시 미래 예상값 2,902.07,
+Linear Regression 7,939.04, Ridge Regression 8,262.77이었다.
+
+서울시 미래 예상값 기준 예측이 전체·60분·180분과 13개 Area 모두에서 가장
+정확했다. 따라서 최종 판단은 `BASELINE_RETAINED`이며 Linear Regression과 Ridge
+Regression은 채택하지 않고 현재 PoC의 추가 조정을 종료한다. 별도 최종 시험구간은
+만들지 않았고 `evaluation_status=PROVISIONAL`,
+`data_sufficiency_status=PROVISIONAL_SPLIT_ONLY`, `test_split_created=false`,
+`official_model_gate_judgment=null`을 유지한다. 운영 사용·사용자 게시·공식 추천은
+허용하지 않는다.
+
+자체 모델은 여러 주 또는 여러 달의 데이터, 별도 최종 시험구간, 날씨·행사 등 새
+입력자료, 실제 방문·판매·매출 자료, 서울시 미래 예상값 오차보정 문제의 별도 정의가
+생기고 PM이 새로 승인한 경우에만 다시 검토한다.
+
 **상태: `PROVISIONAL_BASELINE_RETAINED`**
 
 ### 29.2 EG-8D Area 예상 유동인구 변화 순서
@@ -1243,6 +1273,7 @@ ANALYSIS_PLAN은 다음 조건을 만족해야 Approved 상태로 전환할 수 
 
 | 버전 | 날짜 | 변경내용 | 작성자 | 승인상태 |
 |---|---|---|---|---|
+| v0.1.10 | 2026-07-29 | §29.1에 신규 공식 데이터 재평가를 과거 결과와 구분해 추가; Ridge `alpha=100.0` 고정, 서울시 미래 예상값 기준 예측 유지, 자체 모델 미채택·추가 조정 종료와 재검토 조건 기록 | 신동현 | PM 최종 결정 |
 | v0.1.9 | 2026-07-28 | EG-8D 공개 Runtime의 평가시각·모드 주입을 제거하고, Runtime 전용 시스템 시계 경로와 RUNTIME을 금지한 내부 감사·합성 주입경로, Current-only 행 유형과 합성 D2/E2 비운영 식별 계약을 §29.2.1에 반영 | 신동현 | PM 변경내용 검토 전 |
 | v0.1.8 | 2026-07-28 | EG-8D 60분·180분 Horizon별 `evaluation_time` 기반 최신성 잠정 Gate와 생산 Builder의 Current-only 전용 계약·Runtime 통합시험·사례 D/E를 §29.2.1에 추가; 공식 Recommendation과 수집 스키마는 변경하지 않음 | 신동현 | PM 변경내용 검토 전 |
 | v0.1.7 | 2026-07-28 | EG-8D 서울시 Forecast 기반 60분·180분 Area 예상 유동인구 변화·미래 인구 규모 독립 순위와 Horizon별 변화 요약을 §29.2에 반영; 양의 증가가 없는 180분 결과, 중간값·단일 Snapshot 한계와 공식 Recommendation Output·Spot·판매효과 제외 명시 | 신동현 | PM 변경내용 검토 전 |
