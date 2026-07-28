@@ -1,7 +1,7 @@
 # Analysis Plan
 
 - 문서 상태: Draft
-- 버전: v0.1.7
+- 버전: v0.1.8
 - 작성자: 신동현
 - 최종 승인자: 신동현
 - 최초 작성일: 2026-07-17
@@ -935,6 +935,89 @@ EG-8C에서 잠정 유지한 서울시 Forecast와 잠긴 EG-8C Run #2 입력 Sn
 Origin과 같은 정본 시각으로 사용해 가장 최신인 회차를 선택하며, 최신 시각이
 동률이면 임의 선택하지 않고 실패한다.
 
+#### 29.2.1 Horizon별 데이터 최신성 잠정 Gate
+
+Area 계산 뒤 실제 표시와 후속 사용 가능 여부는 `evaluation_time`을 기준으로
+60분·180분 Horizon별로 따로 판정한다. 모든 시각은 `Asia/Seoul` timezone-aware
+값이어야 한다. 공개 Runtime Builder와 CLI는 평가시각·모드·게시 표식을 받지 않는
+Runtime 전용 경로만 사용한다. 이 경로가 실행 시작에 서울 시스템 현재시각을 한 번
+확보해 `RUNTIME`·`SYSTEM_CLOCK_ASIA_SEOUL`과 운영 게시정책을 고정한다. 공통
+실행부는 이렇게 이미 확정된 내부 실행 맥락만 받으며 원시 `evaluation_time`·
+`evaluation_mode`·게시 표식을 받지 않는다. 따라서 `None`을 Runtime 시각으로
+해석하거나 시스템 현재시각을 읽어 Runtime을 시작할 수 없다. 평가시각을 주입하는 내부
+경로는 `HISTORICAL_AUDIT`·`SYNTHETIC_VALIDATION`만 허용한다. 과거 또는 현재와 같은
+시각과 일관된 Runtime 표식을 전달해도 주입 경로의 `RUNTIME`은 계약 오류로 차단한다.
+
+세 시간지표는 다음과 같다.
+
+- Snapshot 경과시간: `evaluation_time - selected_complete_observed_at`
+- 완전성 지연: `latest_available_current_observed_at - selected_complete_observed_at`
+- Horizon 잔여시간: `forecast_target_at - evaluation_time`
+
+| Horizon | `FRESH` | `DEGRADED` | 그 외 |
+|---:|---|---|---|
+| 60분 | 경과·지연 각각 15분 이하, 잔여 45분 이상 | `FRESH`가 아니고 경과·지연 각각 30분 이하, 잔여 30분 이상 | `STALE_BLOCKED` |
+| 180분 | 경과·지연 각각 15분 이하, 잔여 165분 이상 | `FRESH`가 아니고 경과·지연 각각 60분 이하, 잔여 120분 이상 | `STALE_BLOCKED` |
+
+`FRESH`는 Area 표시와 Spot 내부평가가 가능하고, `DEGRADED`는 기준시각·대상시각·
+잔여시간·최신 데이터가 아닌 Area 참고정보라는 경고와 함께 Area만 표시할 수 있다.
+`STALE_BLOCKED`는 해당 Horizon의 Area 표시와 Spot 후속 사용을 모두 차단한다.
+공식 Recommendation은 모든 상태에서 계속 차단한다. 최신성 실패를 이유로 다른
+회차를 다시 선택하지 않는다.
+
+완전 Snapshot이 없으면 두 Horizon은 `NO_COMPLETE_SNAPSHOT`이며 Forecast 순위를
+생성하지 않는다. Run Builder는 최신 Current 회차의 승인된 13개 Area가 각각
+정확히 하나인지와 인구 범위·시각 계약을 검증한다. 공개 `RUNTIME`이고 최신 Current가
+15분 이내인 경우에만 현재 인구 범위·중간값·혼잡도·기준시각·경과시간을 담은
+Current-only 표시를 허용한다. 결과는 `current_area_state.csv`·JSON·Metadata·전용
+Manifest 네 파일 계약이며 Forecast·60분/180분 변화·순위·Spot·공식 추천·판매 기회
+표현을 포함하지 않는다. 15분 초과와 `HISTORICAL_AUDIT`는 같은 전용 계약에 표시
+불가 사유를 기록하되 모든 사용자 표시·Spot·추천 플래그를 차단한다. Current 누락·
+중복, 파싱 실패, timezone-naive 또는 서울 외 시간대, 미래 Current와 시간 역전은
+공개 전에 실패한다.
+
+Current-only 행은 `CURRENT_AREA_STATE_ONLY_V1`·`CURRENT_STATE_ROW`로 식별한다.
+실제 Runtime 결과는 `operational_observation=true`이고 합성 결과가 아니며, 합성
+검증 결과는 `SYNTHETIC_CURRENT_ONLY_VALIDATION`·`synthetic_validation=true`·
+`operational_observation=false`로 Metadata와 Manifest 모두에 기록한다. 합성 결과는
+정책상 허용 여부를 `simulated_policy_outcome`으로만 보존하며 사용자 표시·운영 게시·
+운영 통계 사용은 모두 금지한다.
+
+이 임계값은 PoC 잠정값이며 운영 SLA가 아니다. 과거 1,027회에는
+`collection_purpose`, `run_mode`, `environment`, `schema_version`,
+`collector_runtime`, `is_test`가 없어 운영 모집단 성공률을 판정하지 않는다.
+필드 추가는 별도 수집 계약에서 다루며 이번 변경은 수집 스키마를 바꾸지 않는다.
+
+잠긴 Dataset의 같은 14:00 완전 Snapshot과 14:15 최신 Current를 사용한 역사 검증에서
+14:15 평가는 60분·180분 모두 `FRESH`, 14:35 평가는 60분
+`STALE_BLOCKED`·180분 `DEGRADED`, 다음 날 07:43 평가는 두 Horizon 모두
+`STALE_BLOCKED`였다. 세 결과는 실제 생성시각과 과거 평가시각을 분리한
+`HISTORICAL_AUDIT`로 저장소 밖 별도 Result Root에 새 Run으로 보존하며 사용자 표시
+적격 결과로 사용하지 않는다.
+
+생산 Builder 통합시험은 공개경로가 서울 시스템 평가시각을 한 번만 사용하고 완전
+Snapshot 경로에서 Area 표시·Spot 내부평가 조건을 기록하되 공식 추천은 계속
+차단함을 확인했다. 보완 전 합성 사례 D(10분)와 E(16분)는 기존 결과로 보존했으며,
+전용 Manifest SHA-256은 각각
+`a68edc5771e15126fd4da7bc3bf4591ea31225f7f09a470920735d37cc136ad0`,
+`93ed146a0eead42aa5cb958ae1c0938ffea28a60ed00c4d73940f61d9cab2c2d`다.
+식별 보완 후 합성 Fixture로 각 1회 생성한 D2
+`eg8d-area-priority-20260728T134259-kst`는 `CURRENT_ONLY_ALLOWED`, E2
+`eg8d-area-priority-20260728T134301-kst`는 `CURRENT_ONLY_BLOCKED` 정책 결과를
+기록했다. 두 결과의 실제 사용자 표시·운영 게시·운영 통계 플래그는 모두 false이며,
+전용 Manifest SHA-256은 각각
+`f743bc49955e7443e44ad7a331c7dbafae403093216d77d5fb8dc6db3970fa2b`,
+`11d1ff201926a2a77a56559cb27ae06c6340144b2640815590b1077b8de946e9`다.
+Runtime 전용 경로와 평가시각 주입 경로를 분리한 뒤에도 D2·E2는 허용된
+`SYNTHETIC_VALIDATION` 경로의 비운영 결과로 현재 계약을 그대로 충족한다.
+공통 실행부 Signature와 직접 호출 회귀시험은 과거시각 또는 `None`과 원시
+`RUNTIME` 조합을 전달할 수 없고, 공통 실행부가 시스템 시계를 읽지 않으며 실패 시
+결과 디렉터리·Metadata·Manifest를 만들지 않음을 확인한다. 이로써 마지막 내부
+Runtime 시작 계약 문제를 해소했다.
+실제 Builder 입력에서 고정 `+09:00` offset만 가진 시각을 만드는 경로는 확인되지
+않았다. 해당 입력을 향후 허용하려면 Core Gate를 완화하지 않고 입력 경계에서
+`ZoneInfo("Asia/Seoul")`로 정규화하는 별도 변경이 필요하다.
+
 2026-07-28 결정적 선택 보완 후 오프라인 결과 Run
 `eg8d-area-priority-20260728T074335-kst`는 잠긴 Dataset의 전체 1,027회 중 완전한
 86회를 확인하고 기존과 같은 회차 `6ebf1dab-8494-44e0-b598-80248f7f6ff0`을 자동
@@ -1160,6 +1243,8 @@ ANALYSIS_PLAN은 다음 조건을 만족해야 Approved 상태로 전환할 수 
 
 | 버전 | 날짜 | 변경내용 | 작성자 | 승인상태 |
 |---|---|---|---|---|
+| v0.1.9 | 2026-07-28 | EG-8D 공개 Runtime의 평가시각·모드 주입을 제거하고, Runtime 전용 시스템 시계 경로와 RUNTIME을 금지한 내부 감사·합성 주입경로, Current-only 행 유형과 합성 D2/E2 비운영 식별 계약을 §29.2.1에 반영 | 신동현 | PM 변경내용 검토 전 |
+| v0.1.8 | 2026-07-28 | EG-8D 60분·180분 Horizon별 `evaluation_time` 기반 최신성 잠정 Gate와 생산 Builder의 Current-only 전용 계약·Runtime 통합시험·사례 D/E를 §29.2.1에 추가; 공식 Recommendation과 수집 스키마는 변경하지 않음 | 신동현 | PM 변경내용 검토 전 |
 | v0.1.7 | 2026-07-28 | EG-8D 서울시 Forecast 기반 60분·180분 Area 예상 유동인구 변화·미래 인구 규모 독립 순위와 Horizon별 변화 요약을 §29.2에 반영; 양의 증가가 없는 180분 결과, 중간값·단일 Snapshot 한계와 공식 Recommendation Output·Spot·판매효과 제외 명시 | 신동현 | PM 변경내용 검토 전 |
 | v0.1.6 | 2026-07-27 | EG-8C 잠정 인구 중간값 회귀의 승인 입력·두 Baseline·Linear/Ridge·TRAIN 전용 전처리·Validation 판단과 1회 실행 결과를 §29.1에 반영; 서울시 Forecast 잠정 유지, 공식 Model Gate 미판정, 피크 예측 제외 | 신동현 | PM 변경내용 검토 전 |
 | v0.1.5 | 2026-07-24 | Spot Forecast 착수 전 사전조건 체크리스트(§6.6.1) 추가 — Spot 좌표·명칭 검증, 센서 좌표·거리·대표성 확인, Spot별 시계열·Ground Truth 확보, 최소 데이터기간, DIRECT/NEARBY 분리평가를 실행 전 확인 항목으로 정리 | 신동현 | PM 결정 |
