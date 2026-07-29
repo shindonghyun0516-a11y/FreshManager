@@ -1,11 +1,11 @@
 # Recommendation Output Contract
 
 - 문서 상태: Draft
-- 버전: v0.3.0
+- 버전: v0.4.0
 - 작성자: 신동현
 - 최종 승인자: 신동현
 - 최초 작성일: 2026-07-24
-- 최종 수정일: 2026-07-24
+- 최종 수정일: 2026-07-29
 - 적용 프로젝트: Freshmanager Data PoC
 - 관련 문서:
   - `AGENTS.md`
@@ -15,7 +15,8 @@
   - `docs/product/EG6_AREA_SPOT_PANEL.md`(Spot Candidate Anchor·S-DoT 정적 연결 정의)
   - `docs/data/ML_READY_DATASET_SPEC.md`(Area-Spot-Sensor 데이터 관계)
   - `docs/analysis/ANALYSIS_PLAN.md`(Spot Forecast 분석 가능성 조건)
-  - `ai-context/DECISION_LOG.md`의 D-003, D-004, D-005, D-006, D-008, D-009, D-015
+  - `docs/product/AREA_SPOT_RECOMMENDATION_AND_UI_POLICY.md`(원격 근거 정책)
+  - `ai-context/DECISION_LOG.md`의 D-003, D-004, D-005, D-006, D-008, D-009, D-015, D-019
 - 변경 시 PM 승인: 필요
 
 ---
@@ -40,6 +41,24 @@ Model Output(EG-8C)
 이 문서는 Recommendation MVP의 구현을 승인하지 않는다. Recommendation MVP
 Workstream의 공식 Engineering Gate 번호는 계속 `NOT_ASSIGNED`다(D-008,
 ai-context/ARCHITECTURE_DECISIONS.md ADR-011).
+
+### 1.1 데이터 기반 우선 후보와 이 계약의 경계
+
+D-019의 `데이터 기반 우선 후보`는 공식 Recommendation Output 전 단계의 원격
+근거 평가결과다. `recommendation_type=SPOT`이나 판매·운영 적합성을 뜻하지 않으며,
+이 계약의 구현을 우회하지 않는다. 현재 PoC에서는 다음 정책 상태를 평가문서에
+기록하되 생산 스키마 필드로 구현하지 않는다.
+
+```text
+verification_mode=REMOTE_EVIDENCE_ONLY
+field_verification_status=UNAVAILABLE
+operational_suitability_status=NOT_VERIFIED
+recommendation_scope=DATA_PRIORITY_ONLY
+```
+
+데이터 기반 우선 후보가 생겨도 §9.1의 공식 SPOT Recommendation Eligibility를
+통과한 것으로 취급하지 않는다. 현재 PoC는 §9.1 통과를 달성조건으로 삼지 않으며
+공식 SPOT Recommendation을 생성하지 않는다.
 
 **v0.2.0 범위 추가:** 이 문서는 처음에는 "어떤 Area 또는 Spot을 추천할지"만
 계약했다. v0.2.0부터는 "특정 Spot 자체의 현재·미래 혼잡 상태를 얼마나 직접적인
@@ -308,7 +327,8 @@ Spot(조합 A 또는 B)을 전제로 하며, §3.3 조합 C(현재 기본값)에
 필요성·대안을 먼저 보고한 뒤 추가한다.
 
 **현재 13개 Spot은 전부 `field_verified=false`이므로 이 조건을 만족하지
-않는다. 즉 현재 상태에서는 `recommendation_type = SPOT`을 사용할 수 없다**
+않는다. D-019의 원격 준비도 점수나 데이터 기반 우선 후보도 이 값을 바꾸지 않는다.
+현재 PoC에서는 `recommendation_type = SPOT`을 사용하지 않는다**
 (§3.3 조합 C가 현재의 기본 조합이다).
 
 ### 9.2 Spot Forecast Eligibility
@@ -342,7 +362,7 @@ B에서는 §6 필드를 애초에 채우지 않기 때문이다.
 다음과 같다.
 
 ```text
-fallback_reason = NO_FIELD_VERIFIED_SPOT
+fallback_reason = NO_ELIGIBLE_SPOT
 ```
 
 ## 11. 공통 필드 후보
@@ -392,7 +412,7 @@ fallback_reason = NO_FIELD_VERIFIED_SPOT
 
 | 값 | 의미 |
 |---|---|
-| `FIELD_VALIDATION_REQUIRED` | 현재 13개 Spot의 기본값. 현장검증이 아직 필요함 |
+| `FIELD_VALIDATION_REQUIRED` | 기존 Spot Master의 현재 기본값. D-019 원격 평가상태와 별개 |
 | `VERIFIED` | 현장검증·운영 적합성 확인 완료. §9.1 Eligibility의 통과 조건 |
 
 `VERIFIED`로의 전환 절차와 판정 기준은 이 문서가 정의하지 않으며 별도 Issue와
@@ -421,7 +441,7 @@ UI/UX 상세 설계에서 정한다. 코드 후보 예시:
 - `PEAK_APPROACHING`
 - `AREA_RANK_HIGH`
 - `DATA_FRESH`
-- `NO_FIELD_VERIFIED_SPOT`
+- `NO_ELIGIBLE_SPOT`
 
 실제 최종 Enum은 PM 승인 전까지 확정하지 않는다.
 
@@ -480,6 +500,7 @@ UI/UX 상세 설계에서 정한다. 코드 후보 예시:
 
 | 버전 | 날짜 | 변경내용 | 작성자 | 승인상태 |
 |---|---|---|---|---|
+| v0.4.0 | 2026-07-29 | D-019의 데이터 기반 우선 후보를 공식 Recommendation Output 전 단계로 분리. 원격 검증 정책값과 운영 적합성 미검증 경계를 추가하고 현재 PoC가 공식 SPOT Recommendation을 생성하지 않음을 명시 | 신동현 | PM 결정 |
 | v0.3.0 | 2026-07-24 | SPOT+SPOT/SPOT+AREA/AREA+AREA/AREA+SPOT 4개 조합을 명시적으로 계약화(§3.1~3.4). Spot Recommendation Eligibility(§9.1)와 Spot Forecast Eligibility(§9.2)를 분리해 `field_verified`/`validation_status`의 값 기준(단순 존재가 아니라 `true`/`VERIFIED`)을 명확히 함. `validation_status` 값 공간에 `VERIFIED` 추가(§12). AREA-scope일 때 Spot Forecast 필드가 명시적 null임을 명시(§6). 근거 수준·조합별 UI 표현표에 조합 B 예시와 금지 예시 추가(§8) | 신동현 | PM 결정 |
 | v0.2.0 | 2026-07-24 | Spot Identity·Prediction Scope·Spatial Evidence·Spot Forecast Content 계약 추가. Forecast Summary/Reason Codes/Action Message 3계층 분리와 근거 수준별 UI 표현 규칙 추가. 기존 S-DoT 정적 연결과 `spatial_support_type`의 관계 명시. null/필드 생략 계약 명시 | 신동현 | PM 결정 |
 | v0.1.0 | 2026-07-24 | 최초 초안 작성(EG-8E Recommendation Output 목표 계약) | 신동현 | PM 결정 |

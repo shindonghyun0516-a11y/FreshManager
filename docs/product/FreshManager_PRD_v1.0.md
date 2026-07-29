@@ -84,8 +84,8 @@ EG-4에서 여의도 POI072 실제 응답과 원본·메타데이터 저장을 �
 | --- | --- | --- | --- |
 | PM/PO 신동현 | PoC 운영자·최종 승인자 | 비개발자도 실행·판정 가능한 증거 | 범위, 실제 호출, 다음 Gate, Merge |
 | 분석 담당자 | 현재 시스템의 직접 사용자 | 재현 가능한 수집·품질·분석 데이터 | 분석 실행·리포트 작성 |
-| 프레시매니저 | 장기 목표 사용자 | 이동 가능한 후보 시간·장소와 이유 | 후속 Gate C 인터뷰·현장 수용 |
-| hy 이해관계자 | 후속 제휴·실증 검토자 | 과대해석 없는 정량 근거와 한계 | 내부 데이터·현장 실증 승인 |
+| 프레시매니저 | 장기 목표 사용자 | 이동 가능한 후보 시간·장소와 이유 | 후속 화면 기반 사용성 검토 |
+| hy 이해관계자 | 후속 제휴·실증 검토자 | 과대해석 없는 정량 근거와 한계 | 내부 데이터·운영 실증 승인 |
 | Codex/개발 지원 | 구현·검증·문서화 보조 | 명확한 계약·승인 경계·자동검사 | 독자 승인권 없음 |
 
 ## 4. 제품 원칙
@@ -95,8 +95,9 @@ EG-4에서 여의도 POI072 실제 응답과 원본·메타데이터 저장을 �
 **유동인구 ≠ 매출:** 인구·혼잡은 기회와 운영 난이도의 대리신호이며, 카드소비는 일반 소비활동 대리변수다.
 
 **Area ≠ Spot:** 서울시 Area 수집값을 특정 출구·건물 앞 보행량으로 표현하지 않는다.
-Spot은 고정 판매 위치가 아니라 Area·S-DoT·공간 Context와 현장검증을 바탕으로
-생성하는 판매 후보 위치다.
+Spot은 고정 판매 위치가 아니라 Area·S-DoT·공간 Context와 원격 근거를 바탕으로
+구성하는 판매 후보 위치다. 현재 PoC에서는 현장검증을 할 수 없으며 최대 출력은
+데이터 기반 우선 후보다.
 
 **시점 무결성:** 요청·관측·예측 스냅샷·예측 대상·후속 관측 시각을 분리하고 미래정보 누수를 금지한다.
 
@@ -109,10 +110,11 @@ Spot은 고정 판매 위치가 아니라 Area·S-DoT·공간 Context와 현장�
 **로컬 원본 우선:** 로컬 Raw·Metadata·Collection Log·Manifest가 공식 원본이다.
 Google Drive에는 검증된 복사본을 자동 백업하며 백업 실패는 API 재호출 사유가 아니다.
 
-**추천 대상 우선순위:** 신뢰할 수 있고 추천 가능한 Spot이 있으면 반드시
-`target_level=SPOT`을 사용한다. Spot이 없거나 운영 가능성이 미확인일 때만
-`target_level=AREA`와 필수 `fallback_reason`을 사용한다. 현재
-`STATION_CENTER_PROXY`는 검증된 판매 Spot이 아니다.
+**결과 수준:** 원격 근거가 충분한 Spot은 `recommendation_scope=DATA_PRIORITY_ONLY`인
+데이터 기반 우선 후보로만 기록한다. 근거가 부족하면 판매 후보 또는 AREA 안내로
+하향한다. 현재 `STATION_CENTER_PROXY`는 실제 Spot이나 검증된 판매 위치가 아니다.
+`operational_suitability_status=NOT_VERIFIED`를 유지하며 공식 Recommendation
+Output의 `target_level=SPOT`으로 자동 승격하지 않는다.
 
 ## 5. 목표와 비목표
 
@@ -171,9 +173,9 @@ UI는 Model Output을 직접 소비하지 않고 Recommendation Output만 소비
 - 별도 PM Live 승인 없는 실제 5분 반복수집·자동 재시도·클라우드 실행
 
 이 현재 PoC 비목표는 장기 제품 목표에서의 영구 제외를 뜻하지 않는다. 실제 Spot
-좌표와 Area 내부 복수 후보, Spot별 동적·정적 근거, 접근성·안전·판매 가능성,
-현장검증과 사용자 이동·준비 가능시간이 확보되면 별도 승인 후 실제 Spot과 판매시간
-추천으로 확장할 수 있다.
+좌표와 Area 내부 복수 후보, Spot별 동적·정적 근거, 반복성·Backtesting과 원격
+운영제한 자료가 확보되면 데이터 기반 우선 후보까지 검토할 수 있다. 실제 안전·
+카트 정차·판매 허용과 운영 적합성은 별도 운영기관 확인 없이는 확정하지 않는다.
 
 ## 6. 범위 모델
 
@@ -385,13 +387,14 @@ Area 단위 api_error, timeout, parse_error, validation_error는 해당 결과�
 
 ### 8.16 FR-14 Spot Candidate·SPOT 우선·AREA fallback
 
-Spot Candidate는 Area 데이터와 S-DoT 근접성·공간 Context·현장검증 상태로 생성한다.
-추천 기능을 후속 구현할 때 근거가 충분하고 운영 가능한 후보가 있으면 반드시 SPOT을
-추천한다. 후보 근거가 부족하거나 현장 운영 가능성이 확인되지 않으면 AREA로 fallback하고
-이유를 기록한다.
+Spot Candidate는 Area 데이터, 선택적 S-DoT 또는 대체 동적 근거와 공식 위치·시설
+Context로 구성한다. 원격 근거가 충분하면 데이터 기반 우선 후보로 기록하고,
+근거가 부족하면 판매 후보 또는 AREA로 하향해 이유를 기록한다.
 
-- `target_level=SPOT`: 신뢰 가능한 Spot과 현장 운영 가능성이 확인됨
-- `target_level=AREA`: 추천 가능한 Spot이 없거나 운영 가능성이 미확인
+- `recommendation_scope=DATA_PRIORITY_ONLY`: 원격 근거 비교의 우선 후보이며 공식 추천 아님
+- `target_level=AREA`: 데이터 기반 우선 후보 조건이 충족되지 않음
+- `field_verification_status=UNAVAILABLE`: 현재 PoC의 현장검증 불가
+- `operational_suitability_status=NOT_VERIFIED`: 판매·안전·정차·운영 적합성 미확인
 - AREA fallback에는 `fallback_reason`이 필수다.
 - Area Observation은 특정 출구나 Spot의 직접 유동인구가 아니다.
 - 동적 S-DoT 관측과 Spot Candidate Evaluation 오류가 EG-6B Area 수집을 중단시키면 안 된다.
@@ -457,7 +460,7 @@ Spot Candidate는 Area 데이터와 S-DoT 근접성·공간 Context·현장검�
 - 예측: 리드타임별 MAE·RMSE·상대오차·예측범위 포함률·혼잡 등급 일치율
 - 패턴: 요일·시간 기준선, 변동성, 피크 지속시간, 비관행 피크 반복 횟수
 - 운영성: 한 회차 소요시간, 호출량, 저장공간 증가량, 백업 성공·복구 검증
-- 서비스 연결성: 이동 가능한 리드타임, Candidate Evidence Assessment, Area–Spot 해석 적합성, 현장 검증 필요 비율
+- 서비스 연결성: 이동 가능한 리드타임, Candidate Evidence Assessment, Area–Spot 해석 적합성, 원격 근거 충족률
 
 ## 11. 실험 설계와 데이터 기간
 
@@ -503,7 +506,7 @@ Spot Candidate는 Area 데이터와 S-DoT 근접성·공간 Context·현장검�
    - R7E EG-8E: Recommendation Output Contract·UI/UX Readiness(Recommendation MVP
      구현이 아님)
 9. R8 후속 — Recommendation MVP Workstream(`PLANNED`, Gate number `NOT_ASSIGNED`, 별도 PM 승인)
-10. R9 후속 — Gate C 인터뷰, 현장 Spot 검증, 필요 시 121개 확대·Gate D 설계
+10. R9 후속 — 화면 기반 사용성 검토, 원격 Spot 근거 검증, 필요 시 121개 확대·Gate D 설계
 
 ## 13. 의존성
 
@@ -515,7 +518,7 @@ Spot Candidate는 Area 데이터와 S-DoT 근접성·공간 Context·현장검�
 | 백업 | Google Drive for Desktop Sync 논리 루트와 별도 즉시 Backup Worker | EG-6B Live 선행 준비 |
 | CSV | 첫 실제 Batch의 필드·결측·Forecast 구조 | 품질 감사 후 별도 Issue |
 | 분석 데이터 | 예측 스냅샷·후속 관측 영속화와 시간 정렬 | EG-7/8 구현 |
-| 현장 연결 | 담당구역·이동시간·재고·판매 가능 공간 | Gate C/D |
+| 운영 연결 | 담당구역·이동시간·재고·판매 가능 공간 | 별도 운영기관 확인·Gate C/D |
 | 법적 | 공공누리 출처표시·재배포 범위 | 대외 공개 전 확인 |
 
 ## 14. 리스크와 대응
@@ -523,7 +526,7 @@ Spot Candidate는 Area 데이터와 S-DoT 근접성·공간 Context·현장검�
 | **ID** | **리스크** | **영향** | **대응** |
 | --- | --- | --- | --- |
 | R-01 | 유동인구를 매출로 오해 | 높음 | 표현 통제·판매 데이터 없이 성과 주장 금지 |
-| R-02 | Area가 실제 Spot보다 넓음 | 높음 | Area–Spot 분리·현장 검증·S-DoT 보조 |
+| R-02 | Area가 실제 Spot보다 넓음 | 높음 | Area–Spot 분리·원격 다중근거·선택적 S-DoT 보조·운영 적합성 미확인 표시 |
 | R-03 | 예측 발행시각 부재 | 중간 | requested_at을 스냅샷으로 보존하되 명칭 과대해석 금지 |
 | R-04 | API 지연·결측·스키마 변경 | 높음 | 품질 지표·원본 보존·명시적 실패 상태 |
 | R-05 | 반복수집 중 저장 손실 | 높음 | 불변 저장·Manifest·백업 Gate·복구 시험 |
@@ -592,7 +595,8 @@ Spot Candidate는 Area 데이터와 S-DoT 근접성·공간 Context·현장검�
 | **용어** | **정의** |
 | --- | --- |
 | Area | 서울시 실시간 도시데이터가 제공하는 공식 공간 단위 |
-| Spot Candidate | Area·S-DoT 근접성·공간 Context·현장검증으로 생성하는 판매 후보 위치 |
+| Spot Candidate | Area·선택적 S-DoT 또는 대체 동적 근거·공식 공간 Context로 구성하는 판매 후보 위치 |
+| 데이터 기반 우선 후보 | 복수 후보의 원격 근거·반복성·최신성·불확실성 조건을 충족한 비교우위 후보; 공식 추천이나 판매 적합성 보장 아님 |
 | Candidate Anchor Point | 후보 생성의 출발점; 현재 Spot Master의 역 중심 대리좌표이며 판매 Spot 확정값이 아님 |
 | S-DoT | Area 내부 활성 위치 판단을 보조하는 독립 센서 계층; Area 대체값이나 판매량이 아님 |
 | 예측 스냅샷 | 한 수집시점에 확보한 미래 예측 묶음 |
@@ -608,5 +612,6 @@ Spot Candidate는 Area 데이터와 S-DoT 근접성·공간 Context·현장검�
 
 | 버전 | 날짜 | 변경내용 | 승인상태 |
 |---|---|---|---|
+| v1.2 | 2026-07-29 | 현장검증 불가 전제의 원격 근거 기반 Spot 후보 정책을 반영. 현재 PoC 최대 결과를 데이터 기반 우선 후보로 제한하고 운영 적합성 미검증을 명시 | PM 결정 D-019 |
 | v1.1 | 2026-07-24 | EG-8을 상위 Gate로 유지하고 EG-8A~EG-8E로 세분화. PoC 범위에 미래 Area 인구·피크 예측, Area/Spot Ranking, Recommendation Output Contract, UI/UX 설계·와이어프레임·프로토타입을 포함. 판매량·매출 예측, 상용 앱·웹 출시, 실시간 서빙·MLOps는 계속 비목표. §5.2~5.4, §10.1, §12, 부록A 갱신 | PM 결정 |
 | v1.0 | 2026-07-22 | 최초 공식 제품 기준 확정 | PM 승인 |
