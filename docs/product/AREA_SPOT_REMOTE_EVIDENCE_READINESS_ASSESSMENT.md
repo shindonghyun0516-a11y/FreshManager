@@ -9,8 +9,9 @@
 ## 1. 목적
 
 현장검증을 할 수 없는 FreshManager PoC에서 승인된 13개 Area가 복수 Spot 후보의
-원격 비교를 시작할 준비가 어느 정도인지 평가한다. 이 평가는 판매 적합성이나 추천
-성능 평가가 아니다. 실제 Spot 등록, 좌표 생성, 데이터 수집과 추천 실행도 아니다.
+원격 비교를 시작할 준비가 어느 정도인지 1차로 평가한다. 이 점수는 원격 근거를
+발견·확인한 준비도이며 판매 적합성, 추천 성능이나 최종 사업 우선순위가 아니다.
+실제 Spot 등록, 좌표 생성, 데이터 수집과 추천 실행도 아니다.
 
 ## 2. 현장검증 불가 전제
 
@@ -55,8 +56,9 @@ Area와 역 단위 자료를 특정 Spot의 직접값으로 바꾸지 않는다.
 | 자료 최신성·품질 | 10 | 갱신주기가 공개된 출처의 존재만 일부 인정; 실제 행 최신성은 미확인 |
 | 제한·불확실성 관리 | 5 | 직접값과 대리값, 미확인 운영 적합성을 명시한 경우 인정 |
 
-점수는 객관적 성능값이나 판매 적합성 점수가 아니다. 공식 자료의 특정 Area 행을
-확인하지 않은 상태에서 후보 수·좌표·동적값을 추정하지 않았다.
+점수는 객관적 성능값이나 판매 적합성 점수가 아니다. Area별 공식 자료 확인 깊이가
+같지 않으므로 현재 점수만으로 최종 우선 Area를 고를 수 없다. 공식 자료의 특정
+Area 행을 확인하지 않은 상태에서 후보 수·좌표·동적값을 추정하지 않았다.
 
 ## 6. 13개 Area 준비도 Matrix
 
@@ -64,42 +66,52 @@ Area와 역 단위 자료를 특정 Spot의 직접값으로 바꾸지 않는다.
 동적 직접근거와 Spot Backtesting은 `NOT_CONFIRMED`, 운영 적합성은
 `NOT_VERIFIED`다. S-DoT 등급은 기존 Anchor 기준 정적 연결이며 Spot 직접관측이 아니다.
 
-| Area ID·이름 | 현재 Anchor | 실제 후보 구성 가능성·공식 위치근거 | 비교 후보 수 | S-DoT | 직접·대리 동적근거 | 반복·Backtesting | 원격 운영근거 | 주요 공백 | 준비도 | 증거수준 | 판단 |
-|---|---|---|---:|---|---|---|---|---|---:|---|---|
-| `POI019` 구로디지털단지역 | `SPOT-EG6-001` 역 중심 | LOW; 공통 역세권 자료의 해당 행 미확인 | 0 | 미지원 | 직접 `NOT_CONFIRMED`; 역·Area 대리 가능성만 있음 | Spot 반복·Backtesting `NOT_READY` | 출입구 자료 가능, 제한 `NOT_CONFIRMED` | 후보 좌표·복수비교·동적값 | 18/100 | LOW | 보류 |
-| `POI013` 가산디지털단지역 | `SPOT-EG6-002` 역 중심 | LOW; 공통 역세권 자료의 해당 행 미확인 | 0 | 미지원 | 직접 `NOT_CONFIRMED`; 역·Area 대리 가능성만 있음 | Spot 반복·Backtesting `NOT_READY` | 출입구 자료 가능, 제한 `NOT_CONFIRMED` | 후보 좌표·복수비교·동적값 | 18/100 | LOW | 보류 |
-| `POI014` 강남역 | `SPOT-EG6-003` 역 중심 | LOW; 공통 출입구 자료의 해당 행 미확인 | 0 | 직접 후보 | 직접 `NOT_CONFIRMED`; 정적 S-DoT·역·Area 대리 가능 | Spot 반복·Backtesting `NOT_READY` | 출입구 자료 가능, 제한 `NOT_CONFIRMED` | 실제 후보와 센서 측정범위 | 22/100 | LOW | 예비후보 |
-| `POI072` 여의도 | `SPOT-EG6-004` 역 중심 | LOW; 공통 역세권 자료의 해당 행 미확인 | 0 | 미지원 | 직접 `NOT_CONFIRMED`; 역·Area 대리 가능성만 있음 | Spot 반복·Backtesting `NOT_READY` | 출입구 자료 가능, 제한 `NOT_CONFIRMED` | 후보 좌표·복수비교·동적값 | 18/100 | LOW | 보류 |
-| `POI001` 강남 MICE 관광특구 | `SPOT-EG6-005` 삼성역 중심 | MEDIUM; 코엑스 공식 진입로·시설구역 출처 있음, 후보 미등록 | 0 | 미지원 | 직접 `NOT_CONFIRMED`; 역·Area 대리 가능성만 있음 | Spot 반복·Backtesting `NOT_READY` | 공식 진입·시설정보 있음, 판매 허용 `NOT_CONFIRMED` | 후보 좌표·동적 비교·점유 제한 | 25/100 | MEDIUM | PM 검토용 우선 Area 후보 |
-| `POI034` 선릉역 | `SPOT-EG6-006` 역 중심 | LOW; 공통 출입구 자료의 해당 행 미확인 | 0 | 인근 | 직접 `NOT_CONFIRMED`; 인근 S-DoT·역·Area 대리 가능 | Spot 반복·Backtesting `NOT_READY` | 출입구 자료 가능, 제한 `NOT_CONFIRMED` | 실제 후보와 센서 측정범위 | 20/100 | LOW | 보류 |
-| `POI042` 역삼역 | `SPOT-EG6-007` 역 중심 | LOW; 공통 출입구 자료의 해당 행 미확인 | 0 | 미지원 | 직접 `NOT_CONFIRMED`; 역·Area 대리 가능성만 있음 | Spot 반복·Backtesting `NOT_READY` | 출입구 자료 가능, 제한 `NOT_CONFIRMED` | 후보 좌표·복수비교·동적값 | 18/100 | LOW | 보류 |
-| `POI025` 뚝섬역 | `SPOT-EG6-008` 역 중심 | LOW; 공통 출입구 자료의 해당 행 미확인 | 0 | 직접 후보 | 직접 `NOT_CONFIRMED`; 정적 S-DoT·역·Area 대리 가능 | Spot 반복·Backtesting `NOT_READY` | 출입구 자료 가능, 제한 `NOT_CONFIRMED` | 실제 후보와 센서 측정범위 | 22/100 | LOW | 예비후보 |
-| `POI088` 광화문광장 | `SPOT-EG6-009` 광화문역 중심 | MEDIUM; 공식 광장 구역·진입·이용정보 출처 있음, 후보 미등록 | 0 | 인근 | 직접 `NOT_CONFIRMED`; 인근 S-DoT·Area 대리 가능 | Spot 반복·Backtesting `NOT_READY` | 광장 이용절차 있음, 판매 허용 `NOT_CONFIRMED` | 후보 좌표·동적 비교·행사 영향 | 27/100 | MEDIUM | PM 검토용 우선 Area 후보 |
-| `POI003` 명동 관광특구 | `SPOT-EG6-010` 을지로입구역 중심 | LOW; 공통 출입구 자료의 해당 행 미확인 | 0 | 인근 | 직접 `NOT_CONFIRMED`; 인근 S-DoT·역·Area 대리 가능 | Spot 반복·Backtesting `NOT_READY` | 출입구 자료 가능, 제한 `NOT_CONFIRMED` | 실제 후보와 센서 측정범위 | 20/100 | LOW | 보류 |
-| `POI119` 잠실역 | `SPOT-EG6-011` 역 중심 | LOW; 공통 출입구 자료의 해당 행 미확인 | 0 | 인근 | 직접 `NOT_CONFIRMED`; 인근 S-DoT·역·Area 대리 가능 | Spot 반복·Backtesting `NOT_READY` | 출입구 자료 가능, 제한 `NOT_CONFIRMED` | 실제 후보와 센서 측정범위 | 20/100 | LOW | 보류 |
-| `POI033` 서울역 | `SPOT-EG6-012` 역 중심 | LOW; 공통 역세권 자료의 해당 행 미확인 | 0 | 미지원 | 직접 `NOT_CONFIRMED`; 역·Area 대리 가능성만 있음 | Spot 반복·Backtesting `NOT_READY` | 출입구 자료 가능, 제한 `NOT_CONFIRMED` | 후보 좌표·복수비교·동적값 | 18/100 | LOW | 보류 |
-| `POI032` 서울식물원·마곡나루역 | `SPOT-EG6-013` 역 중심 | MEDIUM; 공식 공원 안내도에 진입로·구역 있음, 후보 미등록 | 0 | 직접 후보 | 직접 `NOT_CONFIRMED`; 정적 S-DoT·역·Area 대리 가능 | Spot 반복·Backtesting `NOT_READY` | 공식 시설안내 있음, 판매 허용 `NOT_CONFIRMED` | 후보 좌표·동적 비교·운영 제한 | 29/100 | MEDIUM | PM 검토용 우선 Area 후보 |
+`자료 확인수준`은 다음 세 값으로 구분한다. `AREA_SPECIFIC_CONFIRMED`는 Area별
+공식 자료 내용을 확인한 상태, `COMMON_SOURCE_ROW_CONFIRMED`는 공통 공식자료의
+해당 Area 행을 확인한 상태, `COMMON_SOURCE_ROW_NOT_CONFIRMED`는 공통 출처의 존재만
+확인하고 해당 행은 이번 조사에서 확인하지 않은 상태다. 마지막 값은 자료나 행이
+없다는 뜻이 아니다.
+
+| Area ID·이름 | 현재 Anchor | 실제 후보 구성 가능성·공식 위치근거 | 자료 확인수준 | 비교 후보 수 | S-DoT | 직접·대리 동적근거 | 반복·Backtesting | 원격 운영근거 | 주요 공백 | 준비도 | 증거수준 | 판단 |
+|---|---|---|---|---:|---|---|---|---|---|---:|---|---|
+| `POI019` 구로디지털단지역 | `SPOT-EG6-001` 역 중심 | LOW; 공통 역세권 자료의 해당 행 미확인 | `COMMON_SOURCE_ROW_NOT_CONFIRMED` | 0 | 미지원 | 직접 `NOT_CONFIRMED`; 역·Area 대리 가능성만 있음 | Spot 반복·Backtesting `NOT_READY` | 출입구 자료 가능, 제한 `NOT_CONFIRMED` | 후보 좌표·복수비교·동적값 | 18/100 | LOW | 보류 |
+| `POI013` 가산디지털단지역 | `SPOT-EG6-002` 역 중심 | LOW; 공통 역세권 자료의 해당 행 미확인 | `COMMON_SOURCE_ROW_NOT_CONFIRMED` | 0 | 미지원 | 직접 `NOT_CONFIRMED`; 역·Area 대리 가능성만 있음 | Spot 반복·Backtesting `NOT_READY` | 출입구 자료 가능, 제한 `NOT_CONFIRMED` | 후보 좌표·복수비교·동적값 | 18/100 | LOW | 보류 |
+| `POI014` 강남역 | `SPOT-EG6-003` 역 중심 | LOW; 공통 출입구 자료의 해당 행 미확인 | `COMMON_SOURCE_ROW_NOT_CONFIRMED` | 0 | 직접 후보 | 직접 `NOT_CONFIRMED`; 정적 S-DoT·역·Area 대리 가능 | Spot 반복·Backtesting `NOT_READY` | 출입구 자료 가능, 제한 `NOT_CONFIRMED` | 실제 후보와 센서 측정범위 | 22/100 | LOW | 예비후보 |
+| `POI072` 여의도 | `SPOT-EG6-004` 역 중심 | LOW; 공통 역세권 자료의 해당 행 미확인 | `COMMON_SOURCE_ROW_NOT_CONFIRMED` | 0 | 미지원 | 직접 `NOT_CONFIRMED`; 역·Area 대리 가능성만 있음 | Spot 반복·Backtesting `NOT_READY` | 출입구 자료 가능, 제한 `NOT_CONFIRMED` | 후보 좌표·복수비교·동적값 | 18/100 | LOW | 보류 |
+| `POI001` 강남 MICE 관광특구 | `SPOT-EG6-005` 삼성역 중심 | MEDIUM; 코엑스 공식 진입로·시설구역 출처 있음, 후보 미등록 | `AREA_SPECIFIC_CONFIRMED` | 0 | 미지원 | 직접 `NOT_CONFIRMED`; 역·Area 대리 가능성만 있음 | Spot 반복·Backtesting `NOT_READY` | 공식 진입·시설정보 있음, 판매 허용 `NOT_CONFIRMED` | 후보 좌표·동적 비교·점유 제한 | 25/100 | MEDIUM | 동일기준 추가확인 대상 Shortlist |
+| `POI034` 선릉역 | `SPOT-EG6-006` 역 중심 | LOW; 공통 출입구 자료의 해당 행 미확인 | `COMMON_SOURCE_ROW_NOT_CONFIRMED` | 0 | 인근 | 직접 `NOT_CONFIRMED`; 인근 S-DoT·역·Area 대리 가능 | Spot 반복·Backtesting `NOT_READY` | 출입구 자료 가능, 제한 `NOT_CONFIRMED` | 실제 후보와 센서 측정범위 | 20/100 | LOW | 보류 |
+| `POI042` 역삼역 | `SPOT-EG6-007` 역 중심 | LOW; 공통 출입구 자료의 해당 행 미확인 | `COMMON_SOURCE_ROW_NOT_CONFIRMED` | 0 | 미지원 | 직접 `NOT_CONFIRMED`; 역·Area 대리 가능성만 있음 | Spot 반복·Backtesting `NOT_READY` | 출입구 자료 가능, 제한 `NOT_CONFIRMED` | 후보 좌표·복수비교·동적값 | 18/100 | LOW | 보류 |
+| `POI025` 뚝섬역 | `SPOT-EG6-008` 역 중심 | LOW; 공통 출입구 자료의 해당 행 미확인 | `COMMON_SOURCE_ROW_NOT_CONFIRMED` | 0 | 직접 후보 | 직접 `NOT_CONFIRMED`; 정적 S-DoT·역·Area 대리 가능 | Spot 반복·Backtesting `NOT_READY` | 출입구 자료 가능, 제한 `NOT_CONFIRMED` | 실제 후보와 센서 측정범위 | 22/100 | LOW | 예비후보 |
+| `POI088` 광화문광장 | `SPOT-EG6-009` 광화문역 중심 | MEDIUM; 공식 광장 구역·진입·이용정보 출처 있음, 후보 미등록 | `AREA_SPECIFIC_CONFIRMED` | 0 | 인근 | 직접 `NOT_CONFIRMED`; 인근 S-DoT·Area 대리 가능 | Spot 반복·Backtesting `NOT_READY` | 광장 이용절차 있음, 판매 허용 `NOT_CONFIRMED` | 후보 좌표·동적 비교·행사 영향 | 27/100 | MEDIUM | 동일기준 추가확인 대상 Shortlist |
+| `POI003` 명동 관광특구 | `SPOT-EG6-010` 을지로입구역 중심 | LOW; 공통 출입구 자료의 해당 행 미확인 | `COMMON_SOURCE_ROW_NOT_CONFIRMED` | 0 | 인근 | 직접 `NOT_CONFIRMED`; 인근 S-DoT·역·Area 대리 가능 | Spot 반복·Backtesting `NOT_READY` | 출입구 자료 가능, 제한 `NOT_CONFIRMED` | 실제 후보와 센서 측정범위 | 20/100 | LOW | 보류 |
+| `POI119` 잠실역 | `SPOT-EG6-011` 역 중심 | LOW; 공통 출입구 자료의 해당 행 미확인 | `COMMON_SOURCE_ROW_NOT_CONFIRMED` | 0 | 인근 | 직접 `NOT_CONFIRMED`; 인근 S-DoT·역·Area 대리 가능 | Spot 반복·Backtesting `NOT_READY` | 출입구 자료 가능, 제한 `NOT_CONFIRMED` | 실제 후보와 센서 측정범위 | 20/100 | LOW | 보류 |
+| `POI033` 서울역 | `SPOT-EG6-012` 역 중심 | LOW; 공통 역세권 자료의 해당 행 미확인 | `COMMON_SOURCE_ROW_NOT_CONFIRMED` | 0 | 미지원 | 직접 `NOT_CONFIRMED`; 역·Area 대리 가능성만 있음 | Spot 반복·Backtesting `NOT_READY` | 출입구 자료 가능, 제한 `NOT_CONFIRMED` | 후보 좌표·복수비교·동적값 | 18/100 | LOW | 보류 |
+| `POI032` 서울식물원·마곡나루역 | `SPOT-EG6-013` 역 중심 | MEDIUM; 공식 공원 안내도에 진입로·구역 있음, 후보 미등록 | `AREA_SPECIFIC_CONFIRMED` | 0 | 직접 후보 | 직접 `NOT_CONFIRMED`; 정적 S-DoT·역·Area 대리 가능 | Spot 반복·Backtesting `NOT_READY` | 공식 시설안내 있음, 판매 허용 `NOT_CONFIRMED` | 후보 좌표·동적 비교·운영 제한 | 29/100 | MEDIUM | 동일기준 추가확인 대상 Shortlist |
 
 점수 구성은 일반 Area가 위치 5, 동적 4~8, 반복 2, Backtesting 0, 최신성 2,
 한계관리 5점이다. 공식 시설·진입 자료가 별도로 확인된 세 Area만 위치근거를
 12점으로 평가했다. S-DoT 직접 후보 8점, 인근 후보 6점, 미지원 4점은 **확보
 가능성**만 반영하며 동적 직접관측으로 인정하지 않는다.
 
-## 7. PM 검토용 우선 Area 2~3개
+## 7. 동일기준 추가확인 대상 Shortlist
 
 1. **서울식물원·마곡나루역(29점):** 공식 안내도와 진입구역, Anchor 기준
    `DIRECT_COVERAGE`가 있다. 실제 후보 좌표·센서 측정범위·판매 제한은 미확인이다.
 2. **광화문광장(27점):** 공식 구역·이용절차 자료와 `NEARBY_SUPPORT`가 있다.
    행사·점유조건과 후보별 동적 비교는 미확인이다.
 3. **강남 MICE 관광특구(25점):** 코엑스 공식 진입로·시설구역 자료로 후보 구성을
-   시작할 수 있다. S-DoT 인접 지원과 판매 허용 여부는 미확인이다.
+   시작할 수 있다. 현재 Anchor 기준 S-DoT는 미지원이다. 실제 후보 Spot 좌표를
+   확보한 후 인접 센서 또는 센서군을 재탐색할 수 있는지는 미확인이다.
 
-세 곳 모두 **최종 선정 Area**, 공식 추천 Area 또는 판매 적합 Area가 아니다.
-추천 신뢰도는 자료 준비도 기준 `LOW~MEDIUM`이며 운영 적합성은 미검증이다.
+세 곳은 Area별 공식 출처가 먼저 확인돼 추가조사를 시작하기 쉬운 1차 Shortlist일
+뿐이다. **최종 선정 Area**, 사업 적합성 우수 Area, 공식 추천 Area 또는 판매 적합
+Area가 아니며, 다른 10개보다 실제 준비도가 높다고 결론내릴 수 없다. 13개 Area에
+같은 최소 근거 확인을 적용한 뒤에만 최종 우선 Area를 제안할 수 있다. 추천 신뢰도는
+자료 준비도 기준 `LOW~MEDIUM`이며 운영 적합성은 미검증이다.
 
 ## 8. 실제 Spot 후보 구성 가능성
 
-세 우선 Area는 공식 명칭이 있는 진입로·광장 구역·공원 구역을 바탕으로 후보 목록을
+세 Shortlist Area는 공식 명칭이 있는 진입로·광장 구역·공원 구역을 바탕으로 후보 목록을
 만들 가능성이 있다. 이번 조사에서는 특정 출구나 구역을 Spot으로 등록하지 않았고
 좌표도 수집·생성하지 않았다. 나머지 10개 Area도 공통 역세권·출입구 자료의 실제
 행을 확인한 뒤 후보 구성 가능성을 다시 판정해야 한다.
@@ -143,7 +155,8 @@ Area와 역 단위 자료를 특정 Spot의 직접값으로 바꾸지 않는다.
 
 ## 13. 후속 작업구조
 
-PM이 우선 Area를 선택한 뒤에만 다음을 각각 별도 승인한다.
+13개 Area에 동일한 최소 근거 확인을 적용하고 PM이 최종 우선 Area를 선택한 뒤에만
+다음을 각각 별도 승인한다.
 
 1. 실제 Spot 후보 범위 승인
 2. 공식 위치·근거 Dataset 구성
@@ -159,9 +172,9 @@ PM이 우선 Area를 선택한 뒤에만 다음을 각각 별도 승인한다.
 
 ## 14. PM 결정사항
 
-다음 한 가지 결정은 위 세 곳 중 후속 원격 근거 구성을 시작할 우선 Area를 고르는
-것이다. 이번 문서는 공식 선정, 실제 Spot 등록, 데이터 수집 또는 추천 실행을
-승인하지 않는다.
+다음 한 가지 결정은 13개 Area의 공통자료 실제 행, 공식 좌표와 운영 제약을 같은
+최소 기준으로 추가 확인하는 후속 조사를 승인할지 여부다. 이번 문서는 우선 Area
+선정, 실제 Spot 등록, 데이터 수집 또는 추천 실행을 승인하지 않는다.
 
 ## 15. 근거 출처
 
