@@ -30,10 +30,11 @@
 - 일일 운영시간대: `OPEN_PM_DECISION`
 - 운영 Plan·`pilot_run_id`·Batch ID·Plan fingerprint: `NOT_GENERATED`
 - S-DoT 동적 수집: `NOT_STARTED`
-- Spot 원격 추천 계약: `REMOTE_SPOT_RECOMMENDATION_CONTRACT_DRAFT_READY_FOR_PM_REVIEW`
-- Spot 자동 추천: `NOT_STARTED`
+- 장기 Spot 원격 추천 계약: `AVAILABLE_ON_MAIN`(D-020, PR #130)
+- 초기 파일럿 A안: `FIVE_AREA_SPOT_SELECTION_SUPPORT_DRAFT_IN_PR_131`(D-021)
+- Spot 자동 추천: `DEFERRED_AFTER_INITIAL_PILOT`
 - 24시간 Scheduler(로컬 EG-7 Live 파일럿 확대 기준): `NOT_IMPLEMENTED`
-- ML 학습: `PROVISIONAL_COMPARISON_COMPLETED`
+- ML 학습: `COMPARISON_COMPLETED_NOT_ADOPTED`; 추천 사용 `false`
 - PoC 상시 13개 Area 반복수집 Runtime: **Apps Script** `ACTIVE`(§2.1 참조)
 
 PM이 장기 기준으로 확정한 5분 주기의 EG-7 1시간 파일럿 Controller와 파생
@@ -117,17 +118,20 @@ PM이 장기 기준으로 확정한 5분 주기의 EG-7 1시간 파일럿 Contro
 - ML Model: `BASELINE_RETAINED_PROVISIONAL`
 - Issue #118: `CLOSED·COMPLETED` — 30분 직접 예상값 부재와 무대체 정책,
   현재·30·60·90·120·150·180분 표시구조를 확정했으며 UI는 구현하지 않음
-- Area·Spot 원격 근거 정책·준비도:
-  `REMOTE_SPOT_RECOMMENDATION_CONTRACT_DRAFT_READY_FOR_PM_REVIEW`
-  (Issue #126 완료, PR #127 병합, Issue #129) — D-020은 최종 제품가치를 Area 안의
-  특정 Spot과 판매시간 추천으로 재확정했다. 원격 근거 Eligibility를 충족하면
+- Area·Spot 원격 근거 정책·준비도: `LONG_TERM_CONTRACT_AVAILABLE_ON_MAIN`
+  (Issue #126·#129 완료, PR #127·#130 병합) — D-020은 장기 제품가치를 Area 안의
+  특정 Spot과 판매시간 추천으로 유지한다. 원격 근거 Eligibility를 충족하면
   `field_verification_status=UNAVAILABLE`,
   `operational_suitability_status=NOT_VERIFIED` 상태에서도 SPOT 추천이 가능하다.
   이는 판매 허용·안전·카트 정차·운영 적합성·판매 성공을 보장하지 않는다.
   현재 실제 Spot 등록 0건, 원격 SPOT 추천 가능 Spot 0개, 추천 실행 0건이며
-  S-DoT 동적 수집·결합과 실제 Spot 좌표 기준 재연결은 미완료다. Issue #128의
-  우선 Area 선정 근거 공정성 조사는 이 정책 PR이 main에 반영될 때까지 보류하며,
-  현재 정책 Draft는 PM 검토 대기 상태다.
+  S-DoT 동적 수집·결합과 실제 Spot 좌표 기준 재연결은 미완료다.
+- 초기 파일럿 A안: `PM_REVIEW_PROPOSAL`(D-021, Issue #128, Draft PR #131) — 서울시
+  공식 Forecast로 5개 Area와 판매시간을 `AREA` 단위로 추천하고, Area당 대표
+  Spot 3개를 `USER_SELECTABLE_OPTION`으로 제공해 사용자가 직접 선택한다. Spot별
+  동적근거·자동추천·Backtesting은 `DEFERRED_AFTER_INITIAL_PILOT`이며 머신러닝은
+  비교기록만 보존하고 추천에 사용하지 않는다. 생산 Schema·코드·UI·Backend·배포와
+  파일럿 실행은 0건이다.
 - Area Ranking: `IMPLEMENTATION_AVAILABLE_ON_MAIN`(PR #110, Issue #109) — 서울시
   Forecast 기반 60분·180분 예상 유동인구 변화·미래 인구 규모 순위를 각각 계산.
   `LATEST_COMPLETE_LOCKED_SNAPSHOT` 정책으로 잠긴 Dataset의 전체 1,027회 중 승인된
@@ -178,8 +182,8 @@ PM이 장기 기준으로 확정한 5분 주기의 EG-7 1시간 파일럿 Contro
   scikit-learn 1.6.1에서 공통 실행부 직접차단 3개·Runtime 신뢰경계 13개·
   Publication 18개·EG-8D 70개·EG-8C 머신러닝 24개·전체 707개
   시험과 Project Guard `PASS=43, FAIL=0, WARN=0, SKIP=4` 통과.
-- Spot Ranking: `NOT_STARTED`
-- Recommendation Contract: `NOT_STARTED`
+- Spot Ranking: `DEFERRED_AFTER_INITIAL_PILOT`
+- Recommendation Contract: `DRAFT_UPDATED_IN_PR_131`; 생산 Schema `NOT_IMPLEMENTED`
 - UI/UX Detailed Design: `NOT_STARTED`
 
 이 절은 §2.1의 Apps Script 상시 수집 Runtime과 독립적이다. 5분 자동수집 `ACTIVE`
@@ -335,8 +339,9 @@ live_approval_status=NOT_APPROVED
 - 운영 Backup Worker 실행: `0`
 - Google Drive 접근: `0`
 - S-DoT 동적 수집: `NOT_STARTED`
-- Spot 자동 추천: `NOT_STARTED`
-- ML 학습·성능평가: `PROVISIONAL_COMPARISON_COMPLETED` — 공식 모델 채택·Test Gate 미실행
+- Spot 자동 추천: `DEFERRED_AFTER_INITIAL_PILOT`
+- ML 학습·성능평가: `COMPARISON_COMPLETED_NOT_ADOPTED` — 공식 모델 채택·Test
+  Gate 미실행, 추천 사용 `false`
 - production Scheduler(로컬 EG-7 기준): `NOT_IMPLEMENTED` — PoC 상시 Runtime은 Apps Script(§2.1)
 - 로컬 EG-7 Live 파일럿의 자동 24시간 확대: `NOT_APPROVED`
 - 자동 재시도: 금지
@@ -407,13 +412,21 @@ H-707은 구현과 함께 `PASS`로 활성화됐지만 이는 합성 계약 검�
 - 확인 방법: 세션 시작 시 `local main`과 `origin/main`을 조회·비교
 - 주의: 문서에 기록된 과거 SHA를 현재 HEAD로 가정하지 않음
 - PR #71: `MERGED`
+- PR #130: `MERGED`
+- PR #131: `OPEN·DRAFT`
 - Issue #70: `CLOSED`
 - Issue #69: `OPEN`
+- Issue #129: `CLOSED`
+- Issue #128: `OPEN`
 - 병합된 feature Branch: local·remote `DELETED`
 - post-merge 검증 시 작업 트리: `CLEAN`
 - post-merge 검증 시 미추적 파일: `0`
 
 ## 10. 다음 행동
+
+현재 최우선 한 단계는 Draft PR #131의 초기 파일럿 Area 5개와 Area당 대표 Spot
+3개 제안을 PM이 검토하는 것이다. Ready 전환·병합·생산 구현·실행은 별도 승인 전
+수행하지 않는다. 아래 EG-7 Live 결정은 독립 backlog로 유지한다.
 
 현재 OPEN 또는 미생성 결정:
 
@@ -432,7 +445,7 @@ H-707은 구현과 함께 `PASS`로 활성화됐지만 이는 합성 계약 검�
 
 다음 행동 순서:
 
-1. 이 `PROJECT_STATUS.md` 동기화 PR을 PM 승인으로 `main`에 병합한다.
+1. PR #131의 A안 문서 정합화를 PM이 검토한다.
 2. 공식 API 할당량과 rate-limit 호환성을 확인한다.
 3. 로컬 Source와 Drive sync-copy preflight를 확인한다.
 4. 범위가 고정된 운영 Plan v2 하나를 생성한다.
@@ -461,6 +474,7 @@ Issue #69와 현재 Diff → 관련 Rule·Quality·Data 문서 → Decision Log�
 `562f984d7f84203196b34f8d1d827310405d3cc3`다. EG-7 구현과 고정 5분 장기 주기는
 `main`에 있지만 Live 수집은 시작하지 않았다. API 할당량은 `UNCONFIRMED`, 운영
 Plan·`pilot_run_id`·Batch ID·Plan fingerprint는 아직 존재하지 않는다. S-DoT
-동적 S-DoT 수집·Spot 실행은 시작하지 않았고, ML은 잠정 비교까지만 완료했다. 다음 작업은 첫 Live 파일럿
-preflight와 정확한 Plan에 대한 한정된 PM 승인이다. EG-7 구현 Branch를 다시
-만들지 않는다.
+동적 수집·Spot 실행은 시작하지 않았고, ML은 비교 완료 후 미채택 상태다. D-021은
+초기 파일럿을 서울시 공식 Forecast 기반 Area 5개·판매시간 추천과 사용자 선택
+Spot 3개로 제한했다. 현재 다음 작업은 Draft PR #131의 PM 문서 검토다. EG-7 Live
+preflight는 독립 backlog이며 EG-7 구현 Branch를 다시 만들지 않는다.

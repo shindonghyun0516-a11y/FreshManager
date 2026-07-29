@@ -346,6 +346,39 @@ PM이 승인했거나 명시적으로 보류한 제품·운영 결정을 새 AI 
   실제 Spot 등록·데이터 수집·추천 실행·UI·Backend·배포를 승인하지 않는다.
 - Evidence: Issue #129, Follow-up to PR #127, Blocks #128.
 
+### D-021 — 초기 파일럿 Area 추천과 Spot 선택 지원 범위
+
+- Date: `2026-07-29`
+- Status: `ACCEPTED`
+- Relationship: D-020의 원격 데이터 기반 SPOT 자동추천은 장기 제품 목표로
+  유지한다. D-021은 장기 목표를 취소하지 않고 초기 파일럿 범위만 축소한다.
+- Pilot Area: 초기 대상은 PM 검토용 Area 5개이며, Area별 대표 Spot을 정확히
+  3개씩 `spot_role=USER_SELECTABLE_OPTION`으로 제공한다.
+- Recommendation: 서비스는 서울시 공식 현재·예측 유동인구를 기준으로 Area와
+  판매시간만 추천한다.
+
+```text
+recommendation_type=AREA
+recommendation_basis=SEOUL_OFFICIAL_FORECAST
+spot_selection_mode=USER_CHOICE
+spot_auto_recommendation=false
+```
+
+- Spot boundary: Spot은 시스템 추천대상이 아니다. 사용자가 세 선택지 중 이동할
+  지점을 직접 고르며, Spot별 유동인구·밀집도·순위와 자동추천을 제공하지 않는다.
+- ML boundary: 기존 비교실험은
+  `machine_learning_status=COMPARISON_COMPLETED_NOT_ADOPTED`로 보존하고,
+  `machine_learning_used_for_recommendation=false`를 적용한다. 추천 Forecast Source는
+  서울시 공식 예측자료다.
+- Deferred: Spot 동적근거와 S-DoT 신규 수집·연결, Spot별 예측·자동추천,
+  반복성·Backtesting·순위 안정성·추천 신뢰도 임계값은
+  `DEFERRED_AFTER_INITIAL_PILOT`이다.
+- Operational boundary: 현장검증은 `UNAVAILABLE`, 운영 적합성은
+  `NOT_VERIFIED`로 유지한다. Area 예측값을 Spot 직접값으로 표현하지 않는다.
+- Scope boundary: 이 결정은 정책·문서 정합화다. 생산 Schema·코드·시험, 실제
+  Spot 등록·추천 실행·UI·Backend·배포와 파일럿 실행을 승인하지 않는다.
+- Evidence: Issue #128, PR #131.
+
 ## 4. 갱신 규칙
 
 새 PM 결정이 기존 결정을 대체하면 이전 항목을 삭제하지 않고 `SUPERSEDED`로 바꾸고
