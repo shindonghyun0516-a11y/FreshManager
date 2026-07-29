@@ -261,7 +261,7 @@ PM이 승인했거나 명시적으로 보류한 제품·운영 결정을 새 AI 
 ### D-018 — Area 탐색과 Spot 판매 추천의 제품 책임 분리
 
 - Date: `2026-07-29`
-- Status: `ACCEPTED`
+- Status: `ACCEPTED · SUPERSEDED_IN_PART_BY_D-019`
 - Decision: Area는 판매기회를 탐색·분석하는 넓은 구역이고, Spot은 Area 안에서
   실제 이동·판매를 안내할 최종 추천 대상이다. 공식 Spot 추천은 Area 기회뿐 아니라
   Spot별 동적 밀집근거, 같은 Area 안의 Spot 비교, 접근성·안전·판매 가능성,
@@ -282,6 +282,32 @@ PM이 승인했거나 명시적으로 보류한 제품·운영 결정을 새 AI 
 - Scope boundary: 이번 결정은 정책 정의다. UI·지도 API·Spot 추천·머신러닝·
   EG-8D·서울시 API·Apps Script 실행 또는 사용자 게시를 시작하지 않는다.
 - Evidence: Issue #118 최종 PM 결정, Issue #124,
+  `docs/product/AREA_SPOT_RECOMMENDATION_AND_UI_POLICY.md`.
+
+### D-019 — 현장검증 불가 환경의 원격 근거 기반 Spot 후보 정책
+
+- Date: `2026-07-29`
+- Status: `ACCEPTED`
+- Decision: FreshManager PoC에서는 실제 현장방문과 현장검증을 수행할 수 없다.
+  D-018의 현장검증 필수조건은 현재 PoC 범위에서 이 결정으로 부분 대체한다.
+  `field_verified=true`를 현재 PoC의 달성조건으로 사용하지 않는다.
+- Maximum output: 현재 PoC의 최대 Spot 결과는 `데이터 기반 우선 후보`다. 이는
+  현장 적합성 확인 Spot 또는 실제 판매 가능성이 보장된 Spot과 다르다.
+- Policy contract: `verification_mode=REMOTE_EVIDENCE_ONLY`,
+  `field_verification_status=UNAVAILABLE`,
+  `operational_suitability_status=NOT_VERIFIED`,
+  `recommendation_scope=DATA_PRIORITY_ONLY`를 적용한다. 이 결정은 생산 스키마 구현을
+  승인하지 않는다.
+- Evidence method: 공식 위치·시설정보, 선택적 S-DoT 또는 승인된 대체 동적 근거,
+  Area 맥락, 다중 자료 일치성, 반복성·Backtesting·민감도와 최신성을 비교한다.
+  Area 값을 Spot 직접값으로 사용하지 않는다.
+- Safety boundary: 원격자료만으로 실제 안전, 카트 이동·정차, 판매·점유 허용,
+  운영 적합성이나 판매 성공 가능성을 확정하지 않는다. 근거가 부족하면 판매 후보
+  또는 AREA 안내로 하향한다.
+- Future boundary: 향후 실제 운영기관이 별도 현장검증을 수행하는 경우에만 운영
+  적합성 확인단계를 추가할 수 있다. 현재 Issue에서 현장검증 Issue는 만들지 않는다.
+- Evidence: Issue #126,
+  `docs/product/AREA_SPOT_REMOTE_EVIDENCE_READINESS_ASSESSMENT.md`,
   `docs/product/AREA_SPOT_RECOMMENDATION_AND_UI_POLICY.md`.
 
 ## 4. 갱신 규칙
