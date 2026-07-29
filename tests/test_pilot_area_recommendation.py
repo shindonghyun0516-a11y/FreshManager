@@ -410,6 +410,27 @@ class PilotAreaRecommendationTests(unittest.TestCase):
         self.assertFalse(results[60]["pilot_recommendation_allowed"])
         self.assertIsNone(results[60]["recommendation"])
 
+    def test_area_recommendation_does_not_require_spot_evaluation_gate(self) -> None:
+        evaluation = self.runtime_evaluation(changes_60={"POI014": 25})
+        area_only_60 = replace(
+            evaluation.freshness_gate.horizons[60],
+            spot_evaluation_allowed=False,
+        )
+        gate = replace(
+            evaluation.freshness_gate,
+            horizons={**evaluation.freshness_gate.horizons, 60: area_only_60},
+        )
+        area_only = replace(evaluation, freshness_gate=gate)
+        options = pilot_spot_options.load_pilot_spot_options(self.spot_options_path)
+
+        results = pilot_area_recommendation._build_horizon_recommendations(
+            area_only, options
+        )
+
+        self.assertEqual(results[60]["recommendation_status"], "AVAILABLE")
+        self.assertTrue(results[60]["pilot_recommendation_allowed"])
+        self.assertEqual(results[60]["recommendation"]["recommendation_type"], "AREA")
+
     def test_current_only_input_does_not_recommend(self) -> None:
         results = self.run_core(
             changes_60={"POI014": 25},

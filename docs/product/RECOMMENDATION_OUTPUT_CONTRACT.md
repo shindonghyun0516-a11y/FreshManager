@@ -92,8 +92,8 @@ Issue #134의 초기 파일럿 Core(`freshmanager/pilot_area_recommendation.py`)
 
 - 60분과 180분을 서로 독립적으로 판정한다.
 - EG-8D의 최신 완전 13개 Area Snapshot 선택·검증과 기존 순위 규칙을 재사용한다.
-- 해당 Horizon이 `RUNTIME`·`FRESH`이고 완전 Snapshot·Area 표시·Spot 평가 조건을
-  모두 통과하며, 위 5개 Area 중 예상 인구 변화가 양수인 후보가 있을 때만
+- 해당 Horizon이 `RUNTIME`·`FRESH`이고 완전 Snapshot·Area 표시 조건을
+  통과하며, 위 5개 Area 중 예상 인구 변화가 양수인 후보가 있을 때만
   `pilot_recommendation_allowed=true`와 `recommendation_status=AVAILABLE`을 반환한다.
 - 양수 후보가 없으면 `recommendation=null`,
   `pilot_recommendation_allowed=false`, `reason_code=NO_POSITIVE_AREA_OPPORTUNITY`다.

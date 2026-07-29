@@ -94,7 +94,6 @@ def _build_horizon_recommendations(
             and evaluation.freshness_gate.user_display_eligible
             and freshness.freshness_status == "FRESH"
             and freshness.area_result_display_allowed
-            and freshness.spot_evaluation_allowed
         )
         base = {
             "horizon_minutes": horizon,
