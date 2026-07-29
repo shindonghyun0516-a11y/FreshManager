@@ -125,11 +125,13 @@ Evaluation·Recommendation 결과 구조는 유지하되 동적 S-DoT는 EG-7에
 ```text
 Core Observation: EG-6B Area Observation — 모든 승인 Area에서 필수
 Optional Supporting Observation: S-DoT — 지원·접근·수집·품질조건 충족 시만 사용
-Additional Context: Spatial Context + Field Validation + Operational Constraints
+Additional Context: Spatial Context + Field Validation Status + Operational Constraints Status
 
 Area Feature + 선택적 S-DoT Feature + Additional Context
 → Spot Candidate Evaluation
-→ 신뢰 가능한 Spot: SPOT / 없는 경우: AREA + fallback_reason
+→ 원격 Eligibility 충족: SPOT
+→ Spot 근거 부족·Area 근거 충분: AREA + fallback_reason
+→ Area 근거 부족: 추천 없음
 ```
 
 현행 EG-6B는 Core Area Observation만 수집한다. `eg6_spot_master.csv`와
@@ -398,14 +400,18 @@ Area Collector는 Spot 추천 여부와 무관하게 공식 Area 관측을 계�
 ```text
 필수: Area Observation → Area Feature
 선택: S-DoT Observation → 지원·접근·수집·품질조건을 통과한 S-DoT Feature
-추가: Spatial Context + Field Validation + Operational Constraints
+추가: Spatial Context + Field Validation Status + Operational Constraints Status
 결합: Spot Candidate Evaluation
-결과: target_level=SPOT 또는 target_level=AREA + fallback_reason
+결과: target_level=SPOT, target_level=AREA + fallback_reason 또는 추천 없음
 ```
 
 - S-DoT는 Area 데이터를 대체하지 않고 후보 생성과 공간 Feature 분석을 보조한다.
-- 검증된 Spot Candidate가 있으면 반드시 `SPOT`을 선택한다.
-- 후보가 없거나 운영 가능성이 미확인이면 `AREA`로 fallback하고 이유를 기록한다.
+- D-020의 원격 근거 Eligibility를 충족한 Spot Candidate가 있으면 반드시 `SPOT`을
+  선택한다. `field_verification_status=UNAVAILABLE`과
+  `operational_suitability_status=NOT_VERIFIED`는 별도 제한 상태이며 원격 추천을
+  차단하지 않는다.
+- Spot 근거가 부족하고 Area 근거만 충분하면 `AREA`로 fallback하고 이유를
+  기록한다. Area 근거도 부족하면 추천 결과를 생성하지 않는다.
 - 현재 Spot Master의 `STATION_CENTER_PROXY`, `field_verified=false` 행은 Candidate
   Anchor Point이며 추천 가능한 Spot이나 고정 판매 위치가 아니다.
 - Area 값은 특정 출구·Spot의 직접 유동인구 측정값이 아니다.
@@ -594,8 +600,10 @@ S-DoT Feature와 Candidate Evidence Assessment를 입력으로 사용하는 별�
 MVP다. 상태는 `PLANNED`, Gate number는 `NOT_ASSIGNED`이며 EG-8 분석 결과와 PM 승인
 전에는 구현하지 않는다.
 
-- 충분하고 신뢰 가능한 Spot Candidate가 있으면 `target_level=SPOT`을 출력한다.
-- 후보 근거가 부족하면 `target_level=AREA`와 `fallback_reason`을 출력한다.
+- D-020의 원격 근거 Eligibility를 충족한 Spot Candidate가 있으면
+  `target_level=SPOT`을 출력한다.
+- Spot 근거가 부족하고 Area 근거만 충분하면 `target_level=AREA`와
+  `fallback_reason`을 출력한다. Area 근거도 부족하면 추천하지 않는다.
 - 추천 근거에는 사용한 Feature·Evaluation·Context 버전을 남긴다.
 - 추천 실패가 원본 Area Observation을 변경하거나 API 재호출을 유발하지 않는다.
 - 실제 판매효과와 추천 적중은 Recommendation MVP 구현만으로 입증됐다고 표현하지 않는다.
@@ -745,7 +753,7 @@ Project Guard 검사별 현재 PASS·SKIP, 전체 집계와 Live 실행 여부�
 | FR-10 | EG5 report + 목표 reporting | 부분 |
 | FR-11 | Collector statuses + eg6b exit 0/1/2 | H-704/H-705/H-706 |
 | FR-13 | 즉시 Backup Worker·Google Drive for Desktop Sync | H-708 계약; 실환경 상태는 PROJECT_STATUS 참조 |
-| FR-14 | 목표 S-DoT·Spot Candidate·Recommendation 계층 | 미구현; EG6 Panel·EG-8 Feature·현장검증 필요 |
+| FR-14 | 목표 S-DoT·Spot Candidate·Recommendation 계층 | 미구현; EG6 Panel·EG-8 Feature·D-020 원격 Eligibility 필요 |
 | FR-12 | --execute-live + 승인 --batch-id + AGENTS/Git workflow | Project Guard/CI/PM |
 
 ## 근거 자료
@@ -792,9 +800,9 @@ Project Guard 검사별 현재 PASS·SKIP, 전체 집계와 Live 실행 여부�
 | Common failure | 회차 전체의 안전성을 해치는 설정·저장·무결성·내부 오류 |
 | Area failure | 해당 Area만 실패하고 다음 Area 진행이 가능한 API·Timeout·파싱·검증 오류 |
 | S-DoT Data Layer | 센서 위치·근접 관계·관측 변화의 독립 보조 계층; Area 데이터를 대체하지 않음 |
-| Spot Candidate | Area·S-DoT·공간 Context·현장검증을 결합해 생성하는 판매 후보 위치 |
+| Spot Candidate | Area·선택적 S-DoT 또는 승인된 대리근거·공간 Context를 결합해 생성하는 판매 후보 위치 |
 | Candidate Anchor Point | Spot 후보 생성의 기준점; 현재 역 중심 대리좌표이며 고정 판매 위치가 아님 |
-| Recommendation 결과 | 후보 근거에 따라 SPOT 또는 AREA+fallback_reason을 결정하는 후속 Workstream 결과 |
+| Recommendation 결과 | 원격 근거에 따라 SPOT, AREA+fallback_reason 또는 추천 없음을 결정하는 후속 Workstream 결과 |
 | v3 source sheets | Apps Script Runtime이 쓰는 원본 Spreadsheet 탭(`raw_log_v3`/`population_current_v3`/`population_forecast_v3`); EG-8A Python Loader가 읽기 전용으로만 접근 |
 | Model Output | EG-8C 예측 모델의 원시 산출값; UI Presentation이 직접 참조하지 않음 |
 | Recommendation Output | EG-8E Recommendation Output Contract가 정의하는 추천 결과 스키마; Model Output과 UI Presentation 사이의 계층 |

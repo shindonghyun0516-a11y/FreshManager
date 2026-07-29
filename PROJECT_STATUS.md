@@ -30,7 +30,7 @@
 - 일일 운영시간대: `OPEN_PM_DECISION`
 - 운영 Plan·`pilot_run_id`·Batch ID·Plan fingerprint: `NOT_GENERATED`
 - S-DoT 동적 수집: `NOT_STARTED`
-- Spot 원격 근거 준비도: `REMOTE_SPOT_READINESS_ASSESSED_PRIORITY_AREA_SELECTION_PENDING`
+- Spot 원격 추천 계약: `REMOTE_SPOT_RECOMMENDATION_CONTRACT_DRAFT_READY_FOR_PM_REVIEW`
 - Spot 자동 추천: `NOT_STARTED`
 - 24시간 Scheduler(로컬 EG-7 Live 파일럿 확대 기준): `NOT_IMPLEMENTED`
 - ML 학습: `PROVISIONAL_COMPARISON_COMPLETED`
@@ -118,19 +118,16 @@ PM이 장기 기준으로 확정한 5분 주기의 EG-7 1시간 파일럿 Contro
 - Issue #118: `CLOSED·COMPLETED` — 30분 직접 예상값 부재와 무대체 정책,
   현재·30·60·90·120·150·180분 표시구조를 확정했으며 UI는 구현하지 않음
 - Area·Spot 원격 근거 정책·준비도:
-  `REMOTE_SPOT_READINESS_ASSESSED_PRIORITY_AREA_SELECTION_PENDING`
-  (Issue #118·#124 완료, PR #125, Issue #126) — 현장검증이 불가능한 현재 PoC의
-  최대 결과를 데이터 기반 우선 후보로 제한했다. `field_verified=true`를 현재 PoC
-  달성조건으로 사용하지 않으며, `field_verification_status=UNAVAILABLE`,
-  `operational_suitability_status=NOT_VERIFIED`를 유지한다. 13개 Area·Anchor에 같은
-  점수 기준을 적용했지만 Area별 공식 자료 확인 깊이는 같지 않다. 서울식물원·
-  마곡나루역, 광화문광장, 강남 MICE 관광특구는 Area별 공식 출처가 먼저 확인된
-  `동일기준 추가확인 대상 Shortlist`일 뿐 최종 우선 Area나 사업 적합성 우수 Area가
-  아니다. 다른 10개에도 같은 최소 근거 확인을 적용하기 전에는 최종 선정하지 않는다.
-  강남 MICE의 현재 Anchor 기준 S-DoT는 미지원이며, 실제 후보 Spot 좌표 확보 후
-  인접 센서 또는 센서군 재탐색 가능성은 미확인이다.
-  실제 Spot 등록 0건, 데이터 기반 우선 Spot 승격 0건, 추천·UI 실행 0건이다.
-  S-DoT 동적 수집·결합과 실제 Spot 좌표 기준 재연결은 미완료다.
+  `REMOTE_SPOT_RECOMMENDATION_CONTRACT_DRAFT_READY_FOR_PM_REVIEW`
+  (Issue #126 완료, PR #127 병합, Issue #129) — D-020은 최종 제품가치를 Area 안의
+  특정 Spot과 판매시간 추천으로 재확정했다. 원격 근거 Eligibility를 충족하면
+  `field_verification_status=UNAVAILABLE`,
+  `operational_suitability_status=NOT_VERIFIED` 상태에서도 SPOT 추천이 가능하다.
+  이는 판매 허용·안전·카트 정차·운영 적합성·판매 성공을 보장하지 않는다.
+  현재 실제 Spot 등록 0건, 원격 SPOT 추천 가능 Spot 0개, 추천 실행 0건이며
+  S-DoT 동적 수집·결합과 실제 Spot 좌표 기준 재연결은 미완료다. Issue #128의
+  우선 Area 선정 근거 공정성 조사는 이 정책 PR이 main에 반영될 때까지 보류하며,
+  현재 정책 Draft는 PM 검토 대기 상태다.
 - Area Ranking: `IMPLEMENTATION_AVAILABLE_ON_MAIN`(PR #110, Issue #109) — 서울시
   Forecast 기반 60분·180분 예상 유동인구 변화·미래 인구 규모 순위를 각각 계산.
   `LATEST_COMPLETE_LOCKED_SNAPSHOT` 정책으로 잠긴 Dataset의 전체 1,027회 중 승인된

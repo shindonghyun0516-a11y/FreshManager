@@ -6,19 +6,18 @@
 
 **문서 ID:** FM-PRD-001
 
-**버전 / 상태:** v1.1 · 공식 제품 기준
+**버전 / 상태:** v1.3 · 공식 제품 기준
 
-**기준일:** 2026-07-24 (Asia/Seoul)
+**기준일:** 2026-07-29 (Asia/Seoul)
 
 **제품 책임자:** PM/PO 신동현
 
 **기술 기준:** 구현 계약은 `docs/engineering/FreshManager_TRD_v1.0.md`, 현재
 Branch·Pull Request·Issue·실행 상태는 `PROJECT_STATUS.md`를 단일 기준으로 사용
 
-**2026-07-24 변경이력:** EG-8을 상위 Gate로 유지하고 EG-8A~EG-8E로 세분화했다.
-PoC 범위에 미래 Area 인구·피크 예측, Area/Spot Ranking, Recommendation Output
-Contract, UI/UX 설계·와이어프레임·프로토타입을 포함했다. 상세는 §39 변경 이력을
-따른다. **문서 내용 버전은 v1.1**이며, **정본 파일 경로는 기존 링크와
+**2026-07-29 변경이력:** D-020에 따라 원격 SPOT 추천과 운영 적합성 보장을
+분리하고 최종 제품가치를 특정 Spot·판매시간 추천으로 재확정했다. 상세는 변경
+이력을 따른다. **문서 내용 버전은 v1.3**이며, **정본 파일 경로는 기존 링크와
 Project Guard 자동검사 호환성을 위해 그대로 유지**한다. 파일명의 `_v1.0`은
 현재 내부 문서 버전을 의미하지 않는 **Legacy Stable Path**다.
 
@@ -26,10 +25,11 @@ Project Guard 자동검사 호환성을 위해 그대로 유지**한다. 파일�
 첫 Batch 이후 CSV와 Area·선택적 S-DoT·Spot Candidate Evaluation·Recommendation
 Workstream 결정을 반영했다.
 
-> **핵심 결론**  현재 제품은 추천 앱이 아니라, 추천 서비스가 성립할 데이터
-> 전제조건을 검증하는 1인 운영 PoC다. 장기 후보군은 서울시 121개 Area지만 승인
-> MVP 공간 범위는 13개 Area 패널이다. 구현·실행 완료 여부와 다음 작업은
-> `PROJECT_STATUS.md`에서 확인한다.
+> **핵심 결론**  FreshManager는 유동인구 증가가 예상되는 Area를 탐색하고, 해당
+> Area 안의 Spot별 유동인구·밀집도를 비교하여 프래시매니저가 이동해 판매할 특정
+> Spot과 판매시간을 추천한다. 현재는 이 서비스가 성립할지를 단계적으로 검증하는
+> 1인 운영 PoC이며, 구현·실행 완료 여부와 다음 작업은 `PROJECT_STATUS.md`에서
+> 확인한다.
 
 ## 문서 구성
 
@@ -42,14 +42,21 @@ Workstream 결정을 반영했다.
 
 ## 1. 제품 정의와 문서 목적
 
-FreshManager의 장기 비전은 프레시매니저가 정기배송 이후 유동판매를 수행할 때, 이동 가능한 장소와 시간을 데이터로 보조하는 서비스다. 그러나 현재 릴리즈의 제품은 모바일 앱이나 추천 화면이 아니라 서울시 공개데이터가 그 의사결정을 뒷받침할 수 있는지를 검증하는 데이터 타당성 PoC다.
+FreshManager는 유동인구 증가가 예상되는 Area를 탐색하고, 해당 Area 안의 Spot별
+유동인구·밀집도를 비교하여 프래시매니저가 이동해 판매할 특정 Spot과 판매시간을
+추천하는 서비스다. 현재 PoC는 데이터 타당성부터 추천 로직·지도 UI·제한 배포·
+사용자 파일럿과 Go/No-Go까지를 하나의 제품 검증 흐름으로 관리한다. 각 단계는
+별도 PM 승인 후 진행하며, 현재 완료되지 않은 단계를 완료된 제품처럼 표현하지
+않는다.
 
 이 PRD는 기존 요구사항 정의서 v0.4, 병합된 구현 계약, EG-5 실제 수집 분석과
 EG-6A 패널을 하나의 제품 기준으로 정리한다. 제품이 무엇을 해결해야 하는지,
 무엇을 아직 주장할 수 없는지, 어떤 결과를 성공으로 볼지를 정의하며 구현 세부는
 별도 TRD에, 현재 진행 상태는 `PROJECT_STATUS.md`에 위임한다.
 
-> **범위 경계**  본 PoC가 낼 수 있는 결론은 ‘공개데이터가 유동판매 후보 탐색에 쓸 수 있는가’까지다. ‘이 장소·시간에 야쿠르트가 더 잘 팔린다’는 결론은 실제 판매·현장 결과 없이 내릴 수 없다.
+> **범위 경계**  원격 근거가 충분하면 특정 Spot과 판매시간을 추천할 수 있다.
+> 다만 이 추천은 실제 판매 허용·안전·카트 정차·운영 적합성·판매 성공·매출 증가를
+> 보장하지 않는다.
 
 ## 2. 배경과 문제 정의
 
@@ -95,9 +102,9 @@ EG-4에서 여의도 POI072 실제 응답과 원본·메타데이터 저장을 �
 **유동인구 ≠ 매출:** 인구·혼잡은 기회와 운영 난이도의 대리신호이며, 카드소비는 일반 소비활동 대리변수다.
 
 **Area ≠ Spot:** 서울시 Area 수집값을 특정 출구·건물 앞 보행량으로 표현하지 않는다.
-Spot은 고정 판매 위치가 아니라 Area·S-DoT·공간 Context와 원격 근거를 바탕으로
-구성하는 판매 후보 위치다. 현재 PoC에서는 현장검증을 할 수 없으며 최대 출력은
-데이터 기반 우선 후보다.
+Spot은 Area 안에서 복수 후보의 유동인구·밀집도와 반복패턴을 비교해 실제 이동·
+판매 대상으로 추천할 특정 지점이다. 현재 Candidate Anchor를 실제 출구나 판매
+위치로 자동 승격하지 않는다.
 
 **시점 무결성:** 요청·관측·예측 스냅샷·예측 대상·후속 관측 시각을 분리하고 미래정보 누수를 금지한다.
 
@@ -110,11 +117,11 @@ Spot은 고정 판매 위치가 아니라 Area·S-DoT·공간 Context와 원격 
 **로컬 원본 우선:** 로컬 Raw·Metadata·Collection Log·Manifest가 공식 원본이다.
 Google Drive에는 검증된 복사본을 자동 백업하며 백업 실패는 API 재호출 사유가 아니다.
 
-**결과 수준:** 원격 근거가 충분한 Spot은 `recommendation_scope=DATA_PRIORITY_ONLY`인
-데이터 기반 우선 후보로만 기록한다. 근거가 부족하면 판매 후보 또는 AREA 안내로
-하향한다. 현재 `STATION_CENTER_PROXY`는 실제 Spot이나 검증된 판매 위치가 아니다.
-`operational_suitability_status=NOT_VERIFIED`를 유지하며 공식 Recommendation
-Output의 `target_level=SPOT`으로 자동 승격하지 않는다.
+**결과 수준:** D-020의 원격 근거 Eligibility를 충족한 Spot은
+`recommendation_type=SPOT`, `recommendation_basis=REMOTE_EVIDENCE`로 추천할 수
+있다. Spot 근거가 부족하고 Area 근거만 충분하면 `AREA`와 `fallback_reason`으로
+하향하며, Area 근거도 부족하면 추천하지 않는다. 현장검증과 운영 적합성은 추천
+Eligibility와 분리해 `UNAVAILABLE`·`NOT_VERIFIED`로 표시한다.
 
 ## 5. 목표와 비목표
 
@@ -147,11 +154,15 @@ Output의 `target_level=SPOT`으로 자동 승격하지 않는다.
 → EG-8C 미래 Area 인구·피크 예측 모델
 → EG-8D Area Ranking·선택적 S-DoT·Spot Candidate Evaluation
 → EG-8E Recommendation Output Contract·UI/UX Readiness
-→ (별도 PM 승인 후) UI/UX 상세 설계·프로토타입
-→ (Recommendation MVP Workstream, Gate number `NOT_ASSIGNED`) 이동 판단 지원
+→ Area·Spot 추천 가능성 검증과 추천 로직 구현
+→ 지도 UI·Backend 구현
+→ 제한 배포와 사용자 파일럿
+→ 결과분석과 Go/No-Go
 ```
 
-이 흐름은 목표 설계이며 각 단계는 이전 단계 통과와 별도 PM 승인 후 진행한다.
+이는 별도 프로젝트가 아니라 하나의 통합 PoC다. 각 단계는 이전 단계 통과와 별도
+PM 승인 후 진행한다. Recommendation MVP Workstream의 Gate number는 현재
+`NOT_ASSIGNED`다.
 UI는 Model Output을 직접 소비하지 않고 Recommendation Output만 소비한다.
 실제 판매효과·구매전환은 이 흐름만으로 입증되지 않는다.
 
@@ -159,23 +170,23 @@ UI는 Model Output을 직접 소비하지 않고 Recommendation Output만 소비
 
 - 판매량 예측, 매출 예측, 판매 성공확률, 제품별 수요예측, 재고 최적화
 - 판매성과 인과효과 검증
-- 상용 모바일 앱·웹 서비스 구현 및 출시, 상용 지도 서비스 개발·배포, 알림 UX 확정
+- 실제 판매 허용·안전·카트 정차 가능성·판매 성공·매출 증가 보장
+- 승인된 파일럿 범위를 넘어선 13개 Area 전체 구현과 상용 서비스 전체 확대
 - 실시간 모델 서빙, 완성형 MLOps
 - 프레시매니저 위치 추적, 고객 개인정보 수집 또는 개인별 프로파일링
 - 실제 판매량 수집·구매전환율 검증
-- 개별 건물·출구·흡연부스·오피스 입구 단위 정밀 Spot 추천과 이동경로 최적화
-- 현재 Candidate Anchor의 실제 출구 해석, 공식 Spot 추천 제공 또는 출구 단위
-  추천 정확도 검증 주장
+- 현재 Candidate Anchor의 실제 출구 해석·자동 승격과 이동경로 최적화
+- 검증되지 않은 Spot 직접 유동인구·밀집도 또는 추천 정확도 주장
 - 상품 추천과 예상매출 제공
 - 추천 점수 모델·가중치·임계값의 최종 확정(D-009 `OPEN_DECISION` 유지)
 - hy 내부 데이터, 유료 데이터 또는 프로덕션 대규모 인프라 연동
 - 호출한도 확인 전 121개 Area 고빈도 자동수집
 - 별도 PM Live 승인 없는 실제 5분 반복수집·자동 재시도·클라우드 실행
 
-이 현재 PoC 비목표는 장기 제품 목표에서의 영구 제외를 뜻하지 않는다. 실제 Spot
-좌표와 Area 내부 복수 후보, Spot별 동적·정적 근거, 반복성·Backtesting과 원격
-운영제한 자료가 확보되면 데이터 기반 우선 후보까지 검토할 수 있다. 실제 안전·
-카트 정차·판매 허용과 운영 적합성은 별도 운영기관 확인 없이는 확정하지 않는다.
+실제 Spot 좌표와 Area 내부 복수 후보, Spot별 동적·정적 근거, 반복성·순위 안정성,
+최신성과 이동 가능시간이 확인되면 원격 데이터 기반 SPOT 추천을 검토할 수 있다.
+실제 안전·카트 정차·판매 허용과 운영 적합성은 별도 운영기관 확인 없이는
+확정하지 않는다.
 
 ## 6. 범위 모델
 
@@ -195,9 +206,9 @@ UI는 Model Output을 직접 소비하지 않고 Recommendation Output만 소비
 | --- | --- | --- |
 | Core Observation | 판매 가능 Area 탐색 | 모든 승인 Area에서 확보하는 인구 범위·혼잡도·Forecast·시간대 변화 |
 | Optional Supporting Observation | Area 내부 활성 위치 판단 보조 | 지원·접근·수집·품질조건을 만족할 때만 쓰는 S-DoT 위치·관측; Area Collector와 독립 |
-| Additional Context | 후보의 공간·운영 타당성 보강 | Spatial Context·Field Validation·Operational Constraints |
+| Additional Context | 후보의 공간근거와 운영상태 보강 | Spatial Context·Field Validation Status·Operational Constraints Status |
 | Spot Candidate Evaluation | Area 내부 판매 후보 위치 평가 | Area Feature + 선택적 S-DoT Feature + Additional Context의 Candidate Evidence Assessment |
-| Recommendation 결과 | 추천 단위 결정 | 신뢰 가능한 Spot은 `SPOT`, 없으면 `AREA`와 `fallback_reason` |
+| Recommendation 결과 | 추천 단위 결정 | 원격 Eligibility를 충족한 Spot은 `SPOT`; Area 근거만 충분하면 `AREA`와 `fallback_reason`; Area 근거도 부족하면 추천 없음 |
 
 EG-6B는 필수 Area Observation을 확보한다. 정적 EG-6A 참조 연결은 실행 전 무결성
 입력이지만, 동적 S-DoT 관측 수집과 Spot Candidate Evaluation은 후속 독립 책임이므로
@@ -388,14 +399,19 @@ Area 단위 api_error, timeout, parse_error, validation_error는 해당 결과�
 ### 8.16 FR-14 Spot Candidate·SPOT 우선·AREA fallback
 
 Spot Candidate는 Area 데이터, 선택적 S-DoT 또는 대체 동적 근거와 공식 위치·시설
-Context로 구성한다. 원격 근거가 충분하면 데이터 기반 우선 후보로 기록하고,
-근거가 부족하면 판매 후보 또는 AREA로 하향해 이유를 기록한다.
+Context로 구성한다. D-020의 원격 근거 Eligibility를 모두 충족하면 특정 Spot과
+판매시간을 `SPOT`으로 추천한다.
 
-- `recommendation_scope=DATA_PRIORITY_ONLY`: 원격 근거 비교의 우선 후보이며 공식 추천 아님
-- `target_level=AREA`: 데이터 기반 우선 후보 조건이 충족되지 않음
+- `recommendation_type=SPOT`: 원격 근거로 선택한 특정 이동·판매 대상
+- `recommendation_basis=REMOTE_EVIDENCE`: 추천 근거가 원격 데이터임
 - `field_verification_status=UNAVAILABLE`: 현재 PoC의 현장검증 불가
 - `operational_suitability_status=NOT_VERIFIED`: 판매·안전·정차·운영 적합성 미확인
-- AREA fallback에는 `fallback_reason`이 필수다.
+- 원격 SPOT Eligibility는 같은 Area의 비교 가능한 후보 최소 2개(파일럿 목표
+  3~5개), 공식 명칭·위치, 후보를 구분하는 동적 또는 승인된 대리근거, 동일
+  기준시각·시간범위, 반복성 또는 순위 안정성, 최신성·결측, 이동·준비 가능시간,
+  신뢰도와 제한사항을 요구한다.
+- Spot 근거가 부족하고 Area 근거만 충분하면 `AREA`와 필수 `fallback_reason`을
+  사용한다. Area 근거도 부족하면 Recommendation Output을 생성하지 않는다.
 - Area Observation은 특정 출구나 Spot의 직접 유동인구가 아니다.
 - 동적 S-DoT 관측과 Spot Candidate Evaluation 오류가 EG-6B Area 수집을 중단시키면 안 된다.
 - EG-6B의 정적 Spot/S-DoT CSV 검사는 승인된 Area 패널 연결 무결성 확인이며 추천 생성이 아니다.
@@ -597,6 +613,7 @@ Context로 구성한다. 원격 근거가 충분하면 데이터 기반 우선 �
 | Area | 서울시 실시간 도시데이터가 제공하는 공식 공간 단위 |
 | Spot Candidate | Area·선택적 S-DoT 또는 대체 동적 근거·공식 공간 Context로 구성하는 판매 후보 위치 |
 | 데이터 기반 우선 후보 | 복수 후보의 원격 근거·반복성·최신성·불확실성 조건을 충족한 비교우위 후보; 공식 추천이나 판매 적합성 보장 아님 |
+| 원격 데이터 기반 SPOT 추천 | Area 안 복수 Spot을 비교해 특정 이동·판매 지점과 판매시간을 제시하는 추천; 운영 적합성·판매성과 보장 아님 |
 | Candidate Anchor Point | 후보 생성의 출발점; 현재 Spot Master의 역 중심 대리좌표이며 판매 Spot 확정값이 아님 |
 | S-DoT | Area 내부 활성 위치 판단을 보조하는 독립 센서 계층; Area 대체값이나 판매량이 아님 |
 | 예측 스냅샷 | 한 수집시점에 확보한 미래 예측 묶음 |
@@ -612,6 +629,7 @@ Context로 구성한다. 원격 근거가 충분하면 데이터 기반 우선 �
 
 | 버전 | 날짜 | 변경내용 | 승인상태 |
 |---|---|---|---|
+| v1.3 | 2026-07-29 | D-020에 따라 최종 제품가치를 특정 Spot·판매시간 추천으로 재확정. 원격 SPOT 추천 Eligibility와 현장·운영 적합성 상태를 분리하고 SPOT·AREA·추천 없음 하향계약을 반영 | PM 결정 D-020 |
 | v1.2 | 2026-07-29 | 현장검증 불가 전제의 원격 근거 기반 Spot 후보 정책을 반영. 현재 PoC 최대 결과를 데이터 기반 우선 후보로 제한하고 운영 적합성 미검증을 명시 | PM 결정 D-019 |
 | v1.1 | 2026-07-24 | EG-8을 상위 Gate로 유지하고 EG-8A~EG-8E로 세분화. PoC 범위에 미래 Area 인구·피크 예측, Area/Spot Ranking, Recommendation Output Contract, UI/UX 설계·와이어프레임·프로토타입을 포함. 판매량·매출 예측, 상용 앱·웹 출시, 실시간 서빙·MLOps는 계속 비목표. §5.2~5.4, §10.1, §12, 부록A 갱신 | PM 결정 |
 | v1.0 | 2026-07-22 | 최초 공식 제품 기준 확정 | PM 승인 |

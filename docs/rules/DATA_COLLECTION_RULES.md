@@ -261,11 +261,12 @@ Spot 좌표나 S-DoT 관측값을 서울시 Area API 요청값으로 사용하�
 - **Optional Supporting Observation:** S-DoT는 지원·접근·수집·품질조건을 만족할 때만
   위치·근접 관계·관측·시간대 변화를 독립 저장한다. Area 데이터를 대체하거나 Area
   값과 같은 측정값으로 합치지 않는다.
-- **Additional Context:** 공간 Context·현장검증·운영 제약을 Area Feature와 선택적
+- **Additional Context:** 공간 Context·현장검증 상태·운영 제약 상태를 Area Feature와 선택적
   S-DoT Feature에 결합해 Spot Candidate Evaluation을 수행한다. 현재 Spot Master는
   Candidate Anchor Point다.
-- **Recommendation 결과:** 후보 근거가 충분하면 `SPOT`, 부족하면 `AREA`와
-  `fallback_reason`을 기록한다.
+- **Recommendation 결과:** D-020의 원격 근거 Eligibility를 충족하면 `SPOT`, Spot
+  근거가 부족하고 Area 근거만 충분하면 `AREA`와 `fallback_reason`을 기록한다.
+  Area 근거도 부족하면 추천하지 않는다.
 
 동적 S-DoT 수집이나 Spot Candidate Evaluation 실패로 EG-6B Area 수집을
 재호출·중단·롤백하지 않는다. 정적 참조 패널 자체의 연결 무결성 실패는 현재 코드의

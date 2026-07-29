@@ -50,8 +50,11 @@ Area Feature
 
 Score·가중치·임계값은 `PLANNED` 또는 `OPEN_DECISION`이며 필수 확정계약이 아니다.
 
-- 신뢰 가능하고 운영 가능한 Spot이 있으면 `target_level=SPOT`을 사용한다.
-- 그런 Spot이 없으면 `target_level=AREA`로 fallback하고 `fallback_reason`을 기록한다.
+- D-020의 원격 근거 Eligibility를 충족한 Spot이 있으면 `target_level=SPOT`을
+  사용한다. 현장검증 불가와 운영 적합성 미확인은 추천 제한으로 표시하되 원격
+  SPOT 추천 자체를 차단하지 않는다.
+- Spot 근거가 부족하고 Area 근거만 충분하면 `target_level=AREA`로 fallback하고
+  `fallback_reason`을 기록한다. Area 근거도 부족하면 추천하지 않는다.
 - Recommendation MVP Workstream은 `PLANNED`, Gate number `NOT_ASSIGNED`다.
 - EG-6C와 EG-9는 현재 공식 Engineering Gate가 아니다.
 

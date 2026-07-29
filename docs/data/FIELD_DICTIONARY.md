@@ -390,9 +390,10 @@ Backup Root는 `FreshManager-Data/` 논리 구조로만 표현한다. Receipt에
 
 S-DoT 데이터는 지원·접근·수집·품질조건을 만족할 때 Area 내부 활성 위치 판단과
 후보 Feature를 보조하지만 Area 데이터를 대체하지 않는다. Area·선택적 S-DoT·공간
-Context·현장검증·운영 제약으로 신뢰 가능하고 운영 가능한 Spot Candidate가 생성되면
-`target_level=SPOT`을 사용한다. 후보가 없거나 근거가
-부족하면 `target_level=AREA`와 `fallback_reason`을 사용한다. 현재 Spot Master의
+Context와 D-020의 원격 근거 Eligibility로 신뢰 가능한 Spot Candidate가 생성되면
+`target_level=SPOT`을 사용한다. 현장검증·운영 적합성은 별도 상태로 기록한다.
+Spot 근거가 부족하고 Area 근거만 충분하면 `target_level=AREA`와
+`fallback_reason`을 사용하며, Area 근거도 부족하면 추천하지 않는다. 현재 Spot Master의
 `STATION_CENTER_PROXY`는 Candidate Anchor Point이며 검증된 판매 Spot이 아니다.
 S-DoT 미지원 Area도 Area 분석과 추천 후보에서 제외하지 않는다.
 
