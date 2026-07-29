@@ -1,11 +1,11 @@
 # Field Dictionary
 
 - 문서 상태: Draft
-- 버전: v0.1.2
+- 버전: v0.1.6
 - 작성자: 신동현
 - 최종 승인자: 신동현
 - 최초 작성일: 2026-07-17
-- 최종 수정일: 2026-07-22
+- 최종 수정일: 2026-07-29
 - 적용 프로젝트: Freshmanager Data PoC
 - 관련 문서:
   - `AGENTS.md`
@@ -78,6 +78,7 @@
 | `collection_logs` | 수집 성공·실패 기록 | EG-6B Batch Log·Manifest 구현·첫 실제 13개 Area 회차 확인 |
 | `backup_receipts` | Batch별 로컬 Sync 복사·검증 상태 | 구현·Fake/실제 Batch 검증 완료; Worker는 원격 완료 상태를 생성하지 않음 |
 | `eg7_pilot_plans` | 12회차 불변 계획과 Live Gate 상태 | 구현·합성 검증 완료; 운영 계획은 생성하지 않음 |
+| `pilot_area_recommendations` | D-021 5개 Area의 60·180분 독립 추천 결과 | Issue #134 Branch의 메모리 내 Core만 구현; 저장·게시 산출물 없음 |
 | `eg7_execution_events` | 파일럿 상태전이 append-only 로그 | 구현·합성 검증 완료; 실제 실행 기록 없음 |
 | `eg7_slot_index` | 계획 12회차의 종결·호출·Backup 파생 인덱스 | CSV·JSONL 구현·합성 검증 완료 |
 | `eg7_area_observation_index` | 실제 시도 Area의 관측·Forecast·무결성·중복 파생 인덱스 | 최대 156행 CSV·JSONL 구현·합성 검증 완료 |
@@ -368,8 +369,9 @@ Backup Root는 `FreshManager-Data/` 논리 구조로만 표현한다. Receipt에
 | `area_forecasts.csv` | `area_code + forecast_snapshot_time + forecast_target_time + request_id` | PLANNED / NOT_IMPLEMENTED |
 | `collection_errors.csv` | `request_id + area_code` | PLANNED / NOT_IMPLEMENTED |
 
-동적 S-DoT, Spot Candidate와 추천 필드는 현재 구현되지 않았다. 아래 필드는 목표
-계약이며 실제 API 응답 필드나 현행 EG-6B Metadata로 해석하지 않는다.
+동적 S-DoT, Spot Candidate와 D-020 장기 추천 저장 필드는 현재 구현되지 않았다.
+아래 필드는 목표 계약이며 실제 API 응답 필드나 현행 EG-6B Metadata로 해석하지
+않는다. D-021 메모리 내 초기 파일럿 Core 예외는 표 아래에서 별도로 정의한다.
 
 | 필드 | 의미 | 상태 |
 |---|---|---|
@@ -384,7 +386,7 @@ Backup Root는 `FreshManager-Data/` 논리 구조로만 표현한다. Receipt에
 | `score_version` | 정량 점수를 채택할 경우의 계산 계약 버전 | PLANNED / OPEN_DECISION; 필수 필드 아님 |
 | `spatial_context_version` | 공간 Context 버전 | FUTURE_CONTRACT |
 | `target_level` | `SPOT` 또는 `AREA` 추천 단위 | FUTURE_CONTRACT |
-| `fallback_reason` | AREA fallback의 필수 이유 | FUTURE_CONTRACT |
+| `fallback_reason` | D-020 장기 AREA fallback의 필수 이유; D-021 초기 AREA 기본 추천은 `null` | FUTURE_CONTRACT; D-021 메모리 내 Core는 Implemented |
 | `target_spot_id` | SPOT 추천으로 선택한 검증된 후보 식별자 | FUTURE_CONTRACT |
 | `field_verified` | 현장 검증 여부 | 참조 CSV에 존재; 추천 계약 연결은 FUTURE_CONTRACT |
 
@@ -396,6 +398,28 @@ Spot 근거가 부족하고 Area 근거만 충분하면 `target_level=AREA`와
 `fallback_reason`을 사용하며, Area 근거도 부족하면 추천하지 않는다. 현재 Spot Master의
 `STATION_CENTER_PROXY`는 Candidate Anchor Point이며 검증된 판매 Spot이 아니다.
 S-DoT 미지원 Area도 Area 분석과 추천 후보에서 제외하지 않는다.
+
+D-021 초기 파일럿은 D-020의 하향 결과가 아니라 처음부터 의도한 AREA 기본
+추천이므로 `recommendation_type=AREA`, `prediction_scope=AREA`,
+`fallback_reason=null`을 사용한다. Issue #134의 메모리 내 Core 필드는 다음과 같다.
+
+| 필드 | 의미 | 상태 |
+|---|---|---|
+| `horizon_minutes` | 서로 독립적으로 판정하는 `60` 또는 `180` | Implemented |
+| `recommendation_status` | `AVAILABLE` 또는 `UNAVAILABLE` | Implemented |
+| `official_recommendation_allowed` | 항상 `false` | Implemented |
+| `pilot_recommendation_allowed` | 완전한 `RUNTIME`·`FRESH` Horizon에서 5개 Area 중 양수 후보가 있을 때만 `true` | Implemented |
+| `recommendation` | 허용 시 AREA 추천 객체, 그 외 또는 양수 후보가 없으면 `null` | Implemented |
+| `reason_code` | 양수 후보가 없으면 `NO_POSITIVE_AREA_OPPORTUNITY` | Implemented |
+| `spot_selection_mode` | `USER_CHOICE` | Implemented |
+| `spot_auto_recommendation` | `false` | Implemented |
+| `user_selected_spot_id` | 선택 전 `null` | Implemented |
+| `spot_options` | 선택 Area의 순위·기본선택 없는 정확히 3개 사용자 선택지 | Implemented |
+| `machine_learning_used_for_recommendation` | `false` | Implemented |
+| `fallback_reason` | 초기 AREA 기본 추천이므로 `null` | Implemented |
+
+대상은 `POI032`, `POI088`, `POI014`, `POI025`, `POI072` 정확히 5개다. 이 Core는
+Backend·UI·배포·Database 저장 또는 EG-8D/추천 산출물 게시를 수행하지 않는다.
 
 ---
 
@@ -756,6 +780,7 @@ Field Dictionary v0.1은 다음 조건을 만족해야 한다.
 
 | 버전 | 날짜 | 변경내용 | 작성자 | 승인상태 |
 |---|---|---|---|---|
+| v0.1.6 | 2026-07-29 | Issue #134 D-021 메모리 내 초기 AREA 추천 필드와 D-020 장기 AREA fallback 예외를 반영 | 신동현 | Draft PR 검토 대기 |
 | v0.1.5 | 2026-07-23 | Plan 시각 의미 정규화·ACTIVE 장기 기준 필드·Forecast canonical 정렬 집합 계약과 H-707 비교표 반영 | 신동현 | PR #71 변경요청 보완 |
 | v0.1.4 | 2026-07-23 | EG-7 plan·summary v2의 고정 5분 결정 필드와 중복 기반 주기 변경 금지 반영 | 신동현 | PM 최종 결정 |
 | v0.1.3 | 2026-07-23 | EG-6B·Backup 현재 상태와 EG-7 계획·사건·Slot/Area Index·Summary 필드·표현·중복 계약 반영 | 신동현 | PM 구현 범위 승인 |

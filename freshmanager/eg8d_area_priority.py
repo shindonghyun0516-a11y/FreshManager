@@ -241,6 +241,15 @@ class FreshnessGateResult:
 
 
 @dataclass(frozen=True)
+class _InMemoryAreaPriorityEvaluation:
+    rows: tuple[AreaPriorityRow, ...]
+    freshness_gate: FreshnessGateResult
+    population_ranges: Mapping[
+        tuple[str, int], tuple[float, float, float, float]
+    ]
+
+
+@dataclass(frozen=True)
 class _ExecutionContext:
     evaluation_time: datetime
     evaluation_mode: str
@@ -268,6 +277,8 @@ class _Forecast:
     area_name: str
     origin: datetime
     target: datetime
+    population_min: float
+    population_max: float
     midpoint: float
 
 
@@ -722,12 +733,17 @@ def _validated_source_run(
         )
         if key in forecast_index:
             _fail("forecast_duplicate")
+        population_min, population_max = _population_range(
+            row, "forecast_population_min", "forecast_population_max"
+        )
         forecast_index[key] = _Forecast(
             area_code=requested,
             area_name=_required(row, "area_name"),
             origin=origin,
             target=target,
-            midpoint=_midpoint(row, "forecast_population_min", "forecast_population_max"),
+            population_min=population_min,
+            population_max=population_max,
+            midpoint=(population_min + population_max) / 2,
         )
 
     for area_code in eg6b.EG6B_AREA_CODES:
@@ -934,7 +950,7 @@ def _build_area_priority_rows(
     return tuple(results)
 
 
-def _snapshot(path: Path, label: str, expected_sha256: str) -> tuple[bytes, dict[str, object]]:
+def _read_stable_file(path: Path, label: str) -> bytes:
     try:
         before = path.lstat()
         if stat.S_ISLNK(before.st_mode) or not stat.S_ISREG(before.st_mode):
@@ -945,6 +961,11 @@ def _snapshot(path: Path, label: str, expected_sha256: str) -> tuple[bytes, dict
         _fail(f"{label}_unreadable")
     if (before.st_dev, before.st_ino, before.st_size) != (after.st_dev, after.st_ino, after.st_size):
         _fail(f"{label}_changed_during_read")
+    return payload
+
+
+def _snapshot(path: Path, label: str, expected_sha256: str) -> tuple[bytes, dict[str, object]]:
+    payload = _read_stable_file(path, label)
     digest = hashlib.sha256(payload).hexdigest()
     if digest != expected_sha256:
         _fail(f"{label}_sha_mismatch")
@@ -963,9 +984,116 @@ def _csv_from_snapshot(
         rows = list(reader)
     except (UnicodeError, csv.Error):
         _fail(f"{label}_unreadable")
-    if any(None in row for row in rows):
+    if any(
+        None in row or any(not isinstance(value, str) for value in row.values())
+        for row in rows
+    ):
         _fail(f"{label}_row_invalid")
     return rows
+
+
+def _evaluate_area_priority_in_memory(
+    current_rows: Sequence[Mapping[str, str]],
+    forecast_rows: Sequence[Mapping[str, str]],
+    *,
+    execution_context: _ExecutionContext,
+) -> _InMemoryAreaPriorityEvaluation:
+    """Reuse EG-8D selection, ranking, and freshness without publication."""
+    evaluation_time = execution_context.evaluation_time
+    evaluation_mode = execution_context.evaluation_mode
+    if not _is_kst_aware(evaluation_time):
+        _fail("evaluation_time_invalid")
+
+    selection = _find_latest_complete_run(current_rows, forecast_rows)
+    if selection is None:
+        current_selection = _select_latest_current_run(current_rows)
+        _current_by_area, canonical_timestamp = _validated_current_run(
+            current_rows,
+            source_collection_run_id=current_selection.source_collection_run_id,
+        )
+        if canonical_timestamp > evaluation_time:
+            _fail("current_after_evaluation_time")
+        freshness_gate = evaluate_horizon_freshness(
+            evaluation_time=evaluation_time,
+            selected_complete_observed_at=None,
+            latest_available_current_observed_at=canonical_timestamp,
+            forecast_target_at_60m=None,
+            forecast_target_at_180m=None,
+            complete_snapshot_exists=False,
+            time_contract_valid=True,
+            evaluation_mode=evaluation_mode,
+        )
+        return _InMemoryAreaPriorityEvaluation((), freshness_gate, {})
+
+    freshness_gate = evaluate_horizon_freshness(
+        evaluation_time=evaluation_time,
+        selected_complete_observed_at=selection.canonical_timestamp,
+        latest_available_current_observed_at=_latest_current_observed_at(current_rows),
+        forecast_target_at_60m=selection.canonical_timestamp + timedelta(minutes=60),
+        forecast_target_at_180m=selection.canonical_timestamp + timedelta(minutes=180),
+        complete_snapshot_exists=True,
+        time_contract_valid=True,
+        evaluation_mode=evaluation_mode,
+    )
+    rows = _build_area_priority_rows(
+        current_rows,
+        forecast_rows,
+        source_collection_run_id=selection.source_collection_run_id,
+        generated_at=evaluation_time,
+    )
+    current_by_area, forecast_index, _canonical_timestamp = _validated_source_run(
+        current_rows,
+        forecast_rows,
+        source_collection_run_id=selection.source_collection_run_id,
+    )
+    population_ranges = {}
+    for row in rows:
+        forecast = forecast_index[
+            (
+                selection.source_collection_run_id,
+                row.area_code,
+                row.prediction_origin_at,
+                row.prediction_target_at,
+            )
+        ]
+        current = current_by_area[row.area_code]
+        population_ranges[(row.area_code, row.horizon_minutes)] = (
+            current.population_min,
+            current.population_max,
+            forecast.population_min,
+            forecast.population_max,
+        )
+    return _InMemoryAreaPriorityEvaluation(rows, freshness_gate, population_ranges)
+
+
+def _evaluate_runtime_area_priority_in_memory(
+    *,
+    current_path: Path,
+    forecast_path: Path,
+) -> _InMemoryAreaPriorityEvaluation:
+    evaluation_time = _runtime_now()
+    execution_context = _ExecutionContext(
+        evaluation_time=evaluation_time,
+        evaluation_mode="RUNTIME",
+        validation_context=RUNTIME_CONTEXT,
+        operational_observation=True,
+        synthetic_validation=False,
+        clock_source=SYSTEM_CLOCK,
+        operational_publication_allowed=True,
+    )
+    current_rows = _csv_from_snapshot(
+        _read_stable_file(current_path, "current"), CURRENT_REQUIRED_COLUMNS, "current"
+    )
+    forecast_rows = _csv_from_snapshot(
+        _read_stable_file(forecast_path, "forecast"),
+        FORECAST_REQUIRED_COLUMNS,
+        "forecast",
+    )
+    return _evaluate_area_priority_in_memory(
+        current_rows,
+        forecast_rows,
+        execution_context=execution_context,
+    )
 
 
 def _validate_manifest(payload: bytes) -> None:

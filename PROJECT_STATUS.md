@@ -32,7 +32,8 @@
 - S-DoT 동적 수집: `NOT_STARTED`
 - 장기 Spot 원격 추천 계약: `AVAILABLE_ON_MAIN`(D-020, PR #130)
 - 초기 파일럿 A안: `FIVE_AREA_SPOT_SELECTION_SUPPORT_AVAILABLE_ON_MAIN`(D-021, PR #131)
-- 파일럿 사용자 선택 Spot 정적 Master: `IMPLEMENTED_ON_ISSUE_132_BRANCH_PENDING_PM_REVIEW`
+- 파일럿 사용자 선택 Spot 정적 Master: `AVAILABLE_ON_MAIN`(Issue #132, PR #133)
+- 초기 파일럿 Area 추천 Core: `IMPLEMENTED_ON_ISSUE_134_BRANCH_PENDING_DRAFT_PR_REVIEW`
 - Spot 자동 추천: `DEFERRED_AFTER_INITIAL_PILOT`
 - 24시간 Scheduler(로컬 EG-7 Live 파일럿 확대 기준): `NOT_IMPLEMENTED`
 - ML 학습: `COMPARISON_COMPLETED_NOT_ADOPTED`; 추천 사용 `false`
@@ -131,12 +132,20 @@ PM이 장기 기준으로 확정한 5분 주기의 EG-7 1시간 파일럿 Contro
   공식 Forecast로 5개 Area와 판매시간을 `AREA` 단위로 추천하고, Area당 대표
   Spot 3개를 `USER_SELECTABLE_OPTION`으로 제공해 사용자가 직접 선택한다. Spot별
   동적근거·자동추천·Backtesting은 `DEFERRED_AFTER_INITIAL_PILOT`이며 머신러닝은
-  비교기록만 보존하고 추천에 사용하지 않는다. 생산 Schema·코드·UI·Backend·배포와
-  파일럿 실행은 0건이다.
-- 파일럿 사용자 선택 Spot 정적 Master: `IMPLEMENTED_ON_ISSUE_132_BRANCH_PENDING_PM_REVIEW` —
+  비교기록만 보존하고 추천에 사용하지 않는다. 생산 Schema·Backend·UI·배포와
+  공식 추천 실행은 0건이다.
+- 파일럿 사용자 선택 Spot 정적 Master: `AVAILABLE_ON_MAIN`(Issue #132, PR #133) —
   5개 Area·각 3개·총 15개의 주소와 PM 확인 좌표를 기존 Candidate Anchor와 분리해
   저장한다. 모두 사용자 직접 선택용이며 현장검증·운영 적합성·Spot별 동적근거·
   자동추천·추천순위·기본선택은 없다.
+- 초기 파일럿 Area 추천 Core:
+  `IMPLEMENTED_ON_ISSUE_134_BRANCH_PENDING_DRAFT_PR_REVIEW` — 정확한 5개 Area의
+  60분·180분을 독립 판정한다. 완전한 `RUNTIME`·`FRESH` Horizon의 양수 후보만
+  `pilot_recommendation_allowed=true`로 반환하고,
+  `official_recommendation_allowed=false`는 유지한다. 양수 후보가 없으면
+  `recommendation=null`이다. 선택 Area의 Spot은 순위 없는 정확히 3개 사용자
+  선택지이며 ML은 사용하지 않는다. Backend·UI·배포·파일 산출물 게시는 없고
+  추천 실행은 0건이다.
 - Area Ranking: `IMPLEMENTATION_AVAILABLE_ON_MAIN`(PR #110, Issue #109) — 서울시
   Forecast 기반 60분·180분 예상 유동인구 변화·미래 인구 규모 순위를 각각 계산.
   `LATEST_COMPLETE_LOCKED_SNAPSHOT` 정책으로 잠긴 Dataset의 전체 1,027회 중 승인된
@@ -419,19 +428,23 @@ H-707은 구현과 함께 `PASS`로 활성화됐지만 이는 합성 계약 검�
 - PR #71: `MERGED`
 - PR #130: `MERGED`
 - PR #131: `MERGED`
+- PR #133: `MERGED`
 - Issue #70: `CLOSED`
 - Issue #69: `OPEN`
 - Issue #129: `CLOSED`
 - Issue #128: `CLOSED`
-- Issue #132: `OPEN`
+- Issue #132: `CLOSED`
+- Issue #134: `OPEN`
+- Issue #134 Source Branch: `feat/issue-134-pilot-area-recommendation`
+- Issue #134 Draft PR: `PENDING_PM_REVIEW`
 - 병합된 feature Branch: local·remote `DELETED`
 - post-merge 검증 시 작업 트리: `CLEAN`
 - post-merge 검증 시 미추적 파일: `0`
 
 ## 10. 다음 행동
 
-현재 최우선 한 단계는 Issue #132의 초기 파일럿 Area 5개와 Area당 사용자 선택 Spot
-3개 정적 Master 구현을 Draft PR에서 PM이 검토하는 것이다. Ready 전환·병합·실행은 별도 승인 전
+현재 최우선 한 단계는 Issue #134의 메모리 내 초기 파일럿 Area 추천 Core 변경을
+Draft PR에서 PM이 검토하는 것이다. 추천 실행·Ready 전환·병합은 별도 승인 전
 수행하지 않는다. 아래 EG-7 Live 결정은 독립 backlog로 유지한다.
 
 현재 OPEN 또는 미생성 결정:
@@ -451,7 +464,7 @@ H-707은 구현과 함께 `PASS`로 활성화됐지만 이는 합성 계약 검�
 
 다음 행동 순서:
 
-1. Issue #132 정적 Master Draft PR을 PM이 검토한다.
+1. Issue #134 초기 파일럿 Area 추천 Core Draft PR을 PM이 검토한다.
 2. 공식 API 할당량과 rate-limit 호환성을 확인한다.
 3. 로컬 Source와 Drive sync-copy preflight를 확인한다.
 4. 범위가 고정된 운영 Plan v2 하나를 생성한다.
@@ -482,5 +495,7 @@ Issue #69와 현재 Diff → 관련 Rule·Quality·Data 문서 → Decision Log�
 Plan·`pilot_run_id`·Batch ID·Plan fingerprint는 아직 존재하지 않는다. S-DoT
 동적 수집·Spot 실행은 시작하지 않았고, ML은 비교 완료 후 미채택 상태다. D-021은
 초기 파일럿을 서울시 공식 Forecast 기반 Area 5개·판매시간 추천과 사용자 선택
-Spot 3개로 제한했다. 현재 다음 작업은 Issue #132 정적 Master Draft PR의 PM 검토다. EG-7 Live
+Spot 3개로 제한했다. Issue #132·PR #133의 정적 Master는 `main`에 있고, 현재
+다음 작업은 Issue #134 메모리 내 추천 Core Draft PR의 PM 검토다. 추천 실행은
+0건이다. EG-7 Live
 preflight는 독립 backlog이며 EG-7 구현 Branch를 다시 만들지 않는다.
