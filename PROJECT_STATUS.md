@@ -114,9 +114,11 @@ PM이 장기 기준으로 확정한 5분 주기의 EG-7 1시간 파일럿 Contro
   모델 조정을 종료했다. 별도 최종 시험구간은 없고 평가는 `PROVISIONAL`, 공식
   Model Gate 판단은 `null`이며 운영 사용·사용자 게시·공식 추천은 허용하지 않는다.
 - ML Model: `BASELINE_RETAINED_PROVISIONAL`
-- EG-8C 다음 작업: OPEN 상태인 Issue #118의 UI 정책 검토와 별도 승인을 받는 Spot
-  검증. 이번
-  결정으로 UI·Spot·EG-8D를 자동 실행하지 않음
+- Issue #118: `CLOSED·COMPLETED` — 30분 직접 예상값 부재와 무대체 정책,
+  현재·30·60·90·120·150·180분 표시구조를 확정했으며 UI는 구현하지 않음
+- Area·Spot 판매 추천·지도 UI 정책: `POLICY_DEFINED_PENDING_REPOSITORY_REVIEW`
+  (Issue #124) — 13개 Spot은 모두 `판매 후보`, 추천 가능 0개, 현장확인 0개다.
+  정책만 정의했으며 UI·Spot 추천·EG-8D 실행은 시작하지 않음
 - Area Ranking: `IMPLEMENTATION_AVAILABLE_ON_MAIN`(PR #110, Issue #109) — 서울시
   Forecast 기반 60분·180분 예상 유동인구 변화·미래 인구 규모 순위를 각각 계산.
   `LATEST_COMPLETE_LOCKED_SNAPSHOT` 정책으로 잠긴 Dataset의 전체 1,027회 중 승인된
