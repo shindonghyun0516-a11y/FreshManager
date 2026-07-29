@@ -1,7 +1,7 @@
 # Recommendation Output Contract
 
 - 문서 상태: Draft
-- 버전: v0.5.0
+- 버전: v0.6.0
 - 작성자: 신동현
 - 최종 승인자: 신동현
 - 최초 작성일: 2026-07-24
@@ -16,7 +16,7 @@
   - `docs/data/ML_READY_DATASET_SPEC.md`(Area-Spot-Sensor 데이터 관계)
   - `docs/analysis/ANALYSIS_PLAN.md`(Spot Forecast 분석 가능성 조건)
   - `docs/product/AREA_SPOT_RECOMMENDATION_AND_UI_POLICY.md`(원격 근거 정책)
-  - `ai-context/DECISION_LOG.md`의 D-003, D-004, D-005, D-006, D-008, D-009, D-015, D-019, D-020
+  - `ai-context/DECISION_LOG.md`의 D-003, D-004, D-005, D-006, D-008, D-009, D-015, D-019, D-020, D-021
 - 변경 시 PM 승인: 필요
 
 ---
@@ -29,12 +29,14 @@ Recommendation Output 스키마를 소유한다. Model Output(EG-8C 예측 모�
 계약을 정의한다.
 
 ```text
-Model Output(EG-8C)
+서울시 공식 Forecast(D-021 초기 파일럿)
+또는 Model Output(장기, 별도 채택 시)
 → Recommendation Output(EG-8E, 이 문서가 정의)
 → UI Presentation(별도 PM 승인 후 상세 설계)
 ```
 
-이 계층 분리는 모델이 바뀌어도 UI가 직접 깨지지 않게 하려는 목적이며,
+초기 파일럿은 EG-8C Model Output을 거치지 않는다. 이 계층 분리는 입력 예측원이
+바뀌어도 UI가 직접 깨지지 않게 하려는 목적이며,
 `docs/engineering/FreshManager_TRD_v1.0.md` §19.3과 TRD ADR-16이 정의한 원칙과
 동일하다.
 
@@ -42,7 +44,7 @@ Model Output(EG-8C)
 Workstream의 공식 Engineering Gate 번호는 계속 `NOT_ASSIGNED`다(D-008,
 ai-context/ARCHITECTURE_DECISIONS.md ADR-011).
 
-### 1.1 원격 SPOT 추천과 운영 적합성의 경계
+### 1.1 장기 원격 SPOT 추천과 운영 적합성의 경계
 
 D-019의 `데이터 기반 우선 후보`는 Issue #126 당시의 원격 준비도 평가결과다.
 D-020은 이를 현재 PoC의 최대 출력으로 제한한 부분을 대체한다. §9.1의 원격 근거
@@ -61,6 +63,26 @@ operational_suitability_status=NOT_VERIFIED
 안전·카트 이동·정차·시설 점유·판매 성공·매출 증가를 보장하지 않는다. 현재
 등록된 실제 Spot과 §9.1을 통과한 후보는 0개이므로 현재 추천 결과도 0개다.
 
+### 1.2 초기 파일럿 A안
+
+D-021의 초기 파일럿은 D-020 장기 SPOT 추천을 구현하지 않는다. 시스템은 서울시
+공식 Forecast로 Area와 판매시간만 추천하고, 대표 Spot 3개는 순위 없는 사용자
+선택지로 별도 제공한다.
+
+```text
+recommendation_type=AREA
+prediction_scope=AREA
+recommendation_basis=SEOUL_OFFICIAL_FORECAST
+recommendation_forecast_source=SEOUL_OFFICIAL_FORECAST
+spot_selection_mode=USER_CHOICE
+spot_auto_recommendation=false
+machine_learning_used_for_recommendation=false
+```
+
+`spot_options`의 후보는 추천대상 `spot_id`가 아니다. 후보별 직접 유동인구·혼잡·
+순위·예측값을 갖지 않으며, 사용자가 직접 선택한다. 이 절은 목표 계약 후보를
+정의할 뿐 생산 Schema·코드·Database를 구현하거나 변경하지 않는다.
+
 **v0.2.0 범위 추가:** 이 문서는 처음에는 "어떤 Area 또는 Spot을 추천할지"만
 계약했다. v0.2.0부터는 "특정 Spot 자체의 현재·미래 혼잡 상태를 얼마나 직접적인
 근거로 표현할 수 있는지"를 별도 계약(§5~§7)으로 추가한다. **추천 대상이
@@ -76,6 +98,9 @@ Recommendation Output 레코드의 허용값은 다음 둘뿐이다.
 
 이는 기존 D-006("추천은 SPOT 우선, AREA fallback")을 그대로 따르며, **"어떤
 단위를 추천 결과로 제시할지"**를 결정하는 필드다.
+
+D-021 초기 파일럿에서는 `AREA`만 사용한다. 사용자 선택용 Spot 3개가 함께
+표시돼도 `recommendation_type=SPOT`으로 바뀌지 않는다.
 
 Area 근거도 부족한 경우에는 새 Enum을 만들지 않고 Recommendation Output
 레코드를 생성하지 않는다. 추천하지 않은 이유는 향후 실행·검증 증거에 기록한다.
@@ -139,9 +164,12 @@ Recommendation Eligibility와 Spot Forecast Eligibility를 모두 충족해야 �
 
 ### 3.3 조합 C — AREA Recommendation + AREA Prediction
 
-Area를 추천하고 예측도 Area 수준이다. `spot_id`는 명시적 `null`, `fallback_reason`
-필수(§10). **현재 실제 Spot 등록과 원격 Eligibility 통과 후보가 0개이므로 이
-조합이 현재 가능한 추천의 기본값이다.**
+Area를 추천하고 예측도 Area 수준이다. 시스템 추천대상 `spot_id`는 명시적
+`null`이다. D-021 초기 파일럿은 의도된 AREA 기본 추천이므로
+`fallback_reason=null`이며 사용자 선택용 `spot_options` 3개를 별도로 표시할 수
+있다. D-020 장기 하향 결과는 `fallback_reason`이 필수다(§10). **현재 실제 Spot
+등록과 원격 Eligibility 통과 후보가 0개이므로 이 조합이 현재 가능한 추천의
+기본값이다.**
 
 ### 3.4 조합 D — AREA Recommendation + SPOT Prediction(금지)
 
@@ -278,8 +306,9 @@ Eligibility(Spot-level 예측 근거)는 통과하지 못한 상태를 정확히
 
 `spatial_support_type`별로 허용되는 표현 강도를 제한한다. **근거보다 강한
 문구를 생성하지 않는다.** 아래 예시는 모두 §9.1 Eligibility를 통과한
-Spot(조합 A 또는 B)을 전제로 하며, §3.3 조합 C(현재 기본값)에는 Spot 명칭
-자체를 이런 방식으로 언급하지 않는다.
+Spot(조합 A 또는 B)을 전제로 한다. §3.3 조합 C에서 Spot을 시스템 추천대상처럼
+언급하지 않는다. 다만 D-021 초기 파일럿은 `판매 후보 Spot`이라는 명칭으로
+사용자 선택지 3개를 표시할 수 있으며, 후보별 혼잡·순위·추천을 주장하지 않는다.
 
 | 조합·`spatial_support_type` | 허용 표현 예시 |
 |---|---|
@@ -289,9 +318,13 @@ Spot(조합 A 또는 B)을 전제로 하며, §3.3 조합 C(현재 기본값)에
 | 조합 C·`AREA_INFERENCE` | "강남역 Area는 혼잡할 전망입니다. 출구 단위 혼잡도는 확인되지 않았습니다." |
 | `UNSUPPORTED`(Spot 언급이 필요한 예외적 맥락) | "5번 출구의 개별 혼잡 상태를 확인할 수 없습니다." |
 
+**허용 예시(D-021 조합 C)**: "강남역 Area는 1시간 뒤 혼잡할 전망입니다. 판매
+후보 Spot 3개 중 이동할 곳을 선택해 주세요. 후보별 혼잡도는 확인되지 않았습니다."
+
 **금지 예시**: 조합 B 또는 C 상태에서 "강남역 5번 출구는 1시간 뒤 혼잡할
-전망입니다."처럼 Spot 이름과 Spot 자체의 혼잡 예측을 직접 연결하는 문장을
-생성하지 않는다. 이 문장은 조합 A·`DIRECT_SENSOR`에서만 허용된다.
+전망입니다."처럼 Spot 이름과 Spot 자체의 혼잡 예측을 직접 연결하거나 "5번
+출구를 추천합니다"라고 표현하지 않는다. 직접 혼잡 예측 문장은 조합
+A·`DIRECT_SENSOR`에서만 허용된다.
 
 이 표는 표현 강도의 상한을 정의하며, 실제 UI 문구 템플릿은 후속 UI/UX 상세
 설계에서 확정한다.
@@ -375,8 +408,10 @@ B에서는 §6 필드를 애초에 채우지 않기 때문이다.
 `recommendation_type = AREA`인 레코드는 다음을 만족해야 한다(조합 C, §3.3).
 
 - `spot_id`는 명시적 `null`(§12.1 참조)
-- `fallback_reason` 필수(값 존재, §12.1에 따라 생략 아님)
 - `prediction_scope`는 항상 `AREA`다(§3 조합표, 조합 D는 금지)
+- D-021 초기 기본 AREA 추천은 `spot_selection_mode=USER_CHOICE`이고
+  `fallback_reason=null`이다.
+- D-020 장기 SPOT 추천의 하향 AREA 결과는 `fallback_reason`이 필수다.
 
 **현재 Spot Master의 13개 Candidate Anchor 행이 전부 §9.1의 Eligibility를 충족하지 못하므로, 지금
 시점에서는 이 조합이 기본값이다.** 이때 `fallback_reason`의 전형적인 값은
@@ -385,6 +420,8 @@ B에서는 §6 필드를 애초에 채우지 않기 때문이다.
 ```text
 fallback_reason = NO_ELIGIBLE_SPOT
 ```
+
+위 값은 D-020 장기 하향 결과의 예시다. D-021 초기 파일럿에는 사용하지 않는다.
 
 ## 11. 공통 필드 후보
 
@@ -397,13 +434,20 @@ fallback_reason = NO_ELIGIBLE_SPOT
 | `data_freshness` | 근거 데이터의 최신성(예: 지연 시간) |
 | `recommendation_type` | `AREA` 또는 `SPOT`(§2) |
 | `verification_mode` | 원격 경로는 `REMOTE_EVIDENCE_ONLY` |
-| `recommendation_basis` | 추천 근거 유형; 원격 추천은 `REMOTE_EVIDENCE` |
+| `recommendation_basis` | 추천 근거 유형; 초기 파일럿은 `SEOUL_OFFICIAL_FORECAST`, 장기 원격 SPOT은 `REMOTE_EVIDENCE` |
+| `recommendation_forecast_source` | 초기 파일럿 추천 Forecast Source; `SEOUL_OFFICIAL_FORECAST` |
+| `machine_learning_used_for_recommendation` | 초기 파일럿은 `false`; 기존 비교실험과 추천 사용 여부를 분리 |
 | `prediction_scope` | `AREA` 또는 `SPOT`(§3) |
 | `area_code` | 공식 `AREA_CD` |
 | `area_name` | 공식 `AREA_NM` |
 | `area_opportunity_evidence` | Area 판매기회와 유효시간 근거 |
 | `spot_id` | SPOT 추천 시 필수, AREA 추천 시 명시적 `null` |
 | `spot_name`/`spot_type`/`latitude`/`longitude` | Spot Identity(§4) |
+| `spot_selection_mode` | 초기 파일럿은 `USER_CHOICE` |
+| `spot_auto_recommendation` | 초기 파일럿은 `false` |
+| `spot_role` | 초기 파일럿 선택지는 `USER_SELECTABLE_OPTION` |
+| `spot_options` | 초기 파일럿의 순위 없는 사용자 선택 후보 정확히 3개; 추천 `spot_id`와 별개 |
+| `user_selected_spot_id` | 사용자가 선택한 후보 식별자; 선택 전 `null`, 생산 필드명은 구현 Issue에서 확정 |
 | `recommended_sales_start_at`/`recommended_sales_end_at` | 추천 판매 시작·종료시각 |
 | `recommendation_target_at` | 추천 판단이 대상으로 삼은 예측시각 |
 | `spot_comparison_evidence` | 후보별 유동인구·밀집도 또는 승인 대리근거 요약 |
@@ -419,7 +463,7 @@ fallback_reason = NO_ELIGIBLE_SPOT
 | `reason_codes` | 추천 사유 코드 목록(§7, §13) |
 | `action_message` | 행동 권고 메시지(§7) |
 | `limitations` | 원격 추천의 미확인 항목과 사용 제한 |
-| `fallback_reason` | AREA 추천 시 필수, SPOT 추천 시 명시적 `null` |
+| `fallback_reason` | D-021 초기 AREA 기본 추천은 `null`; D-020 장기 하향 AREA는 필수; SPOT 추천은 `null` |
 | `field_verified` | 현장검증 여부 |
 | `field_verification_status` | 현장검증 상태; 현재 원격 경로는 `UNAVAILABLE` |
 | `operational_suitability_status` | 운영 적합성 상태; 미확인은 `NOT_VERIFIED` |
@@ -428,6 +472,10 @@ fallback_reason = NO_ELIGIBLE_SPOT
 
 이 필드 목록은 목표 계약이며 이번 개정으로 생산 Schema가 변경된 것은 아니다.
 실제 구현 시 확정 스키마는 별도 Issue와 PM 승인으로 정한다.
+
+D-021 초기 파일럿에서 `spot_comparison_evidence`, `spot_rank`, `rank_stability`,
+`alternate_spot_id`와 Spot Forecast Content는 모두 `null`이다. `spot_options`는
+후보명·위치 설명과 미확인 상태만 담고 Spot별 Area 예측값을 복사하지 않는다.
 
 ## 12. Spot 기본 상태
 
@@ -461,10 +509,12 @@ JSON null 표현 관례와 동일). 예: AREA 추천의 `spot_id`, SPOT 추천�
 
 ## 13. Fallback과 추천 사유
 
-Spot 근거가 부족하고 Area 근거만 충분한 경우 AREA 추천으로 전환한다. AREA
-추천에는 `fallback_reason`이 반드시 존재해야 한다(§12.1에 따라 값으로 존재,
-생략 아님). Area 근거도 부족·노후·충돌 상태면 Recommendation Output 레코드를
-생성하지 않는다.
+D-021 초기 파일럿은 처음부터 AREA를 추천하므로 fallback이 아니다.
+`spot_selection_mode=USER_CHOICE`와 `fallback_reason=null`을 사용한다.
+
+D-020 장기 계약에서 Spot 근거가 부족하고 Area 근거만 충분하면 AREA 추천으로
+전환하고 `fallback_reason`을 반드시 기록한다(§12.1에 따라 생략하지 않음). Area
+근거도 부족·노후·충돌 상태면 Recommendation Output 레코드를 생성하지 않는다.
 
 Fallback reason 후보는 계약상 Enum 후보로만 기록하며, 확정되지 않은 값은
 `OPEN_DECISION`으로 표시한다.
@@ -534,6 +584,8 @@ UI/UX 상세 설계에서 정한다. 코드 후보 예시:
 - null과 필드 생략 계약 명시
 - Fallback과 reason code 후보를 `OPEN_DECISION`으로 명시
 - SPOT·AREA·추천 없음 하향계약 명시
+- D-021 초기 AREA 추천과 사용자 선택 Spot 3개를 시스템 SPOT 추천과 분리
+- 초기 AREA 기본 추천과 장기 AREA fallback의 `fallback_reason` 차이 명시
 - 판매성과 표현 금지 경계 명시
 - PM 승인
 
@@ -541,6 +593,7 @@ UI/UX 상세 설계에서 정한다. 코드 후보 예시:
 
 | 버전 | 날짜 | 변경내용 | 작성자 | 승인상태 |
 |---|---|---|---|---|
+| v0.6.0 | 2026-07-29 | D-021 초기 파일럿 A안 반영. AREA·판매시간 추천과 사용자 선택 Spot 3개를 시스템 SPOT 추천과 분리하고 서울시 공식 Forecast·ML 미사용·초기 AREA 비-fallback 계약을 추가. 생산 Schema는 미구현 상태 유지 | 신동현 | PM 결정 |
 | v0.5.0 | 2026-07-29 | D-020에 따라 원격 SPOT 추천 Eligibility와 현장·운영 적합성을 분리. 판매시간·비교순위·원격근거·제한 필드 후보, SPOT·AREA·추천 없음 하향계약과 신뢰도 값 공간을 추가. 생산 Schema는 미구현 상태 유지 | 신동현 | PM 결정 |
 | v0.4.0 | 2026-07-29 | D-019의 데이터 기반 우선 후보를 공식 Recommendation Output 전 단계로 분리. 원격 검증 정책값과 운영 적합성 미검증 경계를 추가하고 현재 PoC가 공식 SPOT Recommendation을 생성하지 않음을 명시 | 신동현 | PM 결정 |
 | v0.3.0 | 2026-07-24 | SPOT+SPOT/SPOT+AREA/AREA+AREA/AREA+SPOT 4개 조합을 명시적으로 계약화(§3.1~3.4). Spot Recommendation Eligibility(§9.1)와 Spot Forecast Eligibility(§9.2)를 분리해 `field_verified`/`validation_status`의 값 기준(단순 존재가 아니라 `true`/`VERIFIED`)을 명확히 함. `validation_status` 값 공간에 `VERIFIED` 추가(§12). AREA-scope일 때 Spot Forecast 필드가 명시적 null임을 명시(§6). 근거 수준·조합별 UI 표현표에 조합 B 예시와 금지 예시 추가(§8) | 신동현 | PM 결정 |
