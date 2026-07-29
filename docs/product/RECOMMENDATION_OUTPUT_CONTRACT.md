@@ -1,11 +1,11 @@
 # Recommendation Output Contract
 
 - 문서 상태: Draft
-- 버전: v0.7.0
+- 버전: v0.8.0
 - 작성자: 신동현
 - 최종 승인자: 신동현
 - 최초 작성일: 2026-07-24
-- 최종 수정일: 2026-07-29
+- 최종 수정일: 2026-07-30
 - 적용 프로젝트: Freshmanager Data PoC
 - 관련 문서:
   - `AGENTS.md`
@@ -106,6 +106,45 @@ Issue #134의 초기 파일럿 Core(`freshmanager/pilot_area_recommendation.py`)
 순위·예측값을 갖지 않으며, 사용자가 직접 선택한다. 이 Core는 파일을 생성하거나
 EG-8D 산출물을 갱신·게시하지 않는다. Backend·UI·배포·생산 Database·공식 추천
 게시와 실제 파일럿 실행은 구현하거나 승인하지 않는다.
+
+### 1.3 초기 파일럿 Application Service
+
+Issue #136의 `freshmanager/pilot_recommendation_service.py`는 Core를 한 번 실행해
+요청한 60분 또는 180분 결과를 JSON-safe ViewModel로 바꾸고, 선택값이 현재 추천
+Area의 Spot Option 3개에 포함되는지 검증한다. 상태 계약은 다음과 같다.
+
+- `AVAILABLE_UNSELECTED`: AREA 추천이 있고 아직 Spot을 선택하지 않음
+- `AVAILABLE_SELECTED`: 현재 3개 Option 중 하나를 사용자가 선택함
+- `NO_RECOMMENDATION`: Core가 해당 Horizon에 추천을 제공하지 않음
+- `INVALID_SELECTION`: 다른 Area·존재하지 않는 Option 또는 추천 없는 상태의 선택
+- `INPUT_INVALID`: 허용되지 않은 Horizon·입력 CSV·Core 입력 계약 오류
+
+모든 상태는 같은 최상위 필드 집합을 사용한다. AREA 추천이 있는
+`AVAILABLE_UNSELECTED`·`AVAILABLE_SELECTED`·`INVALID_SELECTION`은 `area`,
+`sales_time`, `spot_options`를 유지한다. AREA 추천이 없는 `NO_RECOMMENDATION`과
+그 상태에서 선택을 시도한 `INVALID_SELECTION`, `INPUT_INVALID`는 `area`·
+`sales_time`·`selected_spot`을 `null`, `spot_options`·`limitations`를 빈 배열로
+반환한다. 모든 `INVALID_SELECTION`의 `selected_spot`은 `null`이다.
+
+`reason_code`는 현재 View 상태의 대표 원인이다. 잘못된 선택이면
+`INVALID_SELECTION`이 대표 원인이 되고, `reason_codes`는 기존 Core 원인을 먼저
+보존한 뒤 선택 오류를 추가한다.
+
+ViewModel은 Area 현재·예측 범위와 변화, 예측 기준시각·대상시각, 현재 Spot Option
+3개, 선택 Spot과 기존 제한사항을 반환한다. 판매시간은 구간이 아니라
+`display_mode=FORECAST_TARGET_POINT`인 예측 대상시각이다. 추천이 없을 때는 Core의
+이유코드와 경고를 유지한다. `official_recommendation_allowed=false`와
+`machine_learning_used_for_recommendation=false`도 유지한다. 필드 정의는
+`docs/data/FIELD_DICTIONARY.md`를 따른다.
+
+이 Service는 HTTP Endpoint·Web Framework·Database·파일·세션·사용자 계정·UI를
+추가하지 않고 선택을 저장하지 않는다. Spot 순위·점수·기본선택·자동추천과
+Spot별 인구·혼잡도도 만들지 않는다.
+
+허용되지 않은 Horizon과 Core가 분류한 입력 계약 오류는 `INPUT_INVALID`
+ViewModel로 반환한다. 예상하지 못한 Core 실행 실패와 내부 출력 계약 위반은 각각
+제한된 `PilotRecommendationServiceError`의 `execution_failed`·`contract_invalid`로
+중단하며, ViewModel이나 오류문에 내부 경로·원본 예외·Stack Trace를 넣지 않는다.
 
 **v0.2.0 범위 추가:** 이 문서는 처음에는 "어떤 Area 또는 Spot을 추천할지"만
 계약했다. v0.2.0부터는 "특정 Spot 자체의 현재·미래 혼잡 상태를 얼마나 직접적인
@@ -615,6 +654,7 @@ UI/UX 상세 설계에서 정한다. 코드 후보 예시:
 - D-021 초기 AREA 추천과 사용자 선택 Spot 3개를 시스템 SPOT 추천과 분리
 - 초기 AREA 기본 추천과 장기 AREA fallback의 `fallback_reason` 차이 명시
 - Issue #134 메모리 내 Core의 Horizon별 허용·추천 없음·비게시 계약 명시
+- Issue #136 ViewModel 상태·사용자 Spot 선택 검증·비저장 계약 명시
 - 판매성과 표현 금지 경계 명시
 - PM 승인
 
@@ -622,7 +662,8 @@ UI/UX 상세 설계에서 정한다. 코드 후보 예시:
 
 | 버전 | 날짜 | 변경내용 | 작성자 | 승인상태 |
 |---|---|---|---|---|
-| v0.7.0 | 2026-07-29 | Issue #134 초기 파일럿 메모리 내 Core 계약 반영. 5개 Area, 60·180분 독립 판정, RUNTIME·FRESH·완전 Snapshot·양수 후보 조건, 추천 없음 null, 별도 파일럿 허용값, 사용자 선택 Spot 3개와 비게시 경계를 명시 | 신동현 | Draft PR 검토 대기 |
+| v0.8.0 | 2026-07-30 | Issue #136 초기 파일럿 ViewModel 상태, 예측 대상시각 표현, 사용자 Spot 선택 검증과 비저장·비게시 경계를 반영 | 신동현 | PM 검토 대기 |
+| v0.7.0 | 2026-07-29 | Issue #134 초기 파일럿 메모리 내 Core 계약 반영. 5개 Area, 60·180분 독립 판정, RUNTIME·FRESH·완전 Snapshot·양수 후보 조건, 추천 없음 null, 별도 파일럿 허용값, 사용자 선택 Spot 3개와 비게시 경계를 명시 | 신동현 | PR #135 main 반영 |
 | v0.6.0 | 2026-07-29 | D-021 초기 파일럿 A안 반영. AREA·판매시간 추천과 사용자 선택 Spot 3개를 시스템 SPOT 추천과 분리하고 서울시 공식 Forecast·ML 미사용·초기 AREA 비-fallback 계약을 추가. 생산 Schema는 미구현 상태 유지 | 신동현 | PM 결정 |
 | v0.5.0 | 2026-07-29 | D-020에 따라 원격 SPOT 추천 Eligibility와 현장·운영 적합성을 분리. 판매시간·비교순위·원격근거·제한 필드 후보, SPOT·AREA·추천 없음 하향계약과 신뢰도 값 공간을 추가. 생산 Schema는 미구현 상태 유지 | 신동현 | PM 결정 |
 | v0.4.0 | 2026-07-29 | D-019의 데이터 기반 우선 후보를 공식 Recommendation Output 전 단계로 분리. 원격 검증 정책값과 운영 적합성 미검증 경계를 추가하고 현재 PoC가 공식 SPOT Recommendation을 생성하지 않음을 명시 | 신동현 | PM 결정 |

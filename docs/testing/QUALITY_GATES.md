@@ -592,13 +592,21 @@ Workstream의 공식 Gate 번호는 계속 `NOT_ASSIGNED`다.
 EG-8E(Recommendation Output Contract·UI/UX Readiness)는 이 Workstream의 계약·
 설계 준비 단계이며, 이 Workstream 자체의 구현 Gate가 아니다.
 
-Issue #134의 D-021 초기 파일럿 Core는 이 공식 Gate를 통과시키지 않는 메모리 내
+Issue #134·PR #135의 D-021 초기 파일럿 Core는 이 공식 Gate를 통과시키지 않는 메모리 내
 최소 경로다. 5개 Area의 60분·180분을 독립 판정하고, 완전한 `RUNTIME`·`FRESH`
 Horizon에 양수 후보가 있을 때만 `pilot_recommendation_allowed=true`로 AREA를
 반환한다. 양수 후보가 없으면 `recommendation=null`이며
 `official_recommendation_allowed=false`는 항상 유지한다. 선택된 Area에는 순위 없는
 Spot 3개를 `USER_CHOICE`로 제공하고 ML은 사용하지 않는다. Backend·UI·배포·파일
 산출물 게시와 실제 추천 실행은 범위 밖이다.
+
+Issue #136의 Application Service도 새 공식 Gate가 아니다. Core를 한 번 호출해
+60분·180분 중 한 결과를 JSON-safe ViewModel로 변환하고, 현재 추천 Area의 Spot
+Option 3개 안에서 사용자 선택을 검증한다. 5개 View 상태, Recommendation 없음,
+잘못된 선택, 제한된 입력 오류, 공식 추천 `false`, ML 미사용과 예측 대상시각만을
+시험한다. 예상 밖 실행 실패·내부 계약 위반은 내부 경로와 원본 예외를 노출하지 않는
+제한된 Service 오류로 중단한다. HTTP·Web Framework·Database·파일저장·UI·배포·
+사용자 파일럿과 Spot 자동추천은 범위 밖이다.
 
 ### 목표
 
