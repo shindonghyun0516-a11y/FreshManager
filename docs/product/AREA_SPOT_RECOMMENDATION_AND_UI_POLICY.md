@@ -2,7 +2,7 @@
 
 - 상태: `PM_APPROVED`
 - 기준일: 2026-07-29
-- 관련 Issue: #124, #126, #128, #129
+- 관련 Issue: #124, #126, #128, #129, #132
 - 상위 Issue: #99
 - 선행 결정: D-018, D-020, D-021
 
@@ -44,6 +44,11 @@ D-020의 Spot은 Eligibility를 통과한 `SYSTEM_RECOMMENDATION_TARGET`이다.
 
 현재 Spot Master의 13개 행은 모두 역 중심 대리좌표인 Candidate Anchor다. 공식 출구나
 검증된 판매 위치가 아니며 `field_verified=false`다.
+
+초기 파일럿의 사용자 선택지는 별도 정본
+`data/reference/pilot_spot_options.csv`의 5개 Area·15개 행이다. 이 행은 PM이 공개
+지도에서 확인한 대표 위치지만 현장검증·운영 적합성·Spot별 동적근거가 없으며,
+시스템 추천이나 추천순위가 아닌 같은 수준의 사용자 선택지다.
 
 13개 Area에는 각각 Candidate Anchor 1개만 연결돼 있다. 이는 실제 출구·흡연부스·
 오피스 입구·광장·버스정류장 같은 판매 후보가 아니라 실제 후보 구성을 위한
@@ -147,12 +152,12 @@ Spot 근거(`DIRECT_SENSOR`)까지 충족한 미래 상태를 설명하는 조�
 | 원격 데이터 기반 SPOT 추천 | §8의 원격 근거 Eligibility를 모두 충족함 | 특정 Spot·판매시간과 운영 미확인 제한을 함께 표시 |
 | 추천 제외 | 공식 제한, 오래된 자료, 근거 충돌 또는 품질 결함 | 후보에서 제외 |
 
-현재 집계는 원격 데이터 기반 SPOT 추천 0개, 판매 후보 13개, 정보 없음 0개,
-원격 근거 확인 중 0개, 추천 제외 0개다. 실제 Spot 등록은 0개이며, 운영 적합성은 모두
-`NOT_VERIFIED`다. 이 13개는 기존 Candidate Anchor 집계다. 초기 파일럿의 대표
-Spot 후보 15개는 표시명 조사후보이며 이 집계나 Spot Master에 등록된 행이 아니다.
+현재 집계는 원격 데이터 기반 SPOT 추천 0개, 기존 Candidate Anchor 13개,
+초기 파일럿 사용자 선택 Spot 15개다. 사용자 선택 Spot은 모두
+`field_verification_status=UNAVAILABLE`,
+`operational_suitability_status=NOT_VERIFIED`이며 판매 후보일 뿐 공식 추천이 아니다.
 
-모든 행에는 다음 공통 상태가 적용된다.
+기존 Candidate Anchor 13개에는 다음 상태가 적용된다.
 
 - 좌표 유형: `STATION_CENTER_PROXY`
 - Spot 유형: `SUBWAY_STATION_CENTER_PROXY`
@@ -162,6 +167,16 @@ Spot 후보 15개는 표시명 조사후보이며 이 집계나 Spot Master에 �
 - 접근 가능성·안전·판매 가능성·마지막 확인일: 확인되지 않음
 - 운영 적합성: `NOT_VERIFIED`
 - 현재 결과범위: 판매 후보; 공식 추천 아님
+
+초기 파일럿 사용자 선택 Spot 15개에는 다음 상태가 적용된다.
+
+- 좌표 상태: `PM_CONFIRMED`
+- 좌표 출처 유형: `PM_PROVIDED_PUBLIC_MAP_LOOKUP`
+- 역할·선택 방식: `USER_SELECTABLE_OPTION`·`USER_CHOICE`
+- 표시순서: 추천순위나 기본선택이 아님
+- 시간대별 Spot 동적 유동인구·혼잡도: 없음
+- 현장검증·운영 적합성: `UNAVAILABLE`·`NOT_VERIFIED`
+- 현재 결과범위: 사용자가 직접 고르는 판매 후보; 공식 추천 아님
 
 | Spot ID | Spot / 소속 Area | 좌표 | 정적 장소근거와 S-DoT 거리 참고 | 현재 상태 | 추천을 막는 부족정보 |
 |---|---|---|---|---|---|
@@ -346,8 +361,8 @@ D-021 초기 파일럿의 `AREA`는 SPOT 추천 실패에 따른 fallback이 아
 
 ## 18. 다음 PM 승인사항
 
-다음 한 단계는 PR #131의 5개 Area·Area당 대표 Spot 3개 제안을 PM이 검토하는
-것이다. UI 구현, 실제 Spot 등록, 추천 실행, 동적 근거 수집과 사용자 게시에는
+다음 한 단계는 Issue #132의 5개 Area·Area당 사용자 선택 Spot 3개 정적 Master
+구현을 Draft PR에서 PM이 검토하는 것이다. UI 구현, 추천 실행, 동적 근거 수집과 사용자 게시에는
 각각 별도 승인이 필요하다.
 
 ## 관련 정본
@@ -356,6 +371,7 @@ D-021 초기 파일럿의 `AREA`는 SPOT 추천 실패에 따른 fallback이 아
 - `docs/product/RECOMMENDATION_OUTPUT_CONTRACT.md`
 - `data/reference/eg6_area_panel.csv`
 - `data/reference/eg6_spot_master.csv`
+- `data/reference/pilot_spot_options.csv`
 - `data/reference/eg6_sdot_links.csv`
 - `docs/product/FreshManager_PRD_v1.0.md`
 - `docs/engineering/FreshManager_TRD_v1.0.md`

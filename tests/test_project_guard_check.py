@@ -1821,6 +1821,7 @@ class Eg6ReferenceProjectGuardTests(unittest.TestCase):
             project_guard.EG6_AREA_PANEL_RELATIVE_PATH,
             project_guard.EG6_SPOT_MASTER_RELATIVE_PATH,
             project_guard.EG6_SDOT_LINKS_RELATIVE_PATH,
+            project_guard.PILOT_SPOT_OPTIONS_RELATIVE_PATH,
         ):
             target = self.project.root / relative_path
             target.parent.mkdir(parents=True, exist_ok=True)
@@ -1849,6 +1850,10 @@ class Eg6ReferenceProjectGuardTests(unittest.TestCase):
 
     def test_h703_missing_required_csv_fails(self) -> None:
         (self.project.root / project_guard.EG6_SDOT_LINKS_RELATIVE_PATH).unlink()
+        self.assertEqual(self.check().status, project_guard.Status.FAIL)
+
+    def test_h703_missing_pilot_spot_options_fails(self) -> None:
+        (self.project.root / project_guard.PILOT_SPOT_OPTIONS_RELATIVE_PATH).unlink()
         self.assertEqual(self.check().status, project_guard.Status.FAIL)
 
     def test_h703_changed_header_contract_fails(self) -> None:
@@ -1909,6 +1914,18 @@ class Eg6ReferenceProjectGuardTests(unittest.TestCase):
             path,
             project_guard.EG6_SPOT_HEADERS,
             lambda rows: rows[0].update({"latitude": "37.3947610", "longitude": "127.1117170"}),
+        )
+        self.assertEqual(self.check().status, project_guard.Status.FAIL)
+
+    def test_h703_duplicate_pilot_coordinate_fails(self) -> None:
+        path = self.project.root / project_guard.PILOT_SPOT_OPTIONS_RELATIVE_PATH
+        self.mutate_csv(
+            path,
+            list(project_guard.PILOT_SPOT_OPTION_HEADERS),
+            lambda rows: rows[1].update({
+                "latitude": rows[0]["latitude"],
+                "longitude": rows[0]["longitude"],
+            }),
         )
         self.assertEqual(self.check().status, project_guard.Status.FAIL)
 
