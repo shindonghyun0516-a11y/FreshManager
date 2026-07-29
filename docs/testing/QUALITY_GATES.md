@@ -604,9 +604,12 @@ Evidence Assessment를 사용해 추천 단위와 근거를 제시하는 최소 
 
 ### 통과조건
 
-- 충분하고 신뢰 가능한 Spot Candidate가 있으면 `target_level=SPOT`을 반환한다.
-- 후보 근거가 부족하면 `target_level=AREA`와 `fallback_reason`을 반환한다.
-- 추천 결과가 사용한 Area·선택적 S-DoT·공간 Context·현장검증 근거를 추적한다.
+- D-020의 원격 근거 Eligibility를 충족한 Spot Candidate가 있으면
+  `target_level=SPOT`을 반환한다.
+- Spot 근거가 부족하고 Area 근거만 충분하면 `target_level=AREA`와
+  `fallback_reason`을 반환한다. Area 근거도 부족하면 추천하지 않는다.
+- 추천 결과가 사용한 Area·선택적 S-DoT·공간 Context와 현장검증·운영 적합성
+  상태를 추적한다.
 - 추천 실패로 원본 Area 데이터가 변경되거나 서울시 API가 재호출되지 않는다.
 - 실제 판매량·판매효과·개인 최적화를 구현 또는 입증했다고 표현하지 않는다.
 

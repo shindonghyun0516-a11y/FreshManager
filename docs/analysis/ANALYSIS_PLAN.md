@@ -185,9 +185,10 @@ EG-6A에서 확정한 13개 Area 패널
 ```text
 필수: Area Observation → Area Feature
 선택: S-DoT Observation → 지원·접근·수집·품질조건을 통과한 S-DoT Feature
-추가: 공간 Context + 현장검증 + 운영 제약
+추가: 공간 Context + 원격 Spot 근거
+별도 상태: 현장검증 + 운영 제약
 결합: Spot Candidate Evaluation
-결과: SPOT 또는 AREA + fallback_reason
+결과: SPOT / AREA + fallback_reason / 추천 없음
 ```
 
 S-DoT는 Area 내부 활성 위치 판단을 보조하는 독립·선택적 데이터 계층이며 Area 값을
@@ -290,9 +291,11 @@ POI 단위 값은 특정 지하철 출구, 건물 앞, 흡연부스 앞의 값�
 
 Area 관측값, S-DoT 관측값과 Spot Candidate Context는 분리한다. 현재 Spot Master의
 `STATION_CENTER_PROXY`는 Candidate Anchor Point이며 현장 검증이 끝난 판매 Spot이
-아니다. Area 값을 해당 좌표의 직접 유동인구로 해석하지 않는다. 후속 추천에서 Area·
-S-DoT·공간·현장검증 근거가 충분한 Spot Candidate가 확인되면 `target_level=SPOT`,
-그렇지 않으면 `target_level=AREA`와 `fallback_reason`을 사용한다.
+아니다. Area 값을 해당 좌표의 직접 유동인구로 해석하지 않는다. 후속 추천에서
+Area 기회와 D-020의 원격 근거 Eligibility가 충분한 Spot Candidate가 확인되면
+`target_level=SPOT`을 사용한다. Spot 근거가 부족하고 Area 근거만 충분하면
+`target_level=AREA`와 `fallback_reason`을 사용하며, Area 근거도 부족하면
+추천하지 않는다. 현장검증·운영 적합성은 별도 상태로 기록한다.
 
 ---
 

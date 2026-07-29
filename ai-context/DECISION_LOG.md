@@ -61,9 +61,12 @@ PM이 승인했거나 명시적으로 보류한 제품·운영 결정을 새 AI 
 ### D-006 — 추천은 SPOT 우선, AREA fallback
 
 - Date: `2026-07-22`
-- Status: `ACCEPTED`
+- Status: `ACCEPTED · SUPERSEDED_IN_PART_BY_D-020`
 - Decision: 신뢰 가능하고 운영 가능한 Spot이 있으면 `target_level=SPOT`, 없으면 `target_level=AREA`와 `fallback_reason`을 사용한다.
 - Consequence: Area fallback은 실패가 아니라 Spot 근거 부족을 명시하는 정상 결과다.
+- Supersession: D-020은 원격 SPOT 추천에 운영 적합성 확인을 요구하던 부분만
+  대체한다. SPOT 우선·AREA fallback과 Area 값을 Spot 직접값으로 쓰지 않는 원칙은
+  유지한다.
 
 ### D-007 — EG-6C 미신설
 
@@ -261,7 +264,7 @@ PM이 승인했거나 명시적으로 보류한 제품·운영 결정을 새 AI 
 ### D-018 — Area 탐색과 Spot 판매 추천의 제품 책임 분리
 
 - Date: `2026-07-29`
-- Status: `ACCEPTED · SUPERSEDED_IN_PART_BY_D-019`
+- Status: `ACCEPTED · SUPERSEDED_IN_PART_BY_D-019_AND_D-020`
 - Decision: Area는 판매기회를 탐색·분석하는 넓은 구역이고, Spot은 Area 안에서
   실제 이동·판매를 안내할 최종 추천 대상이다. 공식 Spot 추천은 Area 기회뿐 아니라
   Spot별 동적 밀집근거, 같은 Area 안의 Spot 비교, 접근성·안전·판매 가능성,
@@ -270,6 +273,9 @@ PM이 승인했거나 명시적으로 보류한 제품·운영 결정을 새 AI 
   않는다. Spot 근거가 부족하면 Area 안내 또는 판매 후보로 하향한다. 현재 등록된
   13개 역 중심 대리좌표는 모두 `field_verified=false`이므로 판매 후보이며 공식
   추천 가능 Spot은 0개다.
+- Supersession: Area와 Spot의 책임 분리, Area 값과 Spot 값의 구분은 유지한다.
+  현장확인·운영 적합성을 원격 SPOT 추천의 필수조건으로 둔 부분만 D-019와 D-020이
+  대체한다.
 - S-DoT boundary: S-DoT는 지원조건을 만족할 때 사용하는 선택적 동적 근거 후보다.
   실제 Spot 좌표와 시간대 관측자료를 결합하기 전에는 Spot 밀집도를 확정하지 않으며,
   근거가 부족하면 Area 안내 또는 판매 후보로 하향한다.
@@ -287,7 +293,7 @@ PM이 승인했거나 명시적으로 보류한 제품·운영 결정을 새 AI 
 ### D-019 — 현장검증 불가 환경의 원격 근거 기반 Spot 후보 정책
 
 - Date: `2026-07-29`
-- Status: `ACCEPTED`
+- Status: `ACCEPTED · SUPERSEDED_IN_PART_BY_D-020`
 - Decision: FreshManager PoC에서는 실제 현장방문과 현장검증을 수행할 수 없다.
   D-018의 현장검증 필수조건은 현재 PoC 범위에서 이 결정으로 부분 대체한다.
   `field_verified=true`를 현재 PoC의 달성조건으로 사용하지 않는다.
@@ -309,6 +315,36 @@ PM이 승인했거나 명시적으로 보류한 제품·운영 결정을 새 AI 
 - Evidence: Issue #126,
   `docs/product/AREA_SPOT_REMOTE_EVIDENCE_READINESS_ASSESSMENT.md`,
   `docs/product/AREA_SPOT_RECOMMENDATION_AND_UI_POLICY.md`.
+- Supersession: 현장검증 불가, 운영 적합성 미확인과 판매·안전·정차·성과 비보장
+  원칙은 유지한다. `데이터 기반 우선 후보`를 현재 PoC의 최대 출력으로 제한하고
+  `recommendation_scope=DATA_PRIORITY_ONLY`를 최종 상한으로 둔 부분만 D-020이
+  대체한다.
+
+### D-020 — 원격 데이터 기반 SPOT 판매 추천과 운영 적합성 분리
+
+- Date: `2026-07-29`
+- Status: `ACCEPTED`
+- Product responsibility: Area는 판매기회와 유효 시간대를 탐색·비교하는 구역이고,
+  Spot은 Area 안에서 프래시매니저가 실제로 이동해 판매하도록 추천받는 특정
+  지점이다. 핵심 출력은 추천 Area·Spot·판매시간과 선택근거다.
+- Remote recommendation: 유효한 Area 기회, 같은 Area 안의 비교 가능한 Spot 최소
+  2개(파일럿 목표 3~5개), 공식 명칭·위치근거, 후보를 구분할 수 있는 Spot별 동적
+  근거 또는 승인된 대리근거, 동일 기준시각·시간범위, 반복성 또는 순위 안정성,
+  최신성·결측관리, 사용자 이동·준비 가능시간, 신뢰도와 제한사항을 모두 충족하면
+  현장검증 없이도 원격 데이터 기반 `SPOT` 추천이 가능하다.
+- Operational boundary: `field_verification_status=UNAVAILABLE`과
+  `operational_suitability_status=NOT_VERIFIED`를 유지한다. 원격 추천은 실제 판매
+  허용·안전·카트 이동·정차·시설 점유·판매 성공·매출 증가를 보장하지 않는다.
+  운영 적합성은 파일럿 사용자 또는 실제 운영기관이 별도로 판단한다.
+- Fallback: Spot 근거가 충분하면 `SPOT`, Area 근거만 충분하면 `AREA`와
+  `fallback_reason`, Area 근거도 부족하면 Recommendation Output을 생성하지 않는다.
+- Existing decisions: D-006의 운영 가능성 필수조건, D-018의 현장·운영 확인
+  필수조건과 D-019의 후보 한정 상한을 부분 대체한다. D-006의 SPOT 우선·AREA
+  fallback, D-018의 Area·Spot 책임 분리, D-019의 현장검증 불가와 운영 적합성
+  미확인 원칙은 유지한다.
+- Scope boundary: 이번 결정은 정책·목표 계약 정합화다. 생산 Schema·코드·시험,
+  실제 Spot 등록·데이터 수집·추천 실행·UI·Backend·배포를 승인하지 않는다.
+- Evidence: Issue #129, Follow-up to PR #127, Blocks #128.
 
 ## 4. 갱신 규칙
 

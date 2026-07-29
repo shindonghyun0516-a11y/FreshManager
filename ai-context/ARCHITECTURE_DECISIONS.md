@@ -51,11 +51,19 @@ Decision Record, 기술 구조 결정 기록) 형식으로 보존한다. 현행 
 
 - Status: `PLANNED`
 - Context: 후보 근거가 충분한 Area와 그렇지 않은 Area를 같은 해상도로 추천하면 과도한 정밀도 주장이 된다.
-- Decision: 신뢰 가능하고 운영 가능한 Spot은 `target_level=SPOT`, 없으면 `target_level=AREA`와 `fallback_reason`을 반환한다.
+- Decision: D-020의 원격 근거 Eligibility를 충족한 Spot은
+  `target_level=SPOT`, Spot 근거가 부족하고 Area 근거만 충분하면
+  `target_level=AREA`와 `fallback_reason`을 반환한다. Area 근거도 부족하면
+  Recommendation Output을 생성하지 않는다.
 - Alternatives: 모든 추천을 AREA 또는 모든 추천을 SPOT으로 고정.
-- Consequences: 추천 근거와 fallback 사유를 추적하고 Area 값을 Spot 직접 유동인구로 표현하지 않는다.
+- Consequences: 추천 근거와 fallback 사유를 추적하고 Area 값을 Spot 직접 유동인구로
+  표현하지 않는다. 원격 SPOT 추천과 운영 적합성 보장을 분리하고, 운영 적합성이
+  미확인이면 그 상태와 제한을 표시한다.
 - Validation: Recommendation MVP Workstream은 Gate number `NOT_ASSIGNED`이며 별도 PM 승인 후 검증한다.
-- Related decision: D-006, D-008.
+- Related decision: D-006, D-008, D-020.
+- History: 이전 문구는 "신뢰 가능하고 운영 가능한 Spot"만 SPOT으로 허용했으나,
+  D-020이 운영 적합성 확인을 원격 추천의 필수조건에서 분리했다. 이전 결정 이력은
+  D-006·D-018·D-019에 보존한다.
 
 ## ADR-006 — Backup Worker를 Collector와 분리
 

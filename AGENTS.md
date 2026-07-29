@@ -81,12 +81,13 @@ Codex는 다음 원칙을 지켜야 한다.
   Forecast·시간대 변화를 수집한다.
 - **Optional Supporting Observation — S-DoT:** 지원·접근·수집·품질조건을 만족할 때만
   센서 위치·근접 관계·관측 변화를 독립적으로 사용한다. Area 데이터를 대체하지 않는다.
-- **Additional Context:** 공간 Context, 현장검증과 운영제약을 별도로 관리한다.
+- **Additional Context:** 공간 Context, 현장검증 상태와 운영제약 상태를 별도로 관리한다.
 - **Spot Candidate Evaluation:** Area Feature에 사용 가능한 S-DoT Feature와 추가
   Context를 결합해 후보 근거를 평가한다. 점수·가중치·임계값은 `OPEN_DECISION`이다.
-- **Recommendation 결과:** 신뢰할 수 있는 후보는 `SPOT`, 그렇지 않으면 `AREA`와
-  `fallback_reason`을 사용한다. Recommendation MVP Workstream의 Gate 번호는
-  `NOT_ASSIGNED`다.
+- **Recommendation 결과:** D-020의 원격 근거 Eligibility를 충족한 후보는 `SPOT`,
+  Spot 근거가 부족하고 Area 근거만 충분하면 `AREA`와 `fallback_reason`을
+  사용한다. Area 근거도 부족하면 추천하지 않는다. Recommendation MVP
+  Workstream의 Gate 번호는 `NOT_ASSIGNED`다.
 
 EG-6B의 책임은 Area Observation 확보까지다. 동적 S-DoT 수집과 Spot Candidate
 Evaluation 실패는 Area Collector를 중단시키지 않는다. 다만 EG-6B 실행 전에는

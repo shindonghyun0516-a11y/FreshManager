@@ -77,11 +77,13 @@
 ```text
 필수 Core Observation: Area Observation
 선택적 Supporting Observation: 사용 가능한 경우의 S-DoT Observation
-추가 Context: Spatial Context + Field Validation + Operational Constraints
+추가 Context: Spatial Context + Field Validation Status + Operational Constraints Status
 
 Area Feature + 선택적 S-DoT Feature + 추가 Context
 → Spot Candidate Evaluation
-→ 신뢰 가능한 Spot: SPOT / 없는 경우: AREA + fallback_reason
+→ 원격 Eligibility 충족: SPOT
+→ Spot 근거 부족·Area 근거 충분: AREA + fallback_reason
+→ Area 근거 부족: 추천 없음
 ```
 
 현재 Spot Master는 확정 판매 위치가 아니라 `STATION_CENTER_PROXY` 기반 Candidate
@@ -474,11 +476,13 @@ EG-7 첫 1시간 파일럿은 주기를 선택하는 시험이 아니라 이 고
 
 이름이 비슷한 장소도 임의로 합치지 않는다.
 
-Spot은 고정 판매 위치가 아니라 Area 데이터와 S-DoT 근접성·공간 Context·현장검증
-상태를 결합해 생성하는 판매 후보 위치다. 후속 추천에서 신뢰할 수 있고 운영 가능한
-Spot Candidate가 확인되면 반드시
-`target_level=SPOT`으로 추천한다. Spot이 없거나 운영 가능성이 미확인이면
-`target_level=AREA`로 fallback하고 이유를 기록한다. 현재 역 중심 대리좌표는
+Spot은 Area 데이터와 선택적 S-DoT 또는 승인된 대리근거·공간 Context를 결합해
+비교하는 구체적인 이동·판매 추천 지점이다. 후속 추천에서 D-020의 원격 근거
+Eligibility를 충족한 Spot Candidate가 확인되면 `target_level=SPOT`으로 추천한다.
+현장검증 불가와 운영 적합성 미확인은 제한 상태로 표시하되 원격 추천 자체를
+차단하지 않는다. Spot 근거가 부족하고 Area 근거만 충분하면
+`target_level=AREA`로 fallback하고 이유를 기록하며, Area 근거도 부족하면
+추천하지 않는다. 현재 역 중심 대리좌표는
 `field_verified=false`인 Candidate Anchor Point이며 검증된 판매 Spot이 아니다.
 동적 S-DoT 관측과 Spot Candidate Evaluation 실패는 EG-6B Area 수집을 중단시키지
 않는다. EG-6B가 확인하는 정적 Spot/S-DoT CSV는 승인된 13개 Area 패널의 참조

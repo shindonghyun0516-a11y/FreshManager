@@ -22,9 +22,10 @@
 ## 2. 개념과 해석 한계
 
 - Area는 서울 실시간 도시데이터의 수집 단위다.
-- Spot은 고정 판매 위치가 아니라 Area·S-DoT 근접성·공간 Context·현장검증으로
-  생성하는 판매 후보 위치다.
-- 현재 Spot Master 행은 Spot Candidate 생성의 기준점인 Candidate Anchor Point다.
+- 현재 Spot Master 행은 고정 판매 위치나 추천 가능한 Spot이 아니라,
+  Area·S-DoT 근접성·공간 Context를 연결하는 Candidate Anchor Point다.
+- 향후 추천 대상 Spot은 D-020 원격 Eligibility를 충족한 특정 지점이며,
+  현장검증·운영 적합성은 추천 대상 정의와 분리된 상태다.
 - S-DoT Link는 Area 내부 활성 위치 판단과 Spot Candidate Feature를 위한 보조
   연결이며 Area 데이터·판매 적합성·실제 판매량을 대체하지 않는다.
 - 모든 Spot 좌표는 공식 출입구 좌표가 아니라 서울시 역사마스터의 역 중심 대용점이다.
@@ -101,11 +102,13 @@ Spot의 업무적 이유는 후속 출구·보행동선 조사의 출발점을 �
 
 후속 추천정책:
 
-- Area Observation과, 사용할 수 있는 경우의 S-DoT Feature, 공간 Context·현장검증·
-  운영 제약으로 Spot Candidate Evaluation을 수행한다.
-- 신뢰할 수 있고 운영 가능한 Spot Candidate가 확인되면 반드시 `target_level=SPOT`으로 추천한다.
-- 추천 가능한 후보가 없거나 운영 가능성이 미확인이면 `target_level=AREA`로
-  fallback하고 `fallback_reason`을 반드시 기록한다.
+- Area Observation과, 사용할 수 있는 경우의 S-DoT Feature, 공간 Context·현장검증
+  상태·운영 제약 상태로 Spot Candidate Evaluation을 수행한다.
+- D-020의 원격 근거 Eligibility를 충족한 Spot Candidate가 확인되면 반드시
+  `target_level=SPOT`으로 추천한다. 현장검증 불가와 운영 적합성 미확인은 제한
+  상태로 표시하되 원격 추천 자체를 차단하지 않는다.
+- Spot 근거가 부족하고 Area 근거만 충분하면 `target_level=AREA`로 fallback하고
+  `fallback_reason`을 반드시 기록한다. Area 근거도 부족하면 추천하지 않는다.
 - 현재 13개 `STATION_CENTER_PROXY`는 모두 `field_verified=false`이므로 검증된
   판매 Spot으로 승격하거나 고정 판매 위치로 표현하지 않는다.
 - Area 수집값은 특정 Spot·출구의 직접 유동인구가 아니다.
