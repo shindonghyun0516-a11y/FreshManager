@@ -1,7 +1,7 @@
 # Recommendation Output Contract
 
 - 문서 상태: Draft
-- 버전: v0.6.0
+- 버전: v0.7.0
 - 작성자: 신동현
 - 최종 승인자: 신동현
 - 최초 작성일: 2026-07-24
@@ -69,6 +69,14 @@ D-021의 초기 파일럿은 D-020 장기 SPOT 추천을 구현하지 않는다.
 공식 Forecast로 Area와 판매시간만 추천하고, 대표 Spot 3개는 순위 없는 사용자
 선택지로 별도 제공한다.
 
+초기 대상은 다음 5개 Area로 고정한다.
+
+- `POI032` 서울식물원·마곡나루역
+- `POI088` 광화문광장
+- `POI014` 강남역
+- `POI025` 뚝섬역
+- `POI072` 여의도
+
 ```text
 recommendation_type=AREA
 prediction_scope=AREA
@@ -79,9 +87,25 @@ spot_auto_recommendation=false
 machine_learning_used_for_recommendation=false
 ```
 
+Issue #134의 초기 파일럿 Core(`freshmanager/pilot_area_recommendation.py`)는 다음
+계약만 메모리에서 구현한다.
+
+- 60분과 180분을 서로 독립적으로 판정한다.
+- EG-8D의 최신 완전 13개 Area Snapshot 선택·검증과 기존 순위 규칙을 재사용한다.
+- 해당 Horizon이 `RUNTIME`·`FRESH`이고 완전 Snapshot·Area 표시 조건을
+  통과하며, 위 5개 Area 중 예상 인구 변화가 양수인 후보가 있을 때만
+  `pilot_recommendation_allowed=true`와 `recommendation_status=AVAILABLE`을 반환한다.
+- 양수 후보가 없으면 `recommendation=null`,
+  `pilot_recommendation_allowed=false`, `reason_code=NO_POSITIVE_AREA_OPPORTUNITY`다.
+- `official_recommendation_allowed`는 결과와 무관하게 항상 `false`다.
+- 선택 Area에는 정확히 3개의 `spot_options`를 순위·기본선택 없이 제공하고,
+  `spot_selection_mode=USER_CHOICE`, `spot_auto_recommendation=false`,
+  `user_selected_spot_id=null`, `machine_learning_used_for_recommendation=false`를 사용한다.
+
 `spot_options`의 후보는 추천대상 `spot_id`가 아니다. 후보별 직접 유동인구·혼잡·
-순위·예측값을 갖지 않으며, 사용자가 직접 선택한다. 이 절은 목표 계약 후보를
-정의할 뿐 생산 Schema·코드·Database를 구현하거나 변경하지 않는다.
+순위·예측값을 갖지 않으며, 사용자가 직접 선택한다. 이 Core는 파일을 생성하거나
+EG-8D 산출물을 갱신·게시하지 않는다. Backend·UI·배포·생산 Database·공식 추천
+게시와 실제 파일럿 실행은 구현하거나 승인하지 않는다.
 
 **v0.2.0 범위 추가:** 이 문서는 처음에는 "어떤 Area 또는 Spot을 추천할지"만
 계약했다. v0.2.0부터는 "특정 Spot 자체의 현재·미래 혼잡 상태를 얼마나 직접적인
@@ -432,6 +456,10 @@ fallback_reason = NO_ELIGIBLE_SPOT
 | `generated_at` | 추천 결과 생성 시각 |
 | `data_observed_at` | 추천 근거로 사용한 관측 데이터의 기준시각 |
 | `data_freshness` | 근거 데이터의 최신성(예: 지연 시간) |
+| `horizon_minutes` | 초기 파일럿은 서로 독립적으로 판정하는 `60` 또는 `180` |
+| `recommendation_status` | 메모리 내 Horizon 결과의 `AVAILABLE` 또는 `UNAVAILABLE` |
+| `official_recommendation_allowed` | 초기 파일럿 Core에서도 항상 `false` |
+| `pilot_recommendation_allowed` | 완전한 `RUNTIME`·`FRESH` Horizon에 양수 후보가 있을 때만 `true` |
 | `recommendation_type` | `AREA` 또는 `SPOT`(§2) |
 | `verification_mode` | 원격 경로는 `REMOTE_EVIDENCE_ONLY` |
 | `recommendation_basis` | 추천 근거 유형; 초기 파일럿은 `SEOUL_OFFICIAL_FORECAST`, 장기 원격 SPOT은 `REMOTE_EVIDENCE` |
@@ -586,6 +614,7 @@ UI/UX 상세 설계에서 정한다. 코드 후보 예시:
 - SPOT·AREA·추천 없음 하향계약 명시
 - D-021 초기 AREA 추천과 사용자 선택 Spot 3개를 시스템 SPOT 추천과 분리
 - 초기 AREA 기본 추천과 장기 AREA fallback의 `fallback_reason` 차이 명시
+- Issue #134 메모리 내 Core의 Horizon별 허용·추천 없음·비게시 계약 명시
 - 판매성과 표현 금지 경계 명시
 - PM 승인
 
@@ -593,6 +622,7 @@ UI/UX 상세 설계에서 정한다. 코드 후보 예시:
 
 | 버전 | 날짜 | 변경내용 | 작성자 | 승인상태 |
 |---|---|---|---|---|
+| v0.7.0 | 2026-07-29 | Issue #134 초기 파일럿 메모리 내 Core 계약 반영. 5개 Area, 60·180분 독립 판정, RUNTIME·FRESH·완전 Snapshot·양수 후보 조건, 추천 없음 null, 별도 파일럿 허용값, 사용자 선택 Spot 3개와 비게시 경계를 명시 | 신동현 | Draft PR 검토 대기 |
 | v0.6.0 | 2026-07-29 | D-021 초기 파일럿 A안 반영. AREA·판매시간 추천과 사용자 선택 Spot 3개를 시스템 SPOT 추천과 분리하고 서울시 공식 Forecast·ML 미사용·초기 AREA 비-fallback 계약을 추가. 생산 Schema는 미구현 상태 유지 | 신동현 | PM 결정 |
 | v0.5.0 | 2026-07-29 | D-020에 따라 원격 SPOT 추천 Eligibility와 현장·운영 적합성을 분리. 판매시간·비교순위·원격근거·제한 필드 후보, SPOT·AREA·추천 없음 하향계약과 신뢰도 값 공간을 추가. 생산 Schema는 미구현 상태 유지 | 신동현 | PM 결정 |
 | v0.4.0 | 2026-07-29 | D-019의 데이터 기반 우선 후보를 공식 Recommendation Output 전 단계로 분리. 원격 검증 정책값과 운영 적합성 미검증 경계를 추가하고 현재 PoC가 공식 SPOT Recommendation을 생성하지 않음을 명시 | 신동현 | PM 결정 |

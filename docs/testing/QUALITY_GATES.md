@@ -554,8 +554,10 @@ Candidate Evaluation" 정의는 삭제되지 않고 **EG-8D**로 계승됐다.
   - 카드소비 기반 소비활동을 실제 판매량으로 표현하지 않는다.
   - 판매결과나 현장 피드백이 없으면 추천 성능·판매효과를 확정하지 않는다.
   - Gate A·B·C 판정과 Engineering Gate를 구분한다.
-- **실패 또는 보류 조건**: Spot Candidate Evaluation 근거가 부족해 전 Area가
-  AREA fallback인 경우도 실패가 아니라 정상 결과다(D-006 원칙).
+- **실패 또는 보류 조건**: D-020 장기 평가에서 Spot Candidate Evaluation 근거가
+  부족해 전 Area가 AREA fallback인 경우도 실패가 아니라 정상 결과다(D-006 원칙).
+  D-021 초기 파일럿의 AREA는 fallback이 아닌 기본 추천이며
+  `fallback_reason=null`을 사용한다.
 - **다음 Gate 전환조건**: PM이 Ranking·Evaluation 결과를 확인하고 EG-8E 착수를
   승인.
 
@@ -573,9 +575,10 @@ Workstream의 공식 Gate 번호는 계속 `NOT_ASSIGNED`다.
 - **필수 산출물**: `docs/product/RECOMMENDATION_OUTPUT_CONTRACT.md`, UI
   정보구조·와이어프레임(비상용 설계 산출물), UI/UX 상세 설계 진입 판정 보고.
 - **통과기준**: Recommendation Output Contract가 SPOT/AREA 스키마 원칙(SPOT은
-  `spot_id` 필수·`fallback_reason` 없음, AREA는 `spot_id=null`·`fallback_reason`
-  필수)을 만족한다. UI 설계 산출물이 Model Output을 직접 참조하지 않고
-  Recommendation Output만 소비한다.
+  `spot_id` 필수·`fallback_reason=null`, D-020 장기 AREA fallback은
+  `spot_id=null`·`fallback_reason` 필수, D-021 초기 AREA 기본 추천은
+  `spot_id=null`·`fallback_reason=null`)을 만족한다. UI 설계 산출물이 Model
+  Output을 직접 참조하지 않고 Recommendation Output만 소비한다.
 - **실패 또는 보류 조건**: Recommendation Output Contract 없이 UI 설계에
   착수하지 않는다(§4 UI/UX 착수 순서 위반).
 - **다음 Gate 전환조건**: EG-8E 통과는 UI/UX **상세** 설계·프로토타입 진행을
@@ -589,6 +592,14 @@ Workstream의 공식 Gate 번호는 계속 `NOT_ASSIGNED`다.
 EG-8E(Recommendation Output Contract·UI/UX Readiness)는 이 Workstream의 계약·
 설계 준비 단계이며, 이 Workstream 자체의 구현 Gate가 아니다.
 
+Issue #134의 D-021 초기 파일럿 Core는 이 공식 Gate를 통과시키지 않는 메모리 내
+최소 경로다. 5개 Area의 60분·180분을 독립 판정하고, 완전한 `RUNTIME`·`FRESH`
+Horizon에 양수 후보가 있을 때만 `pilot_recommendation_allowed=true`로 AREA를
+반환한다. 양수 후보가 없으면 `recommendation=null`이며
+`official_recommendation_allowed=false`는 항상 유지한다. 선택된 Area에는 순위 없는
+Spot 3개를 `USER_CHOICE`로 제공하고 ML은 사용하지 않는다. Backend·UI·배포·파일
+산출물 게시와 실제 추천 실행은 범위 밖이다.
+
 ### 목표
 
 EG-8D에서 검증된 Area Feature와, 승인·확보된 경우의 S-DoT Feature 및 Candidate
@@ -599,7 +610,7 @@ Evidence Assessment를 사용해 추천 단위와 근거를 제시하는 최소 
 
 - EG-8(전체, 특히 EG-8D 후보 평가·EG-8E Recommendation Output Contract) 통과와
   Feature·후보 평가 증거 계약 확인
-- SPOT 판단 근거와 AREA fallback 사유 Enum에 대한 PM 승인
+- D-020 SPOT 판단 근거와 장기 AREA fallback 사유 Enum에 대한 PM 승인
 - 실제 판매효과와 추천 산출물을 구분하는 표시 계약 승인
 
 ### 통과조건
