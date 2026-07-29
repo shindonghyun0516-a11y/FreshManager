@@ -42,6 +42,11 @@ from freshmanager import eg7 as eg7_cli  # noqa: E402
 from freshmanager import backup as backup_worker  # noqa: E402
 from freshmanager.http_adapter import BASE_URL, SeoulPopulationHttpClient  # noqa: E402
 from freshmanager.offline import run as run_offline  # noqa: E402
+from freshmanager.pilot_spot_options import (  # noqa: E402
+    PILOT_SPOT_OPTION_HEADERS,
+    PilotSpotOptionsError,
+    load_pilot_spot_options,
+)
 from freshmanager.storage import FileStorage, StorageError  # noqa: E402
 
 CSV_RELATIVE_PATH = Path("data/reference/seoul_121_places.csv")
@@ -50,6 +55,7 @@ SPEC_RELATIVE_PATH = Path("docs/testing/PROJECT_GUARD_SPEC.md")
 EG6_AREA_PANEL_RELATIVE_PATH = Path("data/reference/eg6_area_panel.csv")
 EG6_SPOT_MASTER_RELATIVE_PATH = Path("data/reference/eg6_spot_master.csv")
 EG6_SDOT_LINKS_RELATIVE_PATH = Path("data/reference/eg6_sdot_links.csv")
+PILOT_SPOT_OPTIONS_RELATIVE_PATH = Path("data/reference/pilot_spot_options.csv")
 
 EXPECTED_HEADERS = ["CATEGORY", "NO", "AREA_CD", "AREA_NM", "ENG_NM"]
 EXPECTED_CATEGORIES = {
@@ -2205,6 +2211,7 @@ def check_h703(context: ProjectGuardContext) -> CheckResult:
         EG6_AREA_PANEL_RELATIVE_PATH,
         EG6_SPOT_MASTER_RELATIVE_PATH,
         EG6_SDOT_LINKS_RELATIVE_PATH,
+        PILOT_SPOT_OPTIONS_RELATIVE_PATH,
     )
     inspections: dict[Path, CsvInspection] = {}
     for relative_path in input_paths:
@@ -2394,9 +2401,24 @@ def check_h703(context: ProjectGuardContext) -> CheckResult:
             if forbidden.search(rendered):
                 return failed("H-703", "EG-6A 참조 CSV에 비밀정보·URL·로컬 절대경로 패턴 존재", *(str(item) for item in input_paths))
 
+    try:
+        load_pilot_spot_options(
+            context.root / PILOT_SPOT_OPTIONS_RELATIVE_PATH,
+            area_panel_path=context.root / EG6_AREA_PANEL_RELATIVE_PATH,
+            anchor_path=context.root / EG6_SPOT_MASTER_RELATIVE_PATH,
+        )
+    except PilotSpotOptionsError:
+        return failed(
+            "H-703",
+            "초기 파일럿 Spot 선택지 Master 계약 불일치",
+            str(PILOT_SPOT_OPTIONS_RELATIVE_PATH),
+            str(EG6_AREA_PANEL_RELATIVE_PATH),
+            str(EG6_SPOT_MASTER_RELATIVE_PATH),
+        )
+
     return passed(
         "H-703",
-        "13개 제안·13개 고유 공식 Area 승인과 Area–Spot–S-DoT 참조 무결성 확인",
+        "13개 Anchor 참조와 5개 Area·15개 사용자 선택 Spot의 정적 계약 확인",
         str(CSV_RELATIVE_PATH),
         *(str(item) for item in input_paths),
     )
