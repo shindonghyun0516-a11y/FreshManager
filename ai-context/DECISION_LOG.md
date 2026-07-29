@@ -258,6 +258,32 @@ PM이 승인했거나 명시적으로 보류한 제품·운영 결정을 새 AI 
   실행하거나 UI·Spot을 구현하지 않는다.
 - Evidence: Issue #119, Issue #120, PR #121.
 
+### D-018 — Area 탐색과 Spot 판매 추천의 제품 책임 분리
+
+- Date: `2026-07-29`
+- Status: `ACCEPTED`
+- Decision: Area는 판매기회를 탐색·분석하는 넓은 구역이고, Spot은 Area 안에서
+  실제 이동·판매를 안내할 최종 추천 대상이다. 공식 Spot 추천은 Area 기회뿐 아니라
+  Spot별 동적 밀집근거, 같은 Area 안의 Spot 비교, 접근성·안전·판매 가능성,
+  정보 최신성, 사용자 이동 가능시간과 현장확인을 모두 요구한다.
+- Evidence boundary: Area 유동인구를 특정 Spot의 직접 유동인구나 밀집도로 표현하지
+  않는다. Spot 근거가 부족하면 Area 안내 또는 판매 후보로 하향한다. 현재 등록된
+  13개 역 중심 대리좌표는 모두 `field_verified=false`이므로 판매 후보이며 공식
+  추천 가능 Spot은 0개다.
+- S-DoT boundary: S-DoT는 지원조건을 만족할 때 사용하는 선택적 동적 근거 후보다.
+  실제 Spot 좌표와 시간대 관측자료를 결합하기 전에는 Spot 밀집도를 확정하지 않으며,
+  근거가 부족하면 Area 안내 또는 판매 후보로 하향한다.
+- Time policy: 현재·30·60·90·120·150·180분 표시구조를 유지하고 60·120·180분을
+  강조한다. 30분 직접값이 없으면 "현재 제공하지 않음"으로 표시하며 90·150분은
+  정확한 값이 있을 때만 표시한다. 현재 머신러닝은 60·180분이고 120분 확대는
+  별도 승인사항이다.
+- Product direction: 장기 목표는 검증된 Spot·시간·상품 추천이지만 판매량·상품·
+  매출·구매전환 자료와 별도 승인 전에는 상품 또는 판매성과를 추정하지 않는다.
+- Scope boundary: 이번 결정은 정책 정의다. UI·지도 API·Spot 추천·머신러닝·
+  EG-8D·서울시 API·Apps Script 실행 또는 사용자 게시를 시작하지 않는다.
+- Evidence: Issue #118 최종 PM 결정, Issue #124,
+  `docs/product/AREA_SPOT_RECOMMENDATION_AND_UI_POLICY.md`.
+
 ## 4. 갱신 규칙
 
 새 PM 결정이 기존 결정을 대체하면 이전 항목을 삭제하지 않고 `SUPERSEDED`로 바꾸고
