@@ -805,7 +805,7 @@ Field Dictionary v0.1은 다음 조건을 만족해야 한다.
 
 | 버전 | 날짜 | 변경내용 | 작성자 | 승인상태 |
 |---|---|---|---|---|
-| v0.1.7 | 2026-07-30 | Issue #136 초기 파일럿 Application Service의 JSON-safe ViewModel·선택 상태·Area·예측 대상시각·비저장 필드를 반영 | 신동현 | PM 검토 대기 |
+| v0.1.7 | 2026-07-30 | Issue #136 초기 파일럿 Application Service의 JSON-safe ViewModel·선택 상태·Area·예측 대상시각·비저장 필드를 반영 | 신동현 | PR #137 main 반영 |
 | v0.1.6 | 2026-07-29 | Issue #134 D-021 메모리 내 초기 AREA 추천 필드와 D-020 장기 AREA fallback 예외를 반영 | 신동현 | PR #135 main 반영 |
 | v0.1.5 | 2026-07-23 | Plan 시각 의미 정규화·ACTIVE 장기 기준 필드·Forecast canonical 정렬 집합 계약과 H-707 비교표 반영 | 신동현 | PR #71 변경요청 보완 |
 | v0.1.4 | 2026-07-23 | EG-7 plan·summary v2의 고정 5분 결정 필드와 중복 기반 주기 변경 금지 반영 | 신동현 | PM 최종 결정 |
