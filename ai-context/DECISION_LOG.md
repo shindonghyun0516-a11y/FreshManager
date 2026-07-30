@@ -432,7 +432,7 @@ official_recommendation_allowed=false
 - Technology boundary: Framework·Dependency·Scaffold·기술 Stack ADR은 이번 결정의
   범위가 아니다. PR #141 병합 뒤 Repository Readiness Audit을 거친 별도 ADR에서만
   공식화한다.
-- Evidence: Issue #140,
+- Evidence: Issue #140, PR #141,
   `docs/product/AREA_FIRST_WEB_PILOT_CONTRACT.md`.
 
 ## 4. 갱신 규칙
