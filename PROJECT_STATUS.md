@@ -34,7 +34,7 @@
 - 초기 파일럿 A안: `FIVE_AREA_SPOT_SELECTION_SUPPORT_AVAILABLE_ON_MAIN`(D-021, PR #131)
 - 파일럿 사용자 선택 Spot 정적 Master: `AVAILABLE_ON_MAIN`(Issue #132, PR #133)
 - 초기 파일럿 Area 추천 Core: `AVAILABLE_ON_MAIN`(Issue #134, PR #135)
-- 초기 파일럿 Recommendation Service: `IMPLEMENTED_ON_ISSUE_136_BRANCH_PENDING_PM_REVIEW`
+- 초기 파일럿 Recommendation Service: `AVAILABLE_ON_MAIN`(Issue #136, PR #137)
 - Spot 자동 추천: `DEFERRED_AFTER_INITIAL_PILOT`
 - 24시간 Scheduler(로컬 EG-7 Live 파일럿 확대 기준): `NOT_IMPLEMENTED`
 - ML 학습: `COMPARISON_COMPLETED_NOT_ADOPTED`; 추천 사용 `false`
@@ -148,7 +148,7 @@ PM이 장기 기준으로 확정한 5분 주기의 EG-7 1시간 파일럿 Contro
   선택지이며 ML은 사용하지 않는다. Backend·UI·배포·파일 산출물 게시는 없고
   추천 실행은 0건이다.
 - 초기 파일럿 Recommendation Service:
-  `IMPLEMENTED_ON_ISSUE_136_BRANCH_PENDING_PM_REVIEW` — Core의 60분·180분 중
+  `AVAILABLE_ON_MAIN`(Issue #136, PR #137) — Core의 60분·180분 중
   요청한 Horizon을 JSON-safe ViewModel로 변환하고 현재 Area의 Spot Option 3개
   안에서 사용자 선택을 검증한다. HTTP·Web Framework·Database·파일·세션 저장,
   UI·배포·사용자 파일럿·Spot 자동추천·ML 실행은 없다.
@@ -436,24 +436,27 @@ H-707은 구현과 함께 `PASS`로 활성화됐지만 이는 합성 계약 검�
 - PR #131: `MERGED`
 - PR #133: `MERGED`
 - PR #135: `MERGED`
+- PR #137: `MERGED`
 - Issue #70: `CLOSED`
 - Issue #69: `OPEN`
 - Issue #129: `CLOSED`
 - Issue #128: `CLOSED`
 - Issue #132: `CLOSED`
 - Issue #134: `CLOSED`
-- Issue #136: `OPEN`
-- Issue #136 Source Branch: `feat/issue-136-pilot-recommendation-service`
-- Issue #136 Review State: `PENDING_PM_REVIEW`
+- Issue #136: `CLOSED · COMPLETED`
+- Issue #136 Source Branch: local·remote `DELETED`
+- Issue #136 Review State: `COMPLETED`
 - 병합된 feature Branch: local·remote `DELETED`
 - post-merge 검증 시 작업 트리: `CLEAN`
 - post-merge 검증 시 미추적 파일: `0`
 
 ## 10. 다음 행동
 
-현재 최우선 한 단계는 Issue #136의 Recommendation ViewModel·사용자 Spot 선택
-검증 Service 변경을 PM이 검토하는 것이다. 추천 실행·Ready 전환·병합은 별도 승인 전
-수행하지 않는다. 아래 EG-7 Live 결정은 독립 backlog로 유지한다.
+현재 최우선 한 단계는 사용자가 담당 Area를 먼저 선택하고 선택 Area의 현재·1시간·
+3시간 유동정보와 Spot 3개를 조회하는 Area-first 웹 파일럿 계약을 별도 PM 승인
+Issue에서 정의하는 것이다. Area-first Service·Spot 프로토타입 데이터·네이버 지도·
+웹 UI·배포·사용자 파일럿은 구현 완료 상태가 아니며 별도 승인 전 시작하지 않는다.
+아래 EG-7 Live 결정은 독립 backlog로 유지한다.
 
 현재 OPEN 또는 미생성 결정:
 
@@ -472,7 +475,7 @@ H-707은 구현과 함께 `PASS`로 활성화됐지만 이는 합성 계약 검�
 
 다음 행동 순서:
 
-1. Issue #136 초기 파일럿 Recommendation Service 변경을 PM이 검토한다.
+1. 별도 PM 승인 Issue에서 Area-first 웹 파일럿 계약을 정의한다.
 2. 공식 API 할당량과 rate-limit 호환성을 확인한다.
 3. 로컬 Source와 Drive sync-copy preflight를 확인한다.
 4. 범위가 고정된 운영 Plan v2 하나를 생성한다.
@@ -503,8 +506,8 @@ Issue #69와 현재 Diff → 관련 Rule·Quality·Data 문서 → Decision Log�
 Plan·`pilot_run_id`·Batch ID·Plan fingerprint는 아직 존재하지 않는다. S-DoT
 동적 수집·Spot 실행은 시작하지 않았고, ML은 비교 완료 후 미채택 상태다. D-021은
 초기 파일럿을 서울시 공식 Forecast 기반 Area 5개·판매시간 추천과 사용자 선택
-Spot 3개로 제한했다. Issue #132·PR #133의 정적 Master와 Issue #134·PR #135의
-추천 Core는 `main`에 있고, 현재 다음 작업은 Issue #136 Recommendation Service
-변경의 PM 검토다. 추천 실행은
-0건이다. EG-7 Live
-preflight는 독립 backlog이며 EG-7 구현 Branch를 다시 만들지 않는다.
+Spot 3개로 제한했다. Issue #132·PR #133의 정적 Master, Issue #134·PR #135의
+추천 Core와 Issue #136·PR #137의 Recommendation Service는 `main`에 있다. 추천
+실행은 0건이며, 다음 작업은 별도 PM 승인 Issue에서 Area-first 웹 파일럿 계약을
+정의하는 것이다. EG-7 Live preflight는 독립 backlog이며 EG-7 구현 Branch를 다시
+만들지 않는다.

@@ -79,7 +79,7 @@
 | `backup_receipts` | Batch별 로컬 Sync 복사·검증 상태 | 구현·Fake/실제 Batch 검증 완료; Worker는 원격 완료 상태를 생성하지 않음 |
 | `eg7_pilot_plans` | 12회차 불변 계획과 Live Gate 상태 | 구현·합성 검증 완료; 운영 계획은 생성하지 않음 |
 | `pilot_area_recommendations` | D-021 5개 Area의 60·180분 독립 추천 결과 | Issue #134·PR #135로 main에 구현; 저장·게시 산출물 없음 |
-| `pilot_recommendation_view_models` | 한 Horizon의 AREA 추천과 사용자 Spot 선택 상태 | Issue #136 Branch의 메모리 반환만 구현; 저장 없음 |
+| `pilot_recommendation_view_models` | 한 Horizon의 AREA 추천과 사용자 Spot 선택 상태 | Issue #136·PR #137로 main에 구현; 메모리 반환만 사용하며 저장 없음 |
 | `eg7_execution_events` | 파일럿 상태전이 append-only 로그 | 구현·합성 검증 완료; 실제 실행 기록 없음 |
 | `eg7_slot_index` | 계획 12회차의 종결·호출·Backup 파생 인덱스 | CSV·JSONL 구현·합성 검증 완료 |
 | `eg7_area_observation_index` | 실제 시도 Area의 관측·Forecast·무결성·중복 파생 인덱스 | 최대 156행 CSV·JSONL 구현·합성 검증 완료 |
@@ -805,7 +805,7 @@ Field Dictionary v0.1은 다음 조건을 만족해야 한다.
 
 | 버전 | 날짜 | 변경내용 | 작성자 | 승인상태 |
 |---|---|---|---|---|
-| v0.1.7 | 2026-07-30 | Issue #136 초기 파일럿 Application Service의 JSON-safe ViewModel·선택 상태·Area·예측 대상시각·비저장 필드를 반영 | 신동현 | PM 검토 대기 |
+| v0.1.7 | 2026-07-30 | Issue #136 초기 파일럿 Application Service의 JSON-safe ViewModel·선택 상태·Area·예측 대상시각·비저장 필드를 반영 | 신동현 | PR #137 main 반영 |
 | v0.1.6 | 2026-07-29 | Issue #134 D-021 메모리 내 초기 AREA 추천 필드와 D-020 장기 AREA fallback 예외를 반영 | 신동현 | PR #135 main 반영 |
 | v0.1.5 | 2026-07-23 | Plan 시각 의미 정규화·ACTIVE 장기 기준 필드·Forecast canonical 정렬 집합 계약과 H-707 비교표 반영 | 신동현 | PR #71 변경요청 보완 |
 | v0.1.4 | 2026-07-23 | EG-7 plan·summary v2의 고정 5분 결정 필드와 중복 기반 주기 변경 금지 반영 | 신동현 | PM 최종 결정 |
