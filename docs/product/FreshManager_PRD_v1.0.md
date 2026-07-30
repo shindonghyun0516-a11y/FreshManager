@@ -6,21 +6,27 @@
 
 **문서 ID:** FM-PRD-001
 
-**버전 / 상태:** v1.4 · 공식 제품 기준
+**버전 / 상태:** v1.5 · 공식 제품 기준
 
-**기준일:** 2026-07-29 (Asia/Seoul)
+**기준일:** 2026-07-30 (Asia/Seoul)
 
 **제품 책임자:** PM/PO 신동현
 
 **기술 기준:** 구현 계약은 `docs/engineering/FreshManager_TRD_v1.0.md`, 현재
 Branch·Pull Request·Issue·실행 상태는 `PROJECT_STATUS.md`를 단일 기준으로 사용
 
+**2026-07-30 변경이력:** D-022에 따라 초기 웹 파일럿의 기본 진입 흐름을
+사용자 담당 Area 선택으로 정렬했다. D-021 Recommendation Core와 Service는 여러
+Area의 기회를 비교하는 내부 분석 기능과 구현 이력으로 유지한다. 상세는 변경 이력과
+`docs/product/AREA_FIRST_WEB_PILOT_CONTRACT.md`를 따른다. **문서 내용 버전은
+v1.5**이며, **정본 파일 경로는 기존 링크와 Project Guard 자동검사 호환성을 위해
+그대로 유지**한다. 파일명의 `_v1.0`은 현재 내부 문서 버전을 의미하지 않는
+**Legacy Stable Path**다.
+
 **2026-07-29 변경이력:** D-020에 따라 원격 SPOT 추천과 운영 적합성 보장을
 분리하고 장기 제품가치를 특정 Spot·판매시간 추천으로 재확정했다. D-021은 초기
 파일럿을 5개 Area·판매시간 추천과 Area당 사용자 선택 Spot 3개로 제한했다. 상세는
-변경 이력을 따른다. **문서 내용 버전은 v1.4**이며, **정본 파일 경로는 기존 링크와
-Project Guard 자동검사 호환성을 위해 그대로 유지**한다. 파일명의 `_v1.0`은
-현재 내부 문서 버전을 의미하지 않는 **Legacy Stable Path**다.
+변경 이력을 따른다.
 
 **2026-07-22 변경이력:** Issue #58 초안에서 Google Drive 자동 백업,
 첫 Batch 이후 CSV와 Area·선택적 S-DoT·Spot Candidate Evaluation·Recommendation
@@ -28,8 +34,9 @@ Workstream 결정을 반영했다.
 
 > **핵심 결론**  장기적으로 FreshManager는 유동인구 증가가 예상되는 Area를
 > 탐색하고, 해당 Area 안의 Spot별 근거를 비교해 특정 Spot과 판매시간을 추천한다.
-> 초기 파일럿에서는 서울시 공식 예측으로 Area·판매시간만 추천하고 Area당 대표
-> Spot 3개 중 이동할 지점은 사용자가 직접 고른다. 현재는 이 서비스가 성립할지를
+> 초기 웹 파일럿에서는 사용자가 담당 Area를 먼저 선택하고 서울시 공식 현재·60분·
+> 180분 Area 정보와 대표 Spot 3개를 확인한 뒤 판촉 후보 위치를 직접 고른다. 현재는
+> 이 서비스가 성립할지를
 > 단계적으로 검증하는 1인 운영 PoC이며, 구현·실행 상태는 `PROJECT_STATUS.md`에서
 > 확인한다.
 
@@ -46,8 +53,9 @@ Workstream 결정을 반영했다.
 
 FreshManager의 장기 목표는 유동인구 증가가 예상되는 Area를 탐색하고, 해당 Area
 안의 Spot별 근거를 비교해 프래시매니저가 이동해 판매할 특정 Spot과 판매시간을
-추천하는 서비스다. 초기 파일럿은 Area 5개와 판매시간을 추천하고 Area별 대표
-Spot 3개를 사용자 선택지로 제공하는 범위다. 현재 PoC는 데이터 타당성부터 추천
+추천하는 서비스다. 초기 웹 파일럿은 사용자가 승인된 5개 중 담당 Area를 선택하고
+해당 Area의 현재·60분·180분 정보와 대표 Spot 3개를 확인해 판촉 후보 위치를 직접
+선택하는 범위다. 현재 PoC는 데이터 타당성부터 추천
 로직·지도 UI·제한 배포·사용자 파일럿과 Go/No-Go까지를 하나의 제품 검증 흐름으로
 관리한다. 각 단계는 별도 PM 승인 후 진행하며, 완료되지 않은 단계를 완료된 제품처럼
 표현하지 않는다.
@@ -120,9 +128,12 @@ EG-4에서 여의도 POI072 실제 응답과 원본·메타데이터 저장을 �
 **로컬 원본 우선:** 로컬 Raw·Metadata·Collection Log·Manifest가 공식 원본이다.
 Google Drive에는 검증된 복사본을 자동 백업하며 백업 실패는 API 재호출 사유가 아니다.
 
-**결과 수준:** 초기 파일럿은 D-021에 따라 `recommendation_type=AREA`,
-`recommendation_basis=SEOUL_OFFICIAL_FORECAST`, `spot_selection_mode=USER_CHOICE`를
-사용하고 Area당 대표 Spot 3개를 사용자 선택지로 제공한다. 장기적으로 D-020의
+**결과 수준:** 초기 웹 파일럿은 D-022에 따라 `area_selection_mode=USER_CHOICE`,
+`area_auto_recommendation=false`, `spot_selection_mode=USER_CHOICE`,
+`spot_auto_recommendation=false`, `official_recommendation_allowed=false`를 사용한다.
+사용자가 선택한 Area의 서울시 공식 정보와 Area당 대표 Spot 3개를 표시하되 Area
+값을 Spot 직접값으로 표현하지 않는다. D-021 Core·Service는 다중 Area 비교·내부
+분석 기능으로 보존한다. 장기적으로 D-020의
 원격 근거 Eligibility를 충족한 Spot은
 `recommendation_type=SPOT`, `recommendation_basis=REMOTE_EVIDENCE`로 추천할 수
 있다. Spot 근거가 부족하고 Area 근거만 충분하면 `AREA`와 `fallback_reason`으로
@@ -148,23 +159,26 @@ Eligibility와 분리해 `UNAVAILABLE`·`NOT_VERIFIED`로 표시한다.
 - Recommendation Output Contract 설계(EG-8E) — 점수·가중치·임계값의 최종 확정은
   포함하지 않는다(D-009 `OPEN_DECISION` 유지)
 - UI/UX 정보구조·와이어프레임·프로토타입(비상용 설계 산출물, EG-8E)
-- 초기 파일럿의 서울시 공식 Forecast 기반 Area 5개·판매시간 추천과 Area당
-  사용자 선택 Spot 3개(D-021; 생산 구현·실행은 별도 승인)
+- 초기 웹 파일럿의 사용자 담당 Area 선택, 선택 Area의 서울시 공식 현재·60분·
+  180분 정보와 Area당 사용자 선택 Spot 3개(D-022; 상세 계약은
+  `AREA_FIRST_WEB_PILOT_CONTRACT.md`, 생산 구현·실행은 별도 승인)
 
 상세 진입·통과조건은 `docs/testing/QUALITY_GATES.md`가 소유한다.
 
 ### 5.3 데이터 수집에서 이동 판단 지원까지의 사용자 가치 흐름
 
-초기 파일럿 A안은 다음 최소 흐름을 사용한다.
+초기 Area-first 웹 파일럿은 다음 최소 흐름을 사용한다.
 
 ```text
-서울시 공식 Forecast
-→ 5개 Area와 판매시간을 AREA 단위로 추천
+사용자가 승인된 5개 중 담당 Area를 직접 선택
+→ 선택 Area의 서울시 공식 현재·60분·180분 정보 확인
 → Area당 대표 Spot 3개를 같은 수준으로 표시
-→ 사용자가 이동할 Spot 직접 선택
+→ 사용자가 판촉 후보 Spot 직접 선택
 ```
 
-기존 머신러닝 비교실험은 기록으로 보존하되 추천에는 사용하지 않는다. 다음 장기
+별도 시간 선택버튼 없이 60분·180분 정보를 함께 표시한다. D-021 Core·Service는
+여러 Area의 기회를 비교하는 내부 분석 기능으로 보존하고, 기존 머신러닝 비교실험은
+기록으로 보존하되 추천에는 사용하지 않는다. 다음 장기
 흐름은 D-020의 제품 목표로 유지하되 초기 파일럿 완료조건으로 사용하지 않는다.
 
 ```text
@@ -183,7 +197,9 @@ Eligibility와 분리해 `UNAVAILABLE`·`NOT_VERIFIED`로 표시한다.
 이는 별도 프로젝트가 아니라 하나의 통합 PoC다. 각 단계는 이전 단계 통과와 별도
 PM 승인 후 진행한다. Recommendation MVP Workstream의 Gate number는 현재
 `NOT_ASSIGNED`다.
-UI는 Model Output을 직접 소비하지 않고 Recommendation Output만 소비한다.
+추천 결과를 표시하는 UI는 Model Output을 직접 소비하지 않고 Recommendation
+Output을 소비한다. D-022 Area-first UI는 시스템 추천 결과가 아니며 별도 사용자
+선택 Area 조회 Service 계약과 `AREA_FIRST_WEB_PILOT_CONTRACT.md`를 따른다.
 실제 판매효과·구매전환은 이 흐름만으로 입증되지 않는다.
 
 ### 5.4 현재 명시적 비목표
@@ -199,7 +215,9 @@ UI는 Model Output을 직접 소비하지 않고 Recommendation Output만 소비
 - 검증되지 않은 Spot 직접 유동인구·밀집도 또는 추천 정확도 주장
 - 상품 추천과 예상매출 제공
 - 추천 점수 모델·가중치·임계값의 최종 확정(D-009 `OPEN_DECISION` 유지)
-- 초기 파일럿의 Spot 자동추천·Spot별 유동인구 비교·Spot Backtesting과 머신러닝 추천
+- 초기 파일럿의 Spot 자동추천·서울시 Area 값을 분배하거나 공식·계산 기반으로 만든
+  Spot별 유동인구 비교·Spot Backtesting과 머신러닝 추천(D-022의 명확히 배지된
+  `PM_MANUAL` 프로토타입 표시는 이 금지대상에 포함하지 않음)
 - hy 내부 데이터, 유료 데이터 또는 프로덕션 대규모 인프라 연동
 - 호출한도 확인 전 121개 Area 고빈도 자동수집
 - 별도 PM Live 승인 없는 실제 5분 반복수집·자동 재시도·클라우드 실행
@@ -229,7 +247,7 @@ UI는 Model Output을 직접 소비하지 않고 Recommendation Output만 소비
 | Optional Supporting Observation | Area 내부 활성 위치 판단 보조 | 지원·접근·수집·품질조건을 만족할 때만 쓰는 S-DoT 위치·관측; Area Collector와 독립 |
 | Additional Context | 후보의 공간근거와 운영상태 보강 | Spatial Context·Field Validation Status·Operational Constraints Status |
 | Spot Candidate Evaluation | Area 내부 판매 후보 위치 평가 | Area Feature + 선택적 S-DoT Feature + Additional Context의 Candidate Evidence Assessment |
-| Recommendation 결과 | 추천 단위 결정 | 초기 파일럿은 서울시 공식 Forecast 기반 `AREA`와 사용자 선택 Spot 3개; 장기는 원격 Eligibility를 충족한 `SPOT`, Area fallback 또는 추천 없음 |
+| Recommendation 결과 | 추천 단위 결정 | D-022 Area-first 초기 화면은 사용자 선택 Area 조회이므로 시스템 Recommendation Output이 아님; D-021 내부 비교 기능은 `AREA`, 장기는 원격 Eligibility를 충족한 `SPOT`, Area fallback 또는 추천 없음 |
 
 EG-6B는 필수 Area Observation을 확보한다. 정적 EG-6A 참조 연결은 실행 전 무결성
 입력이지만, 동적 S-DoT 관측 수집과 Spot Candidate Evaluation은 후속 독립 책임이므로
@@ -417,13 +435,15 @@ Area 단위 api_error, timeout, parse_error, validation_error는 해당 결과�
 상세 상태·충돌·Receipt·복원 목표 계약은
 `docs/data/CLOUD_BACKUP_AND_CSV_MANAGEMENT_PLAN.md`가 소유한다.
 
-### 8.16 FR-14 초기 AREA 추천·사용자 Spot 선택과 장기 SPOT 계약
+### 8.16 FR-14 초기 Area-first 사용자 선택과 장기 SPOT 계약
 
-초기 파일럿은 정확히 5개 Area에 서울시 공식 현재·예측 유동인구를 사용해 Area와
-판매시간을 추천한다. 각 Area에는 대표 Spot 3개를
+초기 웹 파일럿은 사용자가 정확히 5개 중 담당 Area를 먼저 선택하고, 선택 Area의
+서울시 공식 현재·60분·180분 유동정보를 함께 표시한다. 각 Area에는 대표 Spot 3개를
 `spot_role=USER_SELECTABLE_OPTION`으로 제공하며 사용자가 이동할 지점을 직접
-고른다. Spot별 유동인구·밀집도·순위와 자동추천은 제공하지 않고, Area 값을 Spot
-직접값으로 표현하지 않는다. 머신러닝 비교기록은 보존하지만 추천에는 사용하지 않는다.
+고른다. Spot별 프로토타입 정보·점수·순위는 PM 직접 입력값만 허용하고, Area 값을
+Spot 직접값으로 표현하거나 Area·Spot을 자동추천하지 않는다. 머신러닝 비교기록은
+보존하지만 추천에는 사용하지 않는다. 상세 표시·상태·Fallback 계약은
+`docs/product/AREA_FIRST_WEB_PILOT_CONTRACT.md`가 소유한다.
 
 다음은 D-020의 장기 원격 SPOT 추천 계약이다.
 
@@ -617,7 +637,7 @@ Context로 구성한다. D-020의 원격 근거 Eligibility를 모두 충족하�
 | FR-07~08 | TRD 15~18장 | 날씨·상권 Adapter와 시간 정렬 |
 | FR-09~10 | TRD 19~22장 | 분석 파이프라인·관측성·Rollout |
 | FR-13 | TRD 16·20~24장과 Cloud Backup Plan | 백업 Worker·상태·복구·운영 목표 |
-| FR-14 | TRD 14·19장과 EG6 Area Spot Panel | 추천 문맥과 target level 선택 |
+| FR-14 | TRD 14·19장, EG6 Area Spot Panel과 Area-first Web Pilot Contract | 사용자 선택 Area 조회·Spot 선택과 장기 추천 문맥 분리 |
 | NFR-01~10 | TRD 10~24장 | 보안·저장·검증·운영·복구 |
 
 ## 근거 자료
@@ -658,6 +678,7 @@ Context로 구성한다. D-020의 원격 근거 Eligibility를 모두 충족하�
 
 | 버전 | 날짜 | 변경내용 | 승인상태 |
 |---|---|---|---|
+| v1.5 | 2026-07-30 | D-022에 따라 초기 웹 파일럿을 사용자 담당 Area 선택과 선택 Area의 현재·60분·180분 정보 조회, Spot 직접 선택 흐름으로 정렬. D-021 Core·Service는 다중 Area 비교·내부 분석 이력으로 보존 | PM 결정 D-022 |
 | v1.4 | 2026-07-29 | D-021 초기 파일럿 A안 반영. 서울시 공식 Forecast로 Area 5개·판매시간을 추천하고 Area당 대표 Spot 3개 중 사용자가 직접 선택. Spot 자동추천과 ML 추천은 초기 범위에서 제외하고 D-020 장기 목표는 유지 | PM 결정 D-021 |
 | v1.3 | 2026-07-29 | D-020에 따라 최종 제품가치를 특정 Spot·판매시간 추천으로 재확정. 원격 SPOT 추천 Eligibility와 현장·운영 적합성 상태를 분리하고 SPOT·AREA·추천 없음 하향계약을 반영 | PM 결정 D-020 |
 | v1.2 | 2026-07-29 | 현장검증 불가 전제의 원격 근거 기반 Spot 후보 정책을 반영. 현재 PoC 최대 결과를 데이터 기반 우선 후보로 제한하고 운영 적합성 미검증을 명시 | PM 결정 D-019 |

@@ -1,7 +1,7 @@
 # Recommendation Output Contract
 
 - 문서 상태: Draft
-- 버전: v0.8.0
+- 버전: v0.9.0
 - 작성자: 신동현
 - 최종 승인자: 신동현
 - 최초 작성일: 2026-07-24
@@ -16,7 +16,8 @@
   - `docs/data/ML_READY_DATASET_SPEC.md`(Area-Spot-Sensor 데이터 관계)
   - `docs/analysis/ANALYSIS_PLAN.md`(Spot Forecast 분석 가능성 조건)
   - `docs/product/AREA_SPOT_RECOMMENDATION_AND_UI_POLICY.md`(원격 근거 정책)
-  - `ai-context/DECISION_LOG.md`의 D-003, D-004, D-005, D-006, D-008, D-009, D-015, D-019, D-020, D-021
+  - `docs/product/AREA_FIRST_WEB_PILOT_CONTRACT.md`(D-022 Area-first 상세 계약)
+  - `ai-context/DECISION_LOG.md`의 D-003, D-004, D-005, D-006, D-008, D-009, D-015, D-019, D-020, D-021, D-022
 - 변경 시 PM 승인: 필요
 
 ---
@@ -29,10 +30,10 @@ Recommendation Output 스키마를 소유한다. Model Output(EG-8C 예측 모�
 계약을 정의한다.
 
 ```text
-서울시 공식 Forecast(D-021 초기 파일럿)
+서울시 공식 Forecast(D-021 다중 Area 비교·내부 분석)
 또는 Model Output(장기, 별도 채택 시)
 → Recommendation Output(EG-8E, 이 문서가 정의)
-→ UI Presentation(별도 PM 승인 후 상세 설계)
+→ 내부 비교 View 또는 후속 승인 UI Presentation
 ```
 
 초기 파일럿은 EG-8C Model Output을 거치지 않는다. 이 계층 분리는 입력 예측원이
@@ -68,6 +69,9 @@ operational_suitability_status=NOT_VERIFIED
 D-021의 초기 파일럿은 D-020 장기 SPOT 추천을 구현하지 않는다. 시스템은 서울시
 공식 Forecast로 Area와 판매시간만 추천하고, 대표 Spot 3개는 순위 없는 사용자
 선택지로 별도 제공한다.
+
+D-022 이후 이 흐름은 여러 Area의 기회를 비교하는 내부 분석 기능과 구현 이력으로
+보존하며 Area-first 웹 파일럿의 기본 사용자 흐름으로 사용하지 않는다.
 
 초기 대상은 다음 5개 Area로 고정한다.
 
@@ -146,6 +150,18 @@ ViewModel로 반환한다. 예상하지 못한 Core 실행 실패와 내부 출�
 제한된 `PilotRecommendationServiceError`의 `execution_failed`·`contract_invalid`로
 중단하며, ViewModel이나 오류문에 내부 경로·원본 예외·Stack Trace를 넣지 않는다.
 
+### 1.4 Area-first 웹 파일럿 경계
+
+D-022의 Area-first 웹 파일럿은 사용자가 승인된 5개 중 담당 Area를 먼저 선택하고,
+선택 Area의 현재·60분·180분 서울시 공식 Area 정보를 조회한다. 선택 Area의 Spot
+3개는 D-021과 동일한 사용자 선택지이며 Spot 자동추천·기본선택은 없다.
+
+사용자가 선택한 Area를 시스템 추천 Area로 표현하지 않고 기존 Recommendation
+Service를 Area-first Primary API로 직접 사용하지 않는다. 기존 Core·Service와
+D-020 장기 목표는 유지하며, 사용자 선택 Area 조회 Service는 별도 후속 구현이다.
+상세 제품·UI·데이터 표시 계약은
+`docs/product/AREA_FIRST_WEB_PILOT_CONTRACT.md`만 소유한다.
+
 **v0.2.0 범위 추가:** 이 문서는 처음에는 "어떤 Area 또는 Spot을 추천할지"만
 계약했다. v0.2.0부터는 "특정 Spot 자체의 현재·미래 혼잡 상태를 얼마나 직접적인
 근거로 표현할 수 있는지"를 별도 계약(§5~§7)으로 추가한다. **추천 대상이
@@ -162,8 +178,9 @@ Recommendation Output 레코드의 허용값은 다음 둘뿐이다.
 이는 기존 D-006("추천은 SPOT 우선, AREA fallback")을 그대로 따르며, **"어떤
 단위를 추천 결과로 제시할지"**를 결정하는 필드다.
 
-D-021 초기 파일럿에서는 `AREA`만 사용한다. 사용자 선택용 Spot 3개가 함께
-표시돼도 `recommendation_type=SPOT`으로 바뀌지 않는다.
+D-021 다중 Area 비교 기능에서는 `AREA`만 사용한다. 사용자 선택용 Spot 3개가 함께
+표시돼도 `recommendation_type=SPOT`으로 바뀌지 않는다. D-022의 사용자 선택 Area
+조회는 Recommendation Output 레코드나 시스템 Area 추천을 뜻하지 않는다.
 
 Area 근거도 부족한 경우에는 새 Enum을 만들지 않고 Recommendation Output
 레코드를 생성하지 않는다. 추천하지 않은 이유는 향후 실행·검증 증거에 기록한다.
@@ -655,6 +672,7 @@ UI/UX 상세 설계에서 정한다. 코드 후보 예시:
 - 초기 AREA 기본 추천과 장기 AREA fallback의 `fallback_reason` 차이 명시
 - Issue #134 메모리 내 Core의 Horizon별 허용·추천 없음·비게시 계약 명시
 - Issue #136 ViewModel 상태·사용자 Spot 선택 검증·비저장 계약 명시
+- D-022 Area-first 사용자 선택 Area 조회와 기존 다중 Area 비교 기능의 책임 분리
 - 판매성과 표현 금지 경계 명시
 - PM 승인
 
@@ -662,6 +680,7 @@ UI/UX 상세 설계에서 정한다. 코드 후보 예시:
 
 | 버전 | 날짜 | 변경내용 | 작성자 | 승인상태 |
 |---|---|---|---|---|
+| v0.9.0 | 2026-07-30 | D-022 Area-first 웹 파일럿을 사용자 선택 Area 조회계약으로 분리하고 D-021 Core·Service를 다중 Area 비교·내부 분석 이력으로 보존 | 신동현 | PM 검토 대기 |
 | v0.8.0 | 2026-07-30 | Issue #136 초기 파일럿 ViewModel 상태, 예측 대상시각 표현, 사용자 Spot 선택 검증과 비저장·비게시 경계를 반영 | 신동현 | PM 검토 대기 |
 | v0.7.0 | 2026-07-29 | Issue #134 초기 파일럿 메모리 내 Core 계약 반영. 5개 Area, 60·180분 독립 판정, RUNTIME·FRESH·완전 Snapshot·양수 후보 조건, 추천 없음 null, 별도 파일럿 허용값, 사용자 선택 Spot 3개와 비게시 경계를 명시 | 신동현 | PR #135 main 반영 |
 | v0.6.0 | 2026-07-29 | D-021 초기 파일럿 A안 반영. AREA·판매시간 추천과 사용자 선택 Spot 3개를 시스템 SPOT 추천과 분리하고 서울시 공식 Forecast·ML 미사용·초기 AREA 비-fallback 계약을 추가. 생산 Schema는 미구현 상태 유지 | 신동현 | PM 결정 |
