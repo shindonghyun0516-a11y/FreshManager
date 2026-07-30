@@ -208,7 +208,7 @@ PM이 승인했거나 명시적으로 보류한 제품·운영 결정을 새 AI 
   D-008을 대체하지 않는다 — D-008이 결정한 "Recommendation MVP Gate 번호
   `NOT_ASSIGNED`"를 그대로 유지하며, EG-8E는 Recommendation MVP의 구현 Gate가
   아니라 계약·설계 준비(Contract·UI/UX Readiness) Gate다.
-- Related: [[D-008]](양립, 미대체), TRD ADR-16, `ARCHITECTURE_DECISIONS.md`
+- Related: `D-008`(양립, 미대체), TRD ADR-16, `ARCHITECTURE_DECISIONS.md`
   ADR-011.
 
 ### D-016 — Manual V3 Snapshot Intake Metadata 계약
@@ -349,7 +349,7 @@ PM이 승인했거나 명시적으로 보류한 제품·운영 결정을 새 AI 
 ### D-021 — 초기 파일럿 Area 추천과 Spot 선택 지원 범위
 
 - Date: `2026-07-29`
-- Status: `ACCEPTED`
+- Status: `ACCEPTED · SUPERSEDED_IN_PART_BY_D-022`
 - Relationship: D-020의 원격 데이터 기반 SPOT 자동추천은 장기 제품 목표로
   유지한다. D-021은 장기 목표를 취소하지 않고 초기 파일럿 범위만 축소한다.
 - Pilot Area: 초기 대상은 PM 검토용 Area 5개이며, Area별 대표 Spot을 정확히
@@ -378,6 +378,62 @@ spot_auto_recommendation=false
 - Scope boundary: 이 결정은 정책·문서 정합화다. 생산 Schema·코드·시험, 실제
   Spot 등록·추천 실행·UI·Backend·배포와 파일럿 실행을 승인하지 않는다.
 - Evidence: Issue #128, PR #131.
+- Supersession: D-022가 시스템 Area 추천을 초기 웹 파일럿의 기본 진입 흐름으로
+  사용하는 부분과 Spot 직접값을 일절 표시하지 않는 부분을 부분 대체한다. Spot
+  공식값·계산값·자동산출값 금지는 유지하되, 명확히 배지된 `PM_MANUAL` 프로토타입
+  표시만 허용한다. 5개 Area 비교 Core·Service 구현 이력, Area당 Spot 3개·사용자
+  Spot 선택·서울시 Forecast·ML 미사용 계약은 유지한다.
+
+### D-022 — Area-first 초기 웹 파일럿 사용자 흐름
+
+- Date: `2026-07-30`
+- Status: `ACCEPTED`
+- Relationship: D-020의 장기 원격 데이터 기반 SPOT 추천 목표와 D-021의 5개
+  Area·Area당 Spot 3개·사용자 Spot 선택·서울시 Forecast·ML 미사용 계약은
+  유지한다. D-021 Recommendation Core와 Application Service도 여러 Area의 기회를
+  비교하는 내부 분석 기능과 구현 이력으로 보존한다. D-022는 초기 웹 파일럿의
+  기본 진입 흐름을 사용자 담당 Area 선택으로 대체하고, 명확히 배지된 PM 직접 입력
+  Spot 프로토타입 표시를 추가한다.
+- Area selection: 초기 화면은 사용자가 승인된 5개 중 담당 Area를 직접 선택한 뒤
+  선택 Area의 현재·1시간 후·3시간 후 서울시 공식 Area 정보를 조회한다. 내부
+  기술계약의 `horizon_minutes=60`·`180`은 유지하며 사용자 화면에는 노출하지 않는다.
+- Spot selection: 선택 Area의 정확히 3개 Spot을 같은 수준의 선택지로 제공하며,
+  사용자가 `판촉 후보 위치로 선택` 버튼으로 직접 확정한다. 기본선택·자동선택·
+  공식 추천은 없다.
+
+```text
+area_selection_mode=USER_CHOICE
+area_auto_recommendation=false
+spot_selection_mode=USER_CHOICE
+spot_auto_recommendation=false
+machine_learning_used_for_recommendation=false
+official_recommendation_allowed=false
+```
+
+- Data boundary: Area 현재·예측값은 `서울시 공식 Area 데이터`로 표시하고 Spot
+  직접값처럼 표현하지 않는다. Spot 현재·1시간 후·3시간 후·과거 비교·점수·순위는
+  `data_status=PROTOTYPE`, `input_method=PM_MANUAL`인 PM 직접 입력값만 허용한다.
+- Calculation·freshness boundary: Area 증감수·증감률은 EG-8D 중앙값 계산 의미와
+  기존 Horizon별 `FRESH`·`DEGRADED`·`STALE_BLOCKED`·`NO_COMPLETE_SNAPSHOT` 의미를
+  재사용한다. 새 임계값을 만들지 않으며 0분모를 `0%`로 대체하지 않는다.
+- User evidence·responsive boundary: 실제 프래시매니저 인터뷰는 담당 Area 안 판촉
+  위치 판단이 경험·개인 노하우에 의존하는 문제 맥락의 근거다. 웹 파일럿은 같은
+  데이터·Component·선택상태를 공유하는 Responsive Web의 Desktop Web·Mobile Web이며,
+  태블릿 전용 UI는 만들지 않는다. 데스크톱 Spot 상세는 우측 패널, 모바일은 Bottom
+  Sheet로 표시한다.
+- UI boundary: 네이버 지도와 현재 위치는 보조기능이다. 지도·위치 실패가 텍스트
+  기반 Area·Spot 조회와 사용자 선택을 차단하지 않으며 위치와 선택이력을 저장하지
+  않는다. hy 본사 기본 좌표·zoom은 `PM_CONFIRMATION_REQUIRED`다.
+- Service boundary: 기존 Recommendation Service는 Area-first 화면의 Primary API가
+  아니다. 사용자 선택 Area 조회 Application Service는 별도 Issue에서 정의한다.
+- Scope boundary: 이 결정은 제품·UI·데이터 표시 계약이다. 코드·HTTP Endpoint·
+  Spot 프로토타입 파일·지도 Application·Client ID·Database·배포·실제 API·
+  Recommendation·ML·S-DoT 실행을 승인하지 않는다.
+- Technology boundary: Framework·Dependency·Scaffold·기술 Stack ADR은 이번 결정의
+  범위가 아니다. PR #141 병합 뒤 Repository Readiness Audit을 거친 별도 ADR에서만
+  공식화한다.
+- Evidence: Issue #140,
+  `docs/product/AREA_FIRST_WEB_PILOT_CONTRACT.md`.
 
 ## 4. 갱신 규칙
 
