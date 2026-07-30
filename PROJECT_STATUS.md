@@ -35,7 +35,7 @@
 - 파일럿 사용자 선택 Spot 정적 Master: `AVAILABLE_ON_MAIN`(Issue #132, PR #133)
 - 초기 파일럿 Area 추천 Core: `AVAILABLE_ON_MAIN`(Issue #134, PR #135)
 - 초기 파일럿 Recommendation Service: `AVAILABLE_ON_MAIN`(Issue #136, PR #137)
-- Area-first 웹 파일럿 계약: `DRAFT_PENDING_PM_REVIEW`(D-022, Issue #140)
+- Area-first 웹 파일럿 계약: `AVAILABLE_ON_MAIN`(D-022, Issue #140, PR #141)
 - Spot 자동 추천: `DEFERRED_AFTER_INITIAL_PILOT`
 - 24시간 Scheduler(로컬 EG-7 Live 파일럿 확대 기준): `NOT_IMPLEMENTED`
 - ML 학습: `COMPARISON_COMPLETED_NOT_ADOPTED`; 추천 사용 `false`
@@ -154,7 +154,7 @@ PM이 장기 기준으로 확정한 5분 주기의 EG-7 1시간 파일럿 Contro
   안에서 사용자 선택을 검증한다. HTTP·Web Framework·Database·파일·세션 저장,
   UI·배포·사용자 파일럿·Spot 자동추천·ML 실행은 없다.
 - Area-first 웹 파일럿 계약:
-  `DRAFT_PENDING_PM_REVIEW`(D-022, Issue #140) — 초기 기본 흐름은 사용자가 승인된
+  `AVAILABLE_ON_MAIN`(D-022, Issue #140, PR #141) — 초기 기본 흐름은 사용자가 승인된
   5개 중 담당 Area를 먼저 선택하고 선택 Area의 현재·1시간 후·3시간 후 서울시 공식 Area
   정보(내부 `horizon_minutes=60`·`180`)와 Spot 3개를 확인해 판촉 후보 위치를 직접
   선택한다. 같은 데이터·상태를 쓰는 Responsive Desktop Web·Mobile Web이며 태블릿
@@ -163,7 +163,9 @@ PM이 장기 기준으로 확정한 5분 주기의 EG-7 1시간 파일럿 Contro
   기존 Core·Service는 다중 Area 비교·내부 분석 기능으로 보존하고 Area-first
   Primary API로 사용하지 않는다. Area 증감은 EG-8D 중앙값 의미·기존 최신성 상태를
   재사용하며, 실제 프래시매니저 인터뷰의 문제 맥락을 사용한다. 코드·지도·UI·데이터
-  파일·배포는 미구현이고 기술 Stack 공식화는 Audit 이후 별도 ADR이다.
+  파일·배포는 미구현이고 기술 Stack 공식화는 Audit 이후 별도 ADR이다. 이 상태는
+  계약 문서가 `main`에 있다는 뜻이며 Area-first Service·API, Vue UI, FastAPI,
+  NAVER Map, Spot Prototype Data와 배포가 구현됐다는 뜻이 아니다.
 - Area Ranking: `IMPLEMENTATION_AVAILABLE_ON_MAIN`(PR #110, Issue #109) — 서울시
   Forecast 기반 60분·180분 예상 유동인구 변화·미래 인구 규모 순위를 각각 계산.
   `LATEST_COMPLETE_LOCKED_SNAPSHOT` 정책으로 잠긴 Dataset의 전체 1,027회 중 승인된
@@ -215,8 +217,9 @@ PM이 장기 기준으로 확정한 5분 주기의 EG-7 1시간 파일럿 Contro
   Publication 18개·EG-8D 70개·EG-8C 머신러닝 24개·전체 707개
   시험과 Project Guard `PASS=43, FAIL=0, WARN=0, SKIP=4` 통과.
 - Spot Ranking: `DEFERRED_AFTER_INITIAL_PILOT`
-- Recommendation Contract: `DRAFT_AREA_FIRST_RELATIONSHIP_IN_ISSUE_140`; 생산 Schema `NOT_IMPLEMENTED`
-- UI/UX Detailed Design: `AREA_FIRST_CONTRACT_DRAFT_IN_ISSUE_140`; 화면 구현 `NOT_STARTED`
+- Recommendation Contract: 문서 `Draft` 유지; Area-first 관계 `AVAILABLE_ON_MAIN`;
+  생산 Schema `NOT_IMPLEMENTED`
+- UI/UX Detailed Design: Area-first 계약 `AVAILABLE_ON_MAIN`; 화면 구현 `NOT_STARTED`
 
 이 절은 §2.1의 Apps Script 상시 수집 Runtime과 독립적이다. 5분 자동수집 `ACTIVE`
 상태는 이 절과 무관하게 유지된다. v3 source sheets 자체는 ML-ready Dataset이
@@ -449,6 +452,7 @@ H-707은 구현과 함께 `PASS`로 활성화됐지만 이는 합성 계약 검�
 - PR #133: `MERGED`
 - PR #135: `MERGED`
 - PR #137: `MERGED`
+- PR #141: `MERGED`
 - Issue #70: `CLOSED`
 - Issue #69: `OPEN`
 - Issue #129: `CLOSED`
@@ -456,9 +460,9 @@ H-707은 구현과 함께 `PASS`로 활성화됐지만 이는 합성 계약 검�
 - Issue #132: `CLOSED`
 - Issue #134: `CLOSED`
 - Issue #136: `CLOSED · COMPLETED`
-- Issue #140: `OPEN`
-- Issue #140 Source Branch: `docs/issue-140-area-first-web-pilot-contract`
-- Issue #140 Review State: `PM_REVIEW_PENDING`
+- Issue #140: `CLOSED · COMPLETED`
+- Issue #140 Source Branch: local·remote `DELETED`
+- Issue #140 Review State: `COMPLETED`
 - Issue #136 Source Branch: local·remote `DELETED`
 - Issue #136 Review State: `COMPLETED`
 - 병합된 feature Branch: local·remote `DELETED`
@@ -467,10 +471,14 @@ H-707은 구현과 함께 `PASS`로 활성화됐지만 이는 합성 계약 검�
 
 ## 10. 다음 행동
 
-현재 최우선 한 단계는 Issue #140의 Area-first 웹 파일럿 제품·UI·데이터 계약 Draft를
-PM이 검토하는 것이다. Area-first Service·Spot 프로토타입 데이터·네이버 지도·웹
-UI·배포·사용자 파일럿은 구현 완료 상태가 아니며 별도 승인 전 시작하지 않는다.
-아래 EG-7 Live 결정은 독립 backlog로 유지한다.
+현재 최우선 한 단계는 읽기 전용 Repository Readiness Audit이다. Audit은 현재
+파일과 책임을 `KEEP`·`MOVE_CANDIDATE`·`UPDATE_REQUIRED`·`ARCHIVE_CANDIDATE`·
+`DELETE_CANDIDATE`로 분류해 PM 결정자료를 만드는 작업이며, 이번 상태 동기화에서
+분류·이동·삭제를 실행하지 않는다.
+파일 이동·삭제·리팩터링·Root 재구성·Scaffold·Dependency 변경은 Audit 완료 뒤
+별도 승인 범위에서만 수행한다. Area-first Service·API, Vue UI, FastAPI, NAVER Map,
+Spot Prototype Data·배포·사용자 파일럿은 구현 완료 상태가 아니다. 기술 Stack은
+Audit 이후 별도 ADR에서만 공식화한다. 아래 EG-7 Live 결정은 독립 backlog로 유지한다.
 
 현재 OPEN 또는 미생성 결정:
 
@@ -487,23 +495,30 @@ UI·배포·사용자 파일럿은 구현 완료 상태가 아니며 별도 승�
 
 5분 장기 주기는 `CLOSED · PM_APPROVED_FIXED`이며 OPEN 결정이 아니다.
 
-다음 행동 순서:
+Repository Readiness Audit 순서:
 
-1. Issue #140 Area-first 웹 파일럿 계약 Draft를 PM이 검토한다.
-2. 공식 API 할당량과 rate-limit 호환성을 확인한다.
-3. 로컬 Source와 Drive sync-copy preflight를 확인한다.
-4. 범위가 고정된 운영 Plan v2 하나를 생성한다.
-5. `pilot_run_id` 하나와 Batch ID 정확히 12개를 생성한다.
-6. 결정적 Plan fingerprint를 생성·검증한다.
-7. 그 정확한 Plan에 대한 한정된 PM Live 승인을 기록한다.
-8. 첫 Area-only 1시간 Live 수집을 실행한다.
-9. 즉시 기술·데이터 품질 분석을 수행한다.
-10. 자동 확대 없이 중단한다.
-11. 다음 Area 수집 시간창을 결정한다.
-12. 별도 승인된 S-DoT·ML·Spot Workstream을 계속한다.
+1. 현재 Repository를 읽기 전용으로 조사한다.
+2. 파일별 `KEEP`·`MOVE_CANDIDATE`·`UPDATE_REQUIRED`·`ARCHIVE_CANDIDATE`·
+   `DELETE_CANDIDATE`와 근거를 보고한다.
+3. PM이 분류와 후속 변경범위를 별도로 승인한다.
+4. 승인 뒤 필요한 파일 변경과 기술 Stack ADR을 별도 작업으로 진행한다.
 
-2번 이후의 운영 단계는 각 단계에 필요한 확인과 별도 PM 승인을 전제로 하며,
-24시간 수집으로 자동 확대하지 않는다.
+EG-7 Live 독립 backlog 순서:
+
+1. 공식 API 할당량과 rate-limit 호환성을 확인한다.
+2. 로컬 Source와 Drive sync-copy preflight를 확인한다.
+3. 범위가 고정된 운영 Plan v2 하나를 생성한다.
+4. `pilot_run_id` 하나와 Batch ID 정확히 12개를 생성한다.
+5. 결정적 Plan fingerprint를 생성·검증한다.
+6. 그 정확한 Plan에 대한 한정된 PM Live 승인을 기록한다.
+7. 첫 Area-only 1시간 Live 수집을 실행한다.
+8. 즉시 기술·데이터 품질 분석을 수행한다.
+9. 자동 확대 없이 중단한다.
+10. 다음 Area 수집 시간창을 결정한다.
+11. 별도 승인된 S-DoT·ML·Spot Workstream을 계속한다.
+
+각 운영 단계는 필요한 확인과 별도 PM 승인을 전제로 하며, 24시간 수집으로 자동
+확대하지 않는다.
 
 ## 11. 새 세션 복원 메모
 
@@ -521,8 +536,9 @@ Plan·`pilot_run_id`·Batch ID·Plan fingerprint는 아직 존재하지 않는�
 동적 수집·Spot 실행은 시작하지 않았고, ML은 비교 완료 후 미채택 상태다. D-021은
 서울시 Forecast 기반 다중 Area 비교 Core와 사용자 선택 Spot 3개의 구현 이력으로
 보존한다. Issue #132·PR #133의 정적 Master, Issue #134·PR #135의 추천 Core와
-Issue #136·PR #137의 Recommendation Service는 `main`에 있다. D-022·Issue #140은
-초기 웹 파일럿을 사용자 담당 Area 선택 흐름으로 정렬하는 문서 Draft이며 코드·UI·
-지도·배포는 미구현이다. 추천 실행은 0건이고 다음 작업은 Issue #140 Draft의 PM
-검토다. EG-7 Live preflight는 독립 backlog이며 EG-7 구현 Branch를 다시 만들지
-않는다.
+Issue #136·PR #137의 Recommendation Service는 `main`에 있다. D-022의 Area-first
+웹 파일럿 계약은 Issue #140·PR #141로 승인되어 `main`에 있으며, 코드·Service·API·
+Vue UI·FastAPI·NAVER Map·Spot Prototype Data·배포는 미구현이다. 추천 실행은
+0건이고 다음 작업은 읽기 전용 Repository Readiness Audit이다. 기술 Stack은 Audit
+이후 별도 ADR에서만 공식화한다. EG-7 Live preflight는 독립 backlog이며 EG-7 구현
+Branch를 다시 만들지 않는다.
