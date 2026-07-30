@@ -192,6 +192,31 @@ Decision Record, 기술 구조 결정 기록) 형식으로 보존한다. 현행 
 - Related decision: D-015, TRD ADR-14(대체 아님 — EG-8E는 Recommendation MVP의
   구현 Gate가 아니라 계약·설계 준비 Gate), TRD ADR-16.
 
+## ADR-012 — Area-first Web/API 경계와 읽기 전용 데이터 공급
+
+- Status: `ACCEPTED`
+- Context: D-022 Area-first 웹 파일럿은 사용자가 담당 Area를 직접 선택하는 조회
+  흐름이며 D-021 다중 Area Recommendation Service와 책임이 다르다. UI 구현 전에
+  Web/API, 기존 Python Package와 저장소 밖 불변 데이터의 의존방향을 고정해야 한다.
+- Decision: Vue 3·TypeScript·Vite Frontend는 HTTP API만 호출하고, FastAPI·Pydantic·
+  Uvicorn Backend는 새 `SelectedAreaPilotService`를 통해 읽기 전용
+  `AreaDataProvider`와 `PilotSpotOptionRepository`를 사용한다. 웹 요청은 수집·Backup·
+  Dataset·ML·Recommendation을 실행하거나 데이터를 쓰지 않는다. 초기에는 DB·인증·
+  Session·선택이력·위치정보 저장이 없고 Same-origin 배포를 우선한다.
+- Alternatives: 기존 D-021 Recommendation Service를 Primary API로 사용, Vue의 파일
+  직접 읽기, 요청 시 수집, Spreadsheet 직접 접근, 초기 DB·인증·Microservice 도입.
+- Consequences: API는 `GET /api/v1/health`, `GET /api/v1/areas`,
+  `GET /api/v1/areas/{area_code}/pilot-view`만 제공하는 방향이며 Current·60분·180분의
+  부분 가용성과 Freshness를 독립 표현한다. 기존 Code Cleanup은 Scaffold 선행조건이
+  아니며 결정은 `NO_CODE_CLEANUP_REQUIRED_BEFORE_SCAFFOLD`다.
+- Validation: 상세 Stack, Dependency, 오류, 개인정보, Module 재사용 Matrix와 Code
+  Cleanup Gate는
+  [`AREA_FIRST_WEB_API_ARCHITECTURE.md`](../docs/architecture/AREA_FIRST_WEB_API_ARCHITECTURE.md)를
+  따른다. 이 ADR PR은 문서·전체시험·Project Guard만 검증하고 구현은 후속 Issue로
+  분리한다.
+- Related decision: D-020, D-021, D-022, ADR-011.
+- Related work: Issue #148, PR #149.
+
 ## 2. ADR 갱신 규칙
 
 결정이 바뀌면 기존 ADR을 삭제하지 않고 상태를 `SUPERSEDED`로 바꾸며 대체 ADR을
