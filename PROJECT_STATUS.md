@@ -155,11 +155,15 @@ PM이 장기 기준으로 확정한 5분 주기의 EG-7 1시간 파일럿 Contro
   UI·배포·사용자 파일럿·Spot 자동추천·ML 실행은 없다.
 - Area-first 웹 파일럿 계약:
   `DRAFT_PENDING_PM_REVIEW`(D-022, Issue #140) — 초기 기본 흐름은 사용자가 승인된
-  5개 중 담당 Area를 먼저 선택하고 선택 Area의 현재·60분·180분 서울시 공식 Area
-  정보와 Spot 3개를 확인해 판촉 후보 위치를 직접 선택한다. Spot 수치·점수·순위는
+  5개 중 담당 Area를 먼저 선택하고 선택 Area의 현재·1시간 후·3시간 후 서울시 공식 Area
+  정보(내부 `horizon_minutes=60`·`180`)와 Spot 3개를 확인해 판촉 후보 위치를 직접
+  선택한다. 같은 데이터·상태를 쓰는 Responsive Desktop Web·Mobile Web이며 태블릿
+  전용 UI는 없다. Spot 수치·점수·순위는
   PM 직접 입력 프로토타입으로만 구분하며 Area 값을 Spot 값으로 사용하지 않는다.
   기존 Core·Service는 다중 Area 비교·내부 분석 기능으로 보존하고 Area-first
-  Primary API로 사용하지 않는다. 코드·지도·UI·데이터 파일·배포는 미구현이다.
+  Primary API로 사용하지 않는다. Area 증감은 EG-8D 중앙값 의미·기존 최신성 상태를
+  재사용하며, 실제 프래시매니저 인터뷰의 문제 맥락을 사용한다. 코드·지도·UI·데이터
+  파일·배포는 미구현이고 기술 Stack 공식화는 Audit 이후 별도 ADR이다.
 - Area Ranking: `IMPLEMENTATION_AVAILABLE_ON_MAIN`(PR #110, Issue #109) — 서울시
   Forecast 기반 60분·180분 예상 유동인구 변화·미래 인구 규모 순위를 각각 계산.
   `LATEST_COMPLETE_LOCKED_SNAPSHOT` 정책으로 잠긴 Dataset의 전체 1,027회 중 승인된

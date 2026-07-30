@@ -208,7 +208,7 @@ PM이 승인했거나 명시적으로 보류한 제품·운영 결정을 새 AI 
   D-008을 대체하지 않는다 — D-008이 결정한 "Recommendation MVP Gate 번호
   `NOT_ASSIGNED`"를 그대로 유지하며, EG-8E는 Recommendation MVP의 구현 Gate가
   아니라 계약·설계 준비(Contract·UI/UX Readiness) Gate다.
-- Related: [[D-008]](양립, 미대체), TRD ADR-16, `ARCHITECTURE_DECISIONS.md`
+- Related: `D-008`(양립, 미대체), TRD ADR-16, `ARCHITECTURE_DECISIONS.md`
   ADR-011.
 
 ### D-016 — Manual V3 Snapshot Intake Metadata 계약
@@ -395,7 +395,8 @@ spot_auto_recommendation=false
   기본 진입 흐름을 사용자 담당 Area 선택으로 대체하고, 명확히 배지된 PM 직접 입력
   Spot 프로토타입 표시를 추가한다.
 - Area selection: 초기 화면은 사용자가 승인된 5개 중 담당 Area를 직접 선택한 뒤
-  선택 Area의 현재·60분·180분 서울시 공식 Area 정보를 조회한다.
+  선택 Area의 현재·1시간 후·3시간 후 서울시 공식 Area 정보를 조회한다. 내부
+  기술계약의 `horizon_minutes=60`·`180`은 유지하며 사용자 화면에는 노출하지 않는다.
 - Spot selection: 선택 Area의 정확히 3개 Spot을 같은 수준의 선택지로 제공하며,
   사용자가 `판촉 후보 위치로 선택` 버튼으로 직접 확정한다. 기본선택·자동선택·
   공식 추천은 없다.
@@ -410,8 +411,16 @@ official_recommendation_allowed=false
 ```
 
 - Data boundary: Area 현재·예측값은 `서울시 공식 Area 데이터`로 표시하고 Spot
-  직접값처럼 표현하지 않는다. Spot 현재·60분·180분·과거 비교·점수·순위는
+  직접값처럼 표현하지 않는다. Spot 현재·1시간 후·3시간 후·과거 비교·점수·순위는
   `data_status=PROTOTYPE`, `input_method=PM_MANUAL`인 PM 직접 입력값만 허용한다.
+- Calculation·freshness boundary: Area 증감수·증감률은 EG-8D 중앙값 계산 의미와
+  기존 Horizon별 `FRESH`·`DEGRADED`·`STALE_BLOCKED`·`NO_COMPLETE_SNAPSHOT` 의미를
+  재사용한다. 새 임계값을 만들지 않으며 0분모를 `0%`로 대체하지 않는다.
+- User evidence·responsive boundary: 실제 프래시매니저 인터뷰는 담당 Area 안 판촉
+  위치 판단이 경험·개인 노하우에 의존하는 문제 맥락의 근거다. 웹 파일럿은 같은
+  데이터·Component·선택상태를 공유하는 Responsive Web의 Desktop Web·Mobile Web이며,
+  태블릿 전용 UI는 만들지 않는다. 데스크톱 Spot 상세는 우측 패널, 모바일은 Bottom
+  Sheet로 표시한다.
 - UI boundary: 네이버 지도와 현재 위치는 보조기능이다. 지도·위치 실패가 텍스트
   기반 Area·Spot 조회와 사용자 선택을 차단하지 않으며 위치와 선택이력을 저장하지
   않는다. hy 본사 기본 좌표·zoom은 `PM_CONFIRMATION_REQUIRED`다.
@@ -420,6 +429,9 @@ official_recommendation_allowed=false
 - Scope boundary: 이 결정은 제품·UI·데이터 표시 계약이다. 코드·HTTP Endpoint·
   Spot 프로토타입 파일·지도 Application·Client ID·Database·배포·실제 API·
   Recommendation·ML·S-DoT 실행을 승인하지 않는다.
+- Technology boundary: Framework·Dependency·Scaffold·기술 Stack ADR은 이번 결정의
+  범위가 아니다. PR #141 병합 뒤 Repository Readiness Audit을 거친 별도 ADR에서만
+  공식화한다.
 - Evidence: Issue #140,
   `docs/product/AREA_FIRST_WEB_PILOT_CONTRACT.md`.
 

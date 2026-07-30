@@ -1,7 +1,7 @@
 # Area-first Web Pilot Contract
 
 - 문서 상태: Draft
-- 버전: v0.1.0
+- 버전: v0.2.0
 - 작성자: 신동현
 - 최종 승인자: 신동현
 - 최초 작성일: 2026-07-30
@@ -20,7 +20,7 @@
 
 이 문서는 FreshManager 초기 웹 파일럿의 Area-first 제품 흐름, UI 상태와 데이터
 표시 경계를 소유하는 단일 상세 정본이다. 프래시매니저가 본인의 담당 Area를 먼저
-선택하고, 선택 Area의 현재·60분·180분 유동상황과 Area 안의 Spot 3개를 확인한 뒤
+선택하고, 선택 Area의 현재·1시간 후·3시간 후 유동상황과 Area 안의 Spot 3개를 확인한 뒤
 판촉 후보 위치를 직접 선택하는 경험을 정의한다.
 
 이 문서는 HTTP·저장 Schema, Application Service 구현, 지도 SDK 초기화, 화면
@@ -62,9 +62,9 @@ official_recommendation_allowed=false
 
 ### 3.2 해결할 문제
 
-출근·점심·퇴근시간과 개인의 감에만 의존해 한 장소에서 판촉시간을 소비하지만
-실제 유동인구가 적어 판매기회를 놓칠 수 있는 문제를 다룬다. 이 문제 가설은 현재
-판매실적이나 사용자 연구로 검증 완료된 사실이 아니다.
+실제 프래시매니저 인터뷰를 통해 담당 Area 안에서 판촉 위치를 판단하는 과정이 경험과
+개인 노하우에 의존하는 문제 맥락을 확인했다. 이번 파일럿은 이 문제를 바탕으로 Area
+유동정보와 Spot 비교정보를 제공하는 화면구조와 선택과정을 검토하기 위한 프로토타입이다.
 
 ### 3.3 서비스 목적과 금지 표현
 
@@ -76,13 +76,35 @@ official_recommendation_allowed=false
 - 공식 Spot 추천
 - 운영 적합성·안전·정차 가능성 보장
 
-## 4. 고정 파일럿 범위와 사용자 흐름
+## 4. 서비스 형태·고정 파일럿 범위와 사용자 흐름
+
+서비스 형태는 다음으로 고정한다.
+
+```text
+Responsive Web
+Desktop Web + Mobile Web
+Tablet 전용 UI 없음
+```
+
+데스크톱과 모바일은 같은 데이터·Component·선택상태를 사용하고 Layout만 바꾼다.
+좁은 화면은 모바일웹 Layout을 사용하며, 태블릿 전용 Component·정보구조는 만들지
+않는다. 정확한 CSS Breakpoint는 후속 UI 구현계약에서 코드 상수로 확정한다.
+
+데스크톱은 좌측에 담당 Area 선택과 Area 현재·1시간 후·3시간 후 정보·출처·기준시각,
+중앙에 네이버 지도·Spot Marker 3개·현재 위치, 우측에 선택 Spot 상세·비교기준·
+점수·순위·직선거리·`판촉 후보 위치로 선택`을 둔다. Spot 미선택 시 우측 패널에는
+Spot 선택 안내를 표시한다.
+
+모바일은 `Area 선택 → Area 현재·1시간 후·3시간 후 정보 → 네이버 지도 → Spot 목록
+→ Spot 클릭 → Bottom Sheet → 판촉 후보 위치로 선택` 흐름을 사용한다. Spot 상세는
+데스크톱에서 우측 패널, 모바일에서 Bottom Sheet로 표시하며 추가 확인 팝업은 사용하지
+않는다.
 
 | 항목 | 고정값 |
 |---|---|
 | Area 선택 | 승인된 5개 중 사용자 직접 선택 |
 | Spot 선택 | 선택 Area의 정확히 3개 중 사용자 직접 선택 |
-| 시간 표시 | 현재·60분·180분을 함께 표시 |
+| 시간 표시 | 현재·1시간 후·3시간 후를 함께 표시(내부 `horizon_minutes=60`·`180`) |
 | Area 데이터 | 서울시 공식 Area 데이터 |
 | Spot 수치 | PM 직접 입력 프로토타입 데이터 |
 | 추천·ML | Area·Spot 자동추천 없음, ML 미사용, 공식 추천 불허 |
@@ -94,19 +116,21 @@ official_recommendation_allowed=false
 → hy 본사를 중심으로 네이버 지도 표시
 → 담당 Area Dropdown 선택
 → 선택 Area로 지도 이동
-→ Area 현재 유동인구·혼잡도 표시
+→ Area 현재·1시간 후·3시간 후 유동인구·혼잡도 표시
 → Area의 Spot 3개 표시
 → Spot 핀 또는 목록 클릭
-→ Bottom Sheet 상세정보 표시
-→ Spot 현재·60분·180분 프로토타입 정보 확인
+→ 화면 Layout에 따른 Spot 상세정보 표시
+→ Spot 현재·1시간 후·3시간 후 프로토타입 정보 확인
 → 과거 비교기준 선택
 → 점수·순위·직선거리 확인
 → 판촉 후보 위치로 선택
 → 선택 완료
 ```
 
-별도 시간 선택버튼과 선택 확인 팝업은 사용하지 않는다. 60분·180분 정보는 Spot
-Bottom Sheet에서 동시에 표시한다.
+별도 시간 선택버튼과 선택 확인 팝업은 사용하지 않는다. 사용자 화면에서 `Horizon`,
+`60분 호라이즌`, `180분 호라이즌`, `평균 예측`은 사용하지 않는다. 내부 기술·데이터
+계약의 `horizon_minutes=60`·`180`은 현재로부터 예측 대상시각까지의 시간간격이며
+평균이 아니다.
 
 ## 5. Area 선택과 초기 지도
 
@@ -147,20 +171,51 @@ Git에 기록하지 않는다. 후속 환경변수 이름 후보는 `NAVER_MAP_C
 
 - Area명
 - 현재 유동인구 최소·최대, 현재 혼잡도, 데이터 기준시각
-- 60분 후 예상 유동인구 최소·최대, 예측 대상시각, 현재 대비 증감수·증감률
-- 180분 후 예상 유동인구 최소·최대, 예측 대상시각, 현재 대비 증감수·증감률
+- 1시간 후 예상 유동인구 최소·최대, 예측 대상시각, 현재 대비 증감수·증감률
+- 3시간 후 예상 유동인구 최소·최대, 예측 대상시각, 현재 대비 증감수·증감률
 
-출처는 `서울시 공식 Area 데이터`로 표시한다. 기준시각과 예측 대상시각을 구분하고,
-Area 값을 특정 Spot의 직접 관측값·예측값처럼 표시하지 않는다.
+출처는 `서울시 공식 Area 현재 데이터`와 `서울시 공식 Area Forecast`로 표시한다.
+기준시각과 예측 대상시각을 구분하고, Area 값을 특정 Spot의 직접 관측값·예측값처럼
+표시하지 않는다. 1시간 후와 3시간
+후는 각각 독립적으로 다음 EG-8D 중앙값 계산 의미를 재사용한다.
+
+```text
+current_population_midpoint
+= (current_population_min + current_population_max) / 2
+
+forecast_population_midpoint
+= (forecast_population_min + forecast_population_max) / 2
+
+expected_population_change
+= forecast_population_midpoint - current_population_midpoint
+
+expected_population_change_rate
+= expected_population_change / current_population_midpoint
+
+display_change_rate_percent
+= expected_population_change_rate × 100
+```
+
+계산된 값은 Backend 또는 기존 Python Service가 제공하며 Frontend가 별도 계산공식을
+만들지 않는다. 현재 중앙값이 0이면 증감률을 계산하거나 `0%`로 대체하지 않는다.
+서울시 최소·최대 범위는 그대로 표시하고, 중앙값을 서울시 공식 단일 인구값처럼
+표현하지 않는다. 도움말은 "증감수와 증감률은 서울시가 제공한 현재·예상 인구 범위의
+중앙값을 기준으로 계산합니다."를 사용한다.
+
+새 최신성 임계값을 만들지 않고 기존 EG-8D Freshness Gate의 `FRESH`, `DEGRADED`,
+`STALE_BLOCKED`, `NO_COMPLETE_SNAPSHOT` 의미를 재사용한다. 각 미래 시점은 독립적으로
+처리한다. `FRESH`는 정상 표시, `DEGRADED`는 경고와 함께 Area 참고정보 표시,
+`STALE_BLOCKED`는 해당 미래값 미표시, `NO_COMPLETE_SNAPSHOT`은 표시 가능한 최신
+Current가 있으면 현재정보만 표시한다. 다른 시간간격 값을 복사하거나 보간하지 않는다.
 
 ## 7. Spot 프로토타입 데이터 계약
 
-각 Area에는 정확히 3개 Spot을 제공한다. Spot 카드와 Bottom Sheet에는 다음 UI
-영역을 둔다.
+각 Area에는 정확히 3개 Spot을 제공한다. Spot 카드와 Layout별 상세영역(데스크톱
+우측 패널·모바일 Bottom Sheet)에는 다음 UI 영역을 둔다.
 
 - 현재 유동인구·현재 혼잡도
-- 60분 후 예상 유동인구·예상 혼잡도
-- 180분 후 예상 유동인구·예상 혼잡도
+- 1시간 후 예상 유동인구·예상 혼잡도
+- 3시간 후 예상 유동인구·예상 혼잡도
 - 과거 비교 증감수·증감률
 - 판촉 기회점수·Area 내 순위
 
@@ -193,12 +248,12 @@ Spot 상세의 `비교기준` Dropdown은 다음 세 값만 허용한다.
 
 ## 9. Spot 상세와 선택
 
-Spot 핀 또는 목록 클릭은 Bottom Sheet를 열 뿐 최종 선택을 뜻하지 않는다. Bottom
-Sheet에는 다음을 표시한다.
+Spot 핀 또는 목록 클릭은 Layout별 상세영역(데스크톱 우측 패널·모바일 Bottom Sheet)을
+열 뿐 최종 선택을 뜻하지 않는다. 해당 상세영역에는 다음을 표시한다.
 
 - Spot명·주소·유형
 - 프로토타입 데이터 배지와 제한사항
-- 현재·60분·180분 정보
+- 현재·1시간 후·3시간 후 정보
 - 과거 비교 Dropdown과 증감수·증감률
 - 점수·순위
 - 현재 위치에서의 직선거리와 다른 Spot까지의 직선거리
@@ -234,7 +289,7 @@ Spot 조회와 선택을 막지 않는다.
 |---|---|---|---|---|---|
 | `AREA_UNSELECTED` | Area Dropdown, 선택 안내, 가능하면 기본지도 | Area 수치, Spot 핀·목록·상세 | 담당 Area를 선택하세요 | 해당 없음 | Area 선택 |
 | `AREA_LOADING` | 선택 Area명, Loading 안내 | 이전 Area 수치·Spot·선택 | Area 정보를 불러오는 중입니다 | 완료·실패 후 가능 | 대기 또는 Area 변경 |
-| `AREA_AVAILABLE` | Area 현재·60분·180분 공식정보, 출처·기준시각, Spot 3개 | 클릭 전 Spot 상세 | Spot을 눌러 비교하세요 | 수동 새로고침 가능 | 핀 또는 목록 선택 |
+| `AREA_AVAILABLE` | Area 현재·1시간 후·3시간 후 공식정보, 출처·기준시각, Spot 3개 | 클릭 전 Spot 상세 | Spot을 눌러 비교하세요 | 수동 새로고침 가능 | 핀 또는 목록 선택 |
 | `AREA_DATA_UNAVAILABLE` | Area명, 정적 Spot 이름·주소, 안전한 제한 안내 | 공식 Area 수치·증감 | Area 정보를 사용할 수 없어 값을 표시하지 않습니다 | 수동 가능 | 재시도·다른 Area·정적 Spot 확인 |
 | `SPOT_DETAIL_OPEN` | Spot 정체성, 프로토타입 배지, 가능한 수동정보·거리·제한 | 시스템 추천 표현 | 정보를 확인한 뒤 후보 위치를 선택하세요 | 해당 없음 | 비교기준 변경 또는 명시 선택 |
 | `SPOT_SELECTED` | 선택 핀·카드 강조, 선택 완료, 상세 | 자동·공식 추천 주장 | 판촉 후보 위치로 선택했습니다. 다른 Spot으로 변경할 수 있습니다 | 해당 없음 | 유지 또는 재선택 |
@@ -271,13 +326,14 @@ Spot 조회와 선택을 막지 않는다.
 
 Area별 접근권한과 공통 접근코드는 후속 제한배포 단계의 별도 결정으로 보류한다.
 
-## 14. 모바일·접근성 원칙
+## 14. 반응형·접근성 원칙
 
-기준 화면폭은 360px, 390px, 430px다. 다음을 만족해야 한다.
+Desktop Web과 Mobile Web은 같은 기능·데이터·상태를 제공한다. 좁은 화면은 모바일
+Layout을 사용하며 태블릿 전용 UI는 없다. 다음을 만족해야 한다.
 
 - 가로 Overflow 없음
 - 충분한 터치영역과 조작 가능한 Dropdown
-- 지도 드래그와 Bottom Sheet 스크롤 충돌 최소화
+- 지도 드래그와 모바일 Bottom Sheet 스크롤 충돌 최소화
 - 긴 주소 줄바꿈
 - 색상 외 텍스트·형태로 상태 표시
 - 지도 없이도 핵심정보 이해·선택 가능
@@ -296,6 +352,11 @@ Area-first 화면은 사용자 선택 Area를 조회하는 별도 Application Se
 - HTML·CSS·JavaScript, Database, 배포
 - 실제 API·Recommendation·ML·S-DoT 실행
 - 로그인과 사용자 파일럿
+
+후속 구현 목표 기술 스택은 Repository Readiness Audit의 목표구조로만 사용한다.
+이번 계약은 `Responsive Web`과 `Desktop Web + Mobile Web` 제품계약만 정의하며,
+Audit 완료 후 별도 ADR로 공식화하기 전에는 Framework·Dependency·Scaffold를
+구현하거나 확정하지 않는다.
 
 ## 16. PM 확인 대기 항목
 
@@ -317,7 +378,8 @@ Area별 접근권한과 제한배포 방식도 후속 결정이다. 미결정값
 - 사용자 담당 Area 선택이 기본 진입 흐름으로 명시됨
 - 정확한 5개 Area와 Area당 Spot 3개 계약이 명시됨
 - Area 공식 데이터와 Spot PM 수동 프로토타입 데이터가 분리됨
-- 현재·60분·180분, 과거 비교, Bottom Sheet와 명시 선택이 정의됨
+- 반응형 Desktop Web·Mobile Web, 태블릿 전용 UI 제외, 현재·1시간 후·3시간 후,
+  과거 비교와 명시 선택이 정의됨
 - 13개 UI 상태와 지도·위치 실패 Fallback이 정의됨
 - 개인정보 비저장과 모바일 기준이 정의됨
 - D-020·D-021 구현 이력과 기존 Core·Service가 보존됨
@@ -328,4 +390,5 @@ Area별 접근권한과 제한배포 방식도 후속 결정이다. 미결정값
 
 | 버전 | 날짜 | 변경내용 | 승인상태 |
 |---|---|---|---|
+| v0.2.0 | 2026-07-30 | 최신 PM 결정에 따라 반응형 Desktop·Mobile Layout, 사용자 시간표현, 중앙값 기반 Area 증감, EG-8D 최신성 재사용, 실제 인터뷰 근거와 Audit 이후 ADR 경계를 반영 | PM 검토 대기 |
 | v0.1.0 | 2026-07-30 | D-022 Area-first 초기 웹 파일럿의 제품·UI·데이터 표시 계약 초안 | PM 검토 대기 |

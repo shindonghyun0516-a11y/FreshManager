@@ -1,7 +1,7 @@
 # Recommendation Output Contract
 
 - 문서 상태: Draft
-- 버전: v0.9.0
+- 버전: v1.0.0
 - 작성자: 신동현
 - 최종 승인자: 신동현
 - 최초 작성일: 2026-07-24
@@ -72,6 +72,14 @@ D-021의 초기 파일럿은 D-020 장기 SPOT 추천을 구현하지 않는다.
 
 D-022 이후 이 흐름은 여러 Area의 기회를 비교하는 내부 분석 기능과 구현 이력으로
 보존하며 Area-first 웹 파일럿의 기본 사용자 흐름으로 사용하지 않는다.
+
+Area-first 웹 파일럿 UI는 `현재·1시간 후·3시간 후`만 표시하고 내부
+`horizon_minutes=60`·`180`을 사용자 용어로 노출하지 않는다. 이 문서의
+Recommendation Output은 생산 Schema가 아니며, Area 현재·Forecast 범위 중앙값의
+증감수·증감률, 0분모와 Horizon별 최신성 표시 계약은
+`AREA_FIRST_WEB_PILOT_CONTRACT.md`를 단일 정본으로 따른다. 기존 EG-8D
+`FRESH`·`DEGRADED`·`STALE_BLOCKED`·`NO_COMPLETE_SNAPSHOT` 의미를 재사용하며 새
+임계값을 만들지 않는다.
 
 초기 대상은 다음 5개 Area로 고정한다.
 
@@ -152,15 +160,19 @@ ViewModel로 반환한다. 예상하지 못한 Core 실행 실패와 내부 출�
 
 ### 1.4 Area-first 웹 파일럿 경계
 
-D-022의 Area-first 웹 파일럿은 사용자가 승인된 5개 중 담당 Area를 먼저 선택하고,
-선택 Area의 현재·60분·180분 서울시 공식 Area 정보를 조회한다. 선택 Area의 Spot
-3개는 D-021과 동일한 사용자 선택지이며 Spot 자동추천·기본선택은 없다.
+D-022의 Area-first 웹 파일럿은 같은 데이터·Component·선택상태를 쓰는 Responsive
+Desktop Web·Mobile Web에서 사용자가 승인된 5개 중 담당 Area를 먼저 선택하고, 선택
+Area의 현재·1시간 후·3시간 후 서울시 공식 Area 정보를 조회한다. 태블릿 전용 UI는
+없으며 선택 Area의 Spot 3개는 D-021과 동일한 사용자 선택지이고 Spot 자동추천·
+기본선택은 없다.
 
 사용자가 선택한 Area를 시스템 추천 Area로 표현하지 않고 기존 Recommendation
 Service를 Area-first Primary API로 직접 사용하지 않는다. 기존 Core·Service와
 D-020 장기 목표는 유지하며, 사용자 선택 Area 조회 Service는 별도 후속 구현이다.
 상세 제품·UI·데이터 표시 계약은
 `docs/product/AREA_FIRST_WEB_PILOT_CONTRACT.md`만 소유한다.
+Framework·Dependency·Scaffold와 기술 Stack ADR은 Repository Readiness Audit 뒤
+별도 결정으로 보류하며 이 문서는 구현을 승인하지 않는다.
 
 **v0.2.0 범위 추가:** 이 문서는 처음에는 "어떤 Area 또는 Spot을 추천할지"만
 계약했다. v0.2.0부터는 "특정 Spot 자체의 현재·미래 혼잡 상태를 얼마나 직접적인
@@ -680,6 +692,7 @@ UI/UX 상세 설계에서 정한다. 코드 후보 예시:
 
 | 버전 | 날짜 | 변경내용 | 작성자 | 승인상태 |
 |---|---|---|---|---|
+| v1.0.0 | 2026-07-30 | D-022 Area-first 반응형 UI의 사용자 시간표현과 중앙값·최신성 표시 정본 참조를 추가; 생산 Schema는 미구현 유지 | 신동현 | PM 검토 대기 |
 | v0.9.0 | 2026-07-30 | D-022 Area-first 웹 파일럿을 사용자 선택 Area 조회계약으로 분리하고 D-021 Core·Service를 다중 Area 비교·내부 분석 이력으로 보존 | 신동현 | PM 검토 대기 |
 | v0.8.0 | 2026-07-30 | Issue #136 초기 파일럿 ViewModel 상태, 예측 대상시각 표현, 사용자 Spot 선택 검증과 비저장·비게시 경계를 반영 | 신동현 | PM 검토 대기 |
 | v0.7.0 | 2026-07-29 | Issue #134 초기 파일럿 메모리 내 Core 계약 반영. 5개 Area, 60·180분 독립 판정, RUNTIME·FRESH·완전 Snapshot·양수 후보 조건, 추천 없음 null, 별도 파일럿 허용값, 사용자 선택 Spot 3개와 비게시 경계를 명시 | 신동현 | PR #135 main 반영 |
