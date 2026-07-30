@@ -1,14 +1,48 @@
 # FreshManager Repository Readiness Audit
 
-- 문서 상태: `DRAFT_AUDIT_ONLY`
+- 문서 상태: `APPROVED_AUDIT_BASELINE`
 - 관련 Issue: #144
 - 기준 Repository: `shindonghyun0516-a11y/FreshManager`
 - 기준 main SHA: `b87d7cb03f860856888766da56bf904e8f649769`
 - 기준일: 2026-07-31 (Asia/Seoul)
-- PM Decision: `PENDING`
+- PM Decision: `APPROVED_WITH_INTERVIEW_EVIDENCE_CORRECTION`
 
 이 보고서는 Vue·FastAPI 기반 Area-first 웹 파일럿 구현 전 Git 추적 자산의 현재
-역할과 준비도를 분류한다. 기존 파일의 수정·이동·삭제 또는 구현 승인이 아니다.
+역할과 준비도를 분류한다. PM은 분류를 승인했지만 기존 파일의 수정·이동·삭제 또는
+구현 실행은 승인하지 않았다.
+
+## PM 승인 범위
+
+| Classification | 승인 의미 |
+|---|---|
+| `KEEP` | 현재 유지 승인 |
+| `MOVE_CANDIDATE` | 이동 후보로 승인, 이동 실행 미승인 |
+| `UPDATE_REQUIRED` | 갱신 후보로 승인, 수정 실행 미승인 |
+| `ARCHIVE_CANDIDATE` | 보관 후보로 승인, 이동 실행 미승인 |
+| `DELETE_CANDIDATE=0` | 현재 삭제작업을 만들지 않음 |
+
+Inventory 각 행의 `PM Decision=PENDING`은 해당 파일의 실제 이동·수정·보관 실행이
+아직 승인되지 않았다는 뜻이다.
+
+### 실제 인터뷰와 Repository Evidence
+
+| 항목 | 상태 |
+|---|---|
+| `actual_interview_execution_status` | `PM_CONFIRMED` |
+| `repository_evidence_status` | `NOT_TRACKED` |
+| `synthetic_matrix_status` | `NOT_ACTUAL_INTERVIEW_EVIDENCE` |
+| `gate_c_status` | `SEPARATE_EVALUATION_REQUIRED` |
+
+실제 프래시매니저 인터뷰 수행 사실은 PM이 확인했다. 다만 Git 추적자산에는 실제
+인터뷰 원문·요약·참여기록 또는 개인정보 없는 외부 증거 참조가 없어 정본 간
+Evidence Traceability가 부족하다. `interview/interview_matrix.md`는 공개자료 기반
+합성자료이며 실제 인터뷰, 실제 직접 인용 또는 Gate C 통과 근거가 아니다. 실제
+인터뷰 수행 사실만으로 Gate C 통과를 판정하지 않는다.
+
+후속 문서 정합화는 실제 인터뷰 수행 표현을 유지하면서, 별도 PM 승인 아래 개인정보
+없는 Evidence Summary, 참여자 식별정보 없는 최소 Metadata, 실제 답변과 해석의
+구분, 합성 Matrix와 실제 인터뷰의 분리, Gate C 상태의 별도 기록 중 필요한 최소
+범위만 다룬다. 개인정보·원본 녹취·참여자 식별정보는 Git에 추가하지 않는다.
 
 ## 1. Executive Summary
 
@@ -27,10 +61,10 @@ Workflow 관점에서 확인했으며 미분류 파일은 없다.
 
 1. 현재 Python 수집·분석·추천 Application Service는 삭제하거나 즉시 재배치할 대상이
    아니다. 786개 테스트와 Project Guard가 안전계약을 보호한다.
-2. Vue·FastAPI 구현의 실제 선행조건은 코드 정리가 아니라 `apps/web`·`apps/api`의
-   책임, 데이터 공급방식과 배포경계를 정하는 Architecture ADR이다.
-3. `README.md`, `PROJECT_STATUS.md`, 분석·Dataset·제품 문서 7개에는 현재 main 또는
-   확인된 증거와 맞지 않는 상태·근거 표현이 있어 구현자가 잘못된 전제를 잡을 위험이 있다.
+2. `README.md`, `PROJECT_STATUS.md`, 분석·Dataset·제품 문서 7개에는 현재 main 또는
+   확인된 증거와 맞지 않는 상태·근거 표현이 있어 먼저 정합화해야 한다.
+3. 그다음 Vue·FastAPI 구현 전에 `apps/web`·`apps/api`의 책임, 데이터 공급방식과
+   배포경계를 정하는 Architecture ADR이 필요하다.
 4. 즉시 삭제 가능한 파일과 즉시 정리 가능한 코드는 0개다. 이동·보관·인터페이스
    정리는 PM 승인과 ADR 뒤의 별도 작업이어야 한다.
 5. `RECOMMENDATION_OUTPUT_CONTRACT.md`의 v0.8.0 `PM 검토 대기`는 당시 버전 이력이다.
@@ -152,8 +186,8 @@ KEEP 85개는 아래 명시적 파일군으로 설명한다. 각 경로의 최�
 | `data/reference/pilot_spot_options.csv` | Data | 5개 Pilot Area·15개 PM 입력 Spot 선택지 | Experimental | Spot reader, Core, Service, Guard, 3 tests, Product docs | Yes | MOVE_CANDIDATE | HIGH | 공식 Area Master가 아니라 화면표시 prototype인데 `reference/`에 혼재 | HIGH | `data/prototype/pilot_spot_options.csv` | Loader 상수·Guard·Test·문서 링크를 함께 갱신 | PENDING |
 | `docs/engineering/CODEX_HARNESS_ARCHITECTURE.md` | Document | Harness 구조·문서소유권 Architecture | None | AGENTS, README, Development Workflow, ML Rules | Yes | MOVE_CANDIDATE | HIGH | 목표 `docs/architecture/` 책임과 직접 일치 | HIGH | `docs/architecture/CODEX_HARNESS_ARCHITECTURE.md` | 고정 링크·Guard 영향 확인 후 별도 이동 | PENDING |
 | `etc/데이터수집 실행 가이드.md` | Document | 비개발자용 Apps Script·Python 수집 실행가이드 | Internal | Decision Log, ML Dataset Spec | Supporting | MOVE_CANDIDATE | HIGH | 현재 `etc/`보다 Data 실행계약과 함께 탐색하는 편이 명확함; 상단 Backup 표현도 본문과 정렬 필요 | MEDIUM | `docs/data/DATA_COLLECTION_EXECUTION_GUIDE.md` | 두 inbound 링크와 내부 상대링크 갱신, 상태문장 정렬 | PENDING |
-| `interview/interview.md` | Document | Gate C 실제 인터뷰 계획 | None | 직접 inbound 없음; Analysis Plan의 Gate C 책임과 연관 | Supporting | MOVE_CANDIDATE | HIGH | 독립 root 폴더보다 분석 방법론 하위가 역할에 맞음 | MEDIUM | `docs/analysis/GATE_C_INTERVIEW_PLAN.md` | 링크 추가, 실제 인터뷰 미실행 상태 유지 | PENDING |
-| `interview/interview_matrix.md` | Document | 실제 인터뷰 전 합성 응답·코딩체계 | None | Analysis Plan Gate C | Supporting | MOVE_CANDIDATE | HIGH | 합성자료임을 유지한 채 분석문서에서 탐색돼야 함 | HIGH | `docs/analysis/GATE_C_SYNTHETIC_INTERVIEW_MATRIX.md` | Analysis Plan 링크와 “실제 결과 아님” 표현을 함께 정렬 | PENDING |
+| `interview/interview.md` | Document | Gate C 인터뷰 계획 | None | 직접 inbound 없음; Analysis Plan의 Gate C 책임과 연관 | Supporting | MOVE_CANDIDATE | HIGH | 독립 root 폴더보다 분석 방법론 하위가 역할에 맞음 | MEDIUM | `docs/analysis/GATE_C_INTERVIEW_PLAN.md` | PM 확인 수행 사실·privacy-safe Evidence Traceability·Gate C 판정을 분리해 연결 | PENDING |
+| `interview/interview_matrix.md` | Document | 공개자료 기반 합성 응답·코딩체계 | None | Analysis Plan Gate C | Supporting | MOVE_CANDIDATE | HIGH | 실제 인터뷰·직접 인용·Gate C 통과 근거가 아닌 합성자료 | HIGH | `docs/analysis/GATE_C_SYNTHETIC_INTERVIEW_MATRIX.md` | 네 경계를 보존해 Analysis Plan 링크와 함께 정렬 | PENDING |
 
 ## 9. UPDATE_REQUIRED 목록
 
@@ -163,9 +197,9 @@ KEEP 85개는 아래 명시적 파일군으로 설명한다. 각 경로의 최�
 | `PROJECT_STATUS.md` | Document | 현재 상태의 단일 운영 정본 | None | 모든 진입문서·Workflow | Yes | UPDATE_REQUIRED | HIGH | Manual V3 Intake를 `LOCAL_IMPLEMENTATION_COMPLETE_PENDING_PM_DIFF_REVIEW`, Commit·PR 없음으로 기록하지만 PR #114가 병합되고 Issue #113이 종료됨 | CRITICAL | 현재 경로 | 해당 상태와 후속 실제 Snapshot 이력을 현재 main 근거로 정렬 | PENDING |
 | `docs/analysis/ANALYSIS_PLAN.md` | Document | EG-8 분석·평가 방법론 | Internal | Dataset Spec, Output Contract, Gates | Yes | UPDATE_REQUIRED | HIGH | EG-8D를 local PM review 대기로 남기지만 PR #110·#112가 main에 반영됨; 합성 matrix를 “인터뷰 결과”로 표현함 | HIGH | 현재 경로 | main 상태 갱신, 합성자료와 실제 인터뷰를 명확히 분리 | PENDING |
 | `docs/data/ML_READY_DATASET_SPEC.md` | Document | EG-8A/8B Dataset 계약 | Experimental | EG-8A/C code, tests, Analysis, TRD | Yes | UPDATE_REQUIRED | HIGH | §2가 Python Loader와 Dataset을 모두 `NOT_IMPLEMENTED`로 기록하지만 구현·공식 Dataset·Manifest가 존재함 | HIGH | 현재 경로 | 계약은 유지하고 구현·공식 Run 상태를 Status 정본과 연결 | PENDING |
-| `docs/product/AREA_FIRST_WEB_PILOT_CONTRACT.md` | Document | D-022 Area-first Web Pilot 계약 | Product | PRD, Decision Log, Output Contract | Yes | UPDATE_REQUIRED | HIGH | “실제 프래시매니저 인터뷰로 문제 맥락을 확인”했다고 단정하지만 추적 자산에는 인터뷰 계획과 합성 응답만 있고 실제 인터뷰 증거가 없음 | HIGH | 현재 경로 | 근거를 `NOT_CONFIRMED`로 정렬하고 실제 인터뷰 완료로 오독되는 문구 제거 | PENDING |
+| `docs/product/AREA_FIRST_WEB_PILOT_CONTRACT.md` | Document | D-022 Area-first Web Pilot 계약 | Product | PRD, Decision Log, Output Contract | Yes | UPDATE_REQUIRED | HIGH | PM 확인 실제 인터뷰와 Git 정본 사이에 privacy-safe Evidence Traceability가 없음 | HIGH | 현재 경로 | 실제 인터뷰 수행 표현은 유지하고 개인정보 없는 요약·최소 Metadata·답변/해석·합성자료·Gate C 경계 중 승인된 최소 범위만 보완 | PENDING |
 | `docs/product/AREA_SPOT_RECOMMENDATION_AND_UI_POLICY.md` | Document | Area·Spot 장기정책과 초기 Pilot 정책 | Product | Output Contract, Pilot data, D-020~D-022 | Supporting | UPDATE_REQUIRED | HIGH | D-021의 시스템 Area 추천을 초기 기본 흐름으로 설명하지만 D-022가 사용자 담당 Area 직접 선택으로 대체함 | HIGH | 현재 경로 | D-022 기본 흐름과 D-021 내부 분석 이력을 분리 | PENDING |
-| `docs/product/FreshManager_PRD_v1.0.md` | Document | 공식 제품 요구사항 | Product | TRD, Status, Gates, Product contracts | Yes | UPDATE_REQUIRED | HIGH | §2.1이 “실제 프래시매니저 인터뷰로 문제 맥락을 확인”했다고 단정하지만 추적 자산의 matrix는 합성자료이며 실제 인터뷰가 아님을 명시 | HIGH | 현재 경로 | 문제 가설과 확인된 실제 증거를 분리; v1.6 `PM 검토 대기`는 별도 PM 판단 전 유지 | PENDING |
+| `docs/product/FreshManager_PRD_v1.0.md` | Document | 공식 제품 요구사항 | Product | TRD, Status, Gates, Product contracts | Yes | UPDATE_REQUIRED | HIGH | PM 확인 실제 인터뷰와 Git 정본 사이에 privacy-safe Evidence Traceability가 없음 | HIGH | 현재 경로 | 실제 인터뷰 수행 표현은 유지하고 개인정보 없는 요약·최소 Metadata·답변/해석·합성자료·Gate C 경계 중 승인된 최소 범위만 보완; v1.6 `PM 검토 대기`는 별도 PM 판단 전 유지 | PENDING |
 
 ## 10. ARCHIVE_CANDIDATE 목록
 
@@ -238,11 +272,11 @@ Archive는 삭제가 아니다. 이동할 때 역사 배너와 inbound link를 �
 | `docs/engineering/CODEX_HARNESS_ARCHITECTURE.md` | Harness 구조 | Yes | MOVE_CANDIDATE | 자체 | architecture 책임 |
 | `docs/engineering/DEVELOPMENT_WORKFLOW.md` | 병렬 개발절차 | Yes | KEEP | 자체 | Git Workflow와 범위분리 |
 | `docs/engineering/FreshManager_TRD_v1.0.md` | 기술 요구 | Yes | KEEP | 자체·Status | 구성표는 완료상태표가 아니며 Status에 위임 |
-| `docs/product/AREA_FIRST_WEB_PILOT_CONTRACT.md` | D-022 Web Pilot 계약 | Yes | UPDATE_REQUIRED | 자체·D-022 | 실제 인터뷰 근거가 추적 자산에서 미확인 |
+| `docs/product/AREA_FIRST_WEB_PILOT_CONTRACT.md` | D-022 Web Pilot 계약 | Yes | UPDATE_REQUIRED | 자체·D-022 | PM 확인 실제 인터뷰와 Git 정본 사이 privacy-safe Evidence Traceability 부재 |
 | `docs/product/AREA_SPOT_RECOMMENDATION_AND_UI_POLICY.md` | Area·Spot 정책 | Supporting | UPDATE_REQUIRED | D-022·Area-first Contract | 초기 흐름 불일치 |
 | `docs/product/AREA_SPOT_REMOTE_EVIDENCE_READINESS_ASSESSMENT.md` | 원격근거 역사평가 | No | ARCHIVE_CANDIDATE | D-020·Policy | 대체 이력 |
 | `docs/product/EG6_AREA_SPOT_PANEL.md` | 정적 13 Area Panel | Yes | KEEP | 자체 | Guard H-703 입력 |
-| `docs/product/FreshManager_PRD_v1.0.md` | 제품 요구 | Yes | UPDATE_REQUIRED | 자체 | 실제 인터뷰 근거가 추적 자산에서 미확인 |
+| `docs/product/FreshManager_PRD_v1.0.md` | 제품 요구 | Yes | UPDATE_REQUIRED | 자체 | PM 확인 실제 인터뷰와 Git 정본 사이 privacy-safe Evidence Traceability 부재 |
 | `docs/product/PILOT_AREA_SELECTION_ASSESSMENT.md` | D-021 선정조사 | No | ARCHIVE_CANDIDATE | D-021·D-022 | 현재 기본흐름 아님 |
 | `docs/product/RECOMMENDATION_OUTPUT_CONTRACT.md` | 출력계약 | Yes | KEEP | 자체 | v1.0.0, 생산 Schema 미구현 |
 | `docs/rules/CODING_RULES.md` | 코드 규칙 | Yes | KEEP | 자체 | Guard 입력 |
@@ -256,7 +290,7 @@ Archive는 삭제가 아니다. 이동할 때 역사 배너와 inbound link를 �
 | `docs/testing/QUALITY_GATES.md` | EG 진입·통과 | Yes | KEEP | 자체 | 상태는 Status에 위임 |
 | `etc/데이터수집 실행 가이드.md` | 수집 실행가이드 | Supporting | MOVE_CANDIDATE | Data Rules·Status | 위치와 일부 상태정렬 필요 |
 | `interview/interview.md` | Gate C 인터뷰 계획 | Supporting | MOVE_CANDIDATE | Analysis Plan | 분석경로로 이동 적합 |
-| `interview/interview_matrix.md` | 합성 응답 | Supporting | MOVE_CANDIDATE | 실제 인터뷰 없음 | 합성자료 표시 보존 |
+| `interview/interview_matrix.md` | 공개자료 기반 합성 응답 | Supporting | MOVE_CANDIDATE | 실제 인터뷰·직접 인용·Gate C 증거 아님 | 합성자료 표시 보존 |
 
 ## 14. Data·Manifest Matrix
 
@@ -342,8 +376,8 @@ Classification `KEEP`, Confidence `HIGH`, Proposed Target `현재 경로`, PM De
 
 | Priority | Severity | 위험 | 영향 | 최소 대응 |
 |---:|---|---|---|---|
-| 1 | MAJOR | Web/API Architecture와 데이터 공급계약 부재 | 구현이 기존 Collector·외부 Result Root·내부 Service 경계를 임의로 침범할 수 있음 | 코드 전 Architecture ADR |
-| 2 | MAJOR | 7개 정본·지원문서 상태·근거 drift | 구현자가 완료된 기능을 재구현하거나 합성 인터뷰를 실제 근거로 오독할 수 있음 | 문서 정합화 Issue |
+| 1 | MAJOR | 7개 정본·지원문서 상태·근거 drift | Architecture가 낡은 상태나 추적되지 않은 Evidence 전제를 사용할 수 있음 | 문서 정합화 Issue |
+| 2 | MAJOR | Web/API Architecture와 데이터 공급계약 부재 | 구현이 기존 Collector·외부 Result Root·내부 Service 경계를 임의로 침범할 수 있음 | 문서 정합화 뒤 Architecture ADR |
 | 3 | MINOR | 5개 자산의 책임경로 혼재 | 탐색성과 변경영향 파악 저하 | ADR 뒤 원자적 이동 |
 | 4 | MINOR | 5개 역사자산이 현행 탐색경로에 혼재 | 과거 지시를 현재 지시로 오독할 수 있음 | history 이동·배너 보존 |
 | 5 | NOTE | 내부 Module 사이 비공개 helper 호출 | 현재 시험은 통과하지만 HTTP adapter 경계로 노출하기 부적절 | API ADR 뒤 최소 내부 interface 검토 |
@@ -355,10 +389,10 @@ Classification `KEEP`, Confidence `HIGH`, Proposed Target `현재 경로`, PM De
 - MINOR: 2
 - NOTE: 1
 
-추적 자산만으로 실제 프래시매니저 인터뷰 수행 여부는 `NOT_CONFIRMED`다.
-`PM_CONFIRMATION_REQUIRED=true`이며, 확인 전에는 합성 matrix를 실제 인터뷰 또는
-Gate C 통과 증거로 사용할 수 없다. Decision Log의 D-022는 PM 결정 이력 자체이므로
-`KEEP`하되 이 근거 제한을 함께 읽어야 한다.
+실제 프래시매니저 인터뷰 수행은 `PM_CONFIRMED`이고, Git Evidence는 `NOT_TRACKED`다.
+합성 matrix는 실제 인터뷰 또는 Gate C 통과 증거가 아니며 Gate C는 별도로 평가해야
+한다. Decision Log의 D-022는 PM 결정 이력 자체이므로 `KEEP`하되 이 Evidence
+Traceability 제한을 함께 읽어야 한다.
 
 ## Code Cleanup Readiness
 
@@ -366,10 +400,15 @@ Gate C 통과 증거로 사용할 수 없다. Decision Log의 D-022는 PM 결정
 
 **0개.** 현재 코드를 삭제·이동하거나 이름만 정리할 근거가 없다.
 
-### Architecture ADR 이후에만 정리 가능한 코드
+### 최소 진입조건 충족 후에만 정리 가능한 코드
 
-세 인터페이스 seam, 중복을 제거한 **7개 생산파일**이 검토대상이다. 현재 분류는
-모두 `KEEP`이며 ADR이 실제 변경 필요성을 확정할 때만 후속 Issue를 만든다.
+아래 **7개 Interface Seam 후보 범위**는 모두 현재 `KEEP`이다. 코드 정리는 다음
+조건을 모두 충족한 뒤에만 재평가한다.
+
+1. Audit PR #145 병합
+2. 문서 7건 정합화
+3. Web/API·데이터 공급 Architecture ADR 승인·병합
+4. ADR 기준으로 Interface Seam 변경 필요성 재평가
 
 | 순위 | 코드 | 분류 | 정리방식 | 위험 | 선행조건 |
 |---:|---|---|---|---|---|
@@ -380,9 +419,6 @@ Gate C 통과 증거로 사용할 수 없다. Decision Log의 D-022는 PM 결정
 | 5 | `pilot_recommendation_service.py` | KEEP | HTTP adapter가 감쌀 최소 surface 결정 | HIGH | FastAPI schema ADR |
 | 6 | `eg8b.py`·`eg8b_b2a.py`·`eg8b_b2b.py` | KEEP | 중복 output 검증은 공통계약이 생길 때만 검토 | HIGH | Artifact root ADR |
 | 7 | `live.py` + `eg5.py` | KEEP | 유사 transport 조립을 형태만 보고 합치지 않음 | HIGH | Live approval contract 동등성 증명 |
-| 8 | `offline.py` | KEEP | Offline proof 대체 전 보관·삭제 금지 | HIGH | H-506 동등 대체 증거 |
-| 9 | 관련 EG8C·EG8D·Pilot tests | KEEP | 새 interface가 생길 때 구현호출만 교체 | HIGH | 부정시험 손실 0 증명 |
-| 10 | `freshmanager/__init__.py` | KEEP | 미래 API를 위해 export 확대하지 않음 | MEDIUM | composition-root ADR |
 
 ### 삭제하면 안 되는 보호코드
 
@@ -401,21 +437,22 @@ Runtime integration을 실행하지 않았으므로 해당 부분은 `NOT_EVALUA
 
 | Priority | 권장 제목 | 범위 | 산출물 |
 |---:|---|---|---|
-| 1 | `[Architecture] Area-first Web/API 경계와 데이터 공급 계약 확정` | Vue·FastAPI 구성, 기존 Service adapter, 외부 Result read-only 공급, Secret·배포·오류경계 | ADR 1개와 후속 구현파일 범위 |
-| 2 | `[Docs] Repository Readiness 상태·근거 불일치 7건 정합화` | UPDATE_REQUIRED 7개만 현행 main·확인된 증거와 정렬 | 기존 계약 확대 없는 문서 수정 |
-| 3 | `[Structure] prototype·architecture·analysis 문서 위치 정리` | MOVE_CANDIDATE 5개와 inbound reference | 이동·링크·Guard 검증 |
+| 1 | `[Docs] Repository 상태·근거 불일치 7건 정합화` | UPDATE_REQUIRED 7개만 현행 main·확인된 증거와 정렬 | 기존 계약 확대 없는 문서 수정 |
+| 2 | `[Architecture] Area-first Web/API 경계와 데이터 공급 계약` | Vue·FastAPI 구성, 기존 Service adapter, 외부 Result read-only 공급, Secret·배포·오류경계 | ADR 1개와 후속 구현파일 범위 |
+| 3 | `[Structure] prototype·architecture·analysis 책임경로 이동` | MOVE_CANDIDATE 5개와 inbound reference | 이동·링크·Guard 검증 |
 | 4 | `[History] 대체된 계획·조사·분석 문서 보관` | ARCHIVE_CANDIDATE 5개 | `docs/history/`와 docs index |
 
-첫 후속은 Priority 1만 권장한다. 구조이동이나 코드 cleanup을 Web/API Architecture보다
-먼저 수행할 이유는 없다.
+첫 후속은 Priority 1만 권장한다. 현재 정본 상태와 Evidence Traceability를 먼저
+정리해야 Architecture ADR이 현행 근거를 사용할 수 있다. 새 제품요구나 기술결정은
+이 문서 정합화 범위에 포함하지 않는다.
 
 ## 19. PM 결정목록
 
-1. 이 Audit의 85/5/7/5/0 분류를 검토·승인할지 결정한다.
-2. 첫 후속으로 Web/API·데이터 공급 Architecture ADR Issue를 승인할지 결정한다.
-3. 상태 drift 7건을 별도 문서 정합화 Issue로 처리할지 결정한다.
+1. 이 Audit의 85/5/7/5/0 후보분류는 승인됐다. 실제 이동·수정·보관 실행은 미승인이다.
+2. 첫 후속으로 상태·근거 drift 7건의 문서 정합화 Issue를 별도 승인할지 결정한다.
+3. 문서 정합화 뒤 Web/API·데이터 공급 Architecture ADR Issue를 승인할지 결정한다.
 4. MOVE·ARCHIVE 후보는 ADR과 링크영향 검토 뒤 별도 승인할지 결정한다.
-5. `DELETE_CANDIDATE=0`, 즉 현재 삭제작업을 만들지 않는 판단을 확인한다.
+5. `DELETE_CANDIDATE=0`이므로 현재 삭제작업을 만들지 않는다.
 
 ## 20. 전체 파일 Inventory 부록
 
