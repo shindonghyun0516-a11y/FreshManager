@@ -6,14 +6,18 @@
 
 **문서 ID:** FM-PRD-001
 
-**버전 / 상태:** v1.6 · 공식 제품 기준
+**버전 / 상태:** v1.7 · 공식 제품 기준
 
-**기준일:** 2026-07-30 (Asia/Seoul)
+**기준일:** 2026-07-31 (Asia/Seoul)
 
 **제품 책임자:** PM/PO 신동현
 
 **기술 기준:** 구현 계약은 `docs/engineering/FreshManager_TRD_v1.0.md`, 현재
 Branch·Pull Request·Issue·실행 상태는 `PROJECT_STATUS.md`를 단일 기준으로 사용
+
+**2026-07-31 변경이력:** 실제 인터뷰 수행과 Git Evidence 추적 여부, 합성
+Matrix와 Gate C 판정을 분리하고 현재 구현·미구현 경계를 Repository Readiness
+Audit과 정렬했다. D-022 초기 UX와 D-021 내부 비교기능의 책임은 유지한다.
 
 **2026-07-30 변경이력:** D-022에 따라 초기 웹 파일럿의 기본 진입 흐름을
 사용자 담당 Area 선택과 반응형 Desktop Web·Mobile Web으로 정렬했다. 사용자 화면은
@@ -21,7 +25,7 @@ Branch·Pull Request·Issue·실행 상태는 `PROJECT_STATUS.md`를 단일 기�
 D-021 Recommendation Core와 Service는 여러
 Area의 기회를 비교하는 내부 분석 기능과 구현 이력으로 유지한다. 상세는 변경 이력과
 `docs/product/AREA_FIRST_WEB_PILOT_CONTRACT.md`를 따른다. **문서 내용 버전은
-v1.6**이며, **정본 파일 경로는 기존 링크와 Project Guard 자동검사 호환성을 위해
+v1.7**이며, **정본 파일 경로는 기존 링크와 Project Guard 자동검사 호환성을 위해
 그대로 유지**한다. 파일명의 `_v1.0`은 현재 내부 문서 버전을 의미하지 않는
 **Legacy Stable Path**다.
 
@@ -76,6 +80,18 @@ EG-6A 패널을 하나의 제품 기준으로 정리한다. 제품이 무엇을 
 ### 2.1 장기 문제 가설
 
 실제 프래시매니저 인터뷰를 통해 담당 Area 안에서 판촉 위치를 판단하는 과정이 경험과 개인 노하우에 의존하는 문제 맥락을 확인했다. 따라서 PoC는 그보다 앞선 데이터 전제조건을 검증한다.
+
+```text
+actual_interview_execution_status=PM_CONFIRMED
+repository_evidence_status=NOT_TRACKED
+synthetic_matrix_status=NOT_ACTUAL_INTERVIEW_EVIDENCE
+gate_c_status=SEPARATE_EVALUATION_REQUIRED
+```
+
+Git에는 개인정보 없는 실제 Interview Evidence Summary 또는 외부 Evidence
+Reference가 아직 없다. `interview/interview_matrix.md`는 공개자료 기반
+합성자료이며 실제 인터뷰·직접 인용·Gate C 통과 근거가 아니다. 개인정보 없는
+후속 Evidence Traceability는 별도 PM 승인 대상이다.
 
 ### 2.2 현재 검증 문제
 
@@ -150,7 +166,7 @@ Eligibility와 분리해 `UNAVAILABLE`·`NOT_VERIFIED`로 표시한다.
 - G2. 원본·메타데이터·예측 스냅샷·회차 증거를 재현 가능하게 보존한다.
 - G3. 시간대·요일·장소별 반복성과 예측-후속관측 일치도를 평가할 데이터 기반을 만든다.
 - G4. 인구 기회와 혼잡 위험을 분리하고, 카드소비·날씨·S-DoT를 과대해석 없이 보조한다.
-- G5. Gate A·B 판정과 Gate C 인터뷰로 넘어갈지 결정할 수 있는 정량 리포트를 만든다.
+- G5. Gate A·B를 판정하고 Gate C 별도 평가에 필요한 정량 리포트를 만든다.
 - G6. 비개발자 PM이 실행 결과, 실패 이유, 다음 승인사항을 이해할 수 있게 한다.
 
 ### 5.2 현재 PoC 범위에 포함하는 항목 (EG-8A~EG-8E)
@@ -165,6 +181,10 @@ Eligibility와 분리해 `UNAVAILABLE`·`NOT_VERIFIED`로 표시한다.
   3시간 후 정보와 Area당 사용자 선택 Spot 3개(D-022; 반응형 Desktop Web·Mobile Web,
   상세 계약은
   `AREA_FIRST_WEB_PILOT_CONTRACT.md`, 생산 구현·실행은 별도 승인)
+
+Area-first Service·API, Vue UI, FastAPI, NAVER Map, Spot Prototype Data와 배포는
+현재 `NOT_IMPLEMENTED`다. 계약의 `main` 반영을 사용자용 Runtime 구현으로
+해석하지 않는다.
 
 상세 진입·통과조건은 `docs/testing/QUALITY_GATES.md`가 소유한다.
 
@@ -225,7 +245,7 @@ Output을 소비한다. D-022 Area-first UI는 시스템 추천 결과가 아니
   Spot별 유동인구 비교·Spot Backtesting과 머신러닝 추천(D-022의 명확히 배지된
   `PM_MANUAL` 프로토타입 표시는 이 금지대상에 포함하지 않음)
 - D-022 웹 파일럿의 Framework·Dependency·Scaffold 구현과 기술 Stack ADR 확정
-  (Repository Readiness Audit 후 별도 ADR에서만 검토)
+  (Repository Readiness Audit은 완료됐으며 별도 ADR에서만 검토)
 - hy 내부 데이터, 유료 데이터 또는 프로덕션 대규모 인프라 연동
 - 호출한도 확인 전 121개 Area 고빈도 자동수집
 - 별도 PM Live 승인 없는 실제 5분 반복수집·자동 재시도·클라우드 실행
@@ -324,7 +344,7 @@ Anchor Point다. 실제 판매 Spot 확정 데이터가 아니며, 판교역은 
 | FR-11 | P0 | 실패 격리·종료코드 | 구현 |
 | FR-12 | P0 | PM 승인·범위 통제 | 구현 |
 | FR-13 | P0 | Google Drive 자동 백업·복구 | 계획 |
-| FR-14 | P0 | 초기 AREA 추천·사용자 Spot 선택 / 장기 SPOT·AREA fallback | 계획 |
+| FR-14 | P0 | 초기 사용자 Area·Spot 선택 / 장기 SPOT·AREA fallback | 계획 |
 
 ### 8.3 FR-01 공식 기준·패널 검증
 
@@ -523,7 +543,7 @@ Context로 구성한다. D-020의 원격 근거 Eligibility를 모두 충족하�
 | --- | --- | --- | --- |
 | Gate A | 기술적 데이터 타당성 | 안정 수집, 예측 필드, 기준선 대비 유용성, POI 범위 명확성 | 현 PoC |
 | Gate B | 인구·소비 시간패턴 | 비관행 피크, 인구·소비 동행, 이동 리드타임, 반복성 | 현 PoC |
-| Gate C | 사용자 문제 타당성 | 실제 어려움, 경험 대비 가치, 담당구역·재고·시간 제약 | 후속 인터뷰 |
+| Gate C | 사용자 문제 타당성 | 실제 어려움, 경험 대비 가치, 담당구역·재고·시간 제약; `SEPARATE_EVALUATION_REQUIRED` | 별도 평가 |
 | Gate D | 현장 성과 타당성 | 추천 이동·고객 접촉·판매 증가 | 후속 실증 |
 
 ### 10.3 운영·분석 핵심 지표
@@ -663,6 +683,9 @@ Context로 구성한다. D-020의 원격 근거 Eligibility를 모두 충족하�
 | docs/testing/QUALITY_GATES.md | EG-0~EG-8 순서와 통과조건 |
 | docs/testing/PROJECT_GUARD_SPEC.md | 검사 ID·상태·종료코드의 유일한 기준 |
 | PR #54 / commit 6253cc5 완료 기록 | EG-6B 병합, 19/19 Target, 243/243 Full, Guard 41/46 PASS |
+| docs/architecture/REPOSITORY_READINESS_AUDIT.md | 실제 인터뷰·Git Evidence·합성 Matrix·Gate C 상태와 구현 부재 경계 |
+| interview/interview.md | Gate C 인터뷰 설계; 실제 수행 Evidence가 아님 |
+| interview/interview_matrix.md | 공개자료 기반 합성자료; 실제 인터뷰·직접 인용·Gate C 통과 근거가 아님 |
 
 ## 부록 A. 용어
 
@@ -687,7 +710,8 @@ Context로 구성한다. D-020의 원격 근거 Eligibility를 모두 충족하�
 
 | 버전 | 날짜 | 변경내용 | 승인상태 |
 |---|---|---|---|
-| v1.6 | 2026-07-30 | 최신 PM 결정에 따라 D-022 초기 웹 파일럿의 반응형 Desktop·Mobile 구조, 사용자 시간표현, 실제 인터뷰 문제 맥락과 Audit 이후 ADR 경계를 정렬 | PM 검토 대기 |
+| v1.7 | 2026-07-31 | 실제 인터뷰 PM 확인·Git Evidence 미추적·합성 Matrix 비증거·Gate C 별도 평가를 구분하고 D-022 초기 UX, D-021 내부 비교, 현재 Runtime 미구현 경계를 Audit과 정렬 | PM 변경 승인 |
+| v1.6 | 2026-07-30 | 최신 PM 결정에 따라 D-022 초기 웹 파일럿의 반응형 Desktop·Mobile 구조, 사용자 시간표현, 실제 인터뷰 문제 맥락과 Audit 이후 ADR 경계를 정렬 | PR #141 main 반영 |
 | v1.5 | 2026-07-30 | D-022에 따라 초기 웹 파일럿을 사용자 담당 Area 선택과 선택 Area의 현재·60분·180분 정보 조회, Spot 직접 선택 흐름으로 정렬. D-021 Core·Service는 다중 Area 비교·내부 분석 이력으로 보존 | PM 결정 D-022 |
 | v1.4 | 2026-07-29 | D-021 초기 파일럿 A안 반영. 서울시 공식 Forecast로 Area 5개·판매시간을 추천하고 Area당 대표 Spot 3개 중 사용자가 직접 선택. Spot 자동추천과 ML 추천은 초기 범위에서 제외하고 D-020 장기 목표는 유지 | PM 결정 D-021 |
 | v1.3 | 2026-07-29 | D-020에 따라 최종 제품가치를 특정 Spot·판매시간 추천으로 재확정. 원격 SPOT 추천 Eligibility와 현장·운영 적합성 상태를 분리하고 SPOT·AREA·추천 없음 하향계약을 반영 | PM 결정 D-020 |

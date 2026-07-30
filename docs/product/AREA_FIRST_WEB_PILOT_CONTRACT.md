@@ -1,17 +1,18 @@
 # Area-first Web Pilot Contract
 
 - 문서 상태: Approved
-- 버전: v0.2.0
+- 버전: v0.3.0
 - 작성자: 신동현
 - 최종 승인자: 신동현
 - 최초 작성일: 2026-07-30
-- 최종 수정일: 2026-07-30
+- 최종 수정일: 2026-07-31
 - 적용 프로젝트: Freshmanager Data PoC
 - 관련 문서:
   - [`FreshManager_PRD_v1.0.md`](FreshManager_PRD_v1.0.md)
   - [`RECOMMENDATION_OUTPUT_CONTRACT.md`](RECOMMENDATION_OUTPUT_CONTRACT.md)
   - [`DECISION_LOG.md`](../../ai-context/DECISION_LOG.md)의 D-020, D-021, D-022
   - [`PROJECT_STATUS.md`](../../PROJECT_STATUS.md)
+  - [`REPOSITORY_READINESS_AUDIT.md`](../architecture/REPOSITORY_READINESS_AUDIT.md)
 - 변경 시 PM 승인: 필요
 
 ---
@@ -65,6 +66,18 @@ official_recommendation_allowed=false
 실제 프래시매니저 인터뷰를 통해 담당 Area 안에서 판촉 위치를 판단하는 과정이 경험과
 개인 노하우에 의존하는 문제 맥락을 확인했다. 이번 파일럿은 이 문제를 바탕으로 Area
 유동정보와 Spot 비교정보를 제공하는 화면구조와 선택과정을 검토하기 위한 프로토타입이다.
+
+```text
+actual_interview_execution_status=PM_CONFIRMED
+repository_evidence_status=NOT_TRACKED
+synthetic_matrix_status=NOT_ACTUAL_INTERVIEW_EVIDENCE
+gate_c_status=SEPARATE_EVALUATION_REQUIRED
+```
+
+Git에는 개인정보 없는 실제 Interview Evidence Summary 또는 외부 Evidence
+Reference가 아직 없다. `interview/interview_matrix.md`는 공개자료 기반
+합성자료이며 실제 인터뷰·직접 인용·Gate C 통과 근거가 아니다. 후속 Evidence
+Traceability는 개인정보·원본 녹취·참여자 식별정보를 제외한 별도 PM 승인 범위다.
 
 ### 3.3 서비스 목적과 금지 표현
 
@@ -358,6 +371,10 @@ Area-first 화면은 사용자 선택 Area를 조회하는 별도 Application Se
 Audit 완료 후 별도 ADR로 공식화하기 전에는 Framework·Dependency·Scaffold를
 구현하거나 확정하지 않는다.
 
+현재 Area-first Service·API, Vue UI, FastAPI, NAVER Map, Spot Prototype Data와
+배포는 모두 `NOT_IMPLEMENTED`다. Vue·FastAPI는 Audit의 목표구조일 뿐 별도 ADR
+전의 공식 기술 Stack이 아니다.
+
 ## 16. PM 확인 대기 항목
 
 다음 지도 기본값은 `PM_CONFIRMATION_REQUIRED`다.
@@ -383,12 +400,14 @@ Area별 접근권한과 제한배포 방식도 후속 결정이다. 미결정값
 - 13개 UI 상태와 지도·위치 실패 Fallback이 정의됨
 - 개인정보 비저장과 모바일 기준이 정의됨
 - D-020·D-021 구현 이력과 기존 Core·Service가 보존됨
-- 코드·데이터·UI·지도·API·배포가 구현되지 않음
+- Area-first Service·API, Spot Prototype Data, Vue UI·FastAPI·NAVER Map·배포가
+  구현되지 않음
 - PM 문서 검토 완료
 
 ## 18. 변경 이력
 
 | 버전 | 날짜 | 변경내용 | 승인상태 |
 |---|---|---|---|
+| v0.3.0 | 2026-07-31 | 실제 인터뷰 PM 확인과 Git Evidence 미추적, 합성 Matrix 비증거, Gate C 별도 평가를 구분하고 Audit 목표구조와 현재 미구현 Runtime 경계를 명시 | PM 변경 승인 |
 | v0.2.0 | 2026-07-30 | 최신 PM 결정에 따라 반응형 Desktop·Mobile Layout, 사용자 시간표현, 중앙값 기반 Area 증감, EG-8D 최신성 재사용, 실제 인터뷰 근거와 Audit 이후 ADR 경계를 반영 | PR #141 main 반영 |
 | v0.1.0 | 2026-07-30 | D-022 Area-first 초기 웹 파일럿의 제품·UI·데이터 표시 계약 초안 | PM 검토 대기 |

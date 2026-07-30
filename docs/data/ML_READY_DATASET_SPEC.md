@@ -1,11 +1,11 @@
 # ML-ready Dataset Spec
 
 - 문서 상태: Draft
-- 버전: v0.7.3
+- 버전: v0.7.4
 - 작성자: 신동현
 - 최종 승인자: 신동현
 - 최초 작성일: 2026-07-24
-- 최종 수정일: 2026-07-27
+- 최종 수정일: 2026-07-31
 - 적용 프로젝트: Freshmanager Data PoC
 - 관련 문서:
   - `AGENTS.md`
@@ -31,11 +31,20 @@ Runtime이 쓰는 v3 source sheets를 입력으로 하는 ML-ready 데이터셋�
 
 ## 2. 현재 구현 상태
 
-- Python Loader: `NOT_IMPLEMENTED`
-- ML-ready Dataset: `NOT_IMPLEMENTED`
+- Python Loader·Schema Validation·Normalization: `IMPLEMENTATION_AVAILABLE_ON_MAIN`
+- Quality Report·Dataset Manifest·최종 Output Writer:
+  `IMPLEMENTATION_AVAILABLE_ON_MAIN`
+- EG-8A Gate: `IN_PROGRESS`
+- 공식 EG-8C Dataset·Manifest: `AVAILABLE_AS_EXTERNAL_IMMUTABLE_OUTPUT`
+- EG-8C 모델 비교: `COMPLETED` · 서울시 Forecast
+  `BASELINE_RETAINED` · 자체 ML `NOT_ADOPTED`
+- Production Model·Serving·Registry·Monitoring: `NOT_IMPLEMENTED`
 
-이 문서는 구현 결과가 아니라 목표 계약이다. 실제 Spreadsheet 접근, Loader 코드,
-정규화 코드는 이 문서만으로 승인되지 않으며 별도 Issue와 PM 승인이 필요하다.
+이 문서는 Dataset 계약을 소유하며 변동하는 Run·Issue·PR 상태는
+`PROJECT_STATUS.md`를 단일 기준으로 확인한다. 기존 공식 Dataset Profile과 신규
+공식 재평가 Dataset Profile은 서로 다른 불변 Run으로 공존하며, 신규 Profile이
+기존 Profile을 수정·삭제·대체하지 않는다. 공식 Dataset·Manifest와 모델 비교
+산출물은 저장소 밖 실행 Output이며 Git에 추적하지 않는다.
 
 ## 3. 입력 Source와 용어
 
@@ -44,6 +53,15 @@ Runtime이 쓰는 v3 source sheets를 입력으로 하는 ML-ready 데이터셋�
 - `raw_log_v3`
 - `population_current_v3`
 - `population_forecast_v3`
+
+Source 역할은 다음처럼 구분한다.
+
+| Source Type | 역할 |
+|---|---|
+| `SPREADSHEET_V3_SOURCE` | 읽기 전용 원본 입력 |
+| `GIT_TEST_FIXTURE` | 합성 정상·오류·경계 시험 입력이며 운영 증거가 아님 |
+| `EXTERNAL_IMMUTABLE_DATASET_OUTPUT` | 저장소 밖 공식 Dataset·Manifest Run; no-overwrite |
+| `EXTERNAL_MODELING_OUTPUT` | 잠정 모델 비교 산출물; Production Model이 아님 |
 
 이 문서와 후속 구현에서는 다음 용어만 정본으로 사용한다.
 
@@ -387,12 +405,10 @@ Loader V0은 다음 다섯 파일을 산출한다. 전부 Python 표준 라이�
 | Quality Report | JSON | §10/§13 품질 항목 산출 결과 |
 | Dataset Manifest | JSON | 입력·출력 파일 SHA-256, `dataset_version`, Loader 버전(§4.1) |
 
-저장 위치는 저장소 밖 외부 output-root(EG-6B/EG-7과 동일한 관례, env var
-후보 `FRESHMANAGER_EG8A_OUTPUT_ROOT`)를 우선 권고하며, 대안으로 이미
-`.gitignore`가 제외하는 `data/raw/`·`data/processed/`·`data/quality/`
-경로도 후보다. 두 후보 모두 §3.1의 Source Snapshot과 이 절의 Loader
-Output을 분리된 하위 경로로 유지해야 한다. 최종 경로는 실제 구현 Issue에서
-PM이 승인한다.
+공식 실행의 저장 위치는 PM이 승인한 저장소 밖 기존 output-root다. Source
+Snapshot과 Loader Output은 분리된 하위 경로에 두고, 실행마다 새 Run을 배타적으로
+생성하며 기존 Final Dataset·Manifest를 수정·삭제·덮어쓰지 않는다. 저장소 내부
+`data/`는 공식 Dataset·Manifest 공개 위치로 사용하지 않는다.
 
 ### 12.2 EG-8C 공식 Output Run 실행 경계
 
@@ -587,6 +603,7 @@ Spot은 위치 식별 정보는 `Confirmed`이지만 전부 `field_verified=fals
 
 | 버전 | 날짜 | 변경내용 | 작성자 | 승인상태 |
 |---|---|---|---|---|
+| v0.7.4 | 2026-07-31 | Loader·정규화·Manifest Writer의 main 구현, 저장소 밖 기존·신규 공식 Dataset Profile의 불변 공존, EG-8C 비교 완료·서울시 Forecast Baseline 유지와 Production ML 미구현 상태를 계약과 분리해 정렬. Schema·Feature·Label·Leakage 계약은 불변 | 신동현 | PM 변경 승인 |
 | v0.7.3 | 2026-07-27 | 공식 지원 경계를 CLI와 `run_eg8c_dataset_build`로 명시하고 Final 공개 생명주기는 Builder가 소유하도록 정렬. 동일 프로세스 임의 코드 실행은 현 PoC 위협 범위 밖이며 내부 Writer·Rename은 비지원 구현 세부사항임을 명시. 실제 Snapshot 함수 기반 동일 바이트·파일 교체 시험과 공개 Builder의 안전한 구조화 경로 오류 계약을 §12.2에 추가. 공개 산출물 8개와 Schema는 불변 | 신동현 | PM 결정 |
 | v0.7.2 | 2026-07-27 | 공식 공개 진입점을 `run_eg8c_dataset_build` 하나로 단일화하고 기존 공개 Writer·외부 승인 객체 전달을 제거. 같은 이진 Snapshot 바이트의 Hash·크기·JSON 해석 계약, 내부 Writer의 미공개 Staging 전용 책임, Final 직전 존재·파일형식·Symlink·Hash·크기·identity 재검증 후 즉시 배타적 Rename을 §12.2에 명시. 기존 공개 산출물 8개와 Schema는 불변 | 신동현 | PM 결정 |
 | v0.7.1 | 2026-07-27 | 공식 Builder의 Acceptance Contract 필수화, 전 계층 JSON 중복 Key 거부, 불변 Contract 내용과 승인 판단 연결, 행 식별자 집합 검증, Publish 경계 최종 무결성 재검증, 단일 제한 CLI 오류 경계를 §12.2에 보강. 기존 공개 산출물 8개와 Schema는 불변 | 신동현 | PM 결정 |

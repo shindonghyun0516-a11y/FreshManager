@@ -1,21 +1,25 @@
 # Area·Spot 판매 추천과 지도 UI 정책
 
 - 상태: `PM_APPROVED`
-- 기준일: 2026-07-29
-- 관련 Issue: #124, #126, #128, #129, #132
+- 기준일: 2026-07-31
+- 관련 Issue: #124, #126, #128, #129, #132, #140, #146
 - 상위 Issue: #99
-- 선행 결정: D-018, D-020, D-021
+- 선행 결정: D-018, D-020, D-021, D-022
 
-이 문서는 D-021 초기 파일럿의 Area·판매시간 추천과 사용자 Spot 선택 지원,
-D-020 장기 원격 SPOT 추천의 제품 정책을 함께 정의한다. 정책 문서일 뿐 UI,
-추천 계산, 지도 API 또는 사용자 게시를 구현하거나 승인하지 않는다. 추천 결과의
-필드·null·fallback 계약은 `docs/product/RECOMMENDATION_OUTPUT_CONTRACT.md`가 소유한다.
+이 문서는 D-022 초기 Area-first 사용자 선택 흐름, D-021 다중 Area 비교의 내부
+분석 이력과 D-020 장기 원격 SPOT 추천 정책을 함께 정의한다. 정책 문서일 뿐 UI,
+추천 계산, 지도 API 또는 사용자 게시를 구현하거나 승인하지 않는다. 초기 화면의
+상세 정본은 `AREA_FIRST_WEB_PILOT_CONTRACT.md`, 추천 결과의 필드·null·fallback
+계약은 `RECOMMENDATION_OUTPUT_CONTRACT.md`가 소유한다.
 
 ## 1. 서비스 목적
 
-초기 파일럿은 서울시 공식 현재·예측 유동인구로 5개 Area와 판매시간을 추천하고,
-Area별 대표 Spot 3개 중 이동할 지점을 사용자가 직접 고르게 돕는다. 특정 Spot을
-자동 추천하거나 Spot별 유동인구·밀집도를 비교하지 않는다.
+초기 파일럿은 사용자가 승인된 5개 중 담당 Area를 직접 선택하고, 선택 Area의
+서울시 공식 현재·1시간 후·3시간 후 정보와 대표 Spot 3개를 확인해 이동할 지점을
+직접 고르게 돕는다. Area·Spot 자동추천은 없으며, Spot별 값은 명확히 배지된
+`PM_MANUAL` 프로토타입으로만 Area 공식 데이터와 분리해 표시한다. D-021
+Core·Service는 다중 Area 비교 내부 분석 기능으로 보존하며 Area-first 기본 UX나
+Primary API가 아니다.
 
 장기 목표는 Area 안의 복수 Spot을 유동인구·밀집도·반복패턴으로 비교해 특정
 Spot과 판매시간을 추천하는 것이다. 원격 SPOT 추천은 현장 운영 적합성 보장과
@@ -23,9 +27,9 @@ Spot과 판매시간을 추천하는 것이다. 원격 SPOT 추천은 현장 운
 
 ## 2. Area 정의
 
-Area는 판매기회와 유효 판매시간을 탐색하는 넓은 구역이다. Area 화면은 현재
-유동인구, 미래 유동인구 변화, 시간대별 평균, 밀집시간과 다른 Area 대비 기회
-수준을 제공한다.
+Area는 판매기회와 유효 판매시간을 탐색하는 넓은 구역이다. 초기 화면은 사용자가
+선택한 Area의 현재·1시간 후·3시간 후 정보를 제공한다. D-021 내부 분석은
+서울시 공식 Forecast 기반 다중 Area 기회 비교로 제한한다.
 강남역, 여의도, 잠실역, 구로디지털단지역 등이 예다.
 
 Area 값은 Area 전체의 관측·예측 근거다. 특정 출구나 Spot의 직접 유동인구 또는
@@ -59,10 +63,11 @@ Spot 비교와 순위 산정이 불가능하며, 최종 Spot 추천도 계산할
 
 ## 4. 사용자 흐름
 
-### 4.1 초기 파일럿 A안
+### 4.1 초기 Area-first 파일럿
 
-1. 서비스가 서울시 공식 Forecast로 Area와 판매시간을 추천한다.
-2. 추천 Area의 대표 Spot 3개를 같은 수준의 선택지로 표시한다.
+1. 사용자가 승인된 5개 중 담당 Area를 직접 선택한다.
+2. 선택 Area의 서울시 공식 현재·1시간 후·3시간 후 정보와 대표 Spot 3개를
+   같은 수준의 선택지로 표시한다.
 3. 사용자가 이동할 Spot을 직접 선택한다.
 4. 현장검증·운영 적합성 미확인 상태와 한계를 함께 표시한다.
 
@@ -79,8 +84,8 @@ Spot 비교와 순위 산정이 불가능하며, 최종 Spot 추천도 계산할
 
 초기 파일럿에서 허용하는 문구는 다음과 같다.
 
-> 강남역 Area는 12시 30분부터 13시 30분 사이 유동인구가 높아질 것으로
-> 예상됩니다. 판매 후보 Spot은 강남스퀘어, CGV강남 앞, 점프밀라노 앞입니다.
+> 사용자가 선택한 강남역 Area의 현재·1시간 후·3시간 후 공식 정보가 표시됩니다.
+> 판매 후보 Spot은 강남스퀘어, CGV강남 앞, 점프밀라노 앞입니다.
 > 이동할 Spot을 선택해 주세요.
 
 다음 문구는 Spot별 직접근거와 자동추천이 없는 초기 파일럿에서 금지한다.
@@ -196,7 +201,7 @@ Spot 근거(`DIRECT_SENSOR`)까지 충족한 미래 상태를 설명하는 조�
 
 ## 8. 장기 원격 데이터 기반 SPOT 추천 Eligibility
 
-이 절은 D-020 장기 자동추천 조건이다. D-021 초기 파일럿 Area 5개 선정이나
+이 절은 D-020 장기 자동추천 조건이다. D-022 초기 Area 선택이나
 `USER_SELECTABLE_OPTION` 3개 구성의 Hard Filter로 사용하지 않는다.
 
 원격 SPOT 추천은 다음을 모두 요구한다.
@@ -219,9 +224,13 @@ S-DoT 존재나 후보 수만으로 추천하지 않는다. 운영 적합성·�
 
 ### 초기 파일럿
 
-1. 서울시 공식 Forecast로 5개 Area 중 판매기회와 판매시간을 판단한다.
-2. 해당 Area의 대표 Spot 3개를 순위 없이 표시한다.
+1. 사용자가 승인된 5개 중 담당 Area를 직접 선택한다.
+2. 선택 Area의 서울시 공식 현재·1시간 후·3시간 후 정보와 대표 Spot 3개를
+   순위 없이 표시한다.
 3. 사용자가 이동할 Spot을 직접 선택한다.
+
+D-021 Recommendation Core·Service의 서울시 Forecast 기반 다중 Area 비교는
+내부 분석 기능과 구현 이력으로만 유지한다.
 
 ### 장기 원격 SPOT 추천
 
@@ -246,13 +255,18 @@ Spot 근거가 부족하고 Area 근거만 충분하면 `AREA`와 `fallback_reas
 초기 파일럿 정책값은 다음과 같다.
 
 ```text
-recommendation_type=AREA
-recommendation_basis=SEOUL_OFFICIAL_FORECAST
-recommendation_forecast_source=SEOUL_OFFICIAL_FORECAST
+area_selection_mode=USER_CHOICE
+area_auto_recommendation=false
 spot_selection_mode=USER_CHOICE
 spot_auto_recommendation=false
 machine_learning_used_for_recommendation=false
+official_recommendation_allowed=false
+data_status=PROTOTYPE
+input_method=PM_MANUAL
 ```
+
+서울시 공식 값은 Area 정보로만 표시하고 `PM_MANUAL` Spot 프로토타입 값과
+분리한다. 이 사용자 선택 흐름은 Recommendation Output이 아니다.
 
 다음은 장기 D-020 원격 SPOT 평가값이다.
 
@@ -278,10 +292,15 @@ Output Contract를 따른다.
 ## 11. 지도 UI 구조
 
 - 지도에 Area 범위와 Spot 핀을 서로 다른 형태로 표시한다.
-- 초기 파일럿은 추천 Area와 판매시간을 먼저 표시하고, 대표 Spot 3개를 같은
-  수준의 사용자 선택지로 표시한다. 추천·1위·기본선택 표시는 하지 않는다.
+- 초기 파일럿은 사용자가 선택한 Area의 공식 정보와 대표 Spot 3개를 같은 수준의
+  사용자 선택지로 표시한다. 추천·1위·기본선택 표시는 하지 않는다.
 - 사용자가 고른 Spot은 사용자 선택임을 표시하며 시스템 추천으로 바꾸지 않는다.
-- Area·Spot 검색목록과 시간 선택을 제공한다.
+- 승인된 Area 선택과 Spot 선택의 상세 UI는
+  `AREA_FIRST_WEB_PILOT_CONTRACT.md`를 따른다.
+
+다음 지도 상태·상세·분석 이동 항목은 D-020 장기 후속 후보이며 D-022 초기
+파일럿 계약이나 구현 완료상태가 아니다.
+
 - Spot 핀은 원격 데이터 기반 SPOT 추천, 판매 후보, 정보 없음, 원격 근거 확인 중,
   추천 제외를 구분한다.
 - Spot 클릭 시 팝업 또는 모바일 하단 상세창에서 Area 정보, Spot 정보, 추천 근거,
@@ -291,31 +310,18 @@ Output Contract를 따른다.
 
 ## 12. 시간 표시 정책
 
-초기 추천 Forecast Source는 서울시 공식 예측자료다. 기존 머신러닝 비교실험은
-보존하지만 `machine_learning_used_for_recommendation=false`를 적용한다.
-
-수집주기는 고정 5분이다. 화면 표시 Horizon은 현재·30·60·90·120·150·180분이고
-60·120·180분을 주요 시점으로 강조한다. 현재 머신러닝 Horizon은 60·180분이다.
-30분은 수집주기가 아니라 화면의 미래 표시시점이다.
-
-- 30분: 직접 미래 예상값이 없으면 **현재 제공하지 않음**으로 표시한다.
-- 90·150분: 정확히 해당 시점 자료가 있을 때만 표시한다.
-- 60·120·180분: 정확한 자료가 있을 때 주요 시점으로 표시한다.
-- 중간값이나 가장 가까운 시점으로 대체하지 않는다.
-- 현재 머신러닝 평가범위는 60·180분만 유지한다.
-- 머신러닝 120분 확대는 별도 PM 승인사항이다.
-
-60·120·180분 값과 90·150분 값은 서로 다른 기준시각에서 생성될 수 있으며, 모든
-Horizon이 같은 기준시각에 존재한다고 가정하지 않는다. 각 값에는 기준시각과 예측
-대상시각을 각각 표시한다. 서로 다른 기준시각에서 생성된 값을 하나의 연속
-예측선으로 연결하거나 직접적인 변화추세로 비교하지 않는다. 동일 기준시각의 값만
-직접 비교하며, 기준시각이 다르면 개별 예측 스냅샷으로 표시한다.
+초기 Area 정보의 Forecast Source는 서울시 공식 예측자료다. 기존 머신러닝
+비교실험은 보존하지만 `machine_learning_used_for_recommendation=false`를
+적용한다. 사용자 화면은 현재·1시간 후·3시간 후를 표시하고 내부
+`horizon_minutes=60`·`180`을 유지한다. 기준시각·대상시각·최신성과
+미제공 처리의 상세 계약은 `AREA_FIRST_WEB_PILOT_CONTRACT.md`를 따른다.
 
 ## 13. 자료 부족 시 대체안
 
-D-021 초기 파일럿의 `AREA`는 SPOT 추천 실패에 따른 fallback이 아니라 의도된
-기본 추천단위다. 대표 Spot 3개는 사용자 선택지이며 SPOT Eligibility를 통과했다고
-보지 않는다. 다음 하향규칙은 D-020 장기 추천에 적용한다.
+D-022 초기 사용자 Area·Spot 선택은 Recommendation Output이나 fallback이 아니다.
+D-021 내부 다중 Area 비교의 `AREA` 결과도 SPOT 추천 실패에 따른 fallback이
+아니다. 대표 Spot 3개는 사용자 선택지이며 SPOT Eligibility를 통과했다고 보지
+않는다. 다음 하향규칙은 D-020 장기 추천에만 적용한다.
 
 1. Spot 원격 근거 Eligibility를 충족하면 `SPOT`과 판매시간을 추천한다.
 2. Spot 근거가 부족하고 신뢰 가능한 Area 근거만 있으면 `AREA` 안내와
@@ -361,9 +367,10 @@ D-021 초기 파일럿의 `AREA`는 SPOT 추천 실패에 따른 fallback이 아
 
 ## 18. 다음 PM 승인사항
 
-다음 한 단계는 Issue #132의 5개 Area·Area당 사용자 선택 Spot 3개 정적 Master
-구현을 Draft PR에서 PM이 검토하는 것이다. UI 구현, 추천 실행, 동적 근거 수집과 사용자 게시에는
-각각 별도 승인이 필요하다.
+정적 Master와 D-021 Core·Service, D-022 계약은 `main`에 있다. 이 문서 정합화는
+Area-first Service·API, Vue UI, FastAPI, NAVER Map, Spot Prototype Runtime,
+추천 실행 또는 배포를 승인하지 않는다. 해당 구현에는 Architecture ADR과 별도
+PM 승인이 필요하다.
 
 ## 관련 정본
 
