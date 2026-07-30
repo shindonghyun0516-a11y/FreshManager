@@ -6,7 +6,7 @@
 단일 운영 기준이다. 제품 목적은 PRD, 기술 계약은 TRD, 검사 ID와 판정은
 `docs/testing/PROJECT_GUARD_SPEC.md`를 따른다.
 
-마지막 동기화 시각: `2026-07-30` (Asia/Seoul)
+마지막 동기화 시각: `2026-07-31` (Asia/Seoul)
 
 ## 2. 현재 요약
 
@@ -36,6 +36,9 @@
 - 초기 파일럿 Area 추천 Core: `AVAILABLE_ON_MAIN`(Issue #134, PR #135)
 - 초기 파일럿 Recommendation Service: `AVAILABLE_ON_MAIN`(Issue #136, PR #137)
 - Area-first 웹 파일럿 계약: `AVAILABLE_ON_MAIN`(D-022, Issue #140, PR #141)
+- Repository Readiness Audit: `APPROVED_AUDIT_BASELINE` on `main`
+  (Issue #144, PR #145) —
+  `KEEP 85 / MOVE 5 / UPDATE 7 / ARCHIVE 5 / DELETE 0`
 - Spot 자동 추천: `DEFERRED_AFTER_INITIAL_PILOT`
 - 24시간 Scheduler(로컬 EG-7 Live 파일럿 확대 기준): `NOT_IMPLEMENTED`
 - ML 학습: `COMPARISON_COMPLETED_NOT_ADOPTED`; 추천 사용 `false`
@@ -90,9 +93,10 @@ PM이 장기 기준으로 확정한 5분 주기의 EG-7 1시간 파일럿 Contro
   - Source Reader·Schema Validation·Normalization: `IMPLEMENTATION_AVAILABLE_ON_MAIN`(PR #84)
   - Duplicate Detector·Quality Report·Dataset Manifest·최종 Output Writer: `IMPLEMENTATION_AVAILABLE_ON_MAIN`(PR #86, Issue #85)
   - 실제 오류 응답 기반 검증: `NOT_COMPLETED`(합성 Fixture 오류 경로만 테스트 통과, 실 v3 CSV Smoke는 정상 경로만 확인)
-- Manual V3 Snapshot Intake: `LOCAL_IMPLEMENTATION_COMPLETE_PENDING_PM_DIFF_REVIEW`
-  (Issue #113) — 합성 CSV로만 구현·검증했으며 실제 운영 CSV 반입, Commit·Push·PR,
-  Apps Script·Dataset·ML 실행은 하지 않음
+- Manual V3 Snapshot Intake: `AVAILABLE_ON_MAIN`(Issue #113
+  `CLOSED · COMPLETED`, PR #114 `MERGED`) — 구현과 합성 CSV 검증이
+  `main`에 있다. 실제 Snapshot 반입·운영 실행 여부는 구현 완료와 분리된 외부
+  실행 이력으로 확인하며, 이 상태만으로 실제 Intake 실행을 뜻하지 않는다.
 - EG-8B Dataset Profile·시간 커버리지·Forecast-Current Exact Join(B1): `IMPLEMENTATION_AVAILABLE_ON_MAIN`(PR #88, Issue #87)
 - EG-8B Phase 1 Read-only 준비도 분석(ML-ready Dataset·EDA·Forecast 평가·Baseline 가능성): `COMPLETED`
 - ML-ready Dataset: `LOCKED_OFFICIAL_RUN_2` — Run ID `eg8c-20260727T153257-kst`,
@@ -447,13 +451,17 @@ H-707은 구현과 함께 `PASS`로 활성화됐지만 이는 합성 계약 검�
 - 확인 방법: 세션 시작 시 `local main`과 `origin/main`을 조회·비교
 - 주의: 문서에 기록된 과거 SHA를 현재 HEAD로 가정하지 않음
 - PR #71: `MERGED`
+- PR #114: `MERGED`
 - PR #130: `MERGED`
 - PR #131: `MERGED`
 - PR #133: `MERGED`
 - PR #135: `MERGED`
 - PR #137: `MERGED`
 - PR #141: `MERGED`
+- PR #145: `MERGED`
 - Issue #70: `CLOSED`
+- Issue #113: `CLOSED · COMPLETED`
+- Issue #144: `CLOSED · COMPLETED`
 - Issue #69: `OPEN`
 - Issue #129: `CLOSED`
 - Issue #128: `CLOSED`
@@ -471,14 +479,13 @@ H-707은 구현과 함께 `PASS`로 활성화됐지만 이는 합성 계약 검�
 
 ## 10. 다음 행동
 
-현재 최우선 한 단계는 읽기 전용 Repository Readiness Audit이다. Audit은 현재
-파일과 책임을 `KEEP`·`MOVE_CANDIDATE`·`UPDATE_REQUIRED`·`ARCHIVE_CANDIDATE`·
-`DELETE_CANDIDATE`로 분류해 PM 결정자료를 만드는 작업이며, 이번 상태 동기화에서
-분류·이동·삭제를 실행하지 않는다.
-파일 이동·삭제·리팩터링·Root 재구성·Scaffold·Dependency 변경은 Audit 완료 뒤
-별도 승인 범위에서만 수행한다. Area-first Service·API, Vue UI, FastAPI, NAVER Map,
-Spot Prototype Data·배포·사용자 파일럿은 구현 완료 상태가 아니다. 기술 Stack은
-Audit 이후 별도 ADR에서만 공식화한다. 아래 EG-7 Live 결정은 독립 backlog로 유지한다.
+Repository Readiness Audit은 Issue #144·PR #145로 승인·`main` 반영됐다.
+승인된 7개 문서 정합화가 `main`에 반영된 뒤의 다음 한 단계는
+`[Architecture] Area-first Web/API 경계와 데이터 공급 계약` ADR이다.
+파일 이동·삭제·리팩터링·Root 재구성·Scaffold·Dependency 변경은 별도 승인
+범위에서만 수행한다. Area-first Service·API, Vue UI, FastAPI, NAVER Map,
+Spot Prototype Runtime·배포·사용자 파일럿은 구현 완료 상태가 아니다. 기술 Stack은
+별도 ADR에서만 공식화한다. 아래 EG-7 Live 결정은 독립 backlog로 유지한다.
 
 현재 OPEN 또는 미생성 결정:
 
@@ -494,14 +501,6 @@ Audit 이후 별도 ADR에서만 공식화한다. 아래 EG-7 Live 결정은 독
 - Expansion Timing: `OPEN`
 
 5분 장기 주기는 `CLOSED · PM_APPROVED_FIXED`이며 OPEN 결정이 아니다.
-
-Repository Readiness Audit 순서:
-
-1. 현재 Repository를 읽기 전용으로 조사한다.
-2. 파일별 `KEEP`·`MOVE_CANDIDATE`·`UPDATE_REQUIRED`·`ARCHIVE_CANDIDATE`·
-   `DELETE_CANDIDATE`와 근거를 보고한다.
-3. PM이 분류와 후속 변경범위를 별도로 승인한다.
-4. 승인 뒤 필요한 파일 변경과 기술 Stack ADR을 별도 작업으로 진행한다.
 
 EG-7 Live 독립 backlog 순서:
 
@@ -538,7 +537,9 @@ Plan·`pilot_run_id`·Batch ID·Plan fingerprint는 아직 존재하지 않는�
 보존한다. Issue #132·PR #133의 정적 Master, Issue #134·PR #135의 추천 Core와
 Issue #136·PR #137의 Recommendation Service는 `main`에 있다. D-022의 Area-first
 웹 파일럿 계약은 Issue #140·PR #141로 승인되어 `main`에 있으며, 코드·Service·API·
-Vue UI·FastAPI·NAVER Map·Spot Prototype Data·배포는 미구현이다. 추천 실행은
-0건이고 다음 작업은 읽기 전용 Repository Readiness Audit이다. 기술 Stack은 Audit
-이후 별도 ADR에서만 공식화한다. EG-7 Live preflight는 독립 backlog이며 EG-7 구현
+Vue UI·FastAPI·NAVER Map·Spot Prototype Runtime·배포는 미구현이다. 추천 실행은
+0건이다. Repository Readiness Audit은 PR #145로 승인·`main` 반영됐으며,
+승인된 문서 정합화 뒤의 다음 작업은 Area-first Web/API 경계와 데이터 공급
+Architecture ADR이다. 기술 Stack은 별도 ADR에서만 공식화한다. EG-7 Live
+preflight는 독립 backlog이며 EG-7 구현
 Branch를 다시 만들지 않는다.

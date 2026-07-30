@@ -1,11 +1,11 @@
 # Analysis Plan
 
 - 문서 상태: Draft
-- 버전: v0.1.10
+- 버전: v0.1.11
 - 작성자: 신동현
 - 최종 승인자: 신동현
 - 최초 작성일: 2026-07-17
-- 최종 수정일: 2026-07-29
+- 최종 수정일: 2026-07-31
 - 적용 프로젝트: Freshmanager Data PoC
 - 관련 문서:
   - `AGENTS.md`
@@ -204,8 +204,10 @@ Spot Candidate Evaluation은 EG-8D가 계승한 기존 EG-8 정의와 동일하�
 
 미래 Area 인구 예측과 피크 발생 여부·예상 피크시각을 다루는 모델링은
 EG-8C(미래 Area 인구·피크 예측 모델)에 대응한다. EG-8C는 EG-8B가 만든 Baseline
-(B0/B1/B2/서울시 공식 예측) 대비 성능이 확인된 뒤에만 채택하며, 모델 알고리즘
-자체는 §29.1에서 `OPEN_DECISION`으로 남긴다.
+(B0/B1/B2/서울시 공식 예측) 대비 성능이 확인된 뒤에만 채택한다. 승인된
+Linear·Ridge 비교와 신규 공식 Dataset 재평가는 완료됐고 서울시 Forecast
+Baseline을 유지했으며 자체 ML은 채택하지 않았다. 새 모델 후보는 별도 Test
+구간·추가 데이터와 PM 승인 뒤에만 다시 검토한다.
 
 ML-ready 데이터셋의 상세 스키마·버전 계약은 `docs/data/ML_READY_DATASET_SPEC.md`
 가, Recommendation 결과 출력 계약은 `docs/product/RECOMMENDATION_OUTPUT_CONTRACT.md`가
@@ -950,6 +952,8 @@ Regression은 채택하지 않고 현재 PoC의 추가 조정을 종료한다. �
 
 ### 29.2 EG-8D Area 예상 유동인구 변화 순서
 
+이 기능은 Issue #109·PR #110으로 `main`에 반영됐다.
+
 EG-8C에서 잠정 유지한 서울시 Forecast와 잠긴 EG-8C Run #2 입력 Snapshot으로
 승인된 13개 Area의 60분·180분 후 예상 유동인구 변화 순서를 각각 계산한다. 현재와
 미래 인구 대표값은 범위의 중간값을 사용하고, 예상 증가 인구는 미래 중간값에서
@@ -969,6 +973,8 @@ Origin과 같은 정본 시각으로 사용해 가장 최신인 회차를 선택
 동률이면 임의 선택하지 않고 실패한다.
 
 #### 29.2.1 Horizon별 데이터 최신성 잠정 Gate
+
+이 Gate는 Issue #111·PR #112로 `main`에 반영됐다.
 
 Area 계산 뒤 실제 표시와 후속 사용 가능 여부는 `evaluation_time`을 기준으로
 60분·180분 Horizon별로 따로 판정한다. 모든 시각은 `Asia/Seoul` timezone-aware
@@ -1072,7 +1078,7 @@ Spot·S-DoT·이동시간·담당구역·판매량·매출·구매전환·추천
 EG-8D의 Spot Candidate Evaluation과 EG-8E 공식 출력 계약 적용은 별도 PM 승인 후
 진행한다.
 
-**상태: `LOCAL_IMPLEMENTATION_COMPLETE_PENDING_PM_REVIEW`**
+**상태: `IMPLEMENTATION_AVAILABLE_ON_MAIN` · 결과 `PROVISIONAL` · 공식 Recommendation 아님**
 
 ---
 
@@ -1111,7 +1117,14 @@ Gate C는 사용자 가치와 현장 활용 가능성을 평가한다.
 - 업무 방해 가능성
 - 신규·고성과·저성과·이탈 사례 비교
 
-추가 인터뷰는 수행하지 않는다. `interview_matrix.md`에 정리된 인터뷰 결과를 Gate C 판단 근거로 사용하되, 해당 결과는 사용자 문제와 의사결정 요구에 대한 검토 근거이며 실제 현장 사용성이나 판매 성과를 검증한 결과로 해석하지 않는다.
+현재 근거상태는 다음과 같다.
+
+| Source Type | 상태와 사용 경계 |
+|---|---|
+| `PM_CONFIRMATION` | `actual_interview_execution_status=PM_CONFIRMED`; 실제 인터뷰 수행 사실만 확인 |
+| `GIT_TRACKED_REPOSITORY_EVIDENCE` | `repository_evidence_status=NOT_TRACKED`; 개인정보 없는 실제 Evidence Summary·외부 참조 없음 |
+| `SYNTHETIC_SUPPORTING_MATERIAL` | `synthetic_matrix_status=NOT_ACTUAL_INTERVIEW_EVIDENCE`; `interview/interview_matrix.md`는 공개자료 기반 합성자료이며 실제 인터뷰·직접 인용·Gate C 통과 근거가 아님 |
+| `GATE_C_EVALUATION` | `gate_c_status=SEPARATE_EVALUATION_REQUIRED`; 실제 인터뷰 수행 사실만으로 Gate C 통과를 선언하지 않음 |
 
 ---
 
@@ -1276,6 +1289,7 @@ ANALYSIS_PLAN은 다음 조건을 만족해야 Approved 상태로 전환할 수 
 
 | 버전 | 날짜 | 변경내용 | 작성자 | 승인상태 |
 |---|---|---|---|---|
+| v0.1.11 | 2026-07-31 | PR #110·#112의 EG-8D 구현상태와 EG-8C 서울시 Forecast Baseline 유지 결론을 반영하고, 실제 인터뷰 PM 확인·Git Evidence 미추적·합성 Matrix 비증거·Gate C 별도 평가 경계를 분리 | 신동현 | PM 변경 승인 |
 | v0.1.10 | 2026-07-29 | §29.1에 신규 공식 데이터 재평가를 과거 결과와 구분해 추가; Ridge `alpha=100.0` 고정, 서울시 미래 예상값 기준 예측 유지, 자체 모델 미채택·추가 조정 종료와 재검토 조건 기록 | 신동현 | PM 최종 결정 |
 | v0.1.9 | 2026-07-28 | EG-8D 공개 Runtime의 평가시각·모드 주입을 제거하고, Runtime 전용 시스템 시계 경로와 RUNTIME을 금지한 내부 감사·합성 주입경로, Current-only 행 유형과 합성 D2/E2 비운영 식별 계약을 §29.2.1에 반영 | 신동현 | PM 변경내용 검토 전 |
 | v0.1.8 | 2026-07-28 | EG-8D 60분·180분 Horizon별 `evaluation_time` 기반 최신성 잠정 Gate와 생산 Builder의 Current-only 전용 계약·Runtime 통합시험·사례 D/E를 §29.2.1에 추가; 공식 Recommendation과 수집 스키마는 변경하지 않음 | 신동현 | PM 변경내용 검토 전 |

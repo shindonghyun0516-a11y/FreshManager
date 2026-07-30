@@ -10,8 +10,9 @@
 서울시 주요 121장소를 장기 공식 후보군으로 유지하되, 현재는 EG-6A에서 확정한
 13개 Area 패널의 수집·분석 가능성을 먼저 검증한다. EG-6B 첫 실제 단일 회차와
 백업 검증은 완료됐다. 5분은 PM이 확정한 장기 반복수집 기준이며, EG-7의 1시간·
-12회차는 이 고정 주기의 첫 통제 검증이다. Issue #70에서 Controller와 파생 인덱스를
-오프라인 구현 중이며, 실제 반복수집은 별도 PM Live 승인 전까지 금지한다.
+12회차는 이 고정 주기의 첫 통제 검증이다. EG-7 Controller와 파생 인덱스는
+Issue #70·PR #71로 `main`에 반영됐으며, 실제 반복수집은 별도 PM Live 승인 전까지
+금지한다.
 
 ### 공식 문서 안내
 
@@ -61,8 +62,12 @@
 - 실제 EG-6B 13개 Area 단일 회차: 13/13 성공·품질 PASS·백업 무결성 PASS
 - Issue #57: EG-6B 최종 Closeout 완료 후 CLOSED
 - Google Drive 자동 백업: 독립 Backup Worker 구현·검증 완료, PM 원격 동기화 확인 완료
-- EG-7: 5분 장기 기준 PM 확정, Issue #70에서 첫 1시간·12회차 안전성 검증
-  Controller와 ML-ready 파생 인덱스를 오프라인 구현 중
+- EG-7: 5분 장기 기준 PM 확정, Controller와 ML-ready 파생 인덱스
+  `IMPLEMENTATION_AVAILABLE_ON_MAIN`; 첫 1시간 Live `NOT_STARTED`
+- Area-first 제품·UI·데이터 계약은 D-022·PR #141로 승인·`main` 반영됐고,
+  Recommendation Core·Service도 PR #135·#137로 `main`에 있다. Area-first
+  Service·API, Vue UI, FastAPI, NAVER Map, Spot Prototype Runtime과 배포는
+  `NOT_IMPLEMENTED`다. 세부 변동상태는 `PROJECT_STATUS.md`를 따른다.
 
 ### 현재 분석 범위
 
@@ -101,7 +106,7 @@ MVP Workstream의 데이터 필요성을 확인한 뒤 별도 PM 승인으로 12
 ```text
 장기 후보군: 서울시 주요 121장소
 현재 MVP: 1개 Area → 대표 3개 Area → 13개 Area 패널
-현재 Gate: EG-6B 완료 / EG-7 승인 범위의 오프라인 구현·독립 검토 준비
+현재 Gate: EG-6B 완료 / EG-7 구현 완료(main)·Live 독립 backlog 유지
 후속 검토: EG-7·EG-8과 별도 승인된 Recommendation MVP Workstream 결과 후 필요 시 121개 확대
 ```
 
@@ -236,7 +241,9 @@ POI001부터 POI121까지 자동 생성
 - 첫 EG-6B 실제 Batch 13/13 성공, 품질 PASS, 로컬 복사 무결성과 PM 원격 동기화 확인 완료
 - Issue #67·PR #68에서 `.DS_Store` 검증 경계 보정·병합 후 EG-6B 최종 Closeout 완료
 - Issue #69에서 EG-7 5분·1시간·12회차 범위 승인
-- Issue #70에서 EG-7 Controller·파생 인덱스·H-707 오프라인 구현
+- Issue #70·PR #71에서 EG-7 Controller·파생 인덱스·H-707 구현·검증 후
+  `main` 반영, Issue #70 종료
+- Repository Readiness Audit을 Issue #144·PR #145로 승인·`main` 반영
 - `AGENTS.md` 생성
 - Codex의 `AGENTS.md` 인식 확인
 
@@ -245,7 +252,7 @@ POI001부터 POI121까지 자동 생성
 
 ### 진행 예정
 
-- EG-7 Controller·계획 스키마·잠금·로그·파생 인덱스의 독립 검토와 CI
+- Repository 문서 정합화 뒤 Area-first Web/API 경계와 데이터 공급 Architecture ADR
 - 실제 날짜·시각·할당량·운영 ID·계획 지문에 대한 별도 PM 결정
 - PM Live 승인 후에만 동일 13개 Area의 5분·1시간 파일럿 실행 검토
 - 첫 Batch 품질 감사 결과를 기준으로 Raw-to-CSV Exporter 별도 검토
@@ -257,15 +264,15 @@ POI001부터 POI121까지 자동 생성
 - EG-7 실제 5분·1시간 반복수집
 - 실제 운영 계획과 12개 운영 Batch ID 생성·승인
 - 동적 S-DoT 수집
-- Spot 평가·Recommendation
-- ML 학습
+- Spot 자동추천·공식 Recommendation 실행
+- 공식 모델 채택
 - 24시간 Scheduler·영구 백그라운드 서비스·자동 재시도
 - CSV Exporter
-- EG-8D Area Feature·선택적 S-DoT Feature와 Spot Candidate Evaluation
-- Recommendation MVP Workstream(`PLANNED`, Gate number `NOT_ASSIGNED`)
+- EG-8D 선택적 S-DoT Feature와 Spot Candidate Evaluation
+- Recommendation MVP의 사용자용 Runtime·공식 출력 활성화
 - 121장소 자동수집
 - 장기 데이터 누적
-- 장소별 예측 성능 비교
+- 장기 다일자·별도 Test 기반 장소별 예측 성능 평가
 - 카드소비 상권현황 분석
 - Gate A·B·C 데이터 PoC 판정
 - 모바일 서비스 개발
@@ -380,8 +387,8 @@ Issue #32 PM 결정에 따라 이전 최소 계약의 `parser_version` 대신
 | EG-5 | 유형별 대표 3장소 | 통과: POI019·POI013·POI014 실제 수집 3/3, 재시도 0회와 구조 분석 완료 |
 | EG-6A | 13개 Area·Spot·S-DoT 패널 | 통과: Issue #51·PR #52로 13개 고유 공식 Area 패널 `main` 반영 |
 | EG-6B | 동일 13개 Area 단일 수집 | 통과: 첫 실제 Batch 13/13·품질·백업 무결성·원격 동기화 확인과 Closeout 완료 |
-| EG-7 | 동일 13개 Area 반복수집 파일럿 | 구현 중: Issue #69 승인 범위에 따라 Issue #70에서 오프라인 Controller·파생 인덱스 구현; Live 미승인 |
-| EG-8(상위) | 데이터 분석·예측·추천 준비 상위 Gate(EG-8A~8E); 기존 EG-8 정의는 EG-8D가 계승 | 미진행: 상세는 `docs/testing/QUALITY_GATES.md` 참조 |
+| EG-7 | 동일 13개 Area 반복수집 파일럿 | 구현 완료(`main`): Issue #70·PR #71; 첫 Live `NOT_STARTED` |
+| EG-8(상위) | 데이터 분석·예측·추천 준비 상위 Gate(EG-8A~8E); 기존 EG-8 정의는 EG-8D가 계승 | `NOT_STARTED`; 하위 구현·실행 상태는 `PROJECT_STATUS.md` 참조 |
 | Recommendation MVP Workstream | SPOT 우선·AREA fallback 추천 | `PLANNED`; Gate number `NOT_ASSIGNED`, 별도 PM 승인 필요 |
 
 EG-1과 EG-2는 Project Guard 구현 전의 읽기 전용 사전검증이다.
