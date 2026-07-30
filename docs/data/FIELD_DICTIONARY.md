@@ -79,7 +79,7 @@
 | `backup_receipts` | Batch별 로컬 Sync 복사·검증 상태 | 구현·Fake/실제 Batch 검증 완료; Worker는 원격 완료 상태를 생성하지 않음 |
 | `eg7_pilot_plans` | 12회차 불변 계획과 Live Gate 상태 | 구현·합성 검증 완료; 운영 계획은 생성하지 않음 |
 | `pilot_area_recommendations` | D-021 5개 Area의 60·180분 독립 추천 결과 | Issue #134·PR #135로 main에 구현; 저장·게시 산출물 없음 |
-| `pilot_recommendation_view_models` | 한 Horizon의 AREA 추천과 사용자 Spot 선택 상태 | Issue #136 Branch의 메모리 반환만 구현; 저장 없음 |
+| `pilot_recommendation_view_models` | 한 Horizon의 AREA 추천과 사용자 Spot 선택 상태 | Issue #136·PR #137로 main에 구현; 메모리 반환만 사용하며 저장 없음 |
 | `eg7_execution_events` | 파일럿 상태전이 append-only 로그 | 구현·합성 검증 완료; 실제 실행 기록 없음 |
 | `eg7_slot_index` | 계획 12회차의 종결·호출·Backup 파생 인덱스 | CSV·JSONL 구현·합성 검증 완료 |
 | `eg7_area_observation_index` | 실제 시도 Area의 관측·Forecast·무결성·중복 파생 인덱스 | 최대 156행 CSV·JSONL 구현·합성 검증 완료 |
