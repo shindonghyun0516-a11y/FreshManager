@@ -39,6 +39,11 @@
 - Repository Readiness Audit: `APPROVED_AUDIT_BASELINE` on `main`
   (Issue #144, PR #145) —
   `KEEP 85 / MOVE 5 / UPDATE 7 / ARCHIVE 5 / DELETE 0`
+- Repository Readiness 문서 7건 정합화: `AVAILABLE_ON_MAIN`
+  (Issue #146 완료, PR #147 병합)
+- Area-first Web/API Architecture ADR: `DRAFT_PENDING_PM_REVIEW`
+  (ADR-012, Issue #148) — 문서 검토 단계이며 코드·Scaffold·Dependency·API·UI·배포는
+  구현되지 않음
 - Spot 자동 추천: `DEFERRED_AFTER_INITIAL_PILOT`
 - 24시간 Scheduler(로컬 EG-7 Live 파일럿 확대 기준): `NOT_IMPLEMENTED`
 - ML 학습: `COMPARISON_COMPLETED_NOT_ADOPTED`; 추천 사용 `false`
@@ -459,9 +464,12 @@ H-707은 구현과 함께 `PASS`로 활성화됐지만 이는 합성 계약 검�
 - PR #137: `MERGED`
 - PR #141: `MERGED`
 - PR #145: `MERGED`
+- PR #147: `MERGED`
 - Issue #70: `CLOSED`
 - Issue #113: `CLOSED · COMPLETED`
 - Issue #144: `CLOSED · COMPLETED`
+- Issue #146: `CLOSED · COMPLETED`
+- Issue #148: `OPEN`
 - Issue #69: `OPEN`
 - Issue #129: `CLOSED`
 - Issue #128: `CLOSED`
@@ -479,13 +487,14 @@ H-707은 구현과 함께 `PASS`로 활성화됐지만 이는 합성 계약 검�
 
 ## 10. 다음 행동
 
-Repository Readiness Audit은 Issue #144·PR #145로 승인·`main` 반영됐다.
-승인된 7개 문서 정합화가 `main`에 반영된 뒤의 다음 한 단계는
-`[Architecture] Area-first Web/API 경계와 데이터 공급 계약` ADR이다.
+Repository Readiness Audit은 Issue #144·PR #145로, 승인된 7개 문서 정합화는
+Issue #146·PR #147로 `main`에 반영됐다. 현재 다음 한 단계는 Issue #148의
+`[Architecture] Area-first Web/API 경계와 데이터 공급 계약` ADR에 대한 PM 검토다.
 파일 이동·삭제·리팩터링·Root 재구성·Scaffold·Dependency 변경은 별도 승인
 범위에서만 수행한다. Area-first Service·API, Vue UI, FastAPI, NAVER Map,
 Spot Prototype Runtime·배포·사용자 파일럿은 구현 완료 상태가 아니다. 기술 Stack은
-별도 ADR에서만 공식화한다. 아래 EG-7 Live 결정은 독립 backlog로 유지한다.
+ADR-012가 `PROPOSED` 상태로 문서화했으며 PM 승인 전 구현에 착수하지 않는다. 아래
+EG-7 Live 결정은 독립 backlog로 유지한다.
 
 현재 OPEN 또는 미생성 결정:
 
@@ -538,8 +547,9 @@ Plan·`pilot_run_id`·Batch ID·Plan fingerprint는 아직 존재하지 않는�
 Issue #136·PR #137의 Recommendation Service는 `main`에 있다. D-022의 Area-first
 웹 파일럿 계약은 Issue #140·PR #141로 승인되어 `main`에 있으며, 코드·Service·API·
 Vue UI·FastAPI·NAVER Map·Spot Prototype Runtime·배포는 미구현이다. 추천 실행은
-0건이다. Repository Readiness Audit은 PR #145로 승인·`main` 반영됐으며,
-승인된 문서 정합화 뒤의 다음 작업은 Area-first Web/API 경계와 데이터 공급
-Architecture ADR이다. 기술 Stack은 별도 ADR에서만 공식화한다. EG-7 Live
+0건이다. Repository Readiness Audit은 PR #145로, 문서 7건 정합화는 PR #147로
+`main`에 반영됐다. 현재 Issue #148의 Area-first Web/API 경계와 읽기 전용 데이터
+공급 ADR-012가 `DRAFT_PENDING_PM_REVIEW`이며 코드·Scaffold·Dependency·API·UI·배포는
+미구현이다. EG-7 Live
 preflight는 독립 backlog이며 EG-7 구현
 Branch를 다시 만들지 않는다.
