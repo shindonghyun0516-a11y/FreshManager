@@ -1,6 +1,6 @@
 # Area-first Web/API Architecture
 
-- Status: `DRAFT · PROPOSED`
+- Status: `APPROVED · ACCEPTED`
 - Decision record: `ADR-012`
 - Related Issue: `#148`
 - Baseline: `main` at `3740daead8a02964316ed0ba36284ed7f157a6e8`

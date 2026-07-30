@@ -194,7 +194,7 @@ Decision Record, 기술 구조 결정 기록) 형식으로 보존한다. 현행 
 
 ## ADR-012 — Area-first Web/API 경계와 읽기 전용 데이터 공급
 
-- Status: `PROPOSED`
+- Status: `ACCEPTED`
 - Context: D-022 Area-first 웹 파일럿은 사용자가 담당 Area를 직접 선택하는 조회
   흐름이며 D-021 다중 Area Recommendation Service와 책임이 다르다. UI 구현 전에
   Web/API, 기존 Python Package와 저장소 밖 불변 데이터의 의존방향을 고정해야 한다.
@@ -215,7 +215,7 @@ Decision Record, 기술 구조 결정 기록) 형식으로 보존한다. 현행 
   따른다. 이 ADR PR은 문서·전체시험·Project Guard만 검증하고 구현은 후속 Issue로
   분리한다.
 - Related decision: D-020, D-021, D-022, ADR-011.
-- Related work: Issue #148; 이 ADR을 검토하는 Draft PR(번호는 생성 후 GitHub 기록에서 확인).
+- Related work: Issue #148, PR #149.
 
 ## 2. ADR 갱신 규칙
 
