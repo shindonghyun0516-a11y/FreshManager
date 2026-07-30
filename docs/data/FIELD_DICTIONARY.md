@@ -1,11 +1,11 @@
 # Field Dictionary
 
 - 문서 상태: Draft
-- 버전: v0.1.6
+- 버전: v0.1.7
 - 작성자: 신동현
 - 최종 승인자: 신동현
 - 최초 작성일: 2026-07-17
-- 최종 수정일: 2026-07-29
+- 최종 수정일: 2026-07-30
 - 적용 프로젝트: Freshmanager Data PoC
 - 관련 문서:
   - `AGENTS.md`
@@ -78,7 +78,8 @@
 | `collection_logs` | 수집 성공·실패 기록 | EG-6B Batch Log·Manifest 구현·첫 실제 13개 Area 회차 확인 |
 | `backup_receipts` | Batch별 로컬 Sync 복사·검증 상태 | 구현·Fake/실제 Batch 검증 완료; Worker는 원격 완료 상태를 생성하지 않음 |
 | `eg7_pilot_plans` | 12회차 불변 계획과 Live Gate 상태 | 구현·합성 검증 완료; 운영 계획은 생성하지 않음 |
-| `pilot_area_recommendations` | D-021 5개 Area의 60·180분 독립 추천 결과 | Issue #134 Branch의 메모리 내 Core만 구현; 저장·게시 산출물 없음 |
+| `pilot_area_recommendations` | D-021 5개 Area의 60·180분 독립 추천 결과 | Issue #134·PR #135로 main에 구현; 저장·게시 산출물 없음 |
+| `pilot_recommendation_view_models` | 한 Horizon의 AREA 추천과 사용자 Spot 선택 상태 | Issue #136 Branch의 메모리 반환만 구현; 저장 없음 |
 | `eg7_execution_events` | 파일럿 상태전이 append-only 로그 | 구현·합성 검증 완료; 실제 실행 기록 없음 |
 | `eg7_slot_index` | 계획 12회차의 종결·호출·Backup 파생 인덱스 | CSV·JSONL 구현·합성 검증 완료 |
 | `eg7_area_observation_index` | 실제 시도 Area의 관측·Forecast·무결성·중복 파생 인덱스 | 최대 156행 CSV·JSONL 구현·합성 검증 완료 |
@@ -420,6 +421,30 @@ D-021 초기 파일럿은 D-020의 하향 결과가 아니라 처음부터 의�
 
 대상은 `POI032`, `POI088`, `POI014`, `POI025`, `POI072` 정확히 5개다. 이 Core는
 Backend·UI·배포·Database 저장 또는 EG-8D/추천 산출물 게시를 수행하지 않는다.
+
+Issue #136 Application Service의 최상위 ViewModel 필드는 다음과 같다. 모든
+리스트와 객체는 Python 표준 `json`으로 직렬화 가능한 값만 사용한다.
+
+| 필드 | 자료형·허용값 | 의미 |
+|---|---|---|
+| `view_status` | Enum | `AVAILABLE_UNSELECTED`, `AVAILABLE_SELECTED`, `NO_RECOMMENDATION`, `INVALID_SELECTION`, `INPUT_INVALID` |
+| `horizon_minutes` | 정수 `60`·`180` 또는 `null` | 선택 Horizon; 허용되지 않은 입력이면 `null` |
+| `recommendation_status` | `AVAILABLE`·`UNAVAILABLE` | Core의 AREA 추천 상태 |
+| `pilot_recommendation_allowed` | Boolean | 파일럿 AREA 추천 표시 허용 여부 |
+| `official_recommendation_allowed` | Boolean `false` | 공식 추천·게시를 허용하지 않음 |
+| `machine_learning_used_for_recommendation` | Boolean `false` | 서울시 공식 Forecast를 사용하고 ML을 사용하지 않음 |
+| `reason_code` | 문자열 또는 `null` | Core 이유 또는 `INVALID_HORIZON`, `INPUT_INVALID`, `INVALID_SELECTION` |
+| `reason_codes` | 문자열 배열 | Core 이유를 보존하고 필요한 입력·선택 오류를 추가 |
+| `warning_message` | 문자열 또는 `null` | Core의 제한된 경고 |
+| `area` | 객체 또는 `null` | Area 코드·이름, 현재·예측 최소·최대·중간값, 예상 변화·변화율 |
+| `sales_time` | 객체 또는 `null` | 예측 기준시각·대상시각·Horizon과 `FORECAST_TARGET_POINT` 표시방식 |
+| `spot_options` | 객체 배열 | 현재 추천 Area의 순위·기본선택 없는 정확히 3개 Option |
+| `selected_spot` | 객체 또는 `null` | 사용자가 유효하게 선택한 Option 전체정보 |
+| `limitations` | 문자열 배열 | 현재 Option의 기존 `limitations`를 중복 없이 전달 |
+
+`area`는 Core의 Area 필드 10개만, `sales_time`은 `prediction_origin_at`,
+`recommendation_target_at`, `horizon_minutes`, `display_mode`만 사용한다. 판매 시작·
+종료시각, Spot 순위·점수·추천근거·인구·혼잡도·기본선택 필드는 생성하지 않는다.
 
 ---
 
@@ -780,7 +805,8 @@ Field Dictionary v0.1은 다음 조건을 만족해야 한다.
 
 | 버전 | 날짜 | 변경내용 | 작성자 | 승인상태 |
 |---|---|---|---|---|
-| v0.1.6 | 2026-07-29 | Issue #134 D-021 메모리 내 초기 AREA 추천 필드와 D-020 장기 AREA fallback 예외를 반영 | 신동현 | Draft PR 검토 대기 |
+| v0.1.7 | 2026-07-30 | Issue #136 초기 파일럿 Application Service의 JSON-safe ViewModel·선택 상태·Area·예측 대상시각·비저장 필드를 반영 | 신동현 | PM 검토 대기 |
+| v0.1.6 | 2026-07-29 | Issue #134 D-021 메모리 내 초기 AREA 추천 필드와 D-020 장기 AREA fallback 예외를 반영 | 신동현 | PR #135 main 반영 |
 | v0.1.5 | 2026-07-23 | Plan 시각 의미 정규화·ACTIVE 장기 기준 필드·Forecast canonical 정렬 집합 계약과 H-707 비교표 반영 | 신동현 | PR #71 변경요청 보완 |
 | v0.1.4 | 2026-07-23 | EG-7 plan·summary v2의 고정 5분 결정 필드와 중복 기반 주기 변경 금지 반영 | 신동현 | PM 최종 결정 |
 | v0.1.3 | 2026-07-23 | EG-6B·Backup 현재 상태와 EG-7 계획·사건·Slot/Area Index·Summary 필드·표현·중복 계약 반영 | 신동현 | PM 구현 범위 승인 |
