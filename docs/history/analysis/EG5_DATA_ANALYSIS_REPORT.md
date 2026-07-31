@@ -2,9 +2,9 @@
 
 > **문서 역할**  이 보고서는 EG-5 실제 대표 3장소 수집 결과의 역사적 분석 증거다.
 > 현재 제품 단계와 다음 실행 승인은
-> [`FreshManager_PRD_v1.0.md`](../product/FreshManager_PRD_v1.0.md),
-> [`FreshManager_TRD_v1.0.md`](../engineering/FreshManager_TRD_v1.0.md)와
-> [`PROJECT_STATUS.md`](../../PROJECT_STATUS.md)를 따른다.
+> [`FreshManager_PRD_v1.0.md`](../../product/FreshManager_PRD_v1.0.md),
+> [`FreshManager_TRD_v1.0.md`](../../engineering/FreshManager_TRD_v1.0.md)와
+> [`PROJECT_STATUS.md`](../../../PROJECT_STATUS.md)를 따른다.
 
 ## 1. 보고서 상태
 
@@ -376,4 +376,4 @@ Forecast는 구조적으로 사용할 수 있지만 실제 예측시점의 후�
 - 원본·metadata 수정·삭제: 0건
 - 코드·테스트·Harness 수정: 0건
 - 모델 개발 또는 학습: 0건
-- 생성 산출물: `docs/analysis/EG5_DATA_ANALYSIS_REPORT.md` 1개
+- 생성 산출물: `docs/history/analysis/EG5_DATA_ANALYSIS_REPORT.md` 1개

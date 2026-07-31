@@ -11,7 +11,7 @@
   - `AGENTS.md`
   - `docs/product/FreshManager_PRD_v1.0.md`
   - `docs/engineering/FreshManager_TRD_v1.0.md`
-  - `requirements-definition-freshmanager-poc-v0.4.md` (역사 문서)
+  - `docs/history/requirements/requirements-definition-freshmanager-poc-v0.4.md` (역사 문서)
   - `docs/rules/DATA_COLLECTION_RULES.md`
   - `docs/analysis/ANALYSIS_PLAN.md`
   - `docs/data/CLOUD_BACKUP_AND_CSV_MANAGEMENT_PLAN.md`

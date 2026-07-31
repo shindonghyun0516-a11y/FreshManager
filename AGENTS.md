@@ -726,7 +726,7 @@ PM의 최종 승인 전에는 main 브랜치 병합 또는
 7. 작업 관련 Rule·Quality Gate·Data·Analysis 문서
 8. `ai-context/DECISION_LOG.md`의 관련 Decision
 9. `ai-context/ARCHITECTURE_DECISIONS.md`의 관련 ADR
-10. `docs/engineering/CODEX_HARNESS_ARCHITECTURE.md`
+10. `docs/architecture/CODEX_HARNESS_ARCHITECTURE.md`
 
 `PROJECT_STATUS.md`가 현재 상태 복원의 공식 운영 문서다. AI Context 문서는 이를
 대체하지 않으며 PRD·TRD·Rule·코드·테스트와 충돌하면 해당 정본과 실제 검증 증거를
@@ -738,7 +738,7 @@ PM의 최종 승인 전에는 main 브랜치 병합 또는
 |---|---|
 | `FreshManager_PRD_v1.0.md` | 무엇을 왜 만들며 어떤 결과를 성공으로 볼지 정의하는 공식 제품 기준 |
 | `FreshManager_TRD_v1.0.md` | PRD를 현재 구현·데이터·보안·검증 계약으로 변환하는 공식 기술 기준 |
-| `requirements-definition-freshmanager-poc-v0.4.md` | PRD v1.0 이전의 역사적 요구사항 기준선; 현행 실행 기준으로 사용하지 않음 |
+| `docs/history/requirements/requirements-definition-freshmanager-poc-v0.4.md` | PRD v1.0 이전의 역사적 요구사항 기준선; 현행 실행 기준으로 사용하지 않음 |
 | `DATA_COLLECTION_RULES.md` | 데이터 수집·보존·결측·반복주기 분야 규칙 |
 | `QUALITY_GATES.md` | EG 단계의 진입·통과와 다음 단계 전환 조건 |
 | `PROJECT_GUARD_SPEC.md` | 검사 ID·상태·종료코드의 유일한 기준 |

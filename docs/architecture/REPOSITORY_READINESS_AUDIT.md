@@ -9,7 +9,20 @@
 
 이 보고서는 Vue·FastAPI 기반 Area-first 웹 파일럿 구현 전 Git 추적 자산의 현재
 역할과 준비도를 분류한다. PM은 분류를 승인했지만 기존 파일의 수정·이동·삭제 또는
-구현 실행은 승인하지 않았다.
+구현 실행은 이 Audit 시점에는 승인하지 않았다. 아래 분류와 `PENDING`은 Issue #144
+기준의 역사적 감사결과다.
+
+## Issue #150 사후 실행상태
+
+Issue #150의 별도 PM 승인에 따라 문서 이동 4건과 History 보관 5건을 현재 Draft에
+반영했다. 아래 Inventory의 경로는 이동 후 경로로 정렬했지만, 분류값은 당시
+Audit의 판단근거를 보존한다. 이 Draft가 병합되기 전 실행상태는
+`DRAFT_PENDING_PM_REVIEW`다.
+
+- 문서 이동 4건: `MOVED_IN_ISSUE_150_DRAFT`
+- History 보관 5건: `ARCHIVED_IN_ISSUE_150_DRAFT`
+- `data/reference/pilot_spot_options.csv`: `MOVE_CANDIDATE` 유지, 이번 범위에서 미이동
+- 파일 삭제: 0건
 
 ## PM 승인 범위
 
@@ -35,7 +48,7 @@ Inventory 각 행의 `PM Decision=PENDING`은 해당 파일의 실제 이동·�
 
 실제 프래시매니저 인터뷰 수행 사실은 PM이 확인했다. 다만 Git 추적자산에는 실제
 인터뷰 원문·요약·참여기록 또는 개인정보 없는 외부 증거 참조가 없어 정본 간
-Evidence Traceability가 부족하다. `interview/interview_matrix.md`는 공개자료 기반
+Evidence Traceability가 부족하다. `docs/analysis/GATE_C_SYNTHETIC_INTERVIEW_MATRIX.md`는 공개자료 기반
 합성자료이며 실제 인터뷰, 실제 직접 인용 또는 Gate C 통과 근거가 아니다. 실제
 인터뷰 수행 사실만으로 Gate C 통과를 판정하지 않는다.
 
@@ -178,16 +191,17 @@ KEEP 85개는 아래 명시적 파일군으로 설명한다. 각 경로의 최�
 
 ## 8. MOVE_CANDIDATE 목록
 
-이 목록은 이동 승인이 아니다. Inbound reference와 Guard·Test를 같은 후속 변경에서
-원자적으로 갱신해야 한다.
+이 목록은 Issue #144 Audit 당시의 후보분류다. Issue #150 Draft에서는 문서 4건과
+Inbound reference를 함께 이동·갱신했고, Data 파일인
+`data/reference/pilot_spot_options.csv`만 미실행 후보로 남았다.
 
 | Path | Type | Current Role | Runtime Role | References | Source of Truth | Classification | Confidence | Evidence | Risk | Proposed Target | Required Follow-up | PM Decision |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
 | `data/reference/pilot_spot_options.csv` | Data | 5개 Pilot Area·15개 PM 입력 Spot 선택지 | Experimental | Spot reader, Core, Service, Guard, 3 tests, Product docs | Yes | MOVE_CANDIDATE | HIGH | 공식 Area Master가 아니라 화면표시 prototype인데 `reference/`에 혼재 | HIGH | `data/prototype/pilot_spot_options.csv` | Loader 상수·Guard·Test·문서 링크를 함께 갱신 | PENDING |
-| `docs/engineering/CODEX_HARNESS_ARCHITECTURE.md` | Document | Harness 구조·문서소유권 Architecture | None | AGENTS, README, Development Workflow, ML Rules | Yes | MOVE_CANDIDATE | HIGH | 목표 `docs/architecture/` 책임과 직접 일치 | HIGH | `docs/architecture/CODEX_HARNESS_ARCHITECTURE.md` | 고정 링크·Guard 영향 확인 후 별도 이동 | PENDING |
-| `etc/데이터수집 실행 가이드.md` | Document | 비개발자용 Apps Script·Python 수집 실행가이드 | Internal | Decision Log, ML Dataset Spec | Supporting | MOVE_CANDIDATE | HIGH | 현재 `etc/`보다 Data 실행계약과 함께 탐색하는 편이 명확함; 상단 Backup 표현도 본문과 정렬 필요 | MEDIUM | `docs/data/DATA_COLLECTION_EXECUTION_GUIDE.md` | 두 inbound 링크와 내부 상대링크 갱신, 상태문장 정렬 | PENDING |
-| `interview/interview.md` | Document | Gate C 인터뷰 계획 | None | 직접 inbound 없음; Analysis Plan의 Gate C 책임과 연관 | Supporting | MOVE_CANDIDATE | HIGH | 독립 root 폴더보다 분석 방법론 하위가 역할에 맞음 | MEDIUM | `docs/analysis/GATE_C_INTERVIEW_PLAN.md` | PM 확인 수행 사실·privacy-safe Evidence Traceability·Gate C 판정을 분리해 연결 | PENDING |
-| `interview/interview_matrix.md` | Document | 공개자료 기반 합성 응답·코딩체계 | None | Analysis Plan Gate C | Supporting | MOVE_CANDIDATE | HIGH | 실제 인터뷰·직접 인용·Gate C 통과 근거가 아닌 합성자료 | HIGH | `docs/analysis/GATE_C_SYNTHETIC_INTERVIEW_MATRIX.md` | 네 경계를 보존해 Analysis Plan 링크와 함께 정렬 | PENDING |
+| `docs/architecture/CODEX_HARNESS_ARCHITECTURE.md` | Document | Harness 구조·문서소유권 Architecture | None | AGENTS, README, Development Workflow, ML Rules | Yes | MOVE_CANDIDATE | HIGH | 목표 `docs/architecture/` 책임과 직접 일치 | HIGH | `docs/architecture/CODEX_HARNESS_ARCHITECTURE.md` | 고정 링크·Guard 영향 확인 후 별도 이동 | PENDING |
+| `docs/data/DATA_COLLECTION_EXECUTION_GUIDE.md` | Document | 비개발자용 Apps Script·Python 수집 실행가이드 | Internal | Decision Log, ML Dataset Spec | Supporting | MOVE_CANDIDATE | HIGH | 현재 `etc/`보다 Data 실행계약과 함께 탐색하는 편이 명확함; 상단 Backup 표현도 본문과 정렬 필요 | MEDIUM | `docs/data/DATA_COLLECTION_EXECUTION_GUIDE.md` | 두 inbound 링크와 내부 상대링크 갱신, 상태문장 정렬 | PENDING |
+| `docs/analysis/GATE_C_INTERVIEW_PLAN.md` | Document | Gate C 인터뷰 계획 | None | 직접 inbound 없음; Analysis Plan의 Gate C 책임과 연관 | Supporting | MOVE_CANDIDATE | HIGH | 독립 root 폴더보다 분석 방법론 하위가 역할에 맞음 | MEDIUM | `docs/analysis/GATE_C_INTERVIEW_PLAN.md` | PM 확인 수행 사실·privacy-safe Evidence Traceability·Gate C 판정을 분리해 연결 | PENDING |
+| `docs/analysis/GATE_C_SYNTHETIC_INTERVIEW_MATRIX.md` | Document | 공개자료 기반 합성 응답·코딩체계 | None | Analysis Plan Gate C | Supporting | MOVE_CANDIDATE | HIGH | 실제 인터뷰·직접 인용·Gate C 통과 근거가 아닌 합성자료 | HIGH | `docs/analysis/GATE_C_SYNTHETIC_INTERVIEW_MATRIX.md` | 네 경계를 보존해 Analysis Plan 링크와 함께 정렬 | PENDING |
 
 ## 9. UPDATE_REQUIRED 목록
 
@@ -203,15 +217,16 @@ KEEP 85개는 아래 명시적 파일군으로 설명한다. 각 경로의 최�
 
 ## 10. ARCHIVE_CANDIDATE 목록
 
-Archive는 삭제가 아니다. 이동할 때 역사 배너와 inbound link를 보존한다.
+이 목록은 Issue #144 Audit 당시의 후보분류다. Issue #150 Draft에서 5건을 삭제하지
+않고 `docs/history/`로 이동했으며, 역사 배너와 inbound link를 보존했다.
 
 | Path | Type | Current Role | Runtime Role | References | Source of Truth | Classification | Confidence | Evidence | Risk | Proposed Target | Required Follow-up | PM Decision |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| `requirements-definition-freshmanager-poc-v0.4.md` | Document | PRD 이전 요구사항 기준선 | None | AGENTS, Analysis, Field Dictionary, Harness, PRD, Data Rules | No | ARCHIVE_CANDIDATE | HIGH | 문서 첫머리가 역사 문서·현행 기준 아님을 명시; 현재 정본은 PRD/TRD | LOW | `docs/history/requirements/requirements-definition-freshmanager-poc-v0.4.md` | 6개 inbound 링크 갱신과 역사 배너 보존 | PENDING |
-| `docs/analysis/EG5_DATA_ANALYSIS_REPORT.md` | Document | 대표 3 Area 실제수집 역사 분석증거 | Internal | PRD, EG6 Panel | Supporting | ARCHIVE_CANDIDATE | HIGH | 현재 실행방법이 아니라 EG-5 단면 증거; 현행 분석 정본은 Analysis Plan | LOW | `docs/history/analysis/EG5_DATA_ANALYSIS_REPORT.md` | 2개 inbound 링크 갱신, 결과 원문 보존 | PENDING |
-| `docs/product/AREA_SPOT_REMOTE_EVIDENCE_READINESS_ASSESSMENT.md` | Document | Issue #126 당시 원격 Spot 준비도 평가 | Internal | Decision Log, current Policy | No | ARCHIVE_CANDIDATE | HIGH | D-020·후속 계약에 반영된 과거 조사이며 자체 대체상태를 명시 | LOW | `docs/history/research/AREA_SPOT_REMOTE_EVIDENCE_READINESS_ASSESSMENT.md` | 2개 inbound 링크와 외부 근거 유지 | PENDING |
-| `docs/product/PILOT_AREA_SELECTION_ASSESSMENT.md` | Document | D-021 5개 Area 선정 조사 | Internal | 직접 inbound 없음; 후속 D-021/D-022 결정 | No | ARCHIVE_CANDIDATE | HIGH | D-022가 웹 기본 흐름을 사용자 Area 선택으로 바꿨으나 선정 이력은 재현가치가 있음 | LOW | `docs/history/research/PILOT_AREA_SELECTION_ASSESSMENT.md` | D-021 역사 배너와 outbound 링크 검증 | PENDING |
-| `docs/superpowers/plans/2026-07-27-eg8c-ml-modeling.md` | Document | 과거 EG-8C Modeling 실행계획 | Experimental | 코드에 직접 inbound 없음; Analysis·Status가 결과 정본 | No | ARCHIVE_CANDIDATE | HIGH | 첫머리가 Ridge 자동탐색 계획이 후속 결정으로 대체됐음을 명시 | MEDIUM | `docs/history/plans/2026-07-27-eg8c-ml-modeling.md` | 실행지시로 오독되지 않게 역사 배너·결과 링크 유지 | PENDING |
+| `docs/history/requirements/requirements-definition-freshmanager-poc-v0.4.md` | Document | PRD 이전 요구사항 기준선 | None | AGENTS, Analysis, Field Dictionary, Harness, PRD, Data Rules | No | ARCHIVE_CANDIDATE | HIGH | 문서 첫머리가 역사 문서·현행 기준 아님을 명시; 현재 정본은 PRD/TRD | LOW | `docs/history/requirements/requirements-definition-freshmanager-poc-v0.4.md` | 6개 inbound 링크 갱신과 역사 배너 보존 | PENDING |
+| `docs/history/analysis/EG5_DATA_ANALYSIS_REPORT.md` | Document | 대표 3 Area 실제수집 역사 분석증거 | Internal | PRD, EG6 Panel | Supporting | ARCHIVE_CANDIDATE | HIGH | 현재 실행방법이 아니라 EG-5 단면 증거; 현행 분석 정본은 Analysis Plan | LOW | `docs/history/analysis/EG5_DATA_ANALYSIS_REPORT.md` | 2개 inbound 링크 갱신, 결과 원문 보존 | PENDING |
+| `docs/history/research/AREA_SPOT_REMOTE_EVIDENCE_READINESS_ASSESSMENT.md` | Document | Issue #126 당시 원격 Spot 준비도 평가 | Internal | Decision Log, current Policy | No | ARCHIVE_CANDIDATE | HIGH | D-020·후속 계약에 반영된 과거 조사이며 자체 대체상태를 명시 | LOW | `docs/history/research/AREA_SPOT_REMOTE_EVIDENCE_READINESS_ASSESSMENT.md` | 2개 inbound 링크와 외부 근거 유지 | PENDING |
+| `docs/history/research/PILOT_AREA_SELECTION_ASSESSMENT.md` | Document | D-021 5개 Area 선정 조사 | Internal | 직접 inbound 없음; 후속 D-021/D-022 결정 | No | ARCHIVE_CANDIDATE | HIGH | D-022가 웹 기본 흐름을 사용자 Area 선택으로 바꿨으나 선정 이력은 재현가치가 있음 | LOW | `docs/history/research/PILOT_AREA_SELECTION_ASSESSMENT.md` | D-021 역사 배너와 outbound 링크 검증 | PENDING |
+| `docs/history/plans/2026-07-27-eg8c-ml-modeling.md` | Document | 과거 EG-8C Modeling 실행계획 | Experimental | 코드에 직접 inbound 없음; Analysis·Status가 결과 정본 | No | ARCHIVE_CANDIDATE | HIGH | 첫머리가 Ridge 자동탐색 계획이 후속 결정으로 대체됐음을 명시 | MEDIUM | `docs/history/plans/2026-07-27-eg8c-ml-modeling.md` | 실행지시로 오독되지 않게 역사 배너·결과 링크 유지 | PENDING |
 
 ## 11. DELETE_CANDIDATE 목록
 
@@ -259,38 +274,38 @@ Archive는 삭제가 아니다. 이동할 때 역사 배너와 inbound link를 �
 | `AGENTS.md` | 행동·승인·보안 | Yes | KEEP | 자체 | 고정 세션 진입점 |
 | `PROJECT_STATUS.md` | 현재 운영상태 | Yes | UPDATE_REQUIRED | 자체 | Manual Intake 상태 drift |
 | `README.md` | 소개·탐색 | Supporting | UPDATE_REQUIRED | Status·PRD·TRD | EG-7 과거상태 잔존 |
-| `requirements-definition-freshmanager-poc-v0.4.md` | 과거 요구사항 | No | ARCHIVE_CANDIDATE | PRD·TRD | 자체 역사 배너 |
+| `docs/history/requirements/requirements-definition-freshmanager-poc-v0.4.md` | 과거 요구사항 | No | ARCHIVE_CANDIDATE | PRD·TRD | 자체 역사 배너 |
 | `ai-context/ARCHITECTURE_DECISIONS.md` | ADR 이력 | Yes | KEEP | 자체 | 대안·영향 보존 |
 | `ai-context/DECISION_LOG.md` | PM 결정 이력 | Yes | KEEP | 자체 | D-020~D-022 근거 |
 | `ai-context/PROJECT_MEMORY.md` | 장기 맥락복원 | Supporting | KEEP | Status·PRD·TRD | 현재상태 비복제 |
 | `docs/analysis/ANALYSIS_PLAN.md` | 분석 방법론 | Yes | UPDATE_REQUIRED | 자체 | EG-8D·Gate C 표현 drift |
-| `docs/analysis/EG5_DATA_ANALYSIS_REPORT.md` | EG-5 역사증거 | Supporting | ARCHIVE_CANDIDATE | Analysis Plan·Status | 실행 정본 아님 |
+| `docs/history/analysis/EG5_DATA_ANALYSIS_REPORT.md` | EG-5 역사증거 | Supporting | ARCHIVE_CANDIDATE | Analysis Plan·Status | 실행 정본 아님 |
 | `docs/data/CLOUD_BACKUP_AND_CSV_MANAGEMENT_PLAN.md` | Backup·CSV 계약 | Yes | KEEP | 자체 | 코드·Guard 연결 |
 | `docs/data/FIELD_DICTIONARY.md` | 필드 의미 | Yes | KEEP | 자체 | H-707·데이터 계약 |
 | `docs/data/MANUAL_V3_SNAPSHOT_INTAKE.md` | Manual Intake 계약 | Yes | KEEP | 자체 | 생산 parser와 연결 |
 | `docs/data/ML_READY_DATASET_SPEC.md` | Dataset 계약 | Yes | UPDATE_REQUIRED | 자체·Status | 구현상태 drift |
-| `docs/engineering/CODEX_HARNESS_ARCHITECTURE.md` | Harness 구조 | Yes | MOVE_CANDIDATE | 자체 | architecture 책임 |
+| `docs/architecture/CODEX_HARNESS_ARCHITECTURE.md` | Harness 구조 | Yes | MOVE_CANDIDATE | 자체 | architecture 책임 |
 | `docs/engineering/DEVELOPMENT_WORKFLOW.md` | 병렬 개발절차 | Yes | KEEP | 자체 | Git Workflow와 범위분리 |
 | `docs/engineering/FreshManager_TRD_v1.0.md` | 기술 요구 | Yes | KEEP | 자체·Status | 구성표는 완료상태표가 아니며 Status에 위임 |
 | `docs/product/AREA_FIRST_WEB_PILOT_CONTRACT.md` | D-022 Web Pilot 계약 | Yes | UPDATE_REQUIRED | 자체·D-022 | PM 확인 실제 인터뷰와 Git 정본 사이 privacy-safe Evidence Traceability 부재 |
 | `docs/product/AREA_SPOT_RECOMMENDATION_AND_UI_POLICY.md` | Area·Spot 정책 | Supporting | UPDATE_REQUIRED | D-022·Area-first Contract | 초기 흐름 불일치 |
-| `docs/product/AREA_SPOT_REMOTE_EVIDENCE_READINESS_ASSESSMENT.md` | 원격근거 역사평가 | No | ARCHIVE_CANDIDATE | D-020·Policy | 대체 이력 |
+| `docs/history/research/AREA_SPOT_REMOTE_EVIDENCE_READINESS_ASSESSMENT.md` | 원격근거 역사평가 | No | ARCHIVE_CANDIDATE | D-020·Policy | 대체 이력 |
 | `docs/product/EG6_AREA_SPOT_PANEL.md` | 정적 13 Area Panel | Yes | KEEP | 자체 | Guard H-703 입력 |
 | `docs/product/FreshManager_PRD_v1.0.md` | 제품 요구 | Yes | UPDATE_REQUIRED | 자체 | PM 확인 실제 인터뷰와 Git 정본 사이 privacy-safe Evidence Traceability 부재 |
-| `docs/product/PILOT_AREA_SELECTION_ASSESSMENT.md` | D-021 선정조사 | No | ARCHIVE_CANDIDATE | D-021·D-022 | 현재 기본흐름 아님 |
+| `docs/history/research/PILOT_AREA_SELECTION_ASSESSMENT.md` | D-021 선정조사 | No | ARCHIVE_CANDIDATE | D-021·D-022 | 현재 기본흐름 아님 |
 | `docs/product/RECOMMENDATION_OUTPUT_CONTRACT.md` | 출력계약 | Yes | KEEP | 자체 | v1.0.0, 생산 Schema 미구현 |
 | `docs/rules/CODING_RULES.md` | 코드 규칙 | Yes | KEEP | 자체 | Guard 입력 |
 | `docs/rules/DATA_COLLECTION_RULES.md` | 수집 규칙 | Yes | KEEP | 자체 | 5분·원본 계약 |
 | `docs/rules/GIT_WORKFLOW.md` | 단독 Git 절차 | Yes | KEEP | 자체 | Development Workflow와 범위분리 |
 | `docs/rules/ML_EXPERIMENT_RULES.md` | ML Experiment 규칙 | Yes | KEEP | 자체 | Modeling Plan과 책임분리 |
 | `docs/rules/SECURITY_RULES.md` | 보안 규칙 | Yes | KEEP | 자체 | Secret·Git 계약 |
-| `docs/superpowers/plans/2026-07-27-eg8c-ml-modeling.md` | 과거 Modeling Plan | No | ARCHIVE_CANDIDATE | Analysis Plan·D-017 | 후속 결정으로 대체 |
+| `docs/history/plans/2026-07-27-eg8c-ml-modeling.md` | 과거 Modeling Plan | No | ARCHIVE_CANDIDATE | Analysis Plan·D-017 | 후속 결정으로 대체 |
 | `docs/testing/PROJECT_GUARD_REPORT_TEMPLATE.md` | Guard 보고형식 | Yes | KEEP | 자체 | 필수 보고계약 |
 | `docs/testing/PROJECT_GUARD_SPEC.md` | Guard ID·판정 | Yes | KEEP | 자체 | 유일한 검사정본 |
 | `docs/testing/QUALITY_GATES.md` | EG 진입·통과 | Yes | KEEP | 자체 | 상태는 Status에 위임 |
-| `etc/데이터수집 실행 가이드.md` | 수집 실행가이드 | Supporting | MOVE_CANDIDATE | Data Rules·Status | 위치와 일부 상태정렬 필요 |
-| `interview/interview.md` | Gate C 인터뷰 계획 | Supporting | MOVE_CANDIDATE | Analysis Plan | 분석경로로 이동 적합 |
-| `interview/interview_matrix.md` | 공개자료 기반 합성 응답 | Supporting | MOVE_CANDIDATE | 실제 인터뷰·직접 인용·Gate C 증거 아님 | 합성자료 표시 보존 |
+| `docs/data/DATA_COLLECTION_EXECUTION_GUIDE.md` | 수집 실행가이드 | Supporting | MOVE_CANDIDATE | Data Rules·Status | 위치와 일부 상태정렬 필요 |
+| `docs/analysis/GATE_C_INTERVIEW_PLAN.md` | Gate C 인터뷰 계획 | Supporting | MOVE_CANDIDATE | Analysis Plan | 분석경로로 이동 적합 |
+| `docs/analysis/GATE_C_SYNTHETIC_INTERVIEW_MATRIX.md` | 공개자료 기반 합성 응답 | Supporting | MOVE_CANDIDATE | 실제 인터뷰·직접 인용·Gate C 증거 아님 | 합성자료 표시 보존 |
 
 ## 14. Data·Manifest Matrix
 
@@ -435,6 +450,11 @@ Runtime integration을 실행하지 않았으므로 해당 부분은 `NOT_EVALUA
 
 ## 18. 권장 후속 Issue
 
+아래 표는 Issue #144 Audit 당시의 권고 이력이다. Priority 1은 Issue #146,
+Priority 2는 Issue #148에서 완료됐고, 문서 MOVE·ARCHIVE는 Issue #150 Draft에
+통합 반영됐다. `pilot_spot_options.csv` 이동은 여전히 미승인 후보이며 이번
+작업에서 수행하지 않았다.
+
 | Priority | 권장 제목 | 범위 | 산출물 |
 |---:|---|---|---|
 | 1 | `[Docs] Repository 상태·근거 불일치 7건 정합화` | UPDATE_REQUIRED 7개만 현행 main·확인된 증거와 정렬 | 기존 계약 확대 없는 문서 수정 |
@@ -448,11 +468,11 @@ Runtime integration을 실행하지 않았으므로 해당 부분은 `NOT_EVALUA
 
 ## 19. PM 결정목록
 
-1. 이 Audit의 85/5/7/5/0 후보분류는 승인됐다. 실제 이동·수정·보관 실행은 미승인이다.
-2. 첫 후속으로 상태·근거 drift 7건의 문서 정합화 Issue를 별도 승인할지 결정한다.
-3. 문서 정합화 뒤 Web/API·데이터 공급 Architecture ADR Issue를 승인할지 결정한다.
-4. MOVE·ARCHIVE 후보는 ADR과 링크영향 검토 뒤 별도 승인할지 결정한다.
-5. `DELETE_CANDIDATE=0`이므로 현재 삭제작업을 만들지 않는다.
+1. 이 Audit의 85/5/7/5/0 후보분류는 Issue #144 기준 승인 이력으로 보존한다.
+2. 상태·근거 drift 7건 정합화는 Issue #146에서 완료됐다.
+3. Web/API·데이터 공급 Architecture ADR은 Issue #148에서 완료됐다.
+4. 문서 MOVE 4건과 ARCHIVE 5건은 Issue #150 Draft에 반영됐으며 PM 검토 대기다.
+5. `pilot_spot_options.csv` 이동과 `DELETE_CANDIDATE=0`은 기존 상태를 유지한다.
 
 ## 20. 전체 파일 Inventory 부록
 
@@ -483,31 +503,31 @@ Required Follow-up은 없음이다.
 | `data/reference/seoul_121_places.csv` | Data | KEEP | HIGH | CRITICAL | PENDING |
 | `data/samples/population_yeouido_sample.json` | Data | KEEP | HIGH | HIGH | PENDING |
 | `docs/analysis/ANALYSIS_PLAN.md` | Document | UPDATE_REQUIRED | HIGH | HIGH | PENDING |
-| `docs/analysis/EG5_DATA_ANALYSIS_REPORT.md` | Document | ARCHIVE_CANDIDATE | HIGH | LOW | PENDING |
+| `docs/history/analysis/EG5_DATA_ANALYSIS_REPORT.md` | Document | ARCHIVE_CANDIDATE | HIGH | LOW | PENDING |
 | `docs/data/CLOUD_BACKUP_AND_CSV_MANAGEMENT_PLAN.md` | Document | KEEP | HIGH | HIGH | PENDING |
 | `docs/data/FIELD_DICTIONARY.md` | Document | KEEP | HIGH | HIGH | PENDING |
 | `docs/data/MANUAL_V3_SNAPSHOT_INTAKE.md` | Document | KEEP | HIGH | HIGH | PENDING |
 | `docs/data/ML_READY_DATASET_SPEC.md` | Document | UPDATE_REQUIRED | HIGH | HIGH | PENDING |
-| `docs/engineering/CODEX_HARNESS_ARCHITECTURE.md` | Document | MOVE_CANDIDATE | HIGH | HIGH | PENDING |
+| `docs/architecture/CODEX_HARNESS_ARCHITECTURE.md` | Document | MOVE_CANDIDATE | HIGH | HIGH | PENDING |
 | `docs/engineering/DEVELOPMENT_WORKFLOW.md` | Document | KEEP | HIGH | MEDIUM | PENDING |
 | `docs/engineering/FreshManager_TRD_v1.0.md` | Document | KEEP | HIGH | HIGH | PENDING |
 | `docs/product/AREA_FIRST_WEB_PILOT_CONTRACT.md` | Document | UPDATE_REQUIRED | HIGH | HIGH | PENDING |
 | `docs/product/AREA_SPOT_RECOMMENDATION_AND_UI_POLICY.md` | Document | UPDATE_REQUIRED | HIGH | HIGH | PENDING |
-| `docs/product/AREA_SPOT_REMOTE_EVIDENCE_READINESS_ASSESSMENT.md` | Document | ARCHIVE_CANDIDATE | HIGH | LOW | PENDING |
+| `docs/history/research/AREA_SPOT_REMOTE_EVIDENCE_READINESS_ASSESSMENT.md` | Document | ARCHIVE_CANDIDATE | HIGH | LOW | PENDING |
 | `docs/product/EG6_AREA_SPOT_PANEL.md` | Document | KEEP | HIGH | HIGH | PENDING |
 | `docs/product/FreshManager_PRD_v1.0.md` | Document | UPDATE_REQUIRED | HIGH | HIGH | PENDING |
-| `docs/product/PILOT_AREA_SELECTION_ASSESSMENT.md` | Document | ARCHIVE_CANDIDATE | HIGH | LOW | PENDING |
+| `docs/history/research/PILOT_AREA_SELECTION_ASSESSMENT.md` | Document | ARCHIVE_CANDIDATE | HIGH | LOW | PENDING |
 | `docs/product/RECOMMENDATION_OUTPUT_CONTRACT.md` | Document | KEEP | HIGH | HIGH | PENDING |
 | `docs/rules/CODING_RULES.md` | Document | KEEP | HIGH | HIGH | PENDING |
 | `docs/rules/DATA_COLLECTION_RULES.md` | Document | KEEP | HIGH | HIGH | PENDING |
 | `docs/rules/GIT_WORKFLOW.md` | Document | KEEP | HIGH | HIGH | PENDING |
 | `docs/rules/ML_EXPERIMENT_RULES.md` | Document | KEEP | HIGH | MEDIUM | PENDING |
 | `docs/rules/SECURITY_RULES.md` | Document | KEEP | HIGH | HIGH | PENDING |
-| `docs/superpowers/plans/2026-07-27-eg8c-ml-modeling.md` | Document | ARCHIVE_CANDIDATE | HIGH | MEDIUM | PENDING |
+| `docs/history/plans/2026-07-27-eg8c-ml-modeling.md` | Document | ARCHIVE_CANDIDATE | HIGH | MEDIUM | PENDING |
 | `docs/testing/PROJECT_GUARD_REPORT_TEMPLATE.md` | Document | KEEP | HIGH | MEDIUM | PENDING |
 | `docs/testing/PROJECT_GUARD_SPEC.md` | Document | KEEP | HIGH | CRITICAL | PENDING |
 | `docs/testing/QUALITY_GATES.md` | Document | KEEP | HIGH | HIGH | PENDING |
-| `etc/데이터수집 실행 가이드.md` | Document | MOVE_CANDIDATE | HIGH | MEDIUM | PENDING |
+| `docs/data/DATA_COLLECTION_EXECUTION_GUIDE.md` | Document | MOVE_CANDIDATE | HIGH | MEDIUM | PENDING |
 | `freshmanager/__init__.py` | Code | KEEP | HIGH | MEDIUM | PENDING |
 | `freshmanager/backup.py` | Code | KEEP | HIGH | CRITICAL | PENDING |
 | `freshmanager/batch_id.py` | Code | KEEP | HIGH | HIGH | PENDING |
@@ -531,9 +551,9 @@ Required Follow-up은 없음이다.
 | `freshmanager/pilot_recommendation_service.py` | Code | KEEP | HIGH | HIGH | PENDING |
 | `freshmanager/pilot_spot_options.py` | Code | KEEP | HIGH | HIGH | PENDING |
 | `freshmanager/storage.py` | Code | KEEP | HIGH | CRITICAL | PENDING |
-| `interview/interview.md` | Document | MOVE_CANDIDATE | HIGH | MEDIUM | PENDING |
-| `interview/interview_matrix.md` | Document | MOVE_CANDIDATE | HIGH | HIGH | PENDING |
-| `requirements-definition-freshmanager-poc-v0.4.md` | Document | ARCHIVE_CANDIDATE | HIGH | LOW | PENDING |
+| `docs/analysis/GATE_C_INTERVIEW_PLAN.md` | Document | MOVE_CANDIDATE | HIGH | MEDIUM | PENDING |
+| `docs/analysis/GATE_C_SYNTHETIC_INTERVIEW_MATRIX.md` | Document | MOVE_CANDIDATE | HIGH | HIGH | PENDING |
+| `docs/history/requirements/requirements-definition-freshmanager-poc-v0.4.md` | Document | ARCHIVE_CANDIDATE | HIGH | LOW | PENDING |
 | `requirements-ml.txt` | Config | KEEP | HIGH | HIGH | PENDING |
 | `scripts/project_guard_check.py` | Code | KEEP | HIGH | CRITICAL | PENDING |
 | `tests/fixtures/csv/missing_required_column.csv` | Test | KEEP | HIGH | MEDIUM | PENDING |

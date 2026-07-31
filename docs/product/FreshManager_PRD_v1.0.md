@@ -89,7 +89,7 @@ gate_c_status=SEPARATE_EVALUATION_REQUIRED
 ```
 
 Git에는 개인정보 없는 실제 Interview Evidence Summary 또는 외부 Evidence
-Reference가 아직 없다. `interview/interview_matrix.md`는 공개자료 기반
+Reference가 아직 없다. `docs/analysis/GATE_C_SYNTHETIC_INTERVIEW_MATRIX.md`는 공개자료 기반
 합성자료이며 실제 인터뷰·직접 인용·Gate C 통과 근거가 아니다. 개인정보 없는
 후속 Evidence Traceability는 별도 PM 승인 대상이다.
 
@@ -676,16 +676,16 @@ Context로 구성한다. D-020의 원격 근거 Eligibility를 모두 충족하�
 | **자료** | **사용 목적** |
 | --- | --- |
 | AGENTS.md | 프로젝트 정의, 범위, 승인, 보안, 데이터 보존의 상위 기준 |
-| requirements-definition-freshmanager-poc-v0.4.md | 기존 제품 요구, Gate A~D, 5주 평가 설계 |
+| docs/history/requirements/requirements-definition-freshmanager-poc-v0.4.md | 기존 제품 요구, Gate A~D, 5주 평가 설계 |
 | PROJECT_STATUS.md + main Git 상태 | 완료 이력과 현재 구현 기준의 차이 확인 |
-| docs/analysis/EG5_DATA_ANALYSIS_REPORT.md | 대표 3개 실제 수집의 확인된 사실과 Feature 후보 |
+| docs/history/analysis/EG5_DATA_ANALYSIS_REPORT.md | 대표 3개 실제 수집의 확인된 사실과 Feature 후보 |
 | docs/product/EG6_AREA_SPOT_PANEL.md | 13개 Area·Spot·S-DoT 연결과 해석 한계 |
 | docs/testing/QUALITY_GATES.md | EG-0~EG-8 순서와 통과조건 |
 | docs/testing/PROJECT_GUARD_SPEC.md | 검사 ID·상태·종료코드의 유일한 기준 |
 | PR #54 / commit 6253cc5 완료 기록 | EG-6B 병합, 19/19 Target, 243/243 Full, Guard 41/46 PASS |
 | docs/architecture/REPOSITORY_READINESS_AUDIT.md | 실제 인터뷰·Git Evidence·합성 Matrix·Gate C 상태와 구현 부재 경계 |
-| interview/interview.md | Gate C 인터뷰 설계; 실제 수행 Evidence가 아님 |
-| interview/interview_matrix.md | 공개자료 기반 합성자료; 실제 인터뷰·직접 인용·Gate C 통과 근거가 아님 |
+| docs/analysis/GATE_C_INTERVIEW_PLAN.md | Gate C 인터뷰 설계; 실제 수행 Evidence가 아님 |
+| docs/analysis/GATE_C_SYNTHETIC_INTERVIEW_MATRIX.md | 공개자료 기반 합성자료; 실제 인터뷰·직접 인용·Gate C 통과 근거가 아님 |
 
 ## 부록 A. 용어
 

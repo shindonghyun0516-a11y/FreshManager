@@ -11,7 +11,7 @@
   - `AGENTS.md`
   - `docs/product/FreshManager_PRD_v1.0.md`
   - `docs/engineering/FreshManager_TRD_v1.0.md`
-  - `requirements-definition-freshmanager-poc-v0.4.md` (역사 문서)
+  - `docs/history/requirements/requirements-definition-freshmanager-poc-v0.4.md` (역사 문서)
   - `docs/rules/DATA_COLLECTION_RULES.md`
   - `docs/data/FIELD_DICTIONARY.md`
   - `docs/data/CLOUD_BACKUP_AND_CSV_MANAGEMENT_PLAN.md`
@@ -1123,7 +1123,7 @@ Gate C는 사용자 가치와 현장 활용 가능성을 평가한다.
 |---|---|
 | `PM_CONFIRMATION` | `actual_interview_execution_status=PM_CONFIRMED`; 실제 인터뷰 수행 사실만 확인 |
 | `GIT_TRACKED_REPOSITORY_EVIDENCE` | `repository_evidence_status=NOT_TRACKED`; 개인정보 없는 실제 Evidence Summary·외부 참조 없음 |
-| `SYNTHETIC_SUPPORTING_MATERIAL` | `synthetic_matrix_status=NOT_ACTUAL_INTERVIEW_EVIDENCE`; `interview/interview_matrix.md`는 공개자료 기반 합성자료이며 실제 인터뷰·직접 인용·Gate C 통과 근거가 아님 |
+| `SYNTHETIC_SUPPORTING_MATERIAL` | `synthetic_matrix_status=NOT_ACTUAL_INTERVIEW_EVIDENCE`; `docs/analysis/GATE_C_SYNTHETIC_INTERVIEW_MATRIX.md`는 공개자료 기반 합성자료이며 실제 인터뷰·직접 인용·Gate C 통과 근거가 아님 |
 | `GATE_C_EVALUATION` | `gate_c_status=SEPARATE_EVALUATION_REQUIRED`; 실제 인터뷰 수행 사실만으로 Gate C 통과를 선언하지 않음 |
 
 ---

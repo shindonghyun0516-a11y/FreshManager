@@ -42,8 +42,14 @@
 - Repository Readiness 문서 7건 정합화: `AVAILABLE_ON_MAIN`
   (Issue #146 완료, PR #147 병합)
 - Area-first Web/API Architecture: ADR-012 `ACCEPTED`(Issue #148, PR #149)
+- Area-first Map-centered UI Design Contract: `DRAFT_PENDING_PM_REVIEW`
+- Repository Documentation Structure Alignment: `DRAFT_PENDING_PM_REVIEW`
+- History Archive and Documentation Index: `DRAFT_PENDING_PM_REVIEW`
 - Area-first Web/API Implementation: Scaffold·Dependency·Service·API·UI·Map·배포
   `NOT_STARTED`
+- Code Cleanup: `NO_CODE_CLEANUP_REQUIRED_BEFORE_SCAFFOLD`
+- 현재 문서 작업: Issue #150 `OPEN · IN_PROGRESS`,
+  Branch `docs/issue-150-map-centered-design-doc-alignment`
 - Spot 자동 추천: `DEFERRED_AFTER_INITIAL_PILOT`
 - 24시간 Scheduler(로컬 EG-7 Live 파일럿 확대 기준): `NOT_IMPLEMENTED`
 - ML 학습: `COMPARISON_COMPLETED_NOT_ADOPTED`; 추천 사용 `false`
@@ -469,7 +475,9 @@ H-707은 구현과 함께 `PASS`로 활성화됐지만 이는 합성 계약 검�
 - Issue #113: `CLOSED · COMPLETED`
 - Issue #144: `CLOSED · COMPLETED`
 - Issue #146: `CLOSED · COMPLETED`
-- Issue #148: `OPEN`
+- Issue #148: `CLOSED · COMPLETED`
+- Issue #150: `OPEN · IN_PROGRESS`
+- Issue #150 Source Branch: `docs/issue-150-map-centered-design-doc-alignment`
 - Issue #69: `OPEN`
 - Issue #129: `CLOSED`
 - Issue #128: `CLOSED`
@@ -489,11 +497,16 @@ H-707은 구현과 함께 `PASS`로 활성화됐지만 이는 합성 계약 검�
 
 Repository Readiness Audit은 Issue #144·PR #145로, 승인된 7개 문서 정합화는
 Issue #146·PR #147로 `main`에 반영됐다. Area-first Web/API 경계와 읽기 전용 데이터
-공급은 ADR-012 `ACCEPTED`로 확정했다. 후속 작업 후보의 순서는 다음과 같다.
+공급은 ADR-012 `ACCEPTED`로 확정했다. Issue #150은 지도 중심 UI 계약과 문서구조
+정렬 Draft를 작성 중이며 PM 검토 전에는 완료로 확정하지 않는다. 다음 행동은
+다음 순서다.
 
-1. Repository Structure 후보 이동
-2. History 문서 보관과 Docs Index
-3. Vue·FastAPI Scaffold
+1. 이번 Design/Docs PR PM 검토·병합
+2. Vue·FastAPI 통합 Scaffold
+3. Area-first Read-only API·Prototype 공급경로
+4. 지도 중심 Responsive UI·API 연결
+5. NAVER Map·Geolocation·QA·제한배포
+6. 실제 프래시매니저 사용성 검증
 
 파일 이동·삭제·리팩터링·Root 재구성·Scaffold·Dependency 변경은 각각 별도 승인
 범위에서만 수행한다. UI 디자인은 ADR 병합 뒤 별도 작업으로 병행할 수 있다.
@@ -555,6 +568,7 @@ Vue UI·FastAPI·NAVER Map·Spot Prototype Runtime·배포는 미구현이다. �
 0건이다. Repository Readiness Audit은 PR #145로, 문서 7건 정합화는 PR #147로
 `main`에 반영됐다. Area-first Web/API 경계와 읽기 전용 데이터 공급은 ADR-012
 `ACCEPTED`(Issue #148, PR #149)이며 Scaffold·Dependency·Service·API·UI·Map·배포는
-`NOT_STARTED`다. EG-7 Live
+`NOT_STARTED`다. Issue #150의 지도 중심 UI 계약·문서구조·History Index는
+`DRAFT_PENDING_PM_REVIEW`이며 구현 완료를 뜻하지 않는다. EG-7 Live
 preflight는 독립 backlog이며 EG-7 구현
 Branch를 다시 만들지 않는다.
