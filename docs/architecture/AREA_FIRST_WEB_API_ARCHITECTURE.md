@@ -85,14 +85,15 @@ data/prototype
 
 ### 5.1 HTTP Layer — `apps/api`
 
-책임은 Route, 요청 검증, Pydantic Response, 안전한 HTTP 오류 변환, OpenAPI와 초기
-동일 Origin 정적 Vue Build 제공이다. 서울시 API 수집, Spreadsheet 접근, Area 계산,
-Recommendation, ML, Backup, Dataset 생성과 파일 쓰기는 금지한다.
+책임은 Route, 요청 검증, Pydantic Response, 안전한 HTTP 오류 변환, OpenAPI와 공개
+Same-origin 경계다. 서울시 API 수집, Spreadsheet 접근, Area 계산, Recommendation,
+ML, Backup, Dataset 생성과 파일 쓰기는 금지한다.
 
 개발 중에는 Vite Dev Server가 `/api`를 FastAPI Development Server로 Proxy한다.
-초기 배포 기본은 FastAPI가 Vue Build를 같은 Origin에서 제공하는 방식이다. 배포
-환경이 요구하면 별도 배포 Issue에서 같은 Domain Reverse Proxy로 바꿀 수 있으나
-공개 API 계약은 바꾸지 않는다.
+ADR-012 승인 당시 초기 기본안은 FastAPI가 Vue Build를 같은 Origin에서 제공하는
+방식이었다. Vercel 플랫폼 확정 후 ADR-013은 Web·API 두 Project와 Production
+Rewrite를 Working Topology로 제안한다. ADR-013이 승인되기 전에는 어느 방식도 실제
+배포계약이 아니며, 승인 뒤에도 Same-origin과 공개 API 계약은 바뀌지 않는다.
 
 ### 5.2 Application Layer — `SelectedAreaPilotService`
 
@@ -277,9 +278,20 @@ API Key와 분리하며 실제 값은 코드·문서·Git에 기록하지 않는
 
 - 개발: Vite Dev Server + FastAPI Development Server + `/api` Proxy.
 - 파일럿: 사용자 URL 하나와 Same-origin 우선.
-- 초기 기본 배포: FastAPI가 Vue Build 제공.
-- 대안: 같은 Domain Reverse Proxy를 별도 배포 Issue에서 선택 가능.
-- Cloud Provider, Domain, TLS와 운영 로그 정책은 별도 배포 Issue가 소유한다.
+- 배포 플랫폼: `VERCEL`, 상태는 `PLANNED_NOT_DEPLOYED`.
+- Working Topology: `apps/web` Root의 Vue Project와 Repository Root의 FastAPI
+  Project를 분리한다. 이 구성은 `PROPOSED_PENDING_PM_REVIEW`다.
+- FastAPI는 `apps.api.main:app` 표준 ASGI App이며 Local Uvicorn과 Vercel Python
+  Runtime에서 같은 Entry Point를 사용한다. Vercel은 배포 Adapter일 뿐 Business
+  Logic에 포함되지 않는다.
+- ADR-012의 Same-origin 원칙은 유지한다. 실제 API Project 주소가 만들어진 뒤
+  별도 배포 작업에서 Production Rewrite와 Domain을 결정한다.
+- Python Runtime은 API용 Dependency만 설치하고 `requirements-ml.txt`를 설치하지
+  않는다.
+- Runtime 파일쓰기는 금지한다. 후속 Snapshot 공급은 저장소 밖 승인 불변자료를
+  읽기 전용으로 사용하는 Provider가 담당한다.
+- 실제 Vercel Project·Domain·Rewrite·Secret·배포와 운영 로그 정책은 후속 배포
+  작업이 소유한다.
 
 Microservice, API Gateway, BFF, Kubernetes, Redis, Celery, PostgreSQL, 사용자 인증,
 관리자 페이지, Model Serving과 실시간 Collector 연결은 초기 범위가 아니다.
@@ -287,7 +299,8 @@ Microservice, API Gateway, BFF, Kubernetes, Redis, Celery, PostgreSQL, 사용자
 ## 12. 시험·CI 경계
 
 기존 Python 전체시험과 Project Guard를 유지한다. 새 Web/API CI가 이를 대체하거나
-약화하지 않는다. 이 Architecture PR에서는 Workflow를 추가하지 않는다.
+약화하지 않는다. 이 Architecture PR에서는 Workflow를 추가하지 않았고, 후속
+Scaffold는 API Import·시험과 Vue Type Check·Build만 담당하는 별도 Workflow를 둔다.
 
 후속 Backend 시험은 Pydantic Schema, Route, Provider 실패, 부분 Horizon, 허용
 Area, Spot 정확히 3개, no-write, no-network와 Area 선택값 비기록을 검증한다. 후속
@@ -348,11 +361,13 @@ API 구현 중 실제 중복이나 막힌 Interface가 증거로 확인될 때�
 
 ## 15. 결정 결과와 제외범위
 
-이 ADR이 승인되면 후속 Scaffold가 따라야 할 경계만 생긴다. 다음은 여전히
-`NOT_IMPLEMENTED`이며 별도 PM 승인이 필요하다.
+Issue #152 작업공간에는 이 경계를 따르는 `apps/web`·`apps/api` 최소 Scaffold와
+Dependency 초안만 있다. `main` 반영과 실제 기능 구현 완료를 뜻하지 않는다. 다음은
+여전히 `NOT_IMPLEMENTED`이며 별도 PM 승인이 필요하다.
 
-- `apps/web`, `apps/api`, `data/prototype` 생성
-- Vue·FastAPI·NAVER Map 구현과 Dependency 추가
+- `data/prototype` 생성
+- Health 외 Area-first API와 실제 Area 데이터가 연결된 Vue 기능
+- NAVER Map 구현
 - AreaDataProvider, PilotSpotOptionRepository, SelectedAreaPilotService 구현
 - Pilot CSV 이동, 코드 이동·삭제·Refactor
 - Cloud 배포, Database, 인증, 사용자 위치·선택 저장

@@ -66,8 +66,9 @@ Issue #70·PR #71로 `main`에 반영됐으며, 실제 반복수집은 별도 PM
   `IMPLEMENTATION_AVAILABLE_ON_MAIN`; 첫 1시간 Live `NOT_STARTED`
 - Area-first 제품·UI·데이터 계약은 D-022·PR #141로 승인·`main` 반영됐고,
   Recommendation Core·Service도 PR #135·#137로 `main`에 있다. Area-first
-  Service·API, Vue UI, FastAPI, NAVER Map, Spot Prototype Runtime과 배포는
-  `NOT_IMPLEMENTED`다. 세부 변동상태는 `PROJECT_STATUS.md`를 따른다.
+  Vue·FastAPI 최소 Scaffold는 Issue #152 작업공간에서 `DRAFT_PENDING_PM_REVIEW`다.
+  실제 Service·Read-only API·Area 데이터·NAVER Map·Spot Prototype Runtime과
+  배포는 `NOT_IMPLEMENTED`다. 세부 변동상태는 `PROJECT_STATUS.md`를 따른다.
 
 ### 현재 분석 범위
 
@@ -252,7 +253,9 @@ POI001부터 POI121까지 자동 생성
 
 ### 진행 예정
 
-- Repository 문서 정합화 뒤 Area-first Web/API 경계와 데이터 공급 Architecture ADR
+- Vue·FastAPI·Vercel 호환 Scaffold Diff PM 검토와 공식 PR 경로
+- Area-first Read-only API·Prototype 공급경로
+- 지도 중심 Responsive UI·API 연결
 - 실제 날짜·시각·할당량·운영 ID·계획 지문에 대한 별도 PM 결정
 - PM Live 승인 후에만 동일 13개 Area의 5분·1시간 파일럿 실행 검토
 - 첫 Batch 품질 감사 결과를 기준으로 Raw-to-CSV Exporter 별도 검토
@@ -629,6 +632,35 @@ python3 scripts/project_guard_check.py
 ```bash
 python3 -B -m unittest discover -s tests -p "test_*.py" -v
 ```
+
+Web Platform Scaffold는 Python 3.12와 Node 24.x를 사용한다. 현재 로컬 검증은
+Node 24.16.0에서 수행했다. CI는 `node-version: "24"`로 같은 Major를 사용하며 실제
+Patch는 CI 실행 시 확인한다. Vercel Runtime 계약도 특정 Patch가 아닌 지원되는 최신
+24.x다. Backend를 로컬에서 실행하려면 별도 가상환경에서 API Dependency를 설치한다.
+
+```bash
+api_venv_dir=$(mktemp -d "${TMPDIR:-/tmp}/freshmanager-api.XXXXXX")
+python3.12 -m venv "$api_venv_dir"
+. "$api_venv_dir/bin/activate"
+python -m pip install -r requirements.txt
+python -m uvicorn apps.api.main:app --reload --no-access-log
+```
+
+`GET http://127.0.0.1:8000/api/v1/health`는 API 상태만 확인하며 실제 Area 데이터,
+Collector, Recommendation 또는 ML을 실행하지 않는다.
+
+Frontend는 별도 Terminal에서 실행한다.
+
+```bash
+cd apps/web
+npm ci
+npm run typecheck
+npm run build
+npm run dev
+```
+
+Local Vite Server는 `/api` 요청을 Local FastAPI로 Proxy한다. 현재 화면은 연결 전
+Scaffold로, 실제 Area·Spot 데이터, NAVER Map, 위치 기능과 Vercel 배포는 없다.
 
 일반 Project Guard와 일반 테스트는 저장된 샘플 또는 가짜 응답만 사용하며
 네트워크와 실제 서울시 API를 호출하지 않는다. `freshmanager/http_adapter.py`에
