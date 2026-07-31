@@ -5,12 +5,14 @@
 - 관련 Issue: #124, #126, #128, #129, #132, #140, #146
 - 상위 Issue: #99
 - 선행 결정: D-018, D-020, D-021, D-022
+- 제안 결정: D-023 `PROPOSED_PENDING_PM_REVIEW`
 
 이 문서는 D-022 초기 Area-first 사용자 선택 흐름, D-021 다중 Area 비교의 내부
 분석 이력과 D-020 장기 원격 SPOT 추천 정책을 함께 정의한다. 정책 문서일 뿐 UI,
 추천 계산, 지도 API 또는 사용자 게시를 구현하거나 승인하지 않는다. 초기 화면의
 상세 정본은 `AREA_FIRST_WEB_PILOT_CONTRACT.md`, 추천 결과의 필드·null·fallback
-계약은 `RECOMMENDATION_OUTPUT_CONTRACT.md`가 소유한다.
+계약은 `RECOMMENDATION_OUTPUT_CONTRACT.md`, 지도 중심 화면·Component·State 정본은
+[`DESIGN.md`](../design/DESIGN.md)가 소유한다.
 
 ## 1. 서비스 목적
 
@@ -66,10 +68,13 @@ Spot 비교와 순위 산정이 불가능하며, 최종 Spot 추천도 계산할
 ### 4.1 초기 Area-first 파일럿
 
 1. 사용자가 승인된 5개 중 담당 Area를 직접 선택한다.
-2. 선택 Area의 서울시 공식 현재·1시간 후·3시간 후 정보와 대표 Spot 3개를
-   같은 수준의 선택지로 표시한다.
-3. 사용자가 이동할 Spot을 직접 선택한다.
-4. 현장검증·운영 적합성 미확인 상태와 한계를 함께 표시한다.
+2. 지도 중심 기본화면에 선택 Area의 대표 Spot Marker 3개와 `구역 정보`,
+   `후보 위치 3곳` Trigger를 표시한다.
+3. 구역 정보와 후보 위치 목록·상세는 Desktop 단일 Drawer 또는 Mobile 단일
+   Bottom Sheet에서 필요할 때 확인한다.
+4. Marker 또는 목록 Card로 후보 위치 상세를 열고 사용자가 이동할 Spot을 직접
+   선택한다.
+5. 현장검증·운영 적합성 미확인 상태와 한계를 함께 표시한다.
 
 ### 4.2 장기 D-020 흐름
 
@@ -291,16 +296,48 @@ Output Contract를 따른다.
 
 ## 11. 지도 UI 구조
 
-- 지도에 Area 범위와 Spot 핀을 서로 다른 형태로 표시한다.
+### 11.1 초기 D-022 파일럿
+
+- 기본화면은 지도 중심으로 구성하고 Area 정보 Card·Spot 목록·상세를 고정 배치하지
+  않는다.
+- 선택 Area의 Spot 3개를 Marker와 동등한 목록 Card로 제공한다.
+- `구역 정보`와 `후보 위치 3곳` Trigger로 필요한 정보만 연다.
+- Desktop은 지도 위 우측 Slide-over Drawer 하나만 사용하며 Area·목록·상세
+  Drawer를 동시에 열지 않는다.
+- Mobile은 같은 데이터·Component·State를 단일 Bottom Sheet에서 표시한다.
+- Marker 또는 목록 Card를 누르면 같은 Spot 상세를 열고 두 진입점의 상태를
+  동기화한다.
+- Marker는 Default·Opened·Selected 상태를 구분한다. Opened는 상세 열림,
+  Selected는 사용자가 `판촉 후보 위치로 선택`을 누른 상태이며 시스템 추천이 아니다.
+- 지도 실패 시 Area 정보와 Spot 이름·주소 목록·상세·선택을 제공하는
+  `MapFallback`으로 핵심기능을 유지한다.
 - 초기 파일럿은 사용자가 선택한 Area의 공식 정보와 대표 Spot 3개를 같은 수준의
-  사용자 선택지로 표시한다. 추천·1위·기본선택 표시는 하지 않는다.
-- 사용자가 고른 Spot은 사용자 선택임을 표시하며 시스템 추천으로 바꾸지 않는다.
-- 승인된 Area 선택과 Spot 선택의 상세 UI는
-  `AREA_FIRST_WEB_PILOT_CONTRACT.md`를 따른다.
+  선택지로 표시한다. 추천·1위·기본선택 표시는 하지 않는다.
+- 후보 위치는 사용자가 비교·선택하는 미검증 위치다. 검증된 판매위치, 판매 허용
+  지점이나 공식 추천으로 표현하지 않는다.
+- Area 공식정보에는 `데이터 기준시각`, `저장된 최신 승인 데이터 기준`,
+  `서울시 공식 Area 데이터`를 사용한다. `실시간`, `Live`, `Monitoring`,
+  `현재 접속시점 수집`, `자동 새로고침`, `Telemetry`는 사용하지 않는다.
+- 초기 후보 위치에는 `추천`, `최적`, `Best`를 사용하지 않는다.
+
+지도와 데이터의 적용시점은 분리한다.
+
+- 현재 디자인의 지도는 Layout·Interaction 검토용 Placeholder다. 실제
+  Provider·좌표·Zoom·Marker 위치는 NAVER Maps JavaScript API 통합 단계에서
+  확정한다.
+- 현재 화면 수치는 UI 정보구조·Component 검토용 Mock Data다. 실제 Area·Spot
+  데이터는 Provider·Service·API 구현 뒤 연결한다.
+- Mock 값을 운영값으로 표현하거나 Area 값을 Spot 값으로 복사하지 않는다.
+
+상세 UI 계약은 `AREA_FIRST_WEB_PILOT_CONTRACT.md`, Component·State·Stitch 기준은
+[`DESIGN.md`](../design/DESIGN.md)를 따른다.
+
+### 11.2 장기 D-020 후속
 
 다음 지도 상태·상세·분석 이동 항목은 D-020 장기 후속 후보이며 D-022 초기
 파일럿 계약이나 구현 완료상태가 아니다.
 
+- 지도에 Area 범위와 Spot 핀을 서로 다른 형태로 표시한다.
 - Spot 핀은 원격 데이터 기반 SPOT 추천, 판매 후보, 정보 없음, 원격 근거 확인 중,
   추천 제외를 구분한다.
 - Spot 클릭 시 팝업 또는 모바일 하단 상세창에서 Area 정보, Spot 정보, 추천 근거,
@@ -383,4 +420,5 @@ PM 승인이 필요하다.
 - `docs/product/FreshManager_PRD_v1.0.md`
 - `docs/engineering/FreshManager_TRD_v1.0.md`
 - `docs/data/ML_READY_DATASET_SPEC.md`
-- `docs/product/AREA_SPOT_REMOTE_EVIDENCE_READINESS_ASSESSMENT.md`
+- [`DESIGN.md`](../design/DESIGN.md)
+- [`AREA_SPOT_REMOTE_EVIDENCE_READINESS_ASSESSMENT.md`](../history/research/AREA_SPOT_REMOTE_EVIDENCE_READINESS_ASSESSMENT.md)
