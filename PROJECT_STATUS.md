@@ -45,7 +45,11 @@
 - Area-first Map-centered UI Design Contract: `ACCEPTED` · Issue #150 · PR #151
 - Repository Documentation Structure Alignment: `ACCEPTED` · Issue #150 · PR #151
 - History Archive and Documentation Index: `ACCEPTED` · Issue #150 · PR #151
-- Area-first Web/API Implementation: Scaffold·Dependency·Service·API·UI·Map·배포
+- Web Platform Scaffold: `ACCEPTED` · Issue #152 · PR #153
+- Deployment: `deployment_platform=VERCEL`,
+  `deployment_status=PLANNED_NOT_DEPLOYED`
+- Vercel Topology: `TWO_PROJECTS_ACCEPTED_FOR_INITIAL_PILOT`
+- Area-first Read-only Service·API·실제 데이터 연결·NAVER Map·실제 배포:
   `NOT_STARTED`
 - Code Cleanup: `NO_CODE_CLEANUP_REQUIRED_BEFORE_SCAFFOLD`
 - Spot 자동 추천: `DEFERRED_AFTER_INITIAL_PILOT`
@@ -496,17 +500,20 @@ Issue #146·PR #147로 `main`에 반영됐다. Area-first Web/API 경계와 읽�
 공급은 ADR-012 `ACCEPTED`로 확정했다. 지도 중심 UI 계약과 문서구조 정렬은
 Issue #150·PR #151의 승인 정본을 따른다. 다음 행동은 다음 순서다.
 
-1. Vue·FastAPI 통합 Scaffold
-2. Area-first Read-only API·Prototype 공급경로
-3. 지도 중심 Responsive UI·API 연결
-4. NAVER Map·Geolocation·QA·제한배포
-5. 실제 프래시매니저 사용성 검증
+1. End-to-end Area-first Web Pilot 구현·Preview 배포
+2. NAVER Map·Geolocation·Production 배포·통합 QA
+3. 실제 프래시매니저 사용성 검증
 
-파일 이동·삭제·리팩터링·Root 재구성·Scaffold·Dependency 변경은 각각 별도 승인
-범위에서만 수행한다. UI 디자인은 ADR 병합 뒤 별도 작업으로 병행할 수 있다.
-Area-first Service·API, Vue UI, FastAPI, NAVER Map, Spot Prototype Runtime·배포·
-사용자 파일럿은 구현 완료 상태가 아니다. 아래 EG-7 Live 결정은 독립 backlog로
-유지한다.
+1과 2는 하나의 Issue·Branch·PR 안에서 내부 Gate와 Commit으로 진행할 계획이다.
+End-to-end MVP 내부 Gate에서는 Vercel Preview Build, FastAPI Function Bundle 크기와
+필요 시 `excludeFiles`, Production `/api` Rewrite, 잘못된 `area_code` 추적 오류 시험,
+최종 UI Theme·Brand Color와 UI 참고 이미지 해석을 확인한다.
+
+파일 이동·삭제·리팩터링과 후속 Dependency 변경은 각각 별도 승인 범위에서만
+수행한다. Issue #152·PR #153의 Health API와 연결 전 Vue 화면을 포함한 최소 Scaffold는
+승인됐지만, Area-first Service·Read-only API·실제 데이터 연결, NAVER Map,
+Spot Prototype Runtime·배포·사용자 파일럿은 구현 완료 상태가 아니다. 아래 EG-7
+Live 결정은 독립 backlog로 유지한다.
 
 현재 OPEN 또는 미생성 결정:
 
@@ -557,12 +564,15 @@ Plan·`pilot_run_id`·Batch ID·Plan fingerprint는 아직 존재하지 않는�
 서울시 Forecast 기반 다중 Area 비교 Core와 사용자 선택 Spot 3개의 구현 이력으로
 보존한다. Issue #132·PR #133의 정적 Master, Issue #134·PR #135의 추천 Core와
 Issue #136·PR #137의 Recommendation Service는 `main`에 있다. D-022의 Area-first
-웹 파일럿 계약은 Issue #140·PR #141로 승인되어 `main`에 있으며, 코드·Service·API·
-Vue UI·FastAPI·NAVER Map·Spot Prototype Runtime·배포는 미구현이다. 추천 실행은
+웹 파일럿 계약은 Issue #140·PR #141로 승인되어 `main`에 있다. Vue·FastAPI 최소
+Scaffold는 Issue #152·PR #153에서 `ACCEPTED`이며,
+Service·Read-only API·실제 데이터 연결·NAVER Map·Spot Prototype Runtime·배포는
+미구현이다. 추천 실행은
 0건이다. Repository Readiness Audit은 PR #145로, 문서 7건 정합화는 PR #147로
 `main`에 반영됐다. Area-first Web/API 경계와 읽기 전용 데이터 공급은 ADR-012
-`ACCEPTED`(Issue #148, PR #149)이며 Scaffold·Dependency·Service·API·UI·Map·배포는
-`NOT_STARTED`다. Issue #150·PR #151의 지도 중심 UI 계약·문서구조·History Index는
+`ACCEPTED`(Issue #148, PR #149)이며 Scaffold는 Issue #152·PR #153에서 승인됐고,
+나머지 Service·API·실제 데이터·Map·배포는 `NOT_STARTED`다. Issue #150·PR #151의
+지도 중심 UI 계약·문서구조·History Index는
 `ACCEPTED`이며 구현 완료를 뜻하지 않는다. EG-7 Live
 preflight는 독립 backlog이며 EG-7 구현
 Branch를 다시 만들지 않는다.

@@ -217,6 +217,32 @@ Decision Record, 기술 구조 결정 기록) 형식으로 보존한다. 현행 
 - Related decision: D-020, D-021, D-022, ADR-011.
 - Related work: Issue #148, PR #149.
 
+## ADR-013 — Vercel-compatible Web Platform Scaffold
+
+- Status: `ACCEPTED`
+- Context: ADR-012의 Area-first 경계를 구현하기 전에 Vue·FastAPI 개발환경과
+  자동검사를 재현할 최소 Scaffold가 필요하다. PM은 배포 플랫폼을 Vercel로
+  확정했지만 Project·Domain·Rewrite와 실제 배포는 승인하지 않았다.
+- Decision: Vue 3·TypeScript·Vite는 `apps/web`, FastAPI·Pydantic·Uvicorn 표준
+  ASGI App은 `apps/api`에 둔다. Local 개발은 Vite의 `/api` Proxy를 사용한다.
+  FastAPI Entry Point는 `apps.api.main:app`, Python은 3.12, Product Runtime과 ML
+  Dependency는 분리한다. `deployment_platform=VERCEL`,
+  `web_project_root=apps/web`, `api_project_root=REPOSITORY_ROOT`,
+  `vercel_topology=TWO_PROJECTS_ACCEPTED_FOR_INITIAL_PILOT`로 확정하며 ADR-012의
+  Same-origin 공개경계를 유지한다.
+- Alternatives: 단일 Vercel Project에서 FastAPI가 Vue Build를 제공, 별도 Cloud
+  Provider, 초기 Microservice·Database·인증 도입.
+- Consequences: Vercel 두 Project 구성은 초기 Pilot Topology로 승인됐다. Production
+  `/api` Rewrite는 후속 구현이며 ADR-012의 Same-origin 원칙을 대체하지 않는다.
+  Runtime 파일쓰기를 금지하고 후속 승인 Snapshot은 읽기 전용으로만 공급한다.
+  실제 Project·Domain·Secret·Preview·Production 배포는 수행하지 않았다.
+- Validation: API App Import·Health·안전 오류·no-write 시험, Vue strict Type
+  Check·Build, 별도 Web Platform CI, 기존 전체시험과 Project Guard를 사용한다.
+- Evidence: Issue #152, PR #153, exact-head CI Validation, Web Platform Validation,
+  ML Runtime Validation.
+- Related decision: D-022, ADR-012.
+- Related work: Issue #152, PR #153.
+
 ## 2. ADR 갱신 규칙
 
 결정이 바뀌면 기존 ADR을 삭제하지 않고 상태를 `SUPERSEDED`로 바꾸며 대체 ADR을
