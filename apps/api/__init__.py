@@ -1,0 +1,1 @@
+"""FreshManager HTTP API."""
