@@ -1,0 +1,95 @@
+name: Web Platform Validation
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/web-platform.yml
+      - .python-version
+      - pyproject.toml
+      - requirements.txt
+      - requirements-api-test.txt
+      - apps/__init__.py
+      - apps/api/**
+      - apps/web/**
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/web-platform.yml
+      - .python-version
+      - pyproject.toml
+      - requirements.txt
+      - requirements-api-test.txt
+      - apps/__init__.py
+      - apps/api/**
+      - apps/web/**
+
+permissions:
+  contents: read
+
+jobs:
+  api:
+    name: FastAPI Validation
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install API test requirements
+        run: python -m pip install --disable-pip-version-check -r requirements-api-test.txt
+
+      - name: Check API dependency consistency
+        run: python -m pip check
+
+      - name: Verify API app and health endpoint
+        run: >-
+          python -c 'from fastapi.testclient import TestClient;
+          from apps.api.main import app;
+          response = TestClient(app).get("/api/v1/health");
+          assert response.status_code == 200;
+          assert response.json() == {"status": "ok", "service": "freshmanager-api"}'
+
+      - name: Run API tests
+        run: python -B -m unittest discover -s apps/api/tests -p "test_*.py" -v
+
+  web:
+    name: Vue Build Validation
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: Install web dependencies
+        run: npm ci
+
+      - name: Run TypeScript check
+        run: npm run typecheck
+
+      - name: Build web app
+        run: npm run build
+
+      - name: Verify build output is untracked
+        run: |
+          test -z "$(git ls-files -- dist)"
+          git check-ignore --quiet dist/index.html
