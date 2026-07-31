@@ -29,7 +29,7 @@ Issue #70·PR #71로 `main`에 반영됐으며, 실제 반복수집은 별도 PM
 9. [`ARCHITECTURE_DECISIONS.md`](ai-context/ARCHITECTURE_DECISIONS.md)의 관련 ADR
 
 `ai-context/`는 상태·제품·기술 정본을 대체하지 않는 복원 보조 문서다. 전체 Harness
-구조는 [`CODEX_HARNESS_ARCHITECTURE.md`](docs/engineering/CODEX_HARNESS_ARCHITECTURE.md),
+구조는 [`CODEX_HARNESS_ARCHITECTURE.md`](docs/architecture/CODEX_HARNESS_ARCHITECTURE.md),
 백업·CSV 목표계약은
 [`CLOUD_BACKUP_AND_CSV_MANAGEMENT_PLAN.md`](docs/data/CLOUD_BACKUP_AND_CSV_MANAGEMENT_PLAN.md)를 따른다.
 
@@ -694,7 +694,7 @@ Codex는 작업 전 반드시 `AGENTS.md`를 읽는다.
 - `docs/product/FreshManager_PRD_v1.0.md`: 공식 제품 목적·범위·수용 기준
 - `docs/engineering/FreshManager_TRD_v1.0.md`: 공식 기술 구조·계약
 - `PROJECT_STATUS.md`: 현재 단계와 다음 행동
-- `docs/engineering/CODEX_HARNESS_ARCHITECTURE.md`: 문서·검증·승인 책임 구조
+- `docs/architecture/CODEX_HARNESS_ARCHITECTURE.md`: 문서·검증·승인 책임 구조
 - `docs/rules/GIT_WORKFLOW.md`: Git 작업 운영 규칙
 - `docs/rules/SECURITY_RULES.md`: 보안 운영 규칙
 - `docs/rules/DATA_COLLECTION_RULES.md`: 데이터 수집·원본 보존·결측 처리 규칙

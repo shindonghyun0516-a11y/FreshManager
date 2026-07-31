@@ -1,7 +1,7 @@
 # Area-first Web Pilot Contract
 
 - 문서 상태: Approved
-- 버전: v0.3.0
+- 버전: v0.4.0
 - 작성자: 신동현
 - 최종 승인자: 신동현
 - 최초 작성일: 2026-07-30
@@ -10,9 +10,12 @@
 - 관련 문서:
   - [`FreshManager_PRD_v1.0.md`](FreshManager_PRD_v1.0.md)
   - [`RECOMMENDATION_OUTPUT_CONTRACT.md`](RECOMMENDATION_OUTPUT_CONTRACT.md)
-  - [`DECISION_LOG.md`](../../ai-context/DECISION_LOG.md)의 D-020, D-021, D-022
+  - [`DECISION_LOG.md`](../../ai-context/DECISION_LOG.md)의 D-020, D-021, D-022와
+    D-023(`ACCEPTED`)
   - [`PROJECT_STATUS.md`](../../PROJECT_STATUS.md)
   - [`REPOSITORY_READINESS_AUDIT.md`](../architecture/REPOSITORY_READINESS_AUDIT.md)
+  - [`DESIGN.md`](../design/DESIGN.md)
+- 관련 작업: Issue #150, PR #151
 - 변경 시 PM 승인: 필요
 
 ---
@@ -75,7 +78,7 @@ gate_c_status=SEPARATE_EVALUATION_REQUIRED
 ```
 
 Git에는 개인정보 없는 실제 Interview Evidence Summary 또는 외부 Evidence
-Reference가 아직 없다. `interview/interview_matrix.md`는 공개자료 기반
+Reference가 아직 없다. [`GATE_C_SYNTHETIC_INTERVIEW_MATRIX.md`](../analysis/GATE_C_SYNTHETIC_INTERVIEW_MATRIX.md)는 공개자료 기반
 합성자료이며 실제 인터뷰·직접 인용·Gate C 통과 근거가 아니다. 후속 Evidence
 Traceability는 개인정보·원본 녹취·참여자 식별정보를 제외한 별도 PM 승인 범위다.
 
@@ -103,15 +106,16 @@ Tablet 전용 UI 없음
 좁은 화면은 모바일웹 Layout을 사용하며, 태블릿 전용 Component·정보구조는 만들지
 않는다. 정확한 CSS Breakpoint는 후속 UI 구현계약에서 코드 상수로 확정한다.
 
-데스크톱은 좌측에 담당 Area 선택과 Area 현재·1시간 후·3시간 후 정보·출처·기준시각,
-중앙에 네이버 지도·Spot Marker 3개·현재 위치, 우측에 선택 Spot 상세·비교기준·
-점수·순위·직선거리·`판촉 후보 위치로 선택`을 둔다. Spot 미선택 시 우측 패널에는
-Spot 선택 안내를 표시한다.
+데스크톱 기본화면은 지도 중심이다. Header, 담당 Area Dropdown, 데이터 기준시각,
+도움말, 지도, 선택 Area의 Spot Marker 3개, `구역 정보`, `후보 위치 3곳`,
+`내 위치 표시`, 지도 확대·축소와 범례를 표시한다. Area 정보와 Spot 목록·상세는
+기본화면에 고정하지 않고 필요할 때 지도 위 우측 단일 Drawer로 표시한다. Area
+Drawer와 Spot Drawer는 상호배타적이며 한 번에 하나만 연다.
 
-모바일은 `Area 선택 → Area 현재·1시간 후·3시간 후 정보 → 네이버 지도 → Spot 목록
-→ Spot 클릭 → Bottom Sheet → 판촉 후보 위치로 선택` 흐름을 사용한다. Spot 상세는
-데스크톱에서 우측 패널, 모바일에서 Bottom Sheet로 표시하며 추가 확인 팝업은 사용하지
-않는다.
+모바일은 같은 데이터·Component·선택상태를 지도 위 단일 Bottom Sheet로 표시한다.
+`Area 선택 → 지도·Spot Marker 3개 → 구역 정보 또는 후보 위치 3곳 열기 → Marker
+또는 목록 Card 클릭 → 후보 위치 상세 Bottom Sheet → 판촉 후보 위치로 선택` 흐름을
+사용한다. 추가 확인 팝업은 사용하지 않는다.
 
 | 항목 | 고정값 |
 |---|---|
@@ -129,10 +133,10 @@ Spot 선택 안내를 표시한다.
 → hy 본사를 중심으로 네이버 지도 표시
 → 담당 Area Dropdown 선택
 → 선택 Area로 지도 이동
-→ Area 현재·1시간 후·3시간 후 유동인구·혼잡도 표시
-→ Area의 Spot 3개 표시
-→ Spot 핀 또는 목록 클릭
-→ 화면 Layout에 따른 Spot 상세정보 표시
+→ 지도에 Area의 Spot Marker 3개와 정보 Trigger 표시
+→ 필요할 때 구역 정보 또는 후보 위치 3곳 열기
+→ Marker 또는 목록 Card 클릭
+→ Desktop 단일 Drawer 또는 Mobile Bottom Sheet에 Spot 상세정보 표시
 → Spot 현재·1시간 후·3시간 후 프로토타입 정보 확인
 → 과거 비교기준 선택
 → 점수·순위·직선거리 확인
@@ -162,8 +166,10 @@ Area 미선택 상태에서는 Area 유동정보, Spot 핀·목록과 Spot 상�
 선택하면 해당 Area로 이동하고 Spot 3개가 모두 보이도록 지도 범위를 조정한다.
 Area를 변경하면 이전 Area 수치, Spot 상세와 선택 상태를 즉시 해제한다.
 
-지도 Provider는 네이버 지도 JavaScript API다. Area 미선택 시 hy 본사를 기본
-중심으로 사용하지만 다음 값은 PM 확인 전까지 확정하지 않는다.
+목표 지도 Provider는 네이버 지도 JavaScript API다. 현재 디자인의 지도는
+Layout·Interaction 검토용 Placeholder이며 실제 Provider·좌표·Zoom·Marker 위치는
+통합 단계에서 확정한다. Area 미선택 시 hy 본사를 기본 중심으로 사용하는 계약은
+유지하지만 다음 값은 PM 확인 전까지 확정하지 않는다.
 
 ```text
 default_location_name
@@ -180,7 +186,7 @@ Git에 기록하지 않는다. 후속 환경변수 이름 후보는 `NAVER_MAP_C
 
 ## 6. Area 공식 데이터 표시 계약
 
-선택 Area에는 다음 정보를 표시한다.
+선택 Area의 구역 정보 Drawer 또는 Bottom Sheet에는 다음 정보를 표시한다.
 
 - Area명
 - 현재 유동인구 최소·최대, 현재 혼잡도, 데이터 기준시각
@@ -223,8 +229,8 @@ Current가 있으면 현재정보만 표시한다. 다른 시간간격 값을 �
 
 ## 7. Spot 프로토타입 데이터 계약
 
-각 Area에는 정확히 3개 Spot을 제공한다. Spot 카드와 Layout별 상세영역(데스크톱
-우측 패널·모바일 Bottom Sheet)에는 다음 UI 영역을 둔다.
+각 Area에는 정확히 3개 Spot을 제공한다. 후보 위치 목록과 Layout별 상세영역
+(Desktop 단일 Drawer·Mobile Bottom Sheet)에는 다음 UI 영역을 둔다.
 
 - 현재 유동인구·현재 혼잡도
 - 1시간 후 예상 유동인구·예상 혼잡도
@@ -261,8 +267,9 @@ Spot 상세의 `비교기준` Dropdown은 다음 세 값만 허용한다.
 
 ## 9. Spot 상세와 선택
 
-Spot 핀 또는 목록 클릭은 Layout별 상세영역(데스크톱 우측 패널·모바일 Bottom Sheet)을
-열 뿐 최종 선택을 뜻하지 않는다. 해당 상세영역에는 다음을 표시한다.
+Spot Marker 또는 목록 Card 클릭은 같은 Spot의 Layout별 상세영역(Desktop 단일
+Drawer·Mobile Bottom Sheet)을 열 뿐 최종 선택을 뜻하지 않는다. Marker와 목록의
+Opened 상태는 동기화한다. 해당 상세영역에는 다음을 표시한다.
 
 - Spot명·주소·유형
 - 프로토타입 데이터 배지와 제한사항
@@ -272,8 +279,9 @@ Spot 핀 또는 목록 클릭은 Layout별 상세영역(데스크톱 우측 패�
 - 현재 위치에서의 직선거리와 다른 Spot까지의 직선거리
 
 `판촉 후보 위치로 선택` 버튼을 눌러야 선택이 완료된다. 추가 확인 팝업은 계약에
-포함하지 않는다. 선택 후 핀과 카드를 함께 강조하고 다른 Spot으로 다시 선택할 수
-있다. 기본선택·자동선택·시스템 산출 추천순위는 없다.
+포함하지 않는다. Marker는 Default·Opened·Selected 상태를 구분하고, 선택 후
+Marker와 목록 Card를 함께 강조한다. 다른 Spot으로 다시 선택할 수 있다.
+기본선택·자동선택·시스템 산출 추천순위는 없다.
 
 ## 10. 현재 위치와 직선거리
 
@@ -302,16 +310,26 @@ Spot 조회와 선택을 막지 않는다.
 |---|---|---|---|---|---|
 | `AREA_UNSELECTED` | Area Dropdown, 선택 안내, 가능하면 기본지도 | Area 수치, Spot 핀·목록·상세 | 담당 Area를 선택하세요 | 해당 없음 | Area 선택 |
 | `AREA_LOADING` | 선택 Area명, Loading 안내 | 이전 Area 수치·Spot·선택 | Area 정보를 불러오는 중입니다 | 완료·실패 후 가능 | 대기 또는 Area 변경 |
-| `AREA_AVAILABLE` | Area 현재·1시간 후·3시간 후 공식정보, 출처·기준시각, Spot 3개 | 클릭 전 Spot 상세 | Spot을 눌러 비교하세요 | 수동 새로고침 가능 | 핀 또는 목록 선택 |
+| `AREA_AVAILABLE` | 데이터 기준시각, 구역 정보 Trigger, Spot Marker 3개 | Drawer를 열기 전 Area 공식 수치·Spot 상세 | 구역 정보나 후보 위치를 확인하세요 | 수동 새로고침 가능 | Trigger·Marker 또는 목록 선택 |
 | `AREA_DATA_UNAVAILABLE` | Area명, 정적 Spot 이름·주소, 안전한 제한 안내 | 공식 Area 수치·증감 | Area 정보를 사용할 수 없어 값을 표시하지 않습니다 | 수동 가능 | 재시도·다른 Area·정적 Spot 확인 |
+| `SPOT_UNSELECTED` | Spot Marker 3개와 후보 위치 목록 Trigger | Spot 상세·선택 강조 | 후보 위치를 눌러 정보를 확인하세요 | 해당 없음 | Marker 또는 목록 열기 |
+| `SPOT_LIST_OPEN` | 후보 위치 3곳 목록과 Marker 연동상태 | Area Drawer·Spot 상세 | 후보 위치 3곳을 확인하세요 | 해당 없음 | 목록 Card 또는 Marker 선택 |
 | `SPOT_DETAIL_OPEN` | Spot 정체성, 프로토타입 배지, 가능한 수동정보·거리·제한 | 시스템 추천 표현 | 정보를 확인한 뒤 후보 위치를 선택하세요 | 해당 없음 | 비교기준 변경 또는 명시 선택 |
-| `SPOT_SELECTED` | 선택 핀·카드 강조, 선택 완료, 상세 | 자동·공식 추천 주장 | 판촉 후보 위치로 선택했습니다. 다른 Spot으로 변경할 수 있습니다 | 해당 없음 | 유지 또는 재선택 |
+| `SPOT_SELECTED` | 선택 핀·카드 강조, 선택 완료, 상세 | 자동·공식 추천 주장 | 판촉 후보 위치로 선택했습니다. 다른 후보 위치로 변경할 수 있습니다 | 해당 없음 | 유지 또는 재선택 |
 | `SPOT_PROTOTYPE_DATA_UNAVAILABLE` | Spot명·주소·유형, 데이터 없음과 제한 안내 | 누락된 수동값·점수·순위 | 프로토타입 값을 만들거나 대체하지 않았습니다 | 수동 가능 | 정적 정보로 선택·다른 Spot 확인·데이터 갱신 |
+| `MAP_PLACEHOLDER` | Layout·Interaction 검토용 지도 | 실제 좌표·Zoom 정확성 주장 | 지도와 위치는 후속 통합 단계에서 연결합니다 | 해당 없음 | UI 흐름 검토 |
+| `MAP_LOADING` | 지도 Loading, Area·Spot 텍스트 정보 | 지도·Marker | 지도를 불러오는 중입니다 | 완료·실패 후 가능 | 대기 또는 목록 사용 |
+| `MAP_AVAILABLE` | 지도·Marker·Control과 텍스트 정보 | 없음 | 후보 위치를 지도나 목록에서 확인하세요 | 수동 가능 | Marker·목록 사용 |
 | `MAP_UNAVAILABLE` | Area Dropdown, Area 텍스트 정보, Spot 이름·주소 목록·상세·선택 | 지도와 핀 | 지도를 불러오지 못했지만 목록으로 이용할 수 있습니다 | 수동 가능 | 지도 재시도 또는 목록 사용 |
+| `GEOLOCATION_IDLE` | `내 위치 표시` 버튼과 기존 화면 | 현재 위치·거리 | 필요한 경우 내 위치를 표시할 수 있습니다 | 해당 없음 | 명시 버튼 선택 |
 | `GEOLOCATION_REQUESTING` | 기존 화면, 권한 요청 중 안내 | 현재 위치·거리 | 브라우저 위치권한 응답을 기다리는 중입니다 | 응답 후 가능 | 허용 또는 거부 선택 |
 | `GEOLOCATION_AVAILABLE` | 현재 위치, 직선거리, 기존 Area·Spot 정보 | 도보거리·시간·경로 | 거리는 직선거리 근사값입니다 | 명시 버튼으로 가능 | Spot 비교·선택 |
 | `GEOLOCATION_DENIED` | 기존 Area·Spot 화면, 거부 안내 | 현재 위치·거리 | 위치 없이도 이용할 수 있습니다 | 사용자 동작 후 가능 | 주소·목록으로 계속 |
 | `GEOLOCATION_UNAVAILABLE` | 기존 화면, 기기·브라우저 제한 안내 | 현재 위치·거리 | 위치를 확인할 수 없지만 나머지 기능은 이용할 수 있습니다 | 자동 재시도 없음 | 지도·주소로 계속 |
+| `FRESH` | 해당 미래정보 정상 표시 | 없음 | 저장된 최신 승인 데이터 기준입니다 | 해당 없음 | 정보 확인 |
+| `DEGRADED` | 해당 미래정보와 경고 | 없음 | 참고가 필요한 데이터 상태입니다 | 수동 가능 | 경고와 함께 확인 |
+| `STALE_BLOCKED` | 해당 미래값 이용불가 안내 | 오래된 미래값 | 오래된 미래값은 표시하지 않습니다 | 수동 가능 | Current 또는 다른 시점 확인 |
+| `NO_COMPLETE_SNAPSHOT` | 표시 가능한 Current와 미래값 없음 안내 | 불완전한 미래값 | 완전한 미래정보를 사용할 수 없습니다 | 수동 가능 | Current 확인 |
 | `INPUT_INVALID` | 안전한 입력오류, Area Dropdown | 잘못된 입력 기반 파생값·Spot 상세 | 승인된 Area 또는 비교기준을 다시 선택하세요 | 입력 수정 후 가능 | 입력 교정 |
 
 잘못된 입력과 Area 변경 시 이전 Area·Spot 데이터를 그대로 남기지 않는다. 지도·위치
@@ -341,11 +359,14 @@ Area별 접근권한과 공통 접근코드는 후속 제한배포 단계의 별
 
 ## 14. 반응형·접근성 원칙
 
-Desktop Web과 Mobile Web은 같은 기능·데이터·상태를 제공한다. 좁은 화면은 모바일
-Layout을 사용하며 태블릿 전용 UI는 없다. 다음을 만족해야 한다.
+Desktop Web과 Mobile Web은 같은 기능·데이터·상태를 제공한다. Desktop은 단일
+Drawer, 좁은 화면은 단일 Bottom Sheet Container를 사용하며 태블릿 전용 UI는
+없다. 다음을 만족해야 한다.
 
 - 가로 Overflow 없음
 - 충분한 터치영역과 조작 가능한 Dropdown
+- 최소 44×44px Touch Target
+- Drawer·Bottom Sheet가 열릴 때 Focus 이동, 닫힐 때 실행요소로 Focus 복귀
 - 지도 드래그와 모바일 Bottom Sheet 스크롤 충돌 최소화
 - 긴 주소 줄바꿈
 - 색상 외 텍스트·형태로 상태 표시
@@ -397,7 +418,8 @@ Area별 접근권한과 제한배포 방식도 후속 결정이다. 미결정값
 - Area 공식 데이터와 Spot PM 수동 프로토타입 데이터가 분리됨
 - 반응형 Desktop Web·Mobile Web, 태블릿 전용 UI 제외, 현재·1시간 후·3시간 후,
   과거 비교와 명시 선택이 정의됨
-- 13개 UI 상태와 지도·위치 실패 Fallback이 정의됨
+- Area·Spot·Map·Geolocation·Future Data 독립 상태군과 지도·위치 실패 Fallback이
+  정의됨
 - 개인정보 비저장과 모바일 기준이 정의됨
 - D-020·D-021 구현 이력과 기존 Core·Service가 보존됨
 - Area-first Service·API, Spot Prototype Data, Vue UI·FastAPI·NAVER Map·배포가
@@ -408,6 +430,7 @@ Area별 접근권한과 제한배포 방식도 후속 결정이다. 미결정값
 
 | 버전 | 날짜 | 변경내용 | 승인상태 |
 |---|---|---|---|
+| v0.4.0 | 2026-07-31 | Desktop 고정 3열을 지도 중심 기본화면과 상호배타 단일 Drawer로 교체하고 Mobile Bottom Sheet, Marker·목록 동기화와 디자인 정본 연결을 반영 | PM 변경 승인 |
 | v0.3.0 | 2026-07-31 | 실제 인터뷰 PM 확인과 Git Evidence 미추적, 합성 Matrix 비증거, Gate C 별도 평가를 구분하고 Audit 목표구조와 현재 미구현 Runtime 경계를 명시 | PM 변경 승인 |
 | v0.2.0 | 2026-07-30 | 최신 PM 결정에 따라 반응형 Desktop·Mobile Layout, 사용자 시간표현, 중앙값 기반 Area 증감, EG-8D 최신성 재사용, 실제 인터뷰 근거와 Audit 이후 ADR 경계를 반영 | PR #141 main 반영 |
 | v0.1.0 | 2026-07-30 | D-022 Area-first 초기 웹 파일럿의 제품·UI·데이터 표시 계약 초안 | PM 검토 대기 |

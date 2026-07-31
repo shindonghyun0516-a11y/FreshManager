@@ -11,8 +11,8 @@
 > 실행하며 13개 Area 데이터가 계속 누적되고 있다 — 5분 자동수집 동작은 `ACTIVE`다.
 > 다만 이는 24시간 이상 장기 무중단 지속성 검증과는 다른 사실이며, 그 검증은 아직
 > `NOT_COMPLETED`다. Apps Script 소스의 Git 버전관리와 Python 쪽 데이터 통합은
-> `PLANNED`다. 백업은 수집 실행과 분리된 Google Drive for Desktop Sync Backup
-> Worker가 담당하는 목표구조이며 로컬 EG-6B Batch 기준으로는 아직 구현되지 않았다.
+> `PLANNED`다. 수집과 분리된 Google Drive for Desktop Sync Backup Worker 구현은
+> 완료됐으며, EG-7 Live 반복수집은 아직 실행되지 않았다.
 
 ## 0. 현재 Apps Script 자동수집 절차 (참고용)
 
@@ -31,12 +31,12 @@
 
 ## 1. 먼저 확인할 공식 문서
 
-1. [`PROJECT_STATUS.md`](../PROJECT_STATUS.md) — 지금 어디까지 진행됐는지
-2. [`FreshManager_PRD_v1.0.md`](../docs/product/FreshManager_PRD_v1.0.md) — 무엇을 왜 검증하는지
-3. [`FreshManager_TRD_v1.0.md`](../docs/engineering/FreshManager_TRD_v1.0.md) — 현재 수집기가 어떻게 동작하는지
-4. [`DATA_COLLECTION_RULES.md`](../docs/rules/DATA_COLLECTION_RULES.md) — 원본·메타데이터·백업 규칙
-5. [`QUALITY_GATES.md`](../docs/testing/QUALITY_GATES.md) — 다음 단계로 넘어가는 조건
-6. [`CLOUD_BACKUP_AND_CSV_MANAGEMENT_PLAN.md`](../docs/data/CLOUD_BACKUP_AND_CSV_MANAGEMENT_PLAN.md) — Google Drive 백업과 CSV 후속 계획
+1. [`PROJECT_STATUS.md`](../../PROJECT_STATUS.md) — 지금 어디까지 진행됐는지
+2. [`FreshManager_PRD_v1.0.md`](../product/FreshManager_PRD_v1.0.md) — 무엇을 왜 검증하는지
+3. [`FreshManager_TRD_v1.0.md`](../engineering/FreshManager_TRD_v1.0.md) — 현재 수집기가 어떻게 동작하는지
+4. [`DATA_COLLECTION_RULES.md`](../rules/DATA_COLLECTION_RULES.md) — 원본·메타데이터·백업 규칙
+5. [`QUALITY_GATES.md`](../testing/QUALITY_GATES.md) — 다음 단계로 넘어가는 조건
+6. [`CLOUD_BACKUP_AND_CSV_MANAGEMENT_PLAN.md`](CLOUD_BACKUP_AND_CSV_MANAGEMENT_PLAN.md) — Google Drive 백업과 CSV 후속 계획
 
 ## 2. 현재 단계
 

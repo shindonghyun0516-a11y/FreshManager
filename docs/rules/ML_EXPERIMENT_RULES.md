@@ -18,7 +18,7 @@ Feature·Label·Split 사용, Leakage 방지, Baseline 비교, Validation 판단
 Model Decision이다.
 
 Issue·Branch·PR·CI·Merge와 PM 승인 절차는
-`docs/engineering/CODEX_HARNESS_ARCHITECTURE.md`,
+`docs/architecture/CODEX_HARNESS_ARCHITECTURE.md`,
 `docs/engineering/DEVELOPMENT_WORKFLOW.md`와 `docs/rules/GIT_WORKFLOW.md`가 소유한다.
 이 문서는 해당 절차의 승인 결과만 진입조건으로 참조한다. Dataset Schema는
 `docs/data/ML_READY_DATASET_SPEC.md`가, EG-8C Gate는

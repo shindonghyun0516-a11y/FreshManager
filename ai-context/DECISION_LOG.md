@@ -176,7 +176,7 @@ PM이 승인했거나 명시적으로 보류한 제품·운영 결정을 새 AI 
   `collectData`를 반복 실행하며 실행마다 서로 다른 `collection_run_id`로 Raw
   13건·Current 13건·Forecast 156건이 계속 쌓이는 것을 추가로 확인 — 5분 자동수집
   동작은 `ACTIVE`다.
-- Consequence: TRD·PRD·`etc/데이터수집 실행 가이드.md`·`docs/rules/DATA_COLLECTION_RULES.md`·
+- Consequence: TRD·PRD·`docs/data/DATA_COLLECTION_EXECUTION_GUIDE.md`·`docs/rules/DATA_COLLECTION_RULES.md`·
   `PROJECT_STATUS.md`·`PROJECT_MEMORY.md`의 관련 표현을 정렬한다. 5분 자동수집
   동작은 `ACTIVE`로 기록하되, Apps Script의 24시간 이상 장기 지속성, 소스 Git
   버전관리, Python 파이프라인과의 데이터 통합은 각각 `NOT_COMPLETED`·`PLANNED`·
@@ -313,7 +313,7 @@ PM이 승인했거나 명시적으로 보류한 제품·운영 결정을 새 AI 
 - Future boundary: 향후 실제 운영기관이 별도 현장검증을 수행하는 경우에만 운영
   적합성 확인단계를 추가할 수 있다. 현재 Issue에서 현장검증 Issue는 만들지 않는다.
 - Evidence: Issue #126,
-  `docs/product/AREA_SPOT_REMOTE_EVIDENCE_READINESS_ASSESSMENT.md`,
+  `docs/history/research/AREA_SPOT_REMOTE_EVIDENCE_READINESS_ASSESSMENT.md`,
   `docs/product/AREA_SPOT_RECOMMENDATION_AND_UI_POLICY.md`.
 - Supersession: 현장검증 불가, 운영 적합성 미확인과 판매·안전·정차·성과 비보장
   원칙은 유지한다. `데이터 기반 우선 후보`를 현재 PoC의 최대 출력으로 제한하고
@@ -434,6 +434,33 @@ official_recommendation_allowed=false
   공식화한다.
 - Evidence: Issue #140, PR #141,
   `docs/product/AREA_FIRST_WEB_PILOT_CONTRACT.md`.
+
+### D-023 — 지도 중심 Area-first UI 구조
+
+- Date: `2026-07-31`
+- Status: `ACCEPTED`
+- Relationship: D-022의 사용자 담당 Area 직접 선택, Area당 Spot 3개, 사용자
+  Spot 직접 선택, 서울시 Area 데이터와 PM 수동 Spot 프로토타입의 구분을 유지한다.
+- Desktop: 기본화면은 지도를 중심으로 구성한다. `구역 정보`와 `후보 위치 3곳`은
+  필요할 때 여는 단일 우측 Drawer로 표시하며 두 Drawer를 동시에 열지 않는다.
+  Marker 또는 후보 목록을 선택하면 같은 Drawer에서 후보 위치 상세를 표시한다.
+- Mobile: Desktop과 같은 데이터·Component·선택상태를 사용하되 Drawer의 표시
+  Container를 Bottom Sheet로 바꾼다.
+- Layout change: 기존 고정 3열 Layout은 지도 중심 기본화면과 필요 시 여는 단일
+  Drawer·Bottom Sheet 구조로 대체한다.
+- Unchanged contracts: API Endpoint, Area 증감 계산, 최신성 상태와 ADR-012의
+  Dependency 방향·읽기 전용 데이터 공급 경계는 변경하지 않는다.
+- Prototype boundary: 현재 디자인의 지도는 배치·상호작용 확인용 Placeholder이고
+  수치는 UI 구조·Component 확인용 Mock Data다. 운영 사실, 실제 Spot 값 또는
+  공식 추천 결과로 사용하지 않는다.
+- Follow-up: 실제 NAVER Map 좌표·Zoom·Marker와 실제 Area·Spot 데이터는 후속
+  구현 Gate에서 연결한다.
+- Scope boundary: 이 제안은 UI/UX 문서 계약이다. API·계산·Architecture
+  Dependency 변경, Vue·FastAPI 구현, 실제 지도 연결, 데이터 작성·수집·추천·
+  머신러닝 실행이나 배포를 승인하지 않는다.
+- Evidence: Issue #150, PR #151, `docs/design/DESIGN.md`,
+  `docs/product/AREA_FIRST_WEB_PILOT_CONTRACT.md`,
+  `docs/product/AREA_SPOT_RECOMMENDATION_AND_UI_POLICY.md`.
 
 ## 4. 갱신 규칙
 

@@ -164,7 +164,7 @@ Issue #53·PR #54의 EG-6B Batch 실행 코드는 이 참조 패널을 입력으
 - `data/reference/eg6_spot_master.csv`: 서비스 지역별 Candidate Anchor Point
 - `data/reference/eg6_sdot_links.csv`: Anchor별 최근 활성 S-DoT 근접 보조 연결
 - `data/reference/seoul_121_places.csv`: 장소코드와 공식 장소명의 유일한 기준
-- `docs/analysis/EG5_DATA_ANALYSIS_REPORT.md`: EG-5 수집 데이터 구조·Feature 분석 근거
+- `docs/history/analysis/EG5_DATA_ANALYSIS_REPORT.md`: EG-5 수집 데이터 구조·Feature 분석 근거
 
 ## 9. 범위와 다음 승인
 
