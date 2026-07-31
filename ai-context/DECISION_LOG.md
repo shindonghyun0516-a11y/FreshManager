@@ -438,7 +438,7 @@ official_recommendation_allowed=false
 ### D-023 — 지도 중심 Area-first UI 구조
 
 - Date: `2026-07-31`
-- Status: `PROPOSED_PENDING_PM_REVIEW`
+- Status: `ACCEPTED`
 - Relationship: D-022의 사용자 담당 Area 직접 선택, Area당 Spot 3개, 사용자
   Spot 직접 선택, 서울시 Area 데이터와 PM 수동 Spot 프로토타입의 구분을 유지한다.
 - Desktop: 기본화면은 지도를 중심으로 구성한다. `구역 정보`와 `후보 위치 3곳`은
@@ -458,7 +458,7 @@ official_recommendation_allowed=false
 - Scope boundary: 이 제안은 UI/UX 문서 계약이다. API·계산·Architecture
   Dependency 변경, Vue·FastAPI 구현, 실제 지도 연결, 데이터 작성·수집·추천·
   머신러닝 실행이나 배포를 승인하지 않는다.
-- Evidence: Issue #150, `docs/design/DESIGN.md`,
+- Evidence: Issue #150, PR #151, `docs/design/DESIGN.md`,
   `docs/product/AREA_FIRST_WEB_PILOT_CONTRACT.md`,
   `docs/product/AREA_SPOT_RECOMMENDATION_AND_UI_POLICY.md`.
 

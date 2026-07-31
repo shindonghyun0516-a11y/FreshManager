@@ -1,13 +1,13 @@
 # FreshManager UI/UX Design Specification
 
-- 문서 상태: `DRAFT · PROPOSED`
+- 문서 상태: `APPROVED · ACCEPTED`
 - 버전: `v0.1.0`
 - 적용 범위: Area-first 초기 웹 파일럿
 - 관련 결정:
   - [`D-022`](../../ai-context/DECISION_LOG.md)
   - [`ADR-012`](../architecture/AREA_FIRST_WEB_API_ARCHITECTURE.md)
-  - Issue #150
-  - Draft PR: `PENDING`
+  - Related Issue: #150
+  - Related PR: #151
 - 관련 제품계약:
   - [`AREA_FIRST_WEB_PILOT_CONTRACT.md`](../product/AREA_FIRST_WEB_PILOT_CONTRACT.md)
   - [`AREA_SPOT_RECOMMENDATION_AND_UI_POLICY.md`](../product/AREA_SPOT_RECOMMENDATION_AND_UI_POLICY.md)

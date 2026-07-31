@@ -1,6 +1,6 @@
 # Area-first Web Pilot Contract
 
-- 문서 상태: Draft · Proposed
+- 문서 상태: Approved
 - 버전: v0.4.0
 - 작성자: 신동현
 - 최종 승인자: 신동현
@@ -11,10 +11,11 @@
   - [`FreshManager_PRD_v1.0.md`](FreshManager_PRD_v1.0.md)
   - [`RECOMMENDATION_OUTPUT_CONTRACT.md`](RECOMMENDATION_OUTPUT_CONTRACT.md)
   - [`DECISION_LOG.md`](../../ai-context/DECISION_LOG.md)의 D-020, D-021, D-022와
-    제안 상태 D-023(`PROPOSED_PENDING_PM_REVIEW`)
+    D-023(`ACCEPTED`)
   - [`PROJECT_STATUS.md`](../../PROJECT_STATUS.md)
   - [`REPOSITORY_READINESS_AUDIT.md`](../architecture/REPOSITORY_READINESS_AUDIT.md)
   - [`DESIGN.md`](../design/DESIGN.md)
+- 관련 작업: Issue #150, PR #151
 - 변경 시 PM 승인: 필요
 
 ---
@@ -429,7 +430,7 @@ Area별 접근권한과 제한배포 방식도 후속 결정이다. 미결정값
 
 | 버전 | 날짜 | 변경내용 | 승인상태 |
 |---|---|---|---|
-| v0.4.0 | 2026-07-31 | Desktop 고정 3열을 지도 중심 기본화면과 상호배타 단일 Drawer로 교체하고 Mobile Bottom Sheet, Marker·목록 동기화와 디자인 정본 연결을 반영 | PM 검토 대기 |
+| v0.4.0 | 2026-07-31 | Desktop 고정 3열을 지도 중심 기본화면과 상호배타 단일 Drawer로 교체하고 Mobile Bottom Sheet, Marker·목록 동기화와 디자인 정본 연결을 반영 | PM 변경 승인 |
 | v0.3.0 | 2026-07-31 | 실제 인터뷰 PM 확인과 Git Evidence 미추적, 합성 Matrix 비증거, Gate C 별도 평가를 구분하고 Audit 목표구조와 현재 미구현 Runtime 경계를 명시 | PM 변경 승인 |
 | v0.2.0 | 2026-07-30 | 최신 PM 결정에 따라 반응형 Desktop·Mobile Layout, 사용자 시간표현, 중앙값 기반 Area 증감, EG-8D 최신성 재사용, 실제 인터뷰 근거와 Audit 이후 ADR 경계를 반영 | PR #141 main 반영 |
 | v0.1.0 | 2026-07-30 | D-022 Area-first 초기 웹 파일럿의 제품·UI·데이터 표시 계약 초안 | PM 검토 대기 |
