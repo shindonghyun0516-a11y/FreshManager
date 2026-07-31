@@ -351,7 +351,7 @@ PROJECT_STATUS는 상태 복원을 지원하지만 Git 기록이나 현재 Issue
 2. 현재 `main` 코드와 실제 테스트 결과
 3. 현재 Issue의 PM 승인 범위와 병합된 Pull Request
 4. [`FreshManager_PRD_v1.0.md`](../product/FreshManager_PRD_v1.0.md)
-5. [`FreshManager_TRD_v1.0.md`](FreshManager_TRD_v1.0.md)
+5. [`FreshManager_TRD_v1.0.md`](../engineering/FreshManager_TRD_v1.0.md)
 6. [`DATA_COLLECTION_RULES.md`](../rules/DATA_COLLECTION_RULES.md)
 7. [`QUALITY_GATES.md`](../testing/QUALITY_GATES.md)
 8. `AGENTS.md`
@@ -409,8 +409,8 @@ rules의 권한·보안·범위 제한을 따른다.
 요구사항은 제품이 무엇을 해결하고 어떤 범위와 수용 기준을 가지는지 정의한다.
 FreshManager의 상위 제품 범위는
 [`FreshManager_PRD_v1.0.md`](../product/FreshManager_PRD_v1.0.md)를 따른다. 기술 구조와
-구현 계약은 [`FreshManager_TRD_v1.0.md`](FreshManager_TRD_v1.0.md)가 PRD를 변환해
-정의한다. `requirements-definition-freshmanager-poc-v0.4.md`는 PRD 이전의 역사적
+구현 계약은 [`FreshManager_TRD_v1.0.md`](../engineering/FreshManager_TRD_v1.0.md)가 PRD를 변환해
+정의한다. `docs/history/requirements/requirements-definition-freshmanager-poc-v0.4.md`는 PRD 이전의 역사적
 요구사항 기준선으로만 보존한다.
 
 ### 8.2 Issue의 책임
@@ -457,7 +457,7 @@ Branch만으로 충분할 수 있다. 자세한 선택과 정리 절차는
 
 여러 Checklist 항목을 병렬로 다루는 Parent Issue에서 Worktree로 격리한
 Worker Branch들을 하나의 Integration Branch로 모아 단일 Integration PR로
-`main`에 반영하는 절차는 [`DEVELOPMENT_WORKFLOW.md`](DEVELOPMENT_WORKFLOW.md)가
+`main`에 반영하는 절차는 [`DEVELOPMENT_WORKFLOW.md`](../engineering/DEVELOPMENT_WORKFLOW.md)가
 정의한다.
 
 ---
@@ -813,15 +813,15 @@ PRD·TRD를 공식 기준으로 연결하고 다음 중복 방지 원칙을 적�
 | 정보 유형 | 공식 기준 문서 | 다른 문서에서 허용되는 요약 | 금지되는 상세 중복 | 갱신 시점 | 책임 주체 |
 |---|---|---|---|---|---|
 | 제품 문제·대상 사용자·상세 포함·제외 범위·요구사항·수용 기준 | [`FreshManager_PRD_v1.0.md`](../product/FreshManager_PRD_v1.0.md) | README의 핵심 요약과 Issue의 작업 관련 발췌 | 제품 요구사항 상세를 Architecture·상태 문서에 재정의 | 제품 문제·범위·요구사항·수용 기준 변경 시 | PM |
-| 현재 구현과 목표 기술 구조·인터페이스·데이터·보안·검증 계약 | [`FreshManager_TRD_v1.0.md`](FreshManager_TRD_v1.0.md) | Rules·Issue·PR의 관련 기술 계약 링크 | 제품 목적을 TRD에서 재정의하거나 미래 목표를 구현 완료로 표현 | 구현 또는 목표 기술 계약 변경 시 | 구현자, PM 승인 |
-| PRD 이전 요구사항 이력 | [`requirements-definition-freshmanager-poc-v0.4.md`](../../requirements-definition-freshmanager-poc-v0.4.md) | PRD 근거 자료에서 역사 문서로 참조 | 현행 수집 순서·운영 승인 기준으로 사용 | 역사적 근거 보정 시 | PM |
+| 현재 구현과 목표 기술 구조·인터페이스·데이터·보안·검증 계약 | [`FreshManager_TRD_v1.0.md`](../engineering/FreshManager_TRD_v1.0.md) | Rules·Issue·PR의 관련 기술 계약 링크 | 제품 목적을 TRD에서 재정의하거나 미래 목표를 구현 완료로 표현 | 구현 또는 목표 기술 계약 변경 시 | 구현자, PM 승인 |
+| PRD 이전 요구사항 이력 | [`requirements-definition-freshmanager-poc-v0.4.md`](../history/requirements/requirements-definition-freshmanager-poc-v0.4.md) | PRD 근거 자료에서 역사 문서로 참조 | 현행 수집 순서·운영 승인 기준으로 사용 | 역사적 근거 보정 시 | PM |
 | 프로젝트 소개·목표와 범위의 핵심 요약·시작 안내·주요 문서 링크 | [`README.md`](../../README.md) | 프로젝트 한 줄 소개와 README 링크 | 요구사항 정의서의 상세 포함·제외 범위와 수용 기준 반복 | 소개·핵심 요약·진입점 변경 시 | PM 승인, Codex 반영 |
 | 현재 상태·현재 작업·최근 이력·다음 행동 | [`PROJECT_STATUS.md`](../../PROJECT_STATUS.md) | 현재 단계 한 줄과 상태 문서 링크 | 일시적 Issue·Branch·실행 결과 표 | 현행 PROJECT_STATUS 갱신 규칙을 따르며 구체적 체크포인트는 P10에서 재검토 | Codex 초안, PM 확인 |
 | 장기 제품 맥락과 안정적 원칙 | [`PROJECT_MEMORY.md`](../../ai-context/PROJECT_MEMORY.md) | 새 세션 복원용 요약과 정본 링크 | 현재 Branch·HEAD·Issue 상태 또는 PRD·TRD 요구사항 복제 | 장기 목표·핵심 경계 변경 시 | Codex 초안, PM 확인 |
 | 승인된 제품·운영 결정 이력 | [`DECISION_LOG.md`](../../ai-context/DECISION_LOG.md) | 관련 Decision 링크 | 확인되지 않은 날짜·승인·완료 상태 추정 | PM 결정 또는 기존 결정의 폐기·대체 시 | PM 결정, Codex 기록 |
 | 기술 구조 결정과 대안·영향 | [`ARCHITECTURE_DECISIONS.md`](../../ai-context/ARCHITECTURE_DECISIONS.md) | 관련 ADR 링크 | PRD·TRD 또는 현재 상태의 대체 서술 | Architecture 결정·대안·영향 변경 시 | 구현자 초안, PM 승인 |
 | Codex 시작 순서·행동 규칙·금지사항·PM 승인 지점 | [`AGENTS.md`](../../AGENTS.md) | Architecture에서 역할과 진입점만 설명 | 상세 시작 순서·금지사항 복사 | 행동 정책 또는 승인 지점 변경 시 | PM |
-| Harness 전체 구조·계층·관계·책임 모델·피드백 루프 | `docs/engineering/CODEX_HARNESS_ARCHITECTURE.md` | README·AGENTS의 한 문장과 링크 | 전체 계층·책임표·피드백 루프 재작성 | 구성요소·책임·전환 상태 변경 시 | Codex 유지, PM 승인 |
+| Harness 전체 구조·계층·관계·책임 모델·피드백 루프 | `docs/architecture/CODEX_HARNESS_ARCHITECTURE.md` | README·AGENTS의 한 문장과 링크 | 전체 계층·책임표·피드백 루프 재작성 | 구성요소·책임·전환 상태 변경 시 | Codex 유지, PM 승인 |
 | 분야별 Rules | [`docs/rules/`](../rules/) | Architecture에서 문서별 역할과 링크 | 구현·Git·보안·수집 규칙 전문 복사 | 해당 분야 계약 변경 시 | 구현자와 PM |
 | Google Drive 백업·CSV 목표 계약 | [`CLOUD_BACKUP_AND_CSV_MANAGEMENT_PLAN.md`](../data/CLOUD_BACKUP_AND_CSV_MANAGEMENT_PLAN.md) | PRD·TRD·Rules·Status의 역할별 요약과 링크 | 상태 전이·충돌·Receipt·CSV 순서를 여러 문서에서 재정의 | 제공자·목적지·Worker·CSV 계약 변경 시 | PM 승인, 구현자 반영 |
 | Area·S-DoT·Spot Candidate·Recommendation 구조 | PRD 제품계약 + TRD 기술계약 | README·Panel·Analysis의 목적별 요약과 링크 | Spot을 고정 판매 위치로 표현하거나 S-DoT를 Area 대체값·필수 직렬 단계로 재정의 | Feature 구조·추천 정책·EG-8 또는 후속 Workstream 변경 시 | PM 승인, 구현자 반영 |
@@ -1003,8 +1003,8 @@ Context: Spatial Context + Field Validation + Operational Constraints
 - [Decision Log](../../ai-context/DECISION_LOG.md)
 - [Architecture Decisions](../../ai-context/ARCHITECTURE_DECISIONS.md)
 - [FreshManager PRD v1.0](../product/FreshManager_PRD_v1.0.md)
-- [FreshManager TRD v1.0](FreshManager_TRD_v1.0.md)
-- [이전 요구사항 정의서 v0.4](../../requirements-definition-freshmanager-poc-v0.4.md)
+- [FreshManager TRD v1.0](../engineering/FreshManager_TRD_v1.0.md)
+- [이전 요구사항 정의서 v0.4](../history/requirements/requirements-definition-freshmanager-poc-v0.4.md)
 - [Coding Rules](../rules/CODING_RULES.md)
 - [Git Workflow](../rules/GIT_WORKFLOW.md)
 - [Security Rules](../rules/SECURITY_RULES.md)

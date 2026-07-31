@@ -14,7 +14,7 @@
   - `docs/data/FIELD_DICTIONARY.md`(EG-6B/EG-7 원본·메타데이터 필드 정본)
   - `docs/analysis/ANALYSIS_PLAN.md`(EDA·Forecast 평가·Baseline 방법론)
   - `docs/engineering/FreshManager_TRD_v1.0.md`(§14 목표 정규화 데이터 모델 요약)
-  - `etc/데이터수집 실행 가이드.md`(§8 v3 sheets 수동 Export 실행 절차)
+  - `docs/data/DATA_COLLECTION_EXECUTION_GUIDE.md`(§8 v3 sheets 수동 Export 실행 절차)
   - `ai-context/DECISION_LOG.md`의 D-015
 - 변경 시 PM 승인: 필요
 
@@ -80,7 +80,7 @@ EG-8A Loader V0의 입력 방식은 **수동 Spreadsheet CSV Export**로 확정�
 대상은 `raw_log_v3`·`population_current_v3`·`population_forecast_v3` 세
 시트 각각의 CSV Export 파일이다. 수동 Export는 초기 Schema 확인과 Loader
 V0 검증을 위한 읽기 전용 Snapshot 방식이며, 실제 Export 절차는
-`etc/데이터수집 실행 가이드.md` §8이 소유한다.
+`docs/data/DATA_COLLECTION_EXECUTION_GUIDE.md` §8이 소유한다.
 
 V0 범위에서 사용하지 않는 방식:
 

@@ -1,5 +1,15 @@
 # Gate C 인터뷰 설계 — 사용자 문제 타당성 검증
 
+> **문서 역할과 Evidence 경계**
+>
+> - `actual_interview_execution_status=PM_CONFIRMED`
+> - `repository_evidence_status=NOT_TRACKED`
+> - `gate_c_status=SEPARATE_EVALUATION_REQUIRED`
+>
+> 이 문서는 인터뷰 실행 계획과 방법론을 보존한다. PM이 인터뷰 실행 사실을
+> 확인했지만 저장소에는 개인정보를 제외한 Evidence Reference가 추적되지 않는다.
+> 실행 사실 확인과 Gate C 평가는 분리하며, 이 문서만으로 Gate C 통과를 주장하지 않는다.
+
 *근거: 리서치 문서(2026-07-16 공유) + 외부 검토(같은 날, 생존자 편향 지적) + 본인의 실행 가능성 검토. 인용 논문(Palinkas et al., 2015, 목적표집)은 직접 원문 확인 완료.*
 
 ---

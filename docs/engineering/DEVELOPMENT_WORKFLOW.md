@@ -2,7 +2,7 @@
 
 - 문서 상태: 정본(Canonical)
 - 적용 프로젝트: FreshManager Data PoC
-- 관련 문서: `AGENTS.md`, `docs/engineering/CODEX_HARNESS_ARCHITECTURE.md`,
+- 관련 문서: `AGENTS.md`, `docs/architecture/CODEX_HARNESS_ARCHITECTURE.md`,
   `docs/rules/GIT_WORKFLOW.md`, `docs/testing/QUALITY_GATES.md`,
   `docs/testing/PROJECT_GUARD_SPEC.md`, `.github/ISSUE_TEMPLATE/task.md`,
   `.github/ISSUE_TEMPLATE/parent_task.md`, `.github/pull_request_template.md`
@@ -382,7 +382,7 @@ GIT_WORKFLOW.md` §13.3·AGENTS.md §22 기준) 형식으로 복귀한다.
 ## 19. 관련 문서 링크
 
 - [`AGENTS.md`](../../AGENTS.md) — Codex/Claude Code 행동 규칙과 문서 진입점
-- [`docs/engineering/CODEX_HARNESS_ARCHITECTURE.md`](CODEX_HARNESS_ARCHITECTURE.md) — 전체 Harness 구조와 PM Approval 3종 정의
+- [`docs/architecture/CODEX_HARNESS_ARCHITECTURE.md`](../architecture/CODEX_HARNESS_ARCHITECTURE.md) — 전체 Harness 구조와 PM Approval 3종 정의
 - [`docs/rules/GIT_WORKFLOW.md`](../rules/GIT_WORKFLOW.md) — Branch 이름 규칙·Commit 규칙·단독 Issue/PR 절차(v1)
 - [`docs/testing/QUALITY_GATES.md`](../testing/QUALITY_GATES.md) — EG-0~EG-8 진입·통과조건
 - [`docs/testing/PROJECT_GUARD_SPEC.md`](../testing/PROJECT_GUARD_SPEC.md) — 검사 ID·상태·종료코드
