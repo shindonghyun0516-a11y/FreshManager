@@ -91,9 +91,9 @@ ML, Backup, Dataset 생성과 파일 쓰기는 금지한다.
 
 개발 중에는 Vite Dev Server가 `/api`를 FastAPI Development Server로 Proxy한다.
 ADR-012 승인 당시 초기 기본안은 FastAPI가 Vue Build를 같은 Origin에서 제공하는
-방식이었다. Vercel 플랫폼 확정 후 ADR-013은 Web·API 두 Project와 Production
-Rewrite를 Working Topology로 제안한다. ADR-013이 승인되기 전에는 어느 방식도 실제
-배포계약이 아니며, 승인 뒤에도 Same-origin과 공개 API 계약은 바뀌지 않는다.
+방식이었다. Vercel 플랫폼 확정 후 ADR-013은 Web·API 두 Project를 초기 Pilot
+Topology로 승인했다. Production Rewrite는 후속 구현이며 Same-origin과 공개 API
+계약은 바뀌지 않는다.
 
 ### 5.2 Application Layer — `SelectedAreaPilotService`
 
@@ -279,8 +279,9 @@ API Key와 분리하며 실제 값은 코드·문서·Git에 기록하지 않는
 - 개발: Vite Dev Server + FastAPI Development Server + `/api` Proxy.
 - 파일럿: 사용자 URL 하나와 Same-origin 우선.
 - 배포 플랫폼: `VERCEL`, 상태는 `PLANNED_NOT_DEPLOYED`.
-- Working Topology: `apps/web` Root의 Vue Project와 Repository Root의 FastAPI
-  Project를 분리한다. 이 구성은 `PROPOSED_PENDING_PM_REVIEW`다.
+- ADR-013: `ACCEPTED`.
+- Working Topology: Web Root는 `apps/web`, API Root는 Repository Root이며
+  `TWO_PROJECTS_ACCEPTED_FOR_INITIAL_PILOT` 상태다.
 - FastAPI는 `apps.api.main:app` 표준 ASGI App이며 Local Uvicorn과 Vercel Python
   Runtime에서 같은 Entry Point를 사용한다. Vercel은 배포 Adapter일 뿐 Business
   Logic에 포함되지 않는다.
@@ -299,8 +300,8 @@ Microservice, API Gateway, BFF, Kubernetes, Redis, Celery, PostgreSQL, 사용자
 ## 12. 시험·CI 경계
 
 기존 Python 전체시험과 Project Guard를 유지한다. 새 Web/API CI가 이를 대체하거나
-약화하지 않는다. 이 Architecture PR에서는 Workflow를 추가하지 않았고, 후속
-Scaffold는 API Import·시험과 Vue Type Check·Build만 담당하는 별도 Workflow를 둔다.
+약화하지 않는다. Issue #152 Scaffold는 API Import·시험과 Vue Type Check·Build를
+담당하는 별도 Workflow를 둔다.
 
 후속 Backend 시험은 Pydantic Schema, Route, Provider 실패, 부분 Horizon, 허용
 Area, Spot 정확히 3개, no-write, no-network와 Area 선택값 비기록을 검증한다. 후속
@@ -361,9 +362,19 @@ API 구현 중 실제 중복이나 막힌 Interface가 증거로 확인될 때�
 
 ## 15. 결정 결과와 제외범위
 
-Issue #152 작업공간에는 이 경계를 따르는 `apps/web`·`apps/api` 최소 Scaffold와
-Dependency 초안만 있다. `main` 반영과 실제 기능 구현 완료를 뜻하지 않는다. 다음은
-여전히 `NOT_IMPLEMENTED`이며 별도 PM 승인이 필요하다.
+Issue #152·PR #153의 이 경계를 따르는 `apps/web`·`apps/api` 최소 Scaffold와
+Dependency는 승인됐다. 이는 실제 Area 기능, Snapshot 연결 또는 Vercel 배포 완료를
+뜻하지 않는다. 다음은 여전히 `NOT_IMPLEMENTED`이며 별도 PM 승인이 필요하다.
+
+다음 항목은 별도 Issue로 분리하지 않고 후속 End-to-end MVP의 내부 Gate와 Commit에서
+확인한다.
+
+- Vercel Preview Build
+- FastAPI Function Bundle 크기와 필요 시 `excludeFiles`
+- Production `/api` Rewrite
+- 잘못된 `area_code` 추적 오류 시험
+- 최종 UI Theme·Brand Color
+- UI 참고 이미지 해석
 
 - `data/prototype` 생성
 - Health 외 Area-first API와 실제 Area 데이터가 연결된 Vue 기능

@@ -66,9 +66,10 @@ Issue #70·PR #71로 `main`에 반영됐으며, 실제 반복수집은 별도 PM
   `IMPLEMENTATION_AVAILABLE_ON_MAIN`; 첫 1시간 Live `NOT_STARTED`
 - Area-first 제품·UI·데이터 계약은 D-022·PR #141로 승인·`main` 반영됐고,
   Recommendation Core·Service도 PR #135·#137로 `main`에 있다. Area-first
-  Vue·FastAPI 최소 Scaffold는 Issue #152 작업공간에서 `DRAFT_PENDING_PM_REVIEW`다.
-  실제 Service·Read-only API·Area 데이터·NAVER Map·Spot Prototype Runtime과
-  배포는 `NOT_IMPLEMENTED`다. 세부 변동상태는 `PROJECT_STATUS.md`를 따른다.
+  Vue·FastAPI·Vercel 호환 최소 Scaffold는 Issue #152·PR #153에서 승인됐다.
+  실제 Service·Read-only API·Area·Spot 데이터, NAVER Map·Geolocation,
+  Vercel Project·Rewrite·배포는 `NOT_IMPLEMENTED`다. 세부 변동상태는
+  `PROJECT_STATUS.md`를 따른다.
 
 ### 현재 분석 범위
 
@@ -253,9 +254,9 @@ POI001부터 POI121까지 자동 생성
 
 ### 진행 예정
 
-- Vue·FastAPI·Vercel 호환 Scaffold Diff PM 검토와 공식 PR 경로
-- Area-first Read-only API·Prototype 공급경로
-- 지도 중심 Responsive UI·API 연결
+- End-to-end Area-first Web Pilot 구현·Preview 배포
+- NAVER Map·Geolocation·Production 배포·통합 QA
+- 실제 프래시매니저 사용성 검증
 - 실제 날짜·시각·할당량·운영 ID·계획 지문에 대한 별도 PM 결정
 - PM Live 승인 후에만 동일 13개 Area의 5분·1시간 파일럿 실행 검토
 - 첫 Batch 품질 감사 결과를 기준으로 Raw-to-CSV Exporter 별도 검토
