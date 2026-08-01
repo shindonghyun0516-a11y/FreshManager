@@ -14,6 +14,8 @@ on:
       - freshmanager/pilot_spot_options.py
       - freshmanager/selected_area_pilot.py
       - data/prototype/**
+      - scripts/export_web_openapi.py
+      - scripts/generate_web_api_types.py
   push:
     branches:
       - main
@@ -29,6 +31,8 @@ on:
       - freshmanager/pilot_spot_options.py
       - freshmanager/selected_area_pilot.py
       - data/prototype/**
+      - scripts/export_web_openapi.py
+      - scripts/generate_web_api_types.py
 
 permissions:
   contents: read
@@ -62,6 +66,17 @@ jobs:
           response = TestClient(app).get("/api/v1/health");
           assert response.status_code == 200;
           assert response.json() == {"status": "ok", "service": "freshmanager-api"}'
+
+      - name: Verify OpenAPI and runtime error contract
+        run: python -B -m unittest apps.api.tests.test_area_pilot -v
+
+      - name: Verify OpenAPI type generator
+        run: python -B -m unittest apps.api.tests.test_web_api_type_generation -v
+
+      - name: Verify generated web API types
+        run: >-
+          python -B scripts/generate_web_api_types.py
+          --output apps/web/src/generated/api-types.ts --check
 
       - name: Run API tests
         run: python -B -m unittest discover -s apps/api/tests -p "test_*.py" -v
@@ -98,7 +113,16 @@ jobs:
           const app = readFileSync("src/App.vue", "utf8");
           const map = readFileSync("src/naver-map.ts", "utf8");
           const styles = readFileSync("src/styles.css", "utf8");
+          const generated = readFileSync("src/generated/api-types.ts", "utf8");
           const between = (source, start, end) => source.split(start)[1].split(end)[0];
+
+          assert.match(app, /from "\.\/generated\/api-types";/);
+          assert.doesNotMatch(
+            app,
+            /^type (?:PopulationRange|AreaSummary|AreaView|SpotOption|PilotView)\s*=\s*\{/m,
+          );
+          assert.equal(generated.match(/^export type /gm)?.length, 9);
+          assert.doesNotMatch(generated, /\b(?:any|unknown)\b/);
 
           assert.equal(app.match(/straightLineDistanceKm\(/g)?.length, 2);
           assert.match(app, /straightLineDistanceKm\(point, spot\)/);

@@ -83,7 +83,16 @@ def get_areas() -> AreasResponse:
     return AreasResponse(areas=_pilot_service().list_areas(), selection_mode="USER_CHOICE")
 
 
-@app.get("/api/v1/areas/{area_code}/pilot-view", response_model=AreaPilotResponse)
+@app.get(
+    "/api/v1/areas/{area_code}/pilot-view",
+    response_model=AreaPilotResponse,
+    responses={
+        404: {"model": ErrorResponse, "description": "지원하지 않는 Area입니다."},
+        422: {"model": ErrorResponse, "description": "잘못된 Path 또는 요청 형식입니다."},
+        500: {"model": ErrorResponse, "description": "Spot 계약 또는 제한된 내부 오류입니다."},
+        503: {"model": ErrorResponse, "description": "Area Provider가 안전한 응답을 만들 수 없습니다."},
+    },
+)
 def get_area_pilot_view(
     area_code: Annotated[str, Path(pattern=r"^POI\d{3}$")],
 ) -> AreaPilotResponse | JSONResponse:

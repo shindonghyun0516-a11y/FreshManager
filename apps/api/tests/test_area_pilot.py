@@ -109,6 +109,44 @@ class AreaPilotApiTests(unittest.TestCase):
         for forbidden in ("user_location", "user_latitude", "user_longitude"):
             self.assertNotIn(forbidden, api_contract)
 
+    def test_pilot_view_openapi_declares_bounded_error_responses(self) -> None:
+        openapi = self.client.get("/openapi.json").json()
+        schemas = openapi["components"]["schemas"]
+        responses = openapi["paths"]["/api/v1/areas/{area_code}/pilot-view"][
+            "get"
+        ]["responses"]
+
+        self.assertEqual(
+            set(schemas),
+            {
+                "AreaListItem",
+                "AreaPilotData",
+                "AreaPilotResponse",
+                "AreasResponse",
+                "ErrorDetail",
+                "ErrorResponse",
+                "HealthResponse",
+                "PopulationRange",
+                "SpotOption",
+            },
+        )
+        self.assertEqual(
+            schemas["ErrorResponse"]["properties"]["error"]["$ref"],
+            "#/components/schemas/ErrorDetail",
+        )
+        for status, model in {
+            "200": "AreaPilotResponse",
+            "404": "ErrorResponse",
+            "422": "ErrorResponse",
+            "500": "ErrorResponse",
+            "503": "ErrorResponse",
+        }.items():
+            with self.subTest(status=status):
+                self.assertEqual(
+                    responses[status]["content"]["application/json"]["schema"]["$ref"],
+                    f"#/components/schemas/{model}",
+                )
+
     def test_unsupported_area_returns_bounded_404(self) -> None:
         response = self.client.get("/api/v1/areas/POI999/pilot-view")
 

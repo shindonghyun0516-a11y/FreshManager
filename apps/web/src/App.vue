@@ -6,63 +6,14 @@ import {
   type MapPoint,
   type NaverMapController,
 } from "./naver-map";
-
-type PopulationRange = { min: number; max: number };
-
-type AreaSummary = {
-  area_code: string;
-  area_name: string;
-  display_order: number;
-};
-
-type AreaView = AreaSummary & {
-  source: string | null;
-  availability: "DATA_UNAVAILABLE";
-  observed_at: string | null;
-  current_population: PopulationRange | null;
-  forecast_60: PopulationRange | null;
-  forecast_180: PopulationRange | null;
-  congestion_level: string | null;
-  forecast_60_congestion_level: string | null;
-  forecast_180_congestion_level: string | null;
-  forecast_60_target_at: string | null;
-  forecast_180_target_at: string | null;
-  change_amount_60: number | null;
-  change_rate_60: number | null;
-  change_amount_180: number | null;
-  change_rate_180: number | null;
-  freshness: string;
-};
-
-type SpotOption = {
-  spot_option_id: string;
-  spot_name: string;
-  spot_type: string;
-  address: string;
-  latitude: number;
-  longitude: number;
-  display_order: number;
-  field_verification_status: string;
-  operational_suitability_status: string;
-  limitations: string[] | string;
-  prototype_data_status: string;
-  spot_population_source: string | null;
-  observed_at: string | null;
-  current_population: PopulationRange | null;
-  forecast_60: PopulationRange | null;
-  forecast_180: PopulationRange | null;
-  change_amount_60: number | null;
-  change_rate_60: number | null;
-  change_amount_180: number | null;
-  change_rate_180: number | null;
-};
-
-type PilotView = {
-  view_status: "DATA_UNAVAILABLE";
-  warnings: string[];
-  area: AreaView;
-  spot_options: SpotOption[];
-};
+import type {
+  AreaListItem,
+  AreaPilotData,
+  AreaPilotResponse,
+  AreasResponse,
+  PopulationRange,
+  SpotOption,
+} from "./generated/api-types";
 
 type Panel = "none" | "area" | "spots" | "spot";
 type RequestState = "idle" | "loading" | "ready" | "error";
@@ -78,10 +29,10 @@ const numberFormatter = new Intl.NumberFormat("ko-KR", {
   maximumFractionDigits: 1,
 });
 
-const areas = ref<AreaSummary[]>([]);
+const areas = ref<AreaListItem[]>([]);
 const areasState = ref<RequestState>("loading");
 const selectedAreaCode = ref("");
-const pilotView = ref<PilotView | null>(null);
+const pilotView = ref<AreaPilotResponse | null>(null);
 const viewState = ref<RequestState>("idle");
 const panel = ref<Panel>("none");
 const openedSpotId = ref<string | null>(null);
@@ -165,11 +116,10 @@ function changeClass(value: number | null) {
 }
 
 function limitationItems(spot: SpotOption) {
-  return Array.isArray(spot.limitations)
-    ? spot.limitations.filter(Boolean)
-    : spot.limitations
-      ? [spot.limitations]
-      : ["실제 판매 허용 여부, 접근성, 안전성과 카트 정차 가능성은 현장 확인이 필요합니다."];
+  const limitations = spot.limitations.filter(Boolean);
+  return limitations.length
+    ? limitations
+    : ["실제 판매 허용 여부, 접근성, 안전성과 카트 정차 가능성은 현장 확인이 필요합니다."];
 }
 
 function isSpotDataUnavailable(spot: SpotOption) {
@@ -213,7 +163,7 @@ async function loadAreas() {
       headers: { Accept: "application/json" },
     });
     if (!response.ok) throw new Error("AREA_LIST_UNAVAILABLE");
-    const payload = (await response.json()) as { areas: AreaSummary[] };
+    const payload = (await response.json()) as AreasResponse;
     areas.value = payload.areas;
     areasState.value = "ready";
   } catch {
@@ -249,7 +199,7 @@ async function selectArea() {
       },
     );
     if (!response.ok) throw new Error("AREA_VIEW_UNAVAILABLE");
-    pilotView.value = (await response.json()) as PilotView;
+    pilotView.value = (await response.json()) as AreaPilotResponse;
     viewState.value = "ready";
     await nextTick();
     await setupMap();
