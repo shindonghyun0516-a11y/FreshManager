@@ -201,13 +201,17 @@ Recommendation, Recommended, Best, Optimal, Ranking, Ranked 또는 이에 해당
 `pilot-view`는 Area identity, Current, 60분·180분 값과 각 Freshness, Spot Option
 3개, 사용 가능한 PM 수기 Spot 인구 Prototype의 기준시각·현재·60분·180분·증감,
 상태·warning·limitation을 한 Response로 반환한다.
-Pydantic Schema가 API 계약의 정본이고 TypeScript Type은 FastAPI OpenAPI에서
-파생한다. Type Generator Package는 Scaffold Issue에서 승인·선정하며 Frontend와
-Backend Schema를 손으로 이중 관리하지 않는다.
+Pydantic Schema가 API 계약의 정본이고 성공 Response와 `ErrorResponse` 오류 계약을
+FastAPI OpenAPI에 선언한다. TypeScript Type은
+`IN_REPOSITORY_FAIL_CLOSED_OPENAPI_GENERATOR`로 이 OpenAPI에서 결정적으로 생성하며,
+지원하지 않는 Schema 구조는 임의 Type으로 바꾸지 않고 실패한다. 외부 Generator
+Package를 사용하지 않고 Frontend와 Backend Schema를 손으로 이중 관리하지 않는다.
 
 ### 7.1 오류 계약
 
 오류 Body는 다음 한 형태만 사용하고 내부 경로·원본 데이터·예외문을 포함하지 않는다.
+`pilot-view`의 404·422·500·503 Response는 OpenAPI에서도 모두 `ErrorResponse`로
+문서화하며 Runtime 오류 Body와 HTTP 상태를 변경하지 않는다.
 
 ```json
 {
@@ -268,6 +272,9 @@ Spot 열림·선택 상태를 초기화한다.
   Application log에는 Route template과 HTTP 상태만 남기고 Area 코드를 기록하지 않는다.
 - Spot 선택은 현재 Browser 상태에만 두고 API, 로그, Telemetry, Analytics, Database,
   파일 또는 Browser 영구저장소로 전송·기록하지 않는다.
+- 지도 Script Load 실패는 Loader와 이번 호출에서 만든 Script를 정리하고 다음 수동
+  재시도를 허용한다. 재시도는 Area·Spot 선택·사용자 위치를 유지하며 API나
+  Geolocation을 다시 호출하지 않는다.
 
 NAVER Maps Client ID는 Frontend 환경변수로 주입하고 허용 Domain을 제한한다. 서울시
 API Key와 분리하며 실제 값은 코드·문서·Git에 기록하지 않는다. Client ID는 Browser에
@@ -362,24 +369,22 @@ API 구현 중 실제 중복이나 막힌 Interface가 증거로 확인될 때�
 ## 15. 결정 결과와 제외범위
 
 Issue #152·PR #153의 `apps/web`·`apps/api` 최소 Scaffold 위에 Issue #154가 다음을
-로컬 구현·검증했다. 아직 Draft PR 전 상태이며 공식 반영이나 배포 완료를 뜻하지 않는다.
+구현·검증했다. 구현은 PR #155 `OPEN · DRAFT` Head에서 이용할 수 있지만 아직
+`main`에 반영되지 않았고 배포 완료를 뜻하지 않는다.
 
 - `data/prototype`과 정적 Spot Master 이동
 - Health 외 Area-first Read-only API와 Vue 연결
-- NAVER Map Adapter와 Browser-only Geolocation
+- `ErrorResponse` OpenAPI와 저장소 내부 Fail-closed Type Generator
+- 실패 복구·수동 재시도를 지원하는 NAVER Map Adapter와 Browser-only Geolocation
+- Fixed Global Toast 없는 Inline Selection Status
 - AreaDataProvider, PilotSpotOptionRepository, SelectedAreaPilotService
 - 잘못된 `area_code`와 안전한 HTTP 오류 계약
 
-다음은 여전히 `NOT_IMPLEMENTED`이며 별도 PM 승인이 필요하다.
-
-다음 항목은 별도 Issue로 분리하지 않고 후속 End-to-end MVP의 내부 Gate와 Commit에서
-확인한다.
+다음은 PR #155 Head에서도 완료되지 않았으며 별도 PM 승인이 필요하다.
 
 - Vercel Preview Build
 - FastAPI Function Bundle 크기와 필요 시 `excludeFiles`
 - Production `/api` Rewrite
-- 최종 UI Theme·Brand Color
-- UI 참고 이미지 해석
 - 승인 Area Artifact 실제 연결
 - NAVER Map Credential 기반 Runtime 검증
 - Spot Population Prototype 실데이터 입력

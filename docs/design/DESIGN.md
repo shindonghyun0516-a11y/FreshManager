@@ -237,7 +237,7 @@ Spot 인구정보는 `spot_population_source=PM_MANUAL_PROTOTYPE`인 PM 직접 �
 `판촉 후보 위치로 선택`을 누르면 다음과 같이 표시한다.
 
 - 선택 Marker에 체크 표시
-- 선택 완료 Toast 또는 Inline Status
+- 선택 완료 Inline Status
 - Drawer 상세는 유지 가능
 - 다른 Spot으로 변경 가능
 
@@ -263,7 +263,7 @@ Sheet로 바꾼다.
 - 구역 정보 → Bottom Sheet
 - 후보 위치 목록 → Bottom Sheet
 - 후보 위치 상세 → Bottom Sheet
-- 선택 완료 → Bottom Sheet + Toast
+- 선택 완료 → Bottom Sheet + Inline Status
 
 추가 확인 Popup은 사용하지 않는다.
 
@@ -375,7 +375,7 @@ Area·Spot·Map·Geolocation·Future Data는 서로 독립된 상태군이다. �
 | `PrototypeBadge` | Prototype·PM 직접 입력 출처 표시 |
 | `LimitationNotice` | 확인되지 않은 운영·현장 한계 표시 |
 | `SelectSpotButton` | 후보 위치 명시 선택 |
-| `SelectionToast` | 선택 완료와 변경 가능 안내 |
+| `SelectionStatus` | 선택 완료와 변경 가능 안내 |
 | `LoadingState` | Area·Map·위치 Loading 안내 |
 | `EmptyState` | 선택 전 또는 제공값 없음 안내 |
 | `ErrorState` | 안전한 오류와 다음 행동 안내 |
@@ -438,7 +438,7 @@ Area·Spot·Map·Geolocation·Future Data는 서로 독립된 상태군이다. �
 
 - 역할: Senior Product Designer이자 UX Writer
 - 맥락: 서버 저장 없이 Browser Memory에서 후보 위치 선택상태만 유지
-- 작업: Selected Marker Check, Toast 또는 Inline Status와 재선택 가능성을 설계
+- 작업: Selected Marker Check, Inline Status와 재선택 가능성을 설계
 - 형식: Desktop 선택 완료 화면 1개
 - 유지사항: 상세 Drawer 유지 가능, 정확한 선택 완료·변경 가능 문구
 - 금지사항: 서버 저장·Campaign 등록·위치 확정·Lock·변경 불가 주장

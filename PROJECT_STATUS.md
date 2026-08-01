@@ -46,15 +46,26 @@
 - Repository Documentation Structure Alignment: `ACCEPTED` · Issue #150 · PR #151
 - History Archive and Documentation Index: `ACCEPTED` · Issue #150 · PR #151
 - Web Platform Scaffold: `ACCEPTED` · Issue #152 · PR #153
-- Area-first End-to-end MVP: `LOCAL_IMPLEMENTATION_COMPLETE_PM_REVIEW_REQUIRED` · Issue #154 —
-  PM 수동 Spot 인구 Prototype만 허용하고, 값 부재 시
+- Area-first End-to-end MVP: `LOCAL_IMPLEMENTATION_COMPLETE · REVIEW_FIXES_COMPLETE · READY_FOR_PM_REVIEW` ·
+  Issue #154 · PR #155 `OPEN · DRAFT` — 구현은 PR Head에 있으며 아직 `main`에
+  반영되지 않았다. PM 수동 Spot 인구 Prototype만 허용하고 값 부재 시
   `SPOT_PROTOTYPE_DATA_UNAVAILABLE`을 사용한다.
+- PR #155 신규 Exact Head CI: `PENDING_NEW_HEAD_VALIDATION`
+- Area Data: `DATA_UNAVAILABLE`
+- Spot Population: `SPOT_PROTOTYPE_DATA_UNAVAILABLE`
+- NAVER Credential Runtime: `NOT_VERIFIED`
 - Deployment: `deployment_platform=VERCEL`,
   `deployment_status=PLANNED_NOT_DEPLOYED`
 - Vercel Topology: `TWO_PROJECTS_ACCEPTED_FOR_INITIAL_PILOT`
-- Area-first Read-only Service·API·데이터 공급·NAVER Map·배포 준비:
-  `LOCAL_IMPLEMENTATION_COMPLETE_PM_REVIEW_REQUIRED`(Issue #154); 실제 Vercel 배포
-  `NOT_STARTED`
+- Area-first Read-only Service·API·데이터 공급·NAVER Maps Adapter·Browser-only
+  Geolocation: `IMPLEMENTATION_AVAILABLE_ON_PR_HEAD`(Issue #154, PR #155),
+  `main` Integration `NOT_MERGED`
+- Web API Type 계약: `ErrorResponse` OpenAPI 연결,
+  `IN_REPOSITORY_FAIL_CLOSED_OPENAPI_GENERATOR`, 외부 Generator Dependency `0`
+- Map·선택 피드백: 실패 Loader 복구·수동 재시도, Fixed Global Toast `0`,
+  `Inline Status`
+- Web QA: `responsive_equivalent_viewport=PASS`,
+  `actual_browser_zoom_200=PENDING_MANUAL_QA`
 - Code Cleanup: `NO_CODE_CLEANUP_REQUIRED_BEFORE_SCAFFOLD`
 - Spot 자동 추천: `DEFERRED_AFTER_INITIAL_PILOT`
 - 24시간 Scheduler(로컬 EG-7 Live 파일럿 확대 기준): `NOT_IMPLEMENTED`
@@ -242,7 +253,8 @@ PM이 장기 기준으로 확정한 5분 주기의 EG-7 1시간 파일럿 Contro
 - Recommendation Contract: 문서 `Draft` 유지; Area-first 관계 `AVAILABLE_ON_MAIN`;
   생산 Schema `NOT_IMPLEMENTED`
 - UI/UX Detailed Design: Area-first 계약 `AVAILABLE_ON_MAIN`; Issue #154 화면 구현
-  `LOCAL_IMPLEMENTATION_COMPLETE_PM_REVIEW_REQUIRED`, 공식 반영·배포 `NOT_STARTED`
+  `IMPLEMENTATION_AVAILABLE_ON_PR_HEAD`(PR #155 `OPEN · DRAFT`), Review Fix 완료·PM 검토 준비,
+  `main` Integration `NOT_MERGED`, 배포 `PLANNED_NOT_DEPLOYED`
 
 이 절은 §2.1의 Apps Script 상시 수집 Runtime과 독립적이다. 5분 자동수집 `ACTIVE`
 상태는 이 절과 무관하게 유지된다. v3 source sheets 자체는 ML-ready Dataset이
@@ -506,22 +518,20 @@ Issue #146·PR #147로 `main`에 반영됐다. Area-first Web/API 경계와 읽�
 공급은 ADR-012 `ACCEPTED`로 확정했다. 지도 중심 UI 계약과 문서구조 정렬은
 Issue #150·PR #151의 승인 정본을 따른다. 다음 행동은 다음 순서다.
 
-1. Issue #154 End-to-end Area-first Web Pilot PM Diff 검토
-2. PM 승인 후 Git 공식 검토 경로와 Preview 배포 검토
-3. 실제 프래시매니저 사용성 검증
+1. PR #155 Review Fix와 전체 로컬검증 마무리
+2. 신규 Exact Head CI 확인
+3. PM Draft 검토
 
-1과 2는 하나의 Issue·Branch·PR 안에서 내부 Gate와 Commit으로 진행할 계획이다.
-End-to-end MVP 내부 Gate에서는 Vercel Preview Build, FastAPI Function Bundle 크기와
-필요 시 `excludeFiles`, Production `/api` Rewrite, 잘못된 `area_code` 추적 오류 시험,
-최종 UI Theme·Brand Color와 UI 참고 이미지 해석을 확인한다.
+Preview 배포는 PR #155 검토와 별도의 PM 승인 전에는 수행하지 않는다.
 
 파일 이동·삭제·리팩터링과 후속 Dependency 변경은 각각 별도 승인 범위에서만
 수행한다. Issue #152·PR #153의 Health API와 연결 전 Vue 화면을 포함한 최소 Scaffold는
-승인됐다. Issue #154의 Area-first Service·Read-only API·데이터 공급, NAVER Map,
-Spot Population Prototype Runtime과 배포 준비는 로컬 구현·검증을 마치고 PM Diff
-검토를 기다린다. 720×450 반응형 동등 검사는 통과했고 실제 Browser Zoom 200%는
-`PENDING_MANUAL_QA`다. Stage·Commit·Push·PR·실제 배포는 수행하지 않았다. 아래 EG-7 Live
-결정은 독립 backlog로 유지한다.
+승인됐다. Issue #154의 Area-first Service·Read-only API·데이터 공급, NAVER Maps
+Adapter, Browser-only Geolocation과 Spot Population Prototype Runtime은 PR #155
+`OPEN · DRAFT` Head에 구현됐으며 Review Fix를 완료해 PM 검토 준비 상태다. 아직 `main`에는 반영되지
+않았고 실제 Vercel 배포도 수행하지 않았다. `responsive_equivalent_viewport=PASS`지만
+`actual_browser_zoom_200=PENDING_MANUAL_QA`다. 아래 EG-7 Live 결정은 독립 backlog로
+유지한다.
 
 현재 OPEN 또는 미생성 결정:
 
@@ -573,17 +583,18 @@ Plan·`pilot_run_id`·Batch ID·Plan fingerprint는 아직 존재하지 않는�
 보존한다. Issue #132·PR #133의 정적 Master, Issue #134·PR #135의 추천 Core와
 Issue #136·PR #137의 Recommendation Service는 `main`에 있다. D-022의 Area-first
 웹 파일럿 계약은 Issue #140·PR #141로 승인되어 `main`에 있다. Vue·FastAPI 최소
-Scaffold는 Issue #152·PR #153에서 `ACCEPTED`이며,
-Service·Read-only API·데이터 공급·NAVER Map·Spot Population Prototype Runtime·
-배포 준비는 Issue #154에서 로컬 구현·검증을 마쳤으며 PM Diff 검토 대기 상태다.
-720×450 반응형 동등 검사는 통과했고 실제 Browser Zoom 200%는
-`PENDING_MANUAL_QA`다.
+Scaffold는 Issue #152·PR #153에서 `ACCEPTED`이며, Service·Read-only API·데이터 공급·
+NAVER Maps Adapter·Browser-only Geolocation·Spot Population Prototype Runtime은 Issue
+#154·PR #155의 `OPEN · DRAFT` Head에 구현됐다. Review Fix가 완료돼 PM 검토 준비 상태이며 아직
+`main`에는 반영되지 않았다. `responsive_equivalent_viewport=PASS`지만
+`actual_browser_zoom_200=PENDING_MANUAL_QA`다.
 아직 공식 반영·배포 완료가 아니다. 추천 실행은
 0건이다. Repository Readiness Audit은 PR #145로, 문서 7건 정합화는 PR #147로
 `main`에 반영됐다. Area-first Web/API 경계와 읽기 전용 데이터 공급은 ADR-012
 `ACCEPTED`(Issue #148, PR #149)이며 Scaffold는 Issue #152·PR #153에서 승인됐고,
-나머지 실제 Area 데이터 연결·NAVER Map Credential 기반 Runtime·배포는
-`NOT_STARTED`다. Issue #150·PR #151의
+나머지 실제 Area Artifact 연결·Spot Population 실제값·NAVER Credential 기반
+Runtime·Vercel 배포는 각각 `DATA_UNAVAILABLE`·`SPOT_PROTOTYPE_DATA_UNAVAILABLE`·
+`NOT_VERIFIED`·`PLANNED_NOT_DEPLOYED`다. Issue #150·PR #151의
 지도 중심 UI 계약·문서구조·History Index는
 `ACCEPTED`이며 구현 완료를 뜻하지 않는다. EG-7 Live
 preflight는 독립 backlog이며 EG-7 구현
