@@ -11,6 +11,9 @@ on:
       - apps/__init__.py
       - apps/api/**
       - apps/web/**
+      - freshmanager/pilot_spot_options.py
+      - freshmanager/selected_area_pilot.py
+      - data/prototype/**
   push:
     branches:
       - main
@@ -23,6 +26,9 @@ on:
       - apps/__init__.py
       - apps/api/**
       - apps/web/**
+      - freshmanager/pilot_spot_options.py
+      - freshmanager/selected_area_pilot.py
+      - data/prototype/**
 
 permissions:
   contents: read
@@ -82,6 +88,41 @@ jobs:
 
       - name: Install web dependencies
         run: npm ci
+
+      - name: Verify browser-only location and interaction contract
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from "node:assert/strict";
+          import { readFileSync } from "node:fs";
+
+          const app = readFileSync("src/App.vue", "utf8");
+          const map = readFileSync("src/naver-map.ts", "utf8");
+          const styles = readFileSync("src/styles.css", "utf8");
+          const between = (source, start, end) => source.split(start)[1].split(end)[0];
+
+          assert.equal(app.match(/straightLineDistanceKm\(/g)?.length, 2);
+          assert.match(app, /straightLineDistanceKm\(point, spot\)/);
+          assert.doesNotMatch(app, /selectedSpotDistances|다른 후보 위치까지 직선거리/);
+          assert.doesNotMatch(app, /localStorage|sessionStorage|document\.cookie/);
+          assert.equal(app.match(/navigator\.geolocation\.getCurrentPosition/g)?.length, 1);
+
+          const location = between(app, "function requestLocation()", "function handleEscape()");
+          const beforeRequest = location.split("navigator.geolocation.getCurrentPosition")[0];
+          assert.match(beforeRequest, /userLocation\.value = null/);
+          assert.match(beforeRequest, /mapController\?\.setUserLocation\(null\)/);
+
+          for (const body of [
+            between(app, "async function loadAreas()", "async function selectArea()"),
+            between(app, "async function selectArea()", "function destroyMap()"),
+          ]) {
+            const call = between(body, "const response = await fetch(", "if (!response.ok)");
+            assert.doesNotMatch(call, /userLocation|latitude|longitude|body:|URLSearchParams/);
+          }
+
+          assert.match(map, /setUserLocation\(point: MapPoint \| null\)/);
+          assert.match(app, /const focusTrigger = panel\.value === "none" \? trigger : undefined/);
+          assert.match(styles, /\.selection-toast \{[\s\S]*?pointer-events: none;/);
+          NODE
 
       - name: Run TypeScript check
         run: npm run typecheck
