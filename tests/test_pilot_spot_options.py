@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import hashlib
 import tempfile
 import unittest
 from collections import Counter
@@ -15,7 +16,7 @@ from freshmanager.pilot_spot_options import (
 
 
 ROOT = Path(__file__).resolve().parents[1]
-MASTER_PATH = ROOT / "data/reference/pilot_spot_options.csv"
+MASTER_PATH = ROOT / "data/prototype/pilot_spot_options.csv"
 AREA_PANEL_PATH = ROOT / "data/reference/eg6_area_panel.csv"
 ANCHOR_PATH = ROOT / "data/reference/eg6_spot_master.csv"
 
@@ -69,6 +70,11 @@ class PilotSpotOptionsTests(unittest.TestCase):
         return path
 
     def test_master_matches_pm_coordinate_contract(self) -> None:
+        self.assertFalse((ROOT / "data/reference/pilot_spot_options.csv").exists())
+        self.assertEqual(
+            hashlib.sha256(MASTER_PATH.read_bytes()).hexdigest(),
+            "754d4c57c07bf0fbee4b7b1190d2b65ef43fcf1e4a84380116868f51bb21a246",
+        )
         rows = self.load()
 
         self.assertEqual(len(rows), 15)
