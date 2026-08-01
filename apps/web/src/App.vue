@@ -38,7 +38,6 @@ const panel = ref<Panel>("none");
 const openedSpotId = ref<string | null>(null);
 const selectedSpotId = ref<string | null>(null);
 const helpOpen = ref(false);
-const toastMessage = ref("");
 const mapState = ref<MapState>("idle");
 const geolocationState = ref<GeolocationState>("idle");
 const userLocation = ref<MapPoint | null>(null);
@@ -49,19 +48,11 @@ let viewAbortController: AbortController | undefined;
 let mapController: NaverMapController | undefined;
 let mapGeneration = 0;
 let returnFocusElement: HTMLElement | null = null;
-let toastTimer: number | undefined;
 
 const openedSpot = computed(
   () =>
     pilotView.value?.spot_options.find(
       (spot) => spot.spot_option_id === openedSpotId.value,
-    ) ?? null,
-);
-
-const selectedSpot = computed(
-  () =>
-    pilotView.value?.spot_options.find(
-      (spot) => spot.spot_option_id === selectedSpotId.value,
     ) ?? null,
 );
 
@@ -282,11 +273,6 @@ function backToSpotList() {
 function selectSpot() {
   if (!openedSpot.value) return;
   selectedSpotId.value = openedSpot.value.spot_option_id;
-  toastMessage.value = "판촉 후보 위치로 선택했습니다. 다른 후보 위치로 변경할 수 있습니다.";
-  window.clearTimeout(toastTimer);
-  toastTimer = window.setTimeout(() => {
-    toastMessage.value = "";
-  }, 4200);
 }
 
 function requestLocation() {
@@ -338,7 +324,6 @@ onBeforeUnmount(() => {
   document.removeEventListener("keydown", handleDocumentKeydown);
   viewAbortController?.abort();
   destroyMap();
-  window.clearTimeout(toastTimer);
 });
 </script>
 
@@ -428,6 +413,14 @@ onBeforeUnmount(() => {
           <h1>{{ pilotView.area.area_name }}</h1>
           <p v-if="mapState === 'loading'">지도를 불러오는 동안 목록을 이용할 수 있습니다.</p>
           <p v-else>지도를 불러오지 못했지만 후보 위치 정보와 선택 기능은 이용할 수 있습니다.</p>
+          <button
+            v-if="pilotView && viewState === 'ready' && mapState === 'unavailable'"
+            class="secondary-button"
+            type="button"
+            @click="setupMap"
+          >
+            지도 다시 시도
+          </button>
           <div class="fallback-spot-list" aria-label="후보 위치 바로가기">
             <button
               v-for="spot in pilotView.spot_options"
@@ -671,7 +664,12 @@ onBeforeUnmount(() => {
               </section>
 
               <div class="sticky-action">
-                <p v-if="selectedSpotId === openedSpot.spot_option_id" class="selection-status">
+                <p
+                  v-if="selectedSpotId === openedSpot.spot_option_id"
+                  class="selection-status"
+                  role="status"
+                  aria-live="polite"
+                >
                   현재 선택한 후보 위치입니다. 다른 후보 위치로 변경할 수 있습니다.
                 </p>
                 <button class="primary-button" type="button" @click="selectSpot">
@@ -686,10 +684,5 @@ onBeforeUnmount(() => {
         </aside>
       </section>
     </main>
-
-    <div v-if="toastMessage" class="selection-toast" role="status" aria-live="polite">
-      <strong>{{ selectedSpot?.spot_name }}</strong>
-      <span>{{ toastMessage }}</span>
-    </div>
   </div>
 </template>

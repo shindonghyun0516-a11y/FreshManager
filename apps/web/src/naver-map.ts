@@ -45,23 +45,33 @@ function loadMaps(clientId: string): Promise<NaverMaps> {
   if (window.naver?.maps) return Promise.resolve(window.naver.maps);
   if (loader) return loader;
 
-  loader = new Promise((resolve, reject) => {
+  loader = new Promise<NaverMaps>((resolve, reject) => {
     const existing = document.querySelector<HTMLScriptElement>(
       "script[data-freshmanager-naver-map]",
     );
     const script = existing ?? document.createElement("script");
-
-    const finish = () =>
-      window.naver?.maps
-        ? resolve(window.naver.maps)
-        : reject(new Error("NAVER_MAP_UNAVAILABLE"));
+    const cleanupListeners = () => {
+      script.removeEventListener("load", finish);
+      script.removeEventListener("error", rejectLoad);
+    };
+    const rejectLoad = () => {
+      cleanupListeners();
+      script.remove();
+      loader = undefined;
+      reject(new Error("NAVER_MAP_UNAVAILABLE"));
+    };
+    const finish = () => {
+      const maps = window.naver?.maps;
+      if (!maps) {
+        rejectLoad();
+        return;
+      }
+      cleanupListeners();
+      resolve(maps);
+    };
 
     script.addEventListener("load", finish, { once: true });
-    script.addEventListener(
-      "error",
-      () => reject(new Error("NAVER_MAP_UNAVAILABLE")),
-      { once: true },
-    );
+    script.addEventListener("error", rejectLoad, { once: true });
 
     if (!existing) {
       script.dataset.freshmanagerNaverMap = "true";

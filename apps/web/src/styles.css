@@ -823,28 +823,6 @@ p {
   background: var(--brand-dark);
 }
 
-.selection-toast {
-  position: fixed;
-  z-index: 50;
-  pointer-events: none;
-  right: 24px;
-  bottom: 24px;
-  max-width: 420px;
-  display: grid;
-  gap: 4px;
-  padding: 15px 18px;
-  border: 1px solid #b4a3d4;
-  border-radius: 10px;
-  color: #3f2d62;
-  background: #fbf9ff;
-  box-shadow: 0 12px 36px rgb(42 26 72 / 20%);
-  font-size: 0.82rem;
-}
-
-.selection-toast strong {
-  font-size: 0.9rem;
-}
-
 @keyframes spin {
   to {
     transform: rotate(360deg);
@@ -1017,13 +995,6 @@ p {
   .spot-card {
     min-height: 112px;
     padding: 15px;
-  }
-
-  .selection-toast {
-    right: 14px;
-    bottom: 14px;
-    left: 14px;
-    max-width: none;
   }
 
 }
