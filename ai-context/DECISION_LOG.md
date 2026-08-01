@@ -14,6 +14,7 @@ PM이 승인했거나 명시적으로 보류한 제품·운영 결정을 새 AI 
 - `OPEN_DECISION`: PM이 아직 확정하지 않은 선택
 - `HISTORICAL`: 과거 이력이며 현재 실행 기준이 아닌 결정
 - `SUPERSEDED`: 후속 결정으로 대체된 결정
+- `ACCEPTED_BY_PM_FOR_ISSUE_154`: Issue #154 구현에 적용하는 PM 승인 결정
 
 ## 3. 결정 목록
 
@@ -387,7 +388,7 @@ spot_auto_recommendation=false
 ### D-022 — Area-first 초기 웹 파일럿 사용자 흐름
 
 - Date: `2026-07-30`
-- Status: `ACCEPTED`
+- Status: `ACCEPTED · SUPERSEDED_IN_PART_BY_D-024`
 - Relationship: D-020의 장기 원격 데이터 기반 SPOT 추천 목표와 D-021의 5개
   Area·Area당 Spot 3개·사용자 Spot 선택·서울시 Forecast·ML 미사용 계약은
   유지한다. D-021 Recommendation Core와 Application Service도 여러 Area의 기회를
@@ -434,6 +435,8 @@ official_recommendation_allowed=false
   공식화한다.
 - Evidence: Issue #140, PR #141,
   `docs/product/AREA_FIRST_WEB_PILOT_CONTRACT.md`.
+- Supersession: D-024는 초기 웹 파일럿의 과거 비교·점수·순위 허용부분만 대체한다.
+  PM 수동 Spot 인구 Prototype 허용과 Area 공식값 분리, 사용자 직접 선택은 유지한다.
 
 ### D-023 — 지도 중심 Area-first UI 구조
 
@@ -461,6 +464,41 @@ official_recommendation_allowed=false
 - Evidence: Issue #150, PR #151, `docs/design/DESIGN.md`,
   `docs/product/AREA_FIRST_WEB_PILOT_CONTRACT.md`,
   `docs/product/AREA_SPOT_RECOMMENDATION_AND_UI_POLICY.md`.
+
+### D-024 — 판매성과 기반 Spot 점수·순위 제거와 Spot 인구 Prototype 유지
+
+- Date: `2026-08-01`
+- Status: `ACCEPTED_BY_PM_FOR_ISSUE_154`
+- Relationship: D-022·D-023의 Area-first 지도 중심 사용자 흐름, Area당 Spot 3개,
+  사용자 직접 선택과 Area 공식값·Spot Prototype 분리를 유지한다. D-020의 장기 원격
+  SPOT 정책과 EG-8D Area 분석은 변경하지 않는다.
+- Policy:
+
+```text
+sales_history_available=false
+sales_performance_metrics_allowed=false
+opportunity_score_allowed=false
+area_rank_allowed=false
+spot_population_prototype_allowed=true
+spot_population_source=PM_MANUAL_PROTOTYPE
+```
+
+- Data boundary: Spot Identity 정적 Master와 Optional Spot 인구 Prototype을 분리한다.
+  Spot 인구값은 `data_status=PROTOTYPE`, `input_method=PM_MANUAL`인 PM 직접 입력만
+  허용하며 Area 값을 복사·분배·추정하지 않는다.
+- Availability: PM 입력파일이나 해당 Spot 행이 없으면 정적 Spot 3개는 유지하고
+  `SPOT_PROTOTYPE_DATA_UNAVAILABLE`, 인구·증감 `null`과 안전한 안내를 반환한다.
+- Calculation: PM이 제공한 현재 범위와 각 미래 범위의 중앙값으로 60분·180분 증감수와
+  증감률을 독립 계산한다. 현재 중앙값이 0이면 증감률은 `null`이고 누락된 시점은
+  unavailable이다.
+- UI·API consequence: 초기 파일럿은 Spot 인구표·데이터 기준시각·Prototype 출처·
+  제한사항과 명시 선택만 제공한다. 과거 판매이력 비교, 점수·순위 기반 정렬·필터·
+  기본선택·추천표현은 사용하지 않는다.
+- Scope boundary: Issue #154의 제품·API·UI·문서와 로컬 End-to-end 구현에만 적용한다.
+  실제 외부 데이터 승인, Vercel 배포, 공식 Recommendation과 사용자 게시를 승인하지
+  않는다.
+- Evidence: Issue #154 PM 결정,
+  `docs/product/AREA_FIRST_WEB_PILOT_CONTRACT.md`, `docs/design/DESIGN.md`.
 
 ## 4. 갱신 규칙
 

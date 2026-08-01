@@ -1,12 +1,14 @@
 # FreshManager UI/UX Design Specification
 
 - 문서 상태: `APPROVED · ACCEPTED`
-- 버전: `v0.1.0`
+- 버전: `v0.2.0`
 - 적용 범위: Area-first 초기 웹 파일럿
 - 관련 결정:
   - [`D-022`](../../ai-context/DECISION_LOG.md)
+  - [`D-024`](../../ai-context/DECISION_LOG.md)
   - [`ADR-012`](../architecture/AREA_FIRST_WEB_API_ARCHITECTURE.md)
   - Related Issue: #150
+  - Related Issue: #154
   - Related PR: #151
 - 관련 제품계약:
   - [`AREA_FIRST_WEB_PILOT_CONTRACT.md`](../product/AREA_FIRST_WEB_PILOT_CONTRACT.md)
@@ -55,7 +57,6 @@
 - Freshness 임계값
 - Area·Spot 추천 Logic
 - 실제 Spot 운영 적합성
-- 실제 판매성과
 - Backend Route
 - Database·인증·배포구조
 - 실제 지도 좌표·Zoom
@@ -105,7 +106,6 @@ Area 미선택 상태에서는 Spot Marker와 Area·Spot 정보를 표시하지 
 - Area 현재·1시간 후·3시간 후 Card
 - Spot 목록
 - Spot 상세
-- 점수·순위
 - 제한사항
 
 ## 5. 단일 Drawer 계약
@@ -211,25 +211,17 @@ Dropdown으로 축소하지 않는다.
 - 직선거리
 - `프로토타입 데이터` Badge
 - `PM 직접 입력` Badge
-- 현재 Prototype 정보
-- 1시간 후 Prototype 정보
-- 3시간 후 Prototype 정보
-- 비교기준
-- 증감수·증감률
-- 기회점수
-- Area 내 순위
+- 데이터 기준시각
+- 현재 예상 인구 범위
+- 1시간 후 예상 인구 범위와 증감수·증감률
+- 3시간 후 예상 인구 범위와 증감수·증감률
 - 제한사항
 - `판촉 후보 위치로 선택` Sticky CTA
 
-비교기준은 다음 세 값만 사용한다.
-
-- 전일 같은 시간
-- 지난주 같은 요일·시간
-- 최근 4주 같은 요일·시간 평균
-
-기본값은 `최근 4주 같은 요일·시간 평균`이다. `판매 순위`는 사용하지 않고
-`Area 내 순위`로 표시한다. 점수·순위가 PM 직접 입력 Prototype이라는 안내를
-제공한다.
+Spot 인구정보는 `spot_population_source=PM_MANUAL_PROTOTYPE`인 PM 직접 입력값만
+표시한다. 값이 없으면 표의 현재·1시간 후·3시간 후 값은 `—`로 유지하고
+`Spot별 프로토타입 인구 데이터가 아직 입력되지 않았습니다.`를 표시한다. 서울시
+공식 Area 값을 Spot 값으로 복사·분배·추정하지 않는다.
 
 제한사항에는 다음을 포함한다.
 
@@ -290,23 +282,25 @@ Sheet로 바꾼다.
 
 ### 11.1 Map
 
-- 현재 디자인의 지도는 Layout·Interaction 검토용 Placeholder다.
-- 실제 Provider·좌표·Zoom·Marker 위치는 NAVER Maps JavaScript API 통합 단계에서
-  확정한다.
-- 현재 지도 이미지의 지명·좌표 정확성은 디자인 승인대상이 아니다.
+- UI 참고 이미지의 지도는 Layout·Interaction 검토용 Placeholder다.
+- Issue #154는 NAVER Maps JavaScript API Adapter를 로컬 구현했지만 실제 Credential
+  기반 Runtime은 아직 검증하지 않았다.
+- 참고 이미지의 지명·좌표·Zoom·Marker 위치는 구현값으로 사용하지 않는다.
 
 ### 11.2 Data
 
-- 현재 수치는 UI 정보구조·Component 검토용 Mock Data다.
-- 실제 Area·Spot 데이터는 Provider·Service·API 구현 뒤 연결한다.
-- Mock 값은 운영값 또는 사실로 해석하지 않는다.
+- UI 참고 이미지의 수치는 정보구조·Component 검토용 Mock Data다.
+- Issue #154 Runtime은 참고 이미지 수치를 사용하지 않으며 Area·Spot 인구값이 없으면
+  `DATA_UNAVAILABLE`·`SPOT_PROTOTYPE_DATA_UNAVAILABLE`과 `null`을 표시한다.
+- 실제 Area·Spot 데이터는 별도 승인 후 연결하며 Mock 값은 운영값 또는 사실로
+  해석하지 않는다.
 
 다음을 금지한다.
 
 - Mock 값을 운영값으로 표현
 - Area 값을 Spot 값으로 복사
 - 누락값을 0·평균·추정값으로 대체
-- Mock 수치로 판매성과·추천 주장
+- Mock 수치로 운영결과·추천 주장
 
 현재 승인범위는 다음과 같다.
 
@@ -319,12 +313,13 @@ Sheet로 바꾼다.
 - Responsive
 - Accessibility
 
-다음은 후속 승인범위다.
+Issue #154에서 API Binding과 NAVER Map Adapter를 로컬 구현·검증했다. 다음은 후속
+승인범위다.
 
-- NAVER Map 정확성
+- 실제 NAVER Map Credential 기반 Runtime 검증
 - 실제 Area 데이터
 - 실제 Spot Prototype 데이터
-- API Binding
+- 배포
 
 ## 12. 상태 Matrix
 
@@ -336,7 +331,7 @@ Area·Spot·Map·Geolocation·Future Data는 서로 독립된 상태군이다. �
 | Area | `AREA_UNSELECTED` | 담당 Area 선택 안내만 표시하고 Area 수치·Spot을 숨김 |
 | Area | `AREA_LOADING` | 이전 Area 정보·Spot 선택을 지우고 Loading 표시 |
 | Area | `AREA_AVAILABLE` | Area 공식정보와 Spot 3개를 이용할 수 있음 |
-| Area | `AREA_DATA_UNAVAILABLE` | 공식 수치 없이 Area명·안전한 제한 안내와 가능한 정적 Spot 정보 표시 |
+| Area | `DATA_UNAVAILABLE` | 공식 수치 없이 Area명·안전한 제한 안내와 가능한 정적 Spot 정보 표시 |
 | Spot | `SPOT_UNSELECTED` | 상세·선택 강조 없음 |
 | Spot | `SPOT_LIST_OPEN` | 후보 위치 3곳 목록 Drawer 또는 Bottom Sheet 표시 |
 | Spot | `SPOT_DETAIL_OPEN` | 한 Spot의 상세 Drawer 또는 Bottom Sheet 표시 |
@@ -376,9 +371,8 @@ Area·Spot·Map·Geolocation·Future Data는 서로 독립된 상태군이다. �
 | `AreaInfoContent` | Area 공식정보와 기준시각·출처·Freshness |
 | `SpotList` | Spot 3개 목록 |
 | `SpotListItem` | 클릭 가능한 후보 위치 Card |
-| `SpotDetailContent` | Spot Prototype 상세와 제한 |
+| `SpotDetailContent` | Spot PM 수동 인구 Prototype 상세와 제한 |
 | `PrototypeBadge` | Prototype·PM 직접 입력 출처 표시 |
-| `ComparisonSelector` | 승인된 과거 비교기준 선택 |
 | `LimitationNotice` | 확인되지 않은 운영·현장 한계 표시 |
 | `SelectSpotButton` | 후보 위치 명시 선택 |
 | `SelectionToast` | 선택 완료와 변경 가능 안내 |
@@ -423,7 +417,7 @@ Area·Spot·Map·Geolocation·Future Data는 서로 독립된 상태군이다. �
 - 작업: 번호, 이름, 주소·위치설명, 가능한 직선거리, Prototype 이용 가능상태,
   Chevron을 가진 전체 클릭 Card 3개를 설계
 - 형식: Desktop 지도 + 후보 위치 목록 Drawer 상태 1개
-- 유지사항: 제목 `후보 위치 3곳`, 표시순서가 추천순위가 아님, Marker와 목록 상태
+- 유지사항: 제목 `후보 위치 3곳`, 표시순서는 우열 의미가 없음, Marker와 목록 상태
   동기화
 - 금지사항: HTML Select, 기본선택, 역세권·오피스 밀집·유동인구 많음·추천·Best·최적
 - 성공조건: 사용자가 세 후보를 동등하게 훑고 Card 전체로 상세에 들어갈 수 있음
@@ -432,12 +426,12 @@ Area·Spot·Map·Geolocation·Future Data는 서로 독립된 상태군이다. �
 
 - 역할: Senior Product Designer이자 Field Operations SaaS UX Architect
 - 맥락: 한 Spot의 PM 입력 Prototype 정보와 운영 한계를 확인한 뒤 명시적으로 선택
-- 작업: 뒤로가기·닫기, 정체성, Badge, 현재·1시간 후·3시간 후, 비교기준,
-  증감수·증감률, 기회점수, Area 내 순위, 제한과 Sticky CTA를 설계
+- 작업: 뒤로가기·닫기, 정체성, Badge, 데이터 기준시각, 현재·1시간 후·3시간 후
+  예상 인구 범위, 증감수·증감률, 제한과 Sticky CTA를 설계
 - 형식: Desktop 지도 + 후보 위치 상세 Drawer 상태 1개
-- 유지사항: `프로토타입 데이터`, `PM 직접 입력`, 최근 4주 평균 기본값,
+- 유지사항: `프로토타입 데이터`, `PM 직접 입력`, 값 부재 시 `—`,
   `판촉 후보 위치로 선택`
-- 금지사항: 판매 순위, 공식 추천, AI 점수, 판매허용·안전·운영 적합성 확정
+- 금지사항: 공식 추천, 판매허용·안전·운영 적합성 확정
 - 성공조건: Prototype 근거와 한계를 이해한 뒤 CTA로만 선택을 완료할 수 있음
 
 ### 14.5 선택 완료상태
@@ -496,8 +490,8 @@ Area·Spot·Map·Geolocation·Future Data는 서로 독립된 상태군이다. �
 
 - 역할: Senior Product Designer이자 Trust-centered UX Architect
 - 맥락: Spot 정체성은 있으나 PM 입력 Prototype 수치가 없음
-- 작업: Spot명·주소·유형과 데이터 없음·한계를 유지하고 수치·점수·순위를 숨기는
-  상세 상태를 설계
+- 작업: Spot명·주소·유형과 데이터 없음·한계를 유지하고 인구정보 표의 값을 `—`로
+  표시하는 상세 상태를 설계
 - 형식: `SPOT_PROTOTYPE_DATA_UNAVAILABLE` Drawer·Bottom Sheet
 - 유지사항: 정적 Spot 선택 가능, 다른 Spot 확인과 데이터 갱신 안내
 - 금지사항: Area 값 복사, 0·평균·추정값, 공식 데이터 Badge
