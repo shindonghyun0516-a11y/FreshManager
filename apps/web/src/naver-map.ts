@@ -11,6 +11,7 @@ export type MapPoint = { latitude: number; longitude: number };
 type NaverMarker = {
   setIcon(icon: { content: string; anchor: NaverPoint }): void;
   setMap(map: null): void;
+  setZIndex(zIndex: number): void;
 };
 
 type NaverPoint = object;
@@ -86,11 +87,14 @@ function loadMaps(clientId: string): Promise<NaverMaps> {
 
 function markerContent(order: number, state: "default" | "opened" | "selected") {
   const selected = state === "selected";
-  const background = selected ? "#5b21b6" : state === "opened" ? "#0f766e" : "#ffffff";
-  const color = state === "default" ? "#0f4f4a" : "#ffffff";
-  const border = selected ? "#ffffff" : "#0f766e";
+  const background = selected ? "#008577" : state === "opened" ? "#dff5f0" : "#ffffff";
+  const color = selected ? "#ffffff" : "#006b5e";
+  const border = state === "default" ? "#008577" : "#006b5e";
+  const label = selected
+    ? '<svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 12 4 4 8-9"/></svg>'
+    : String(order);
   return {
-    content: `<span aria-hidden="true" style="display:grid;place-items:center;width:42px;height:42px;border:3px solid ${border};border-radius:50% 50% 50% 8px;background:${background};color:${color};font:800 15px/1 system-ui;box-shadow:0 6px 16px rgba(15,49,46,.25);transform:rotate(-45deg)"><span style="transform:rotate(45deg)">${selected ? "✓" : order}</span></span>`,
+    content: `<span aria-hidden="true" style="display:grid;place-items:center;width:44px;height:44px;border:2px solid ${border};border-radius:50% 50% 50% 12px;background:${background};color:${color};font:700 14px/1 'Pretendard Variable',Pretendard,system-ui,sans-serif;box-shadow:0 4px 14px rgba(21,47,41,.10);transform:rotate(-45deg)"><span style="display:grid;place-items:center;transform:rotate(45deg)">${label}</span></span>`,
   };
 }
 
@@ -121,9 +125,10 @@ export async function createNaverMap(
       map,
       position,
       title: spot.name,
+      zIndex: 10,
       icon: {
         ...markerContent(spot.displayOrder, "default"),
-        anchor: new maps.Point(21, 42),
+        anchor: new maps.Point(22, 44),
       },
     });
     listeners.push(
@@ -142,8 +147,9 @@ export async function createNaverMap(
         const state = id === selectedId ? "selected" : id === openedId ? "opened" : "default";
         entry.marker.setIcon({
           ...markerContent(entry.order, state),
-          anchor: new maps.Point(21, 42),
+          anchor: new maps.Point(22, 44),
         });
+        entry.marker.setZIndex(state === "selected" ? 30 : state === "opened" ? 20 : 10);
       }
     },
     setUserLocation(point: MapPoint | null) {
@@ -156,7 +162,7 @@ export async function createNaverMap(
         title: "내 위치",
         icon: {
           content:
-            '<span aria-hidden="true" style="display:block;width:20px;height:20px;border:4px solid #fff;border-radius:50%;background:#6d28d9;box-shadow:0 3px 12px rgba(30,20,70,.35)"></span>',
+            '<span aria-hidden="true" style="display:block;width:20px;height:20px;border:4px solid #fff;border-radius:50%;background:#7657d5;box-shadow:0 4px 14px rgba(21,47,41,.10)"></span>',
           anchor: new maps.Point(10, 10),
         },
       });

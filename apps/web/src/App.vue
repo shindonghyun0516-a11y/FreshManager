@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 
+import PopulationPatternChart from "./components/PopulationPatternChart.vue";
+import PopulationRangeChart from "./components/PopulationRangeChart.vue";
 import {
   createNaverMap,
   type MapPoint,
@@ -8,12 +10,15 @@ import {
 } from "./naver-map";
 import type {
   AreaListItem,
-  AreaPilotData,
   AreaPilotResponse,
   AreasResponse,
   PopulationRange,
   SpotOption,
 } from "./generated/api-types";
+import { ANALYSIS_FIXTURE, AREA_FIXTURES } from "./prototype/area-fixtures";
+import { SPOT_FIXTURES } from "./prototype/spot-fixtures";
+import type { SpotFixture } from "./prototype/prototype-types";
+import { assertApiSpotIdentity, resolvePrototypeDataMode } from "./prototype/prototype-validation";
 
 type Panel = "none" | "area" | "spots" | "spot";
 type RequestState = "idle" | "loading" | "ready" | "error";
@@ -25,15 +30,36 @@ type GeolocationState =
   | "denied"
   | "unavailable";
 
+type ForecastSlot = {
+  id: "current" | "60" | "120" | "180";
+  label: string;
+  range: PopulationRange | null;
+  contractPending?: boolean;
+};
+
+const dataMode = resolvePrototypeDataMode(
+  import.meta.env.VITE_FRESHMANAGER_DATA_MODE,
+  import.meta.env.DEV,
+);
+const fixtureMode = dataMode === "fixture";
+
 const numberFormatter = new Intl.NumberFormat("ko-KR", {
   maximumFractionDigits: 1,
 });
+
+const SPOT_TYPE_LABELS: Readonly<Record<string, string>> = {
+  PARK_ZONE: "공원 구역",
+  PUBLIC_SPACE: "공공장소",
+  TRANSIT_EXIT: "대중교통 출입구",
+  VENUE: "주요 시설",
+};
 
 const areas = ref<AreaListItem[]>([]);
 const areasState = ref<RequestState>("loading");
 const selectedAreaCode = ref("");
 const pilotView = ref<AreaPilotResponse | null>(null);
 const viewState = ref<RequestState>("idle");
+const viewErrorMessage = ref("Area 정보를 불러오지 못했습니다");
 const panel = ref<Panel>("none");
 const openedSpotId = ref<string | null>(null);
 const selectedSpotId = ref<string | null>(null);
@@ -56,8 +82,16 @@ const openedSpot = computed(
     ) ?? null,
 );
 
-const spotPrototypeContractInvalid = computed(
-  () => pilotView.value?.warnings.includes("SPOT_PROTOTYPE_CONTRACT_INVALID") ?? false,
+const areaFixture = computed(() =>
+  fixtureMode
+    ? AREA_FIXTURES.find((fixture) => fixture.area_code === selectedAreaCode.value) ?? null
+    : null,
+);
+
+const openedSpotFixture = computed<SpotFixture | null>(() =>
+  fixtureMode
+    ? SPOT_FIXTURES.find((fixture) => fixture.spot_option_id === openedSpotId.value) ?? null
+    : null,
 );
 
 const panelTitle = computed(() => {
@@ -67,11 +101,92 @@ const panelTitle = computed(() => {
   return "";
 });
 
-const visibleTimestamp = computed(() => pilotView.value?.area.observed_at ?? null);
+const visibleTimestampLabel = computed(() => {
+  if (fixtureMode) return areaFixture.value?.reference_time_label ?? "—";
+  if (dataMode === "unavailable") return "—";
+  return formatDateTime(pilotView.value?.area.observed_at ?? null);
+});
+
+const compactObservedTimeLabel = computed(() => {
+  if (fixtureMode) {
+    const label = areaFixture.value?.reference_time_label.trim() ?? "";
+    return /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(label) ? label : "—";
+  }
+  if (dataMode === "unavailable") return "—";
+  const value = pilotView.value?.area.observed_at;
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+  return new Intl.DateTimeFormat("ko-KR", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(date);
+});
+
+const areaForecastSlots = computed<ForecastSlot[]>(() => {
+  const area = pilotView.value?.area;
+  if (!area) return [];
+  const fixture = areaFixture.value;
+  if (fixtureMode && fixture) {
+    return [
+      { id: "current", label: "현재", range: { min: fixture.population_min, max: fixture.population_max } },
+      ...fixture.forecasts.map((forecast) => ({
+        id: String(forecast.horizon_minutes) as "60" | "120" | "180",
+        label: `${forecast.horizon_minutes}분`,
+        range: { min: forecast.population_min, max: forecast.population_max },
+      })),
+    ];
+  }
+  if (dataMode === "unavailable") return [
+    { id: "current", label: "현재", range: null },
+    { id: "60", label: "60분", range: null },
+    { id: "120", label: "120분", range: null },
+    { id: "180", label: "180분", range: null },
+  ];
+  return [
+    { id: "current", label: "현재", range: area.current_population },
+    { id: "60", label: "60분", range: area.forecast_60 },
+    { id: "120", label: "120분", range: null, contractPending: true },
+    { id: "180", label: "180분", range: area.forecast_180 },
+  ];
+});
+
+const spotForecastSlots = computed<ForecastSlot[]>(() => {
+  const spot = openedSpot.value;
+  if (!spot) return [];
+  const fixture = openedSpotFixture.value;
+  if (fixtureMode && fixture) return [
+    { id: "current", label: "현재", range: { min: fixture.current_population_min, max: fixture.current_population_max } },
+    { id: "60", label: "60분", range: { min: fixture.forecast_60_min, max: fixture.forecast_60_max } },
+    { id: "120", label: "120분", range: { min: fixture.forecast_120_min, max: fixture.forecast_120_max } },
+    { id: "180", label: "180분", range: { min: fixture.forecast_180_min, max: fixture.forecast_180_max } },
+  ];
+  if (dataMode === "unavailable") return [
+    { id: "current", label: "현재", range: null },
+    { id: "60", label: "60분", range: null },
+    { id: "120", label: "120분", range: null },
+    { id: "180", label: "180분", range: null },
+  ];
+  return [
+    { id: "current", label: "현재", range: spot.current_population },
+    { id: "60", label: "60분", range: spot.forecast_60 },
+    { id: "120", label: "120분", range: null, contractPending: true },
+    { id: "180", label: "180분", range: spot.forecast_180 },
+  ];
+});
+
+const areaPopulationAvailable = computed(() =>
+  areaForecastSlots.value.some((slot) => slot.range !== null),
+);
+
+const spotPopulationAvailable = computed(() =>
+  spotForecastSlots.value.some((slot) => slot.range !== null),
+);
 
 function formatRange(value: PopulationRange | null) {
   if (!value) return "—";
-  return `${numberFormatter.format(value.min)} ~ ${numberFormatter.format(value.max)}명`;
+  return `${numberFormatter.format(value.min)}~${numberFormatter.format(value.max)}명`;
 }
 
 function formatDateTime(value: string | null) {
@@ -86,38 +201,6 @@ function formatDateTime(value: string | null) {
     minute: "2-digit",
     hour12: false,
   }).format(date);
-}
-
-function formatChange(value: number | null) {
-  if (value === null) return "—";
-  const sign = value > 0 ? "+" : "";
-  return `${sign}${numberFormatter.format(value)}명`;
-}
-
-function formatRate(value: number | null) {
-  if (value === null) return "—";
-  const percent = value * 100;
-  const sign = percent > 0 ? "+" : "";
-  return `${sign}${numberFormatter.format(percent)}%`;
-}
-
-function changeClass(value: number | null) {
-  if (value === null || value === 0) return "change-neutral";
-  return value > 0 ? "change-up" : "change-down";
-}
-
-function limitationItems(spot: SpotOption) {
-  const limitations = spot.limitations.filter(Boolean);
-  return limitations.length
-    ? limitations
-    : ["실제 판매 허용 여부, 접근성, 안전성과 카트 정차 가능성은 현장 확인이 필요합니다."];
-}
-
-function isSpotDataUnavailable(spot: SpotOption) {
-  return (
-    spot.prototype_data_status === "SPOT_PROTOTYPE_DATA_UNAVAILABLE" ||
-    (!spot.current_population && !spot.forecast_60 && !spot.forecast_180)
-  );
 }
 
 function straightLineDistanceKm(
@@ -147,6 +230,10 @@ function formatDistance(spot: SpotOption) {
   return distance === null ? null : `${numberFormatter.format(distance)}km 직선거리`;
 }
 
+function formatSpotType(value: string) {
+  return SPOT_TYPE_LABELS[value] ?? "기타 후보 위치";
+}
+
 async function loadAreas() {
   areasState.value = "loading";
   try {
@@ -172,6 +259,7 @@ async function selectArea() {
   selectedSpotId.value = null;
   geolocationState.value = "idle";
   userLocation.value = null;
+  viewErrorMessage.value = "Area 정보를 불러오지 못했습니다";
 
   if (!selectedAreaCode.value) {
     viewState.value = "idle";
@@ -190,7 +278,19 @@ async function selectArea() {
       },
     );
     if (!response.ok) throw new Error("AREA_VIEW_UNAVAILABLE");
-    pilotView.value = (await response.json()) as AreaPilotResponse;
+    const payload = (await response.json()) as AreaPilotResponse;
+    if (fixtureMode) {
+      try {
+        assertApiSpotIdentity(selectedAreaCode.value, payload.spot_options);
+      } catch (error) {
+        if (import.meta.env.DEV) console.error("Prototype Spot fixture identity validation failed", error);
+        viewErrorMessage.value = "후보 위치 정보를 불러오지 못했습니다.";
+        viewState.value = "error";
+        mapState.value = "unavailable";
+        return;
+      }
+    }
+    pilotView.value = payload;
     viewState.value = "ready";
     await nextTick();
     await setupMap();
@@ -331,12 +431,17 @@ onBeforeUnmount(() => {
   <div class="app-shell">
     <header class="app-header">
       <a class="brand" href="#main-content" aria-label="FreshManager 메인으로 이동">
-        <span class="brand-mark" aria-hidden="true">F</span>
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none">
+            <path d="M19.5 4.5c-7.8.2-12.4 3.6-13.8 8.2-1.1 3.6 1.4 6.8 4.8 6.8 5.6 0 8.6-6.4 9-15Z" />
+            <path d="M5 19c1.5-4.1 4.7-7.1 9.8-9.2" />
+          </svg>
+        </span>
         <span>FreshManager</span>
       </a>
 
       <div class="header-area-field">
-        <label for="area-select">담당 Area</label>
+        <label class="sr-only" for="area-select">담당 구역 선택</label>
         <select
           id="area-select"
           v-model="selectedAreaCode"
@@ -344,7 +449,11 @@ onBeforeUnmount(() => {
           @change="selectArea"
         >
           <option value="">
-            {{ areasState === "loading" ? "Area를 불러오는 중입니다" : "담당 Area를 선택하세요" }}
+            {{
+              areasState === "loading"
+                ? "담당 구역을 불러오는 중입니다"
+                : "담당 구역을 선택해 주세요"
+            }}
           </option>
           <option
             v-for="area in areas"
@@ -354,11 +463,19 @@ onBeforeUnmount(() => {
             {{ area.area_name }}
           </option>
         </select>
+        <svg
+          class="ui-icon chevron select-chevron"
+          viewBox="0 0 24 24"
+          fill="none"
+          aria-hidden="true"
+        >
+          <path d="m7 9 5 5 5-5" />
+        </svg>
       </div>
 
       <p class="data-time" aria-live="polite">
         <span>데이터 기준시각</span>
-        <strong>{{ formatDateTime(visibleTimestamp) }}</strong>
+        <strong>{{ visibleTimestampLabel }}</strong>
       </p>
 
       <div class="help-wrap">
@@ -369,28 +486,45 @@ onBeforeUnmount(() => {
           aria-controls="help-panel"
           @click="helpOpen = !helpOpen"
         >
-          <span aria-hidden="true">?</span> 도움말
+          <svg class="ui-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <circle cx="12" cy="12" r="9" />
+            <path d="M9.8 9.2a2.35 2.35 0 0 1 4.5.9c0 1.7-2.3 2.1-2.3 3.6" />
+            <path d="M12 17h.01" />
+          </svg>
+          <span class="help-label">도움말</span>
         </button>
         <div v-if="helpOpen" id="help-panel" class="help-panel" role="status">
-          담당 Area를 직접 고른 뒤 지도나 목록에서 후보 위치 3곳을 확인하세요.
-          후보 위치는 현장검증 전의 선택지입니다.
+          <p>담당 구역을 직접 고른 뒤 지도나 목록에서 후보 위치 3곳을 확인하세요. 후보 위치는 현장검증 전의 선택지입니다.</p>
+          <p v-if="fixtureMode">현재 화면의 인구·시간대·변화 값과 기준시각은 서비스 화면과 사용 흐름을 검토하기 위한 고정 시뮬레이션 값입니다.</p>
+          <p v-else-if="dataMode === 'official'">구역 정보는 API가 제공한 값만 표시하며, 제공되지 않은 값은 만들지 않습니다.</p>
+          <p v-else>인구 데이터가 준비되지 않아 값을 표시하지 않으며, 누락값을 임의로 만들지 않습니다.</p>
         </div>
       </div>
     </header>
 
     <main id="main-content" class="app-main">
       <div v-if="areasState === 'error'" class="top-alert" role="alert">
-        <span>Area 목록을 불러오지 못했습니다.</span>
-        <button type="button" @click="loadAreas">다시 시도</button>
+        <span>담당 구역 목록을 불러오지 못했습니다.<br />잠시 후 다시 시도해 주세요.</span>
+        <button class="secondary-button" type="button" @click="loadAreas">담당 구역 다시 불러오기</button>
       </div>
 
-      <section class="map-shell" :data-map-state="mapState" aria-label="후보 위치 지도와 정보">
+      <section
+        class="map-shell"
+        :data-map-state="mapState"
+        :data-panel-open="panel !== 'none'"
+        aria-label="후보 위치 지도와 정보"
+      >
         <div ref="mapCanvas" class="map-canvas" :aria-hidden="mapState !== 'available'"></div>
 
         <div v-if="viewState === 'idle'" class="map-fallback map-empty">
-          <span class="map-fallback-icon" aria-hidden="true">⌖</span>
-          <h1>담당 Area를 선택하세요</h1>
-          <p>승인된 5개 Area 중 담당 구역을 고르면 후보 위치 3곳을 확인할 수 있습니다.</p>
+          <span class="map-fallback-icon" aria-hidden="true">
+            <svg class="ui-icon" viewBox="0 0 24 24" fill="none">
+              <path d="m3.5 6.5 5-2.5 7 2.5 5-2.5v13.5l-5 2.5-7-2.5-5 2.5Z" />
+              <path d="M8.5 4v13.5M15.5 6.5V20" />
+            </svg>
+          </span>
+          <h1>담당 구역을 선택해 주세요</h1>
+          <p>승인된 5개 구역 중 담당 구역을 고르면 후보 위치 3곳을 확인할 수 있습니다.</p>
         </div>
 
         <div v-else-if="viewState === 'loading'" class="map-fallback" role="status">
@@ -400,7 +534,7 @@ onBeforeUnmount(() => {
         </div>
 
         <div v-else-if="viewState === 'error'" class="map-fallback" role="alert">
-          <h1>Area 정보를 불러오지 못했습니다</h1>
+          <h1>{{ viewErrorMessage }}</h1>
           <p>확인되지 않은 값은 표시하지 않았습니다.</p>
           <button class="secondary-button" type="button" @click="selectArea">다시 시도</button>
         </div>
@@ -409,27 +543,18 @@ onBeforeUnmount(() => {
           v-else-if="pilotView && mapState !== 'available'"
           class="map-fallback map-list-fallback"
         >
-          <span class="status-pill">지도 없이 목록 이용</span>
-          <h1>{{ pilotView.area.area_name }}</h1>
-          <p v-if="mapState === 'loading'">지도를 불러오는 동안 목록을 이용할 수 있습니다.</p>
-          <p v-else>지도를 불러오지 못했지만 후보 위치 정보와 선택 기능은 이용할 수 있습니다.</p>
-          <button
-            v-if="pilotView && viewState === 'ready' && mapState === 'unavailable'"
-            class="secondary-button"
-            type="button"
-            @click="setupMap"
-          >
-            지도 다시 시도
-          </button>
-          <div class="fallback-spot-list" aria-label="후보 위치 바로가기">
-            <button
-              v-for="spot in pilotView.spot_options"
-              :key="spot.spot_option_id"
-              type="button"
-              @click="openSpot(spot.spot_option_id, $event)"
-            >
-              <span>{{ spot.display_order }}</span>
-              {{ spot.spot_name }}
+          <div class="fallback-map-grid" aria-hidden="true"></div>
+          <div class="fallback-map-copy">
+            <span class="status-pill">지도 없이 목록 이용</span>
+            <h1>{{ pilotView.area.area_name }}</h1>
+            <p v-if="mapState === 'loading'">지도를 불러오는 동안 후보 목록을 이용할 수 있습니다.</p>
+            <p v-else>지도는 표시하지 못했지만 후보 위치의 정적 정보와 선택 기능은 이용할 수 있습니다.</p>
+            <button v-if="pilotView && viewState === 'ready' && mapState === 'unavailable'" class="secondary-button" type="button" @click="setupMap" aria-label="지도 다시 시도">
+              <svg class="ui-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M20 11a8 8 0 1 0-2.3 5.7" />
+                <path d="M20 5v6h-6" />
+              </svg>
+              지도 다시 시도
             </button>
           </div>
         </div>
@@ -437,17 +562,29 @@ onBeforeUnmount(() => {
         <template v-if="pilotView && viewState === 'ready'">
           <nav class="map-actions" aria-label="지도 정보 열기">
             <button type="button" @click="openPanel('area', $event)">
-              <span aria-hidden="true">ⓘ</span> 구역 정보
+              <svg class="ui-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <circle cx="12" cy="12" r="9" />
+                <path d="M12 11v5M12 8h.01" />
+              </svg>
+              구역 정보
             </button>
             <button type="button" @click="openPanel('spots', $event)">
-              <span aria-hidden="true">⌖</span> 후보 위치 3곳
+              <svg class="ui-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M12 21s6-5.1 6-11a6 6 0 1 0-12 0c0 5.9 6 11 6 11Z" />
+                <circle cx="12" cy="10" r="2" />
+              </svg>
+              후보 위치 3곳
             </button>
             <button
               type="button"
               :disabled="geolocationState === 'requesting'"
               @click="requestLocation"
             >
-              <span aria-hidden="true">◎</span>
+              <svg class="ui-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <circle cx="12" cy="12" r="6" />
+                <circle cx="12" cy="12" r="1.5" />
+                <path d="M12 2v3M12 19v3M2 12h3M19 12h3" />
+              </svg>
               {{ geolocationState === "requesting" ? "위치 확인 중" : "내 위치 표시" }}
             </button>
           </nav>
@@ -485,7 +622,9 @@ onBeforeUnmount(() => {
                 aria-label="후보 위치 목록으로 돌아가기"
                 @click="backToSpotList"
               >
-                ←
+                <svg class="ui-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="m15 18-6-6 6-6" />
+                </svg>
               </button>
               <h2
                 v-if="panel !== 'spot'"
@@ -504,65 +643,72 @@ onBeforeUnmount(() => {
                 aria-label="정보 닫기"
                 @click="closePanel"
               >
-                ×
+                <svg class="ui-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="m6 6 12 12M18 6 6 18" />
+                </svg>
               </button>
             </header>
 
             <div v-if="panel === 'area'" class="panel-scroll area-content">
-              <p class="context-label">서울시 공식 Area 데이터</p>
-              <h3>{{ pilotView.area.area_name }}</h3>
-              <p v-if="pilotView.area.availability === 'DATA_UNAVAILABLE'" class="empty-notice">
-                사용할 수 있는 승인 Area 인구 데이터가 없습니다. 값은 추정하지 않았습니다.
-              </p>
-              <div class="table-scroll">
-                <table class="population-table area-population-table">
-                  <caption>선택 Area의 현재와 미래 유동인구</caption>
-                  <thead>
-                    <tr><th>시점</th><th>예상 범위</th><th>혼잡도</th><th>증감수</th><th>증감률</th></tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      <th>현재</th>
-                      <td>{{ formatRange(pilotView.area.current_population) }}</td>
-                      <td>{{ pilotView.area.congestion_level ?? "—" }}</td>
-                      <td>—</td><td>—</td>
-                    </tr>
-                    <tr>
-                      <th>
-                        1시간 후
-                        <small v-if="pilotView.area.forecast_60_target_at">
-                          {{ formatDateTime(pilotView.area.forecast_60_target_at) }}
-                        </small>
-                      </th>
-                      <td>{{ formatRange(pilotView.area.forecast_60) }}</td>
-                      <td>{{ pilotView.area.forecast_60_congestion_level ?? "—" }}</td>
-                      <td :class="changeClass(pilotView.area.change_amount_60)">{{ formatChange(pilotView.area.change_amount_60) }}</td>
-                      <td :class="changeClass(pilotView.area.change_rate_60)">{{ formatRate(pilotView.area.change_rate_60) }}</td>
-                    </tr>
-                    <tr>
-                      <th>
-                        3시간 후
-                        <small v-if="pilotView.area.forecast_180_target_at">
-                          {{ formatDateTime(pilotView.area.forecast_180_target_at) }}
-                        </small>
-                      </th>
-                      <td>{{ formatRange(pilotView.area.forecast_180) }}</td>
-                      <td>{{ pilotView.area.forecast_180_congestion_level ?? "—" }}</td>
-                      <td :class="changeClass(pilotView.area.change_amount_180)">{{ formatChange(pilotView.area.change_amount_180) }}</td>
-                      <td :class="changeClass(pilotView.area.change_rate_180)">{{ formatRate(pilotView.area.change_rate_180) }}</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-              <dl class="source-list">
-                <div><dt>데이터 기준시각</dt><dd>{{ formatDateTime(pilotView.area.observed_at) }}</dd></div>
-                <div><dt>출처</dt><dd>{{ pilotView.area.source ?? "승인 데이터 없음" }}</dd></div>
-                <div><dt>이용 상태</dt><dd>데이터 없음</dd></div>
-                <div><dt>Freshness</dt><dd>{{ pilotView.area.freshness === "NO_COMPLETE_SNAPSHOT" ? "완전한 Snapshot 없음" : pilotView.area.freshness }}</dd></div>
-              </dl>
+              <section class="panel-context-header">
+                <p class="context-label">선택한 담당 구역</p>
+                <h3>{{ pilotView.area.area_name }}</h3>
+              </section>
+
+              <section class="info-section" aria-labelledby="area-current-title">
+                <div class="section-heading">
+                  <h4 id="area-current-title">현재 유동인구</h4>
+                </div>
+                <dl class="metric-grid metric-grid-three">
+                  <div class="metric-population"><dt>예상 유동인구 범위</dt><dd>{{ formatRange(areaForecastSlots[0]?.range ?? null) }}</dd></div>
+                  <div class="metric-congestion"><dt>혼잡도</dt><dd>{{ fixtureMode ? (areaFixture?.congestion_level ?? "—") : (dataMode === "official" ? (pilotView.area.congestion_level ?? "—") : "—") }}</dd></div>
+                  <div class="metric-observed-time"><dt>기준시각</dt><dd>{{ compactObservedTimeLabel }}</dd></div>
+                </dl>
+                <p v-if="!areaPopulationAvailable" class="section-note">구역 인구 데이터가 준비되지 않아 값을 표시하지 않습니다.</p>
+              </section>
+
+              <section class="info-section" aria-labelledby="area-change-title">
+                <div class="section-heading">
+                  <h4 id="area-change-title">오늘의 변화</h4>
+                </div>
+                <PopulationRangeChart
+                  v-if="areaPopulationAvailable"
+                  ariaPrefix="선택 구역의 오늘 변화"
+                  :slots="areaForecastSlots"
+                  testId="area-forecast-chart"
+                />
+                <p v-else class="section-note">구역의 현재·미래 인구 데이터가 준비되면 표시됩니다.</p>
+              </section>
+
+              <section class="info-section" aria-labelledby="area-pattern-title">
+                <div class="section-heading">
+                  <h4 id="area-pattern-title">반복 패턴</h4>
+                </div>
+                <PopulationPatternChart
+                  v-if="fixtureMode && areaFixture"
+                  :analysis="ANALYSIS_FIXTURE"
+                  :buckets="areaFixture.time_buckets"
+                  :peaks="areaFixture.repeated_peaks"
+                />
+                <p v-else class="section-note">반복 패턴 데이터가 준비되면 표시됩니다.</p>
+              </section>
+
+              <section class="info-section data-basis" aria-labelledby="area-basis-title">
+                <div class="section-heading">
+                  <h4 id="area-basis-title">데이터 기준</h4>
+                </div>
+                <dl class="source-list">
+                  <div><dt>데이터 출처</dt><dd>{{ fixtureMode ? "화면 검토용 시뮬레이션" : (dataMode === "official" ? (pilotView.area.source ?? "—") : "—") }}</dd></div>
+                  <div><dt>분석기간</dt><dd>{{ fixtureMode ? ANALYSIS_FIXTURE.analysis_period_label : "—" }}</dd></div>
+                  <div><dt>관측 시점</dt><dd>{{ fixtureMode ? `${ANALYSIS_FIXTURE.total_observation_points}개` : "—" }}</dd></div>
+                  <div><dt>기준시각</dt><dd>{{ fixtureMode ? (areaFixture?.reference_time_label ?? "—") : compactObservedTimeLabel }}</dd></div>
+                  <div><dt>실제 서울시 연동</dt><dd>{{ dataMode === "official" ? "연결됨" : "연결 전" }}</dd></div>
+                </dl>
+              </section>
             </div>
 
             <div v-else-if="panel === 'spots'" class="panel-scroll spot-list-content">
+              <p class="context-label">{{ pilotView.area.area_name }}</p>
               <p class="panel-intro">
                 표시번호는 위치 구분용이며 우열을 뜻하지 않습니다. 한 곳을 눌러 상세를 확인하세요.
               </p>
@@ -571,7 +717,10 @@ onBeforeUnmount(() => {
                   v-for="spot in pilotView.spot_options"
                   :key="spot.spot_option_id"
                   class="spot-card"
-                  :class="{ selected: selectedSpotId === spot.spot_option_id }"
+                  :class="{
+                    opened: openedSpotId === spot.spot_option_id,
+                    selected: selectedSpotId === spot.spot_option_id,
+                  }"
                   type="button"
                   @click="openSpot(spot.spot_option_id, $event)"
                 >
@@ -580,12 +729,16 @@ onBeforeUnmount(() => {
                     <strong>{{ spot.spot_name }}</strong>
                     <small>{{ spot.address }}</small>
                     <small v-if="formatDistance(spot)">{{ formatDistance(spot) }}</small>
-                    <small v-else-if="isSpotDataUnavailable(spot)" class="data-unavailable">
-                      {{ spotPrototypeContractInvalid ? "프로토타입 데이터 이용 불가" : "프로토타입 데이터 없음" }}
-                    </small>
+                    <span v-if="selectedSpotId === spot.spot_option_id" class="selected-label">
+                      <svg class="ui-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                        <path d="m6 12 4 4 8-9" />
+                      </svg>
+                      선택됨
+                    </span>
                   </span>
-                  <span class="chevron" aria-hidden="true">›</span>
-                  <span v-if="selectedSpotId === spot.spot_option_id" class="sr-only">선택됨</span>
+                  <svg class="ui-icon chevron" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path d="m9 6 6 6-6 6" />
+                  </svg>
                 </button>
               </div>
             </div>
@@ -596,91 +749,80 @@ onBeforeUnmount(() => {
                 <div>
                   <h3>{{ openedSpot.spot_name }}</h3>
                   <p>{{ openedSpot.address }}</p>
-                  <p>유형: {{ openedSpot.spot_type }}</p>
+                  <p class="spot-type">유형: {{ formatSpotType(openedSpot.spot_type) }}</p>
                   <p v-if="formatDistance(openedSpot)" class="distance-text">
                     {{ formatDistance(openedSpot) }} · 현재 위치 기준
                   </p>
+                  <p v-else class="distance-text">현재 위치 직선거리: 확인 불가</p>
+                  <span
+                    v-if="openedSpot.operational_suitability_status === 'NOT_VERIFIED'"
+                    class="field-status"
+                  >
+                    현장 확인 전
+                  </span>
                 </div>
               </section>
 
-              <div class="badge-row" aria-label="데이터 성격">
-                <span class="prototype-badge">프로토타입 데이터</span>
-                <span
-                  v-if="openedSpot.spot_population_source === 'PM_MANUAL_PROTOTYPE'"
-                  class="manual-badge"
-                >
-                  PM 직접 입력
-                </span>
-              </div>
-
-              <p v-if="isSpotDataUnavailable(openedSpot)" class="empty-notice">
-                {{
-                  spotPrototypeContractInvalid
-                    ? "Spot별 프로토타입 인구 입력값을 안전하게 사용할 수 없어 표시하지 않았습니다."
-                    : "Spot별 프로토타입 인구 데이터가 아직 입력되지 않았습니다."
-                }}
-              </p>
-
-              <section aria-labelledby="population-title">
+              <section class="info-section" aria-labelledby="area-context-title">
                 <div class="section-heading">
-                  <h4 id="population-title">유동인구 예상</h4>
-                  <span>{{ formatDateTime(openedSpot.observed_at) }}</span>
+                  <h4 id="area-context-title">선택 구역 전망</h4>
                 </div>
-                <div class="table-scroll">
-                  <table class="population-table spot-population-table">
-                    <caption>후보 위치의 현재와 미래 프로토타입 인구</caption>
-                    <thead>
-                      <tr><th>시점</th><th>예상 범위</th><th>증감수</th><th>증감률</th></tr>
-                    </thead>
-                    <tbody>
-                      <tr>
-                        <th>현재</th>
-                        <td>{{ formatRange(openedSpot.current_population) }}</td>
-                        <td>—</td><td>—</td>
-                      </tr>
-                      <tr>
-                        <th>1시간 후</th>
-                        <td>{{ formatRange(openedSpot.forecast_60) }}</td>
-                        <td :class="changeClass(openedSpot.change_amount_60)">{{ formatChange(openedSpot.change_amount_60) }}</td>
-                        <td :class="changeClass(openedSpot.change_rate_60)">{{ formatRate(openedSpot.change_rate_60) }}</td>
-                      </tr>
-                      <tr>
-                        <th>3시간 후</th>
-                        <td>{{ formatRange(openedSpot.forecast_180) }}</td>
-                        <td :class="changeClass(openedSpot.change_amount_180)">{{ formatChange(openedSpot.change_amount_180) }}</td>
-                        <td :class="changeClass(openedSpot.change_rate_180)">{{ formatRate(openedSpot.change_rate_180) }}</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              </section>
-
-              <section class="limitations" aria-labelledby="limitations-title">
-                <h4 id="limitations-title">제한사항</h4>
-                <ul>
-                  <li v-for="item in limitationItems(openedSpot)" :key="item">{{ item }}</li>
-                </ul>
-                <p>현장검증이 필요합니다.</p>
-              </section>
-
-              <div class="sticky-action">
-                <p
-                  v-if="selectedSpotId === openedSpot.spot_option_id"
-                  class="selection-status"
-                  role="status"
-                  aria-live="polite"
-                >
-                  현재 선택한 후보 위치입니다. 다른 후보 위치로 변경할 수 있습니다.
+                <p class="section-note area-context-note">
+                  이 정보는 후보 위치 자체가 아니라 선택한 구역 전체의 정보입니다.
                 </p>
-                <button class="primary-button" type="button" @click="selectSpot">
-                  {{
-                    selectedSpotId === openedSpot.spot_option_id
-                      ? "선택 유지"
-                      : "판촉 후보 위치로 선택"
-                  }}
-                </button>
-              </div>
+                <PopulationRangeChart
+                  v-if="areaPopulationAvailable"
+                  ariaPrefix="선택 구역 전망"
+                  compact
+                  :slots="areaForecastSlots"
+                  testId="spot-area-forecast-chart"
+                />
+                <p v-else class="section-note">선택 구역의 현재·미래 인구 데이터가 준비되면 표시됩니다.</p>
+              </section>
+
+              <section class="info-section" aria-labelledby="spot-population-title">
+                <div class="section-heading">
+                  <h4 id="spot-population-title">후보 위치별 예상 인구</h4>
+                </div>
+                <PopulationRangeChart
+                  v-if="spotPopulationAvailable"
+                  ariaPrefix="후보 위치별 예상 인구"
+                  compact
+                  :slots="spotForecastSlots"
+                  testId="spot-population-chart"
+                />
+                <p v-else class="section-note">후보 위치별 인구 데이터가 아직 준비되지 않았습니다.</p>
+              </section>
+
+              <section class="limitations info-section" aria-labelledby="limitations-title">
+                <h4 id="limitations-title">제한사항</h4>
+                <p class="limitation-primary">
+                  실제 판매 가능 여부, 접근성, 안전성 및 카트 정차 가능성은 현장에서 확인해야 합니다.
+                </p>
+              </section>
             </div>
+            <footer v-if="panel === 'spot' && openedSpot" class="panel-footer sticky-action">
+              <p
+                v-if="selectedSpotId === openedSpot.spot_option_id"
+                class="selection-status"
+                role="status"
+                aria-live="polite"
+                aria-label="현재 선택한 후보 위치입니다. 다른 후보 위치로 변경할 수 있습니다."
+              >
+                <svg class="ui-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <circle cx="12" cy="12" r="9" />
+                  <path d="m7.5 12 3 3 6-6" />
+                </svg>
+                <span><strong>판촉 후보 위치로 선택했습니다.</strong> 다른 후보 위치로 변경할 수 있습니다.</span>
+              </p>
+              <button class="primary-button" type="button" @click="selectSpot">
+                {{
+                  selectedSpotId === openedSpot.spot_option_id
+                    ? "선택 유지"
+                    : "판촉 후보 위치로 선택"
+                }}
+              </button>
+            </footer>
         </aside>
       </section>
     </main>
