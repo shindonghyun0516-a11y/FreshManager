@@ -42,6 +42,14 @@ declare global {
 
 let loader: Promise<NaverMaps> | undefined;
 
+function assertMapContainerAvailable(element: HTMLElement) {
+  if (typeof element.getBoundingClientRect !== "function") return;
+  const { width, height } = element.getBoundingClientRect();
+  if (!(width > 0 && height > 0)) {
+    throw new Error("NAVER_MAP_CONTAINER_UNAVAILABLE");
+  }
+}
+
 function loadMaps(clientId: string): Promise<NaverMaps> {
   if (window.naver?.maps) return Promise.resolve(window.naver.maps);
   if (loader) return loader;
@@ -106,7 +114,9 @@ export async function createNaverMap(
 ) {
   if (!clientId || spots.length === 0) throw new Error("NAVER_MAP_UNAVAILABLE");
 
+  assertMapContainerAvailable(element);
   const maps = await loadMaps(clientId);
+  assertMapContainerAvailable(element);
   const center = new maps.LatLng(spots[0].latitude, spots[0].longitude);
   const map = new maps.Map(element, {
     center,
@@ -114,6 +124,12 @@ export async function createNaverMap(
     minZoom: 10,
     zoomControl: true,
   });
+  try {
+    assertMapContainerAvailable(element);
+  } catch (error) {
+    map.destroy();
+    throw error;
+  }
   const bounds = new maps.LatLngBounds();
   const listeners: object[] = [];
   const markers = new Map<string, { marker: NaverMarker; order: number }>();

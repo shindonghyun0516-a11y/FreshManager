@@ -13,13 +13,14 @@ const vite = await createServer({
   server: { middlewareMode: true },
 });
 
-const [{ AREA_FIXTURES, ANALYSIS_FIXTURE }, { SPOT_FIXTURES }, calculations, sourcePolicy, validation, providers] = await Promise.all([
+const [{ AREA_FIXTURES, ANALYSIS_FIXTURE }, { SPOT_FIXTURES }, calculations, sourcePolicy, validation, providers, naverMap] = await Promise.all([
   vite.ssrLoadModule("/src/prototype/area-fixtures.ts"),
   vite.ssrLoadModule("/src/prototype/spot-fixtures.ts"),
   vite.ssrLoadModule("/src/prototype/prototype-calculations.ts"),
   vite.ssrLoadModule("/src/prototype/prototype-source-policy.ts"),
   vite.ssrLoadModule("/src/prototype/prototype-validation.ts"),
   vite.ssrLoadModule("/src/data/freshmanager-data-provider.ts"),
+  vite.ssrLoadModule("/src/naver-map.ts"),
 ]);
 
 after(() => vite.close());
@@ -258,4 +259,70 @@ test("static responses contain no score, rank, or automatic recommendation field
     assert.equal(view.spot_auto_recommendation, false);
     assert.equal(view.official_recommendation_allowed, false);
   }
+});
+
+test("NAVER map keeps a positive container and fails closed at zero size", async () => {
+  const styles = readFileSync(resolve(process.cwd(), "src/styles.css"), "utf8");
+  const mapCanvasRule = styles.match(/\.map-canvas\s*\{([^}]*)\}/)?.[1] ?? "";
+  assert.match(mapCanvasRule, /width:\s*100%/);
+  assert.match(mapCanvasRule, /height:\s*100%/);
+
+  let mapDestroyed = 0;
+  let markerCount = 0;
+  class FakeMap {
+    constructor(element) {
+      element.style.position = "relative";
+      if (element.collapseOnCreate) element.height = 0;
+    }
+    fitBounds() {}
+    destroy() { mapDestroyed += 1; }
+  }
+  class FakeMarker {
+    constructor() { markerCount += 1; }
+    setIcon() {}
+    setMap() {}
+    setZIndex() {}
+  }
+  globalThis.window = { naver: { maps: {
+    Map: FakeMap,
+    Marker: FakeMarker,
+    LatLng: class {},
+    LatLngBounds: class { extend() {} },
+    Point: class {},
+    Event: { addListener: () => ({}), removeListener() {} },
+  } } };
+
+  const spots = [1, 2, 3].map((displayOrder) => ({
+    id: `spot-${displayOrder}`,
+    name: `후보 위치 ${displayOrder}`,
+    latitude: 37.5,
+    longitude: 127,
+    displayOrder,
+  }));
+  const element = (width, height) => {
+    const target = { width, height, style: { position: "" } };
+    target.getBoundingClientRect = () => ({ width: target.width, height: target.height });
+    return target;
+  };
+
+  const controller = await naverMap.createNaverMap(element(800, 600), "client", spots, () => {});
+  assert.equal(markerCount, 3);
+  controller.destroy();
+  assert.equal(mapDestroyed, 1);
+
+  await assert.rejects(
+    naverMap.createNaverMap(element(800, 0), "client", spots, () => {}),
+    /NAVER_MAP_CONTAINER_UNAVAILABLE/,
+  );
+  await assert.rejects(
+    naverMap.createNaverMap(element(0, 600), "client", spots, () => {}),
+    /NAVER_MAP_CONTAINER_UNAVAILABLE/,
+  );
+  const collapsedBySdk = element(800, 600);
+  collapsedBySdk.collapseOnCreate = true;
+  await assert.rejects(
+    naverMap.createNaverMap(collapsedBySdk, "client", spots, () => {}),
+    /NAVER_MAP_CONTAINER_UNAVAILABLE/,
+  );
+  assert.equal(mapDestroyed, 2);
 });
