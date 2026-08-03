@@ -4,6 +4,10 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue"
 import PopulationPatternChart from "./components/PopulationPatternChart.vue";
 import PopulationRangeChart from "./components/PopulationRangeChart.vue";
 import {
+  ApiDataProvider,
+  selectFreshManagerDataProvider,
+} from "./data/freshmanager-data-provider";
+import {
   createNaverMap,
   type MapPoint,
   type NaverMapController,
@@ -237,17 +241,21 @@ function formatSpotType(value: string) {
 async function loadAreas() {
   areasState.value = "loading";
   try {
-    const response = await fetch("/api/v1/areas", {
-      headers: { Accept: "application/json" },
-    });
-    if (!response.ok) throw new Error("AREA_LIST_UNAVAILABLE");
-    const payload = (await response.json()) as AreasResponse;
+    const payload = await dataProvider.listAreas();
     areas.value = payload.areas;
     areasState.value = "ready";
   } catch {
     areas.value = [];
     areasState.value = "error";
   }
+}
+
+async function requestAreasFromApi(): Promise<AreasResponse> {
+  const response = await fetch("/api/v1/areas", {
+    headers: { Accept: "application/json" },
+  });
+  if (!response.ok) throw new Error("AREA_LIST_UNAVAILABLE");
+  return (await response.json()) as AreasResponse;
 }
 
 async function selectArea() {
@@ -270,15 +278,10 @@ async function selectArea() {
   viewState.value = "loading";
   viewAbortController = new AbortController();
   try {
-    const response = await fetch(
-      `/api/v1/areas/${encodeURIComponent(selectedAreaCode.value)}/pilot-view`,
-      {
-        headers: { Accept: "application/json" },
-        signal: viewAbortController.signal,
-      },
+    const payload = await dataProvider.getPilotView(
+      selectedAreaCode.value,
+      viewAbortController.signal,
     );
-    if (!response.ok) throw new Error("AREA_VIEW_UNAVAILABLE");
-    const payload = (await response.json()) as AreaPilotResponse;
     if (fixtureMode) {
       try {
         assertApiSpotIdentity(selectedAreaCode.value, payload.spot_options);
@@ -301,6 +304,27 @@ async function selectArea() {
     mapState.value = "unavailable";
   }
 }
+
+async function requestPilotViewFromApi(
+  areaCode: string,
+  signal?: AbortSignal,
+): Promise<AreaPilotResponse> {
+  const response = await fetch(
+    `/api/v1/areas/${encodeURIComponent(areaCode)}/pilot-view`,
+    {
+      headers: { Accept: "application/json" },
+      signal,
+    },
+  );
+  if (!response.ok) throw new Error("AREA_VIEW_UNAVAILABLE");
+  return (await response.json()) as AreaPilotResponse;
+}
+
+const apiDataProvider = new ApiDataProvider(
+  requestAreasFromApi,
+  requestPilotViewFromApi,
+);
+const dataProvider = selectFreshManagerDataProvider(dataMode, apiDataProvider);
 
 function destroyMap() {
   mapGeneration += 1;
