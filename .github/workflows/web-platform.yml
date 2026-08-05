@@ -127,7 +127,7 @@ jobs:
 
           assert.equal(app.match(/straightLineDistanceKm\(/g)?.length, 2);
           assert.match(app, /straightLineDistanceKm\(point, spot\)/);
-          assert.doesNotMatch(app, /selectedSpotDistances|다른 후보 위치까지 직선거리/);
+          assert.doesNotMatch(app, /selectedSpotDistances|다른 판매 위치까지 직선거리/);
           assert.doesNotMatch(app, /localStorage|sessionStorage|document\.cookie/);
           assert.equal(app.match(/navigator\.geolocation\.getCurrentPosition/g)?.length, 1);
 
@@ -174,7 +174,7 @@ jobs:
           );
           assert.match(
             app,
-            /현재 선택한 후보 위치입니다\. 다른 후보 위치로 변경할 수 있습니다\./,
+            /현재 선택한 판매 위치입니다\. 다른 판매 위치로 변경할 수 있습니다\./,
           );
           assert.match(styles, /\.sticky-action \{/);
 
@@ -199,7 +199,7 @@ jobs:
           };
           const spots = [{
             id: "spot-1",
-            name: "후보 위치",
+            name: "판매 위치",
             latitude: 37.5,
             longitude: 127,
             displayOrder: 1,

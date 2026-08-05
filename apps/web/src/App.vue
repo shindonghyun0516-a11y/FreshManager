@@ -100,8 +100,8 @@ const openedSpotFixture = computed<SpotFixture | null>(() =>
 
 const panelTitle = computed(() => {
   if (panel.value === "area") return "구역 정보";
-  if (panel.value === "spots") return "후보 위치 3곳";
-  if (panel.value === "spot") return "후보 위치 상세";
+  if (panel.value === "spots") return "판매 위치 목록";
+  if (panel.value === "spot") return "판매 위치 상세";
   return "";
 });
 
@@ -235,7 +235,7 @@ function formatDistance(spot: SpotOption) {
 }
 
 function formatSpotType(value: string) {
-  return SPOT_TYPE_LABELS[value] ?? "기타 후보 위치";
+  return SPOT_TYPE_LABELS[value] ?? "기타 판매 위치";
 }
 
 async function loadAreas() {
@@ -287,7 +287,7 @@ async function selectArea() {
         assertApiSpotIdentity(selectedAreaCode.value, payload.spot_options);
       } catch (error) {
         if (import.meta.env.DEV) console.error("Prototype Spot fixture identity validation failed", error);
-        viewErrorMessage.value = "후보 위치 정보를 불러오지 못했습니다.";
+        viewErrorMessage.value = "판매 위치 정보를 불러오지 못했습니다.";
         viewState.value = "error";
         mapState.value = "unavailable";
         return;
@@ -518,7 +518,7 @@ onBeforeUnmount(() => {
           <span class="help-label">도움말</span>
         </button>
         <div v-if="helpOpen" id="help-panel" class="help-panel" role="status">
-          <p>담당 구역을 직접 고른 뒤 지도나 목록에서 후보 위치 3곳을 확인하세요. 후보 위치는 현장검증 전의 선택지입니다.</p>
+          <p>담당 구역을 직접 고른 뒤 지도나 판매 위치 목록을 확인하세요. 판매 위치는 현장검증 전의 선택지입니다.</p>
           <p v-if="fixtureMode">현재 화면의 인구·시간대·변화 값과 기준시각은 서비스 화면과 사용 흐름을 검토하기 위한 고정 시뮬레이션 값입니다.</p>
           <p v-else-if="dataMode === 'official'">구역 정보는 API가 제공한 값만 표시하며, 제공되지 않은 값은 만들지 않습니다.</p>
           <p v-else>인구 데이터가 준비되지 않아 값을 표시하지 않으며, 누락값을 임의로 만들지 않습니다.</p>
@@ -536,7 +536,7 @@ onBeforeUnmount(() => {
         class="map-shell"
         :data-map-state="mapState"
         :data-panel-open="panel !== 'none'"
-        aria-label="후보 위치 지도와 정보"
+        aria-label="판매 위치 지도와 정보"
       >
         <div ref="mapCanvas" class="map-canvas" :aria-hidden="mapState !== 'available'"></div>
 
@@ -548,13 +548,13 @@ onBeforeUnmount(() => {
             </svg>
           </span>
           <h1>담당 구역을 선택해 주세요</h1>
-          <p>승인된 5개 구역 중 담당 구역을 고르면 후보 위치 3곳을 확인할 수 있습니다.</p>
+          <p>승인된 5개 구역 중 담당 구역을 고르면 판매 위치 목록을 확인할 수 있습니다.</p>
         </div>
 
         <div v-else-if="viewState === 'loading'" class="map-fallback" role="status">
           <span class="loading-dot" aria-hidden="true"></span>
           <h1>Area 정보를 불러오는 중입니다</h1>
-          <p>이전 Area 정보와 후보 선택은 초기화되었습니다.</p>
+          <p>이전 Area 정보와 판매 위치 선택은 초기화되었습니다.</p>
         </div>
 
         <div v-else-if="viewState === 'error'" class="map-fallback" role="alert">
@@ -571,8 +571,8 @@ onBeforeUnmount(() => {
           <div class="fallback-map-copy">
             <span class="status-pill">지도 없이 목록 이용</span>
             <h1>{{ pilotView.area.area_name }}</h1>
-            <p v-if="mapState === 'loading'">지도를 불러오는 동안 후보 목록을 이용할 수 있습니다.</p>
-            <p v-else>지도는 표시하지 못했지만 후보 위치의 정적 정보와 선택 기능은 이용할 수 있습니다.</p>
+            <p v-if="mapState === 'loading'">지도를 불러오는 동안 판매 위치 목록을 이용할 수 있습니다.</p>
+            <p v-else>지도는 표시하지 못했지만 판매 위치의 정적 정보와 선택 기능은 이용할 수 있습니다.</p>
             <button v-if="pilotView && viewState === 'ready' && mapState === 'unavailable'" class="secondary-button" type="button" @click="setupMap" aria-label="지도 다시 시도">
               <svg class="ui-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                 <path d="M20 11a8 8 0 1 0-2.3 5.7" />
@@ -584,51 +584,53 @@ onBeforeUnmount(() => {
         </div>
 
         <template v-if="pilotView && viewState === 'ready'">
-          <nav class="map-actions" aria-label="지도 정보 열기">
-            <button type="button" @click="openPanel('area', $event)">
-              <svg class="ui-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <circle cx="12" cy="12" r="9" />
-                <path d="M12 11v5M12 8h.01" />
-              </svg>
-              구역 정보
-            </button>
-            <button type="button" @click="openPanel('spots', $event)">
-              <svg class="ui-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <path d="M12 21s6-5.1 6-11a6 6 0 1 0-12 0c0 5.9 6 11 6 11Z" />
-                <circle cx="12" cy="10" r="2" />
-              </svg>
-              후보 위치 3곳
-            </button>
-            <button
-              type="button"
-              :disabled="geolocationState === 'requesting'"
-              @click="requestLocation"
+          <div class="map-tools-dock">
+            <nav class="map-actions" aria-label="지도 정보 열기">
+              <button type="button" @click="openPanel('area', $event)">
+                <svg class="ui-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <circle cx="12" cy="12" r="9" />
+                  <path d="M12 11v5M12 8h.01" />
+                </svg>
+                구역 정보
+              </button>
+              <button type="button" @click="openPanel('spots', $event)">
+                <svg class="ui-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="M12 21s6-5.1 6-11a6 6 0 1 0-12 0c0 5.9 6 11 6 11Z" />
+                  <circle cx="12" cy="10" r="2" />
+                </svg>
+                판매 위치 목록
+              </button>
+              <button
+                type="button"
+                :disabled="geolocationState === 'requesting'"
+                @click="requestLocation"
+              >
+                <svg class="ui-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <circle cx="12" cy="12" r="6" />
+                  <circle cx="12" cy="12" r="1.5" />
+                  <path d="M12 2v3M12 19v3M2 12h3M19 12h3" />
+                </svg>
+                {{ geolocationState === "requesting" ? "위치 확인 중" : "내 위치 표시" }}
+              </button>
+            </nav>
+
+            <div class="map-legend" aria-label="지도 표시 설명">
+              <span><i class="legend-dot spot-dot"></i>판매 위치</span>
+              <span><i class="legend-dot user-dot"></i>내 위치</span>
+            </div>
+
+            <p
+              v-if="geolocationState === 'denied' || geolocationState === 'unavailable'"
+              class="map-notice"
+              role="status"
             >
-              <svg class="ui-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <circle cx="12" cy="12" r="6" />
-                <circle cx="12" cy="12" r="1.5" />
-                <path d="M12 2v3M12 19v3M2 12h3M19 12h3" />
-              </svg>
-              {{ geolocationState === "requesting" ? "위치 확인 중" : "내 위치 표시" }}
-            </button>
-          </nav>
-
-          <div class="map-legend" aria-label="지도 표시 설명">
-            <span><i class="legend-dot spot-dot"></i>후보 위치</span>
-            <span><i class="legend-dot user-dot"></i>내 위치</span>
+              {{
+                geolocationState === "denied"
+                  ? "위치 없이도 이용할 수 있습니다."
+                  : "위치를 확인할 수 없지만 나머지 기능은 이용할 수 있습니다."
+              }}
+            </p>
           </div>
-
-          <p
-            v-if="geolocationState === 'denied' || geolocationState === 'unavailable'"
-            class="map-notice"
-            role="status"
-          >
-            {{
-              geolocationState === "denied"
-                ? "위치 없이도 이용할 수 있습니다."
-                : "위치를 확인할 수 없지만 나머지 기능은 이용할 수 있습니다."
-            }}
-          </p>
         </template>
 
         <aside
@@ -643,7 +645,7 @@ onBeforeUnmount(() => {
                 v-if="panel === 'spot'"
                 class="panel-icon-button"
                 type="button"
-                aria-label="후보 위치 목록으로 돌아가기"
+                aria-label="판매 위치 목록으로 돌아가기"
                 @click="backToSpotList"
               >
                 <svg class="ui-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -659,7 +661,7 @@ onBeforeUnmount(() => {
                 {{ panelTitle }}
               </h2>
               <h2 v-else id="spot-panel-title" ref="panelHeading" tabindex="-1">
-                후보 위치 상세
+                판매 위치 상세
               </h2>
               <button
                 class="panel-icon-button panel-close"
@@ -792,12 +794,11 @@ onBeforeUnmount(() => {
                   <h4 id="area-context-title">선택 구역 전망</h4>
                 </div>
                 <p class="section-note area-context-note">
-                  이 정보는 후보 위치 자체가 아니라 선택한 구역 전체의 정보입니다.
+                  이 정보는 판매 위치 자체가 아니라 선택한 구역 전체의 정보입니다.
                 </p>
                 <PopulationRangeChart
                   v-if="areaPopulationAvailable"
                   ariaPrefix="선택 구역 전망"
-                  compact
                   :slots="areaForecastSlots"
                   testId="spot-area-forecast-chart"
                 />
@@ -806,16 +807,15 @@ onBeforeUnmount(() => {
 
               <section class="info-section" aria-labelledby="spot-population-title">
                 <div class="section-heading">
-                  <h4 id="spot-population-title">후보 위치별 예상 인구</h4>
+                  <h4 id="spot-population-title">판매 위치별 예상 인구</h4>
                 </div>
                 <PopulationRangeChart
                   v-if="spotPopulationAvailable"
-                  ariaPrefix="후보 위치별 예상 인구"
-                  compact
+                  ariaPrefix="판매 위치별 예상 인구"
                   :slots="spotForecastSlots"
                   testId="spot-population-chart"
                 />
-                <p v-else class="section-note">후보 위치별 인구 데이터가 아직 준비되지 않았습니다.</p>
+                <p v-else class="section-note">판매 위치별 인구 데이터가 아직 준비되지 않았습니다.</p>
               </section>
 
               <section class="limitations info-section" aria-labelledby="limitations-title">
@@ -831,19 +831,19 @@ onBeforeUnmount(() => {
                 class="selection-status"
                 role="status"
                 aria-live="polite"
-                aria-label="현재 선택한 후보 위치입니다. 다른 후보 위치로 변경할 수 있습니다."
+                aria-label="현재 선택한 판매 위치입니다. 다른 판매 위치로 변경할 수 있습니다."
               >
                 <svg class="ui-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                   <circle cx="12" cy="12" r="9" />
                   <path d="m7.5 12 3 3 6-6" />
                 </svg>
-                <span><strong>판촉 후보 위치로 선택했습니다.</strong> 다른 후보 위치로 변경할 수 있습니다.</span>
+                <span><strong>판매 위치로 선택했습니다.</strong> 다른 판매 위치로 변경할 수 있습니다.</span>
               </p>
               <button class="primary-button" type="button" @click="selectSpot">
                 {{
                   selectedSpotId === openedSpot.spot_option_id
                     ? "선택 유지"
-                    : "판촉 후보 위치로 선택"
+                    : "판매 위치로 선택"
                 }}
               </button>
             </footer>

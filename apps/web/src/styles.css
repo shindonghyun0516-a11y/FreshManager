@@ -488,14 +488,28 @@ h4 {
   .map-shell[data-panel-open="true"] .fallback-map-copy {
     left: calc((100% - var(--side-panel-width) - 16px) / 2);
   }
+
+  .map-shell[data-panel-open="true"] .map-tools-dock {
+    left: calc((100% - var(--side-panel-width) - 16px) / 2);
+  }
+}
+
+.map-tools-dock {
+  position: absolute;
+  z-index: 10;
+  bottom: 32px;
+  left: 50%;
+  max-width: calc(100% - 40px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  transform: translateX(-50%);
 }
 
 .map-actions {
-  position: absolute;
-  z-index: 10;
-  top: 20px;
-  left: 20px;
   display: grid;
+  grid-template-columns: repeat(3, max-content);
   gap: var(--space-2);
 }
 
@@ -526,12 +540,9 @@ h4 {
 }
 
 .map-legend {
-  position: absolute;
-  z-index: 10;
-  top: 176px;
-  left: 20px;
-  display: grid;
-  gap: 7px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
   padding: 10px 12px;
   border: 1px solid var(--color-border-default);
   border-radius: var(--radius-control);
@@ -564,10 +575,6 @@ h4 {
 }
 
 .map-notice {
-  position: absolute;
-  z-index: 10;
-  top: 246px;
-  left: 20px;
   max-width: 340px;
   margin: 0;
   padding: 10px 12px;
@@ -776,9 +783,10 @@ h4 {
 
 .forecast-chart-plot {
   width: 100%;
-  height: 132px;
+  height: auto;
   display: block;
   overflow: hidden;
+  aspect-ratio: 360 / 124;
 }
 
 .forecast-chart-guide,
@@ -843,7 +851,7 @@ h4 {
 .forecast-chart-labels {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: var(--space-1);
+  gap: 0;
   margin: 0;
 }
 
@@ -851,7 +859,7 @@ h4 {
   min-width: 0;
   display: grid;
   align-content: start;
-  text-align: left;
+  text-align: center;
 }
 
 .forecast-chart-labels dt {
@@ -959,10 +967,6 @@ h4 {
   color: var(--color-text-tertiary);
   font-size: var(--font-size-caption);
   line-height: var(--line-height-caption);
-}
-
-.forecast-chart-compact .forecast-chart-plot {
-  height: 104px;
 }
 
 .pattern-chart {
@@ -1344,20 +1348,13 @@ h4 {
     grid-column: 1 / -1;
   }
 
-  .forecast-chart-plot {
-    height: 112px;
-  }
-
-  .forecast-chart-compact .forecast-chart-plot {
-    height: 92px;
-  }
-
-  .forecast-chart-labels {
-    gap: 2px;
-  }
-
   .forecast-chart-labels dd {
     font-size: var(--font-size-caption);
+  }
+
+  .forecast-chart-labels .range-bound {
+    display: block;
+    white-space: nowrap;
   }
 
   .pattern-bucket-labels {
@@ -1397,10 +1394,16 @@ h4 {
     padding: var(--space-5);
   }
 
-  .map-actions {
-    top: 12px;
+  .map-tools-dock {
     right: 12px;
+    bottom: 32px;
     left: 12px;
+    max-width: none;
+    align-items: stretch;
+    transform: none;
+  }
+
+  .map-actions {
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 6px;
   }
@@ -1421,16 +1424,11 @@ h4 {
   }
 
   .map-legend {
-    top: auto;
-    bottom: 12px;
-    left: 12px;
+    align-self: flex-start;
   }
 
   .map-notice {
-    top: auto;
-    right: 12px;
-    bottom: 12px;
-    left: 12px;
+    max-width: none;
   }
 
   .info-panel {
@@ -1521,16 +1519,20 @@ h4 {
     white-space: normal;
   }
 
-  .forecast-chart-labels .range-bound {
-    display: block;
-    white-space: nowrap;
-  }
-
 }
 
 @media (min-width: 721px) and (max-width: 960px) {
   .map-shell[data-panel-open="true"] .fallback-map-copy {
     display: none;
+  }
+
+  .map-shell[data-panel-open="true"] .map-tools-dock {
+    width: 136px;
+  }
+
+  .map-shell[data-panel-open="true"] .map-actions {
+    width: 100%;
+    grid-template-columns: 1fr;
   }
 }
 

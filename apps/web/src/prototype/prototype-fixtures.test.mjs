@@ -261,6 +261,54 @@ test("static responses contain no score, rank, or automatic recommendation field
   }
 });
 
+test("user-facing Spot copy consistently uses sales location language", () => {
+  const app = readFileSync(resolve(process.cwd(), "src/App.vue"), "utf8");
+
+  assert.match(app, />\s*판매 위치 목록\s*</);
+  assert.match(app, /판매 위치 상세/);
+  assert.match(app, /판매 위치로 선택/);
+  assert.match(app, /판매 위치는 현장검증 전의 선택지입니다/);
+  assert.doesNotMatch(app, /후보 위치|후보 목록|후보 선택/);
+});
+
+test("map tools use one bottom dock without their own absolute positions", () => {
+  const styles = readFileSync(resolve(process.cwd(), "src/styles.css"), "utf8");
+  const dockRule = styles.match(/^\.map-tools-dock\s*\{([^}]*)\}/m)?.[1] ?? "";
+  const actionsRule = styles.match(/^\.map-actions\s*\{([^}]*)\}/m)?.[1] ?? "";
+  const legendRule = styles.match(/^\.map-legend\s*\{([^}]*)\}/m)?.[1] ?? "";
+
+  assert.match(dockRule, /position:\s*absolute/);
+  assert.match(dockRule, /bottom:\s*32px/);
+  assert.doesNotMatch(dockRule, /\btop:/);
+  assert.doesNotMatch(actionsRule, /\b(?:position|top|right|bottom|left):/);
+  assert.doesNotMatch(legendRule, /\b(?:position|top|right|bottom|left):/);
+});
+
+test("forecast points align with the centers of four equal label columns", () => {
+  const chart = readFileSync(
+    resolve(process.cwd(), "src/components/PopulationRangeChart.vue"),
+    "utf8",
+  );
+  const styles = readFileSync(resolve(process.cwd(), "src/styles.css"), "utf8");
+  const plotRule = styles.match(/^\.forecast-chart-plot\s*\{([^}]*)\}/m)?.[1] ?? "";
+  const labelsRule = styles.match(/\.forecast-chart-labels\s*\{([^}]*)\}/)?.[1] ?? "";
+  const labelColumnRule = styles.match(/\.forecast-chart-labels div\s*\{([^}]*)\}/)?.[1] ?? "";
+  const mobileStyles = styles.split("@media (max-width: 720px) {")[1]
+    ?.split("@media (max-width: 380px) {")[0] ?? "";
+
+  assert.match(chart, /const xPositions = \[45, 135, 225, 315\] as const/);
+  assert.match(chart, /x1="1" y1="14" x2="359" y2="14"/);
+  assert.match(chart, /x1="1" y1="62" x2="359" y2="62"/);
+  assert.match(chart, /x1="1" y1="110" x2="359" y2="110"/);
+  assert.match(plotRule, /aspect-ratio:\s*360\s*\/\s*124/);
+  assert.match(plotRule, /height:\s*auto/);
+  assert.doesNotMatch(styles, /\.forecast-chart-plot\s*\{[^}]*height:\s*\d+px/);
+  assert.match(labelsRule, /grid-template-columns:\s*repeat\(4, minmax\(0, 1fr\)\)/);
+  assert.match(labelsRule, /gap:\s*0/);
+  assert.match(labelColumnRule, /text-align:\s*center/);
+  assert.match(mobileStyles, /\.forecast-chart-labels \.range-bound\s*\{[^}]*display:\s*block/);
+});
+
 test("NAVER map keeps a positive container and fails closed at zero size", async () => {
   const styles = readFileSync(resolve(process.cwd(), "src/styles.css"), "utf8");
   const mapCanvasRule = styles.match(/\.map-canvas\s*\{([^}]*)\}/)?.[1] ?? "";
@@ -294,7 +342,7 @@ test("NAVER map keeps a positive container and fails closed at zero size", async
 
   const spots = [1, 2, 3].map((displayOrder) => ({
     id: `spot-${displayOrder}`,
-    name: `후보 위치 ${displayOrder}`,
+    name: `판매 위치 ${displayOrder}`,
     latitude: 37.5,
     longitude: 127,
     displayOrder,

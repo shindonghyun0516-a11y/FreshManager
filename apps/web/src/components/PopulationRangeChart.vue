@@ -13,15 +13,14 @@ type ChartSlot = Readonly<{
 
 type PointId = ChartSlot["id"];
 
-const props = withDefaults(defineProps<{
+const props = defineProps<{
   ariaPrefix: string;
-  compact?: boolean;
   slots: readonly ChartSlot[];
   testId: string;
-}>(), { compact: false });
+}>();
 
 const formatter = new Intl.NumberFormat("ko-KR", { maximumFractionDigits: 1 });
-const xPositions = [42, 134, 226, 318] as const;
+const xPositions = [45, 135, 225, 315] as const;
 const hoveredPointId = ref<PointId | null>(null);
 const focusedPointId = ref<PointId | null>(null);
 const selectedPointId = ref<PointId | null>(null);
@@ -151,12 +150,12 @@ function clearInteraction() {
 </script>
 
 <template>
-  <figure class="forecast-chart" :class="{ 'forecast-chart-compact': compact }" :data-testid="testId" :aria-label="chart.ariaLabel">
+  <figure class="forecast-chart" :data-testid="testId" :aria-label="chart.ariaLabel">
     <div class="forecast-chart-stage">
       <svg class="forecast-chart-plot" viewBox="0 0 360 124" aria-hidden="true" focusable="false">
-        <line class="forecast-chart-guide" x1="20" y1="14" x2="340" y2="14" />
-        <line class="forecast-chart-guide" x1="20" y1="62" x2="340" y2="62" />
-        <line class="forecast-chart-axis" x1="20" y1="110" x2="340" y2="110" />
+        <line class="forecast-chart-guide" x1="1" y1="14" x2="359" y2="14" />
+        <line class="forecast-chart-guide" x1="1" y1="62" x2="359" y2="62" />
+        <line class="forecast-chart-axis" x1="1" y1="110" x2="359" y2="110" />
         <line
           v-for="segment in chart.segments"
           :key="segment.id"
