@@ -10,7 +10,7 @@ from pathlib import Path
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-PILOT_SPOT_OPTIONS_PATH = PROJECT_ROOT / "data/reference/pilot_spot_options.csv"
+PILOT_SPOT_OPTIONS_PATH = PROJECT_ROOT / "data/prototype/pilot_spot_options.csv"
 EG6_AREA_PANEL_PATH = PROJECT_ROOT / "data/reference/eg6_area_panel.csv"
 EG6_SPOT_MASTER_PATH = PROJECT_ROOT / "data/reference/eg6_spot_master.csv"
 

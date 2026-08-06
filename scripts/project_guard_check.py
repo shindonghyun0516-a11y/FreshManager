@@ -55,7 +55,7 @@ SPEC_RELATIVE_PATH = Path("docs/testing/PROJECT_GUARD_SPEC.md")
 EG6_AREA_PANEL_RELATIVE_PATH = Path("data/reference/eg6_area_panel.csv")
 EG6_SPOT_MASTER_RELATIVE_PATH = Path("data/reference/eg6_spot_master.csv")
 EG6_SDOT_LINKS_RELATIVE_PATH = Path("data/reference/eg6_sdot_links.csv")
-PILOT_SPOT_OPTIONS_RELATIVE_PATH = Path("data/reference/pilot_spot_options.csv")
+PILOT_SPOT_OPTIONS_RELATIVE_PATH = Path("data/prototype/pilot_spot_options.csv")
 
 EXPECTED_HEADERS = ["CATEGORY", "NO", "AREA_CD", "AREA_NM", "ENG_NM"]
 EXPECTED_CATEGORIES = {
