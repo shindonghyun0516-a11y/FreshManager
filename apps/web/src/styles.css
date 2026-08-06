@@ -1297,7 +1297,7 @@ h4 {
 
   @media (max-width: 720px) {
   .app-header {
-    height: 64px;
+    height: 72px;
     grid-template-columns: 32px minmax(0, 1fr) 44px;
     gap: var(--space-3);
     padding: 0 var(--space-3);
@@ -1321,7 +1321,7 @@ h4 {
     width: auto;
     min-width: 0;
     flex: 1 1 auto;
-    height: 44px;
+    height: 48px;
     display: block;
     padding-left: 0;
     border-left: 0;
@@ -1331,8 +1331,9 @@ h4 {
   }
 
   .header-area-field select {
+    height: 100%;
     border: 0;
-    min-height: 44px;
+    min-height: 0;
     font-size: var(--font-size-control);
   }
 

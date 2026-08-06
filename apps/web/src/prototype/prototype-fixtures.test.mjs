@@ -296,6 +296,20 @@ test("map tools use one left vertical dock beside the NAVER controls", () => {
   assert.match(mobileActionsRule, /grid-template-columns:\s*1fr/);
 });
 
+test("mobile GNB contains the Area dropdown without clipping", () => {
+  const styles = readFileSync(resolve(process.cwd(), "src/styles.css"), "utf8");
+  const mobileStyles = styles.split("@media (max-width: 720px) {")[1]
+    ?.split("@media (max-width: 380px) {")[0] ?? "";
+  const headerRule = mobileStyles.match(/\.app-header\s*\{([^}]*)\}/)?.[1] ?? "";
+  const fieldRule = mobileStyles.match(/\.header-area-field\s*\{([^}]*)\}/)?.[1] ?? "";
+  const selectRule = mobileStyles.match(/\.header-area-field select\s*\{([^}]*)\}/)?.[1] ?? "";
+
+  assert.match(headerRule, /height:\s*72px/);
+  assert.match(fieldRule, /height:\s*48px/);
+  assert.match(selectRule, /height:\s*100%/);
+  assert.match(selectRule, /min-height:\s*0/);
+});
+
 test("repeated pattern graph uses the same full content width as today's change graph", () => {
   const styles = readFileSync(resolve(process.cwd(), "src/styles.css"), "utf8");
   const patternRule = styles.match(/^\.pattern-chart\s*\{([^}]*)\}/m)?.[1] ?? "";
