@@ -14,6 +14,10 @@ type NaverMarker = {
   setZIndex(zIndex: number): void;
 };
 
+type NaverCircle = {
+  setMap(map: null): void;
+};
+
 type NaverPoint = object;
 
 type NaverMaps = {
@@ -25,6 +29,7 @@ type NaverMaps = {
     destroy(): void;
   };
   Marker: new (options: Record<string, unknown>) => NaverMarker;
+  Circle: new (options: Record<string, unknown>) => NaverCircle;
   LatLng: new (latitude: number, longitude: number) => object;
   LatLngBounds: new () => { extend(point: object): void };
   Point: new (x: number, y: number) => NaverPoint;
@@ -41,6 +46,9 @@ declare global {
 }
 
 let loader: Promise<NaverMaps> | undefined;
+
+const PROTOTYPE_ZONE_RADIUS_METERS = 120;
+const PROTOTYPE_ZONE_COLORS = ["#0072b2", "#e69f00", "#cc79a7"] as const;
 
 function assertMapContainerAvailable(element: HTMLElement) {
   if (typeof element.getBoundingClientRect !== "function") return;
@@ -111,6 +119,7 @@ export async function createNaverMap(
   clientId: string,
   spots: MapSpot[],
   onSpotClick: (spotId: string) => void,
+  showPrototypeZones = false,
 ) {
   if (!clientId || spots.length === 0) throw new Error("NAVER_MAP_UNAVAILABLE");
 
@@ -133,10 +142,26 @@ export async function createNaverMap(
   const bounds = new maps.LatLngBounds();
   const listeners: object[] = [];
   const markers = new Map<string, { marker: NaverMarker; order: number }>();
+  const zones: NaverCircle[] = [];
 
   for (const spot of spots) {
     const position = new maps.LatLng(spot.latitude, spot.longitude);
     bounds.extend(position);
+    if (showPrototypeZones) {
+      const color = PROTOTYPE_ZONE_COLORS[zones.length % PROTOTYPE_ZONE_COLORS.length];
+      zones.push(new maps.Circle({
+        map,
+        center: position,
+        radius: PROTOTYPE_ZONE_RADIUS_METERS,
+        strokeColor: color,
+        strokeOpacity: 0.9,
+        strokeWeight: 2,
+        fillColor: color,
+        fillOpacity: 0.14,
+        clickable: false,
+        zIndex: 1,
+      }));
+    }
     const marker = new maps.Marker({
       map,
       position,
@@ -187,6 +212,7 @@ export async function createNaverMap(
       listeners.forEach((listener) => maps.Event.removeListener(listener));
       userMarker?.setMap(null);
       markers.forEach(({ marker }) => marker.setMap(null));
+      zones.forEach((zone) => zone.setMap(null));
       map.destroy();
     },
   };

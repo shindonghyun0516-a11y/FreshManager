@@ -488,28 +488,24 @@ h4 {
   .map-shell[data-panel-open="true"] .fallback-map-copy {
     left: calc((100% - var(--side-panel-width) - 16px) / 2);
   }
-
-  .map-shell[data-panel-open="true"] .map-tools-dock {
-    left: calc((100% - var(--side-panel-width) - 16px) / 2);
-  }
 }
 
 .map-tools-dock {
   position: absolute;
   z-index: 10;
-  bottom: 32px;
-  left: 50%;
-  max-width: calc(100% - 40px);
+  top: 16px;
+  left: 56px;
+  max-width: calc(100% - 68px);
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: flex-start;
   gap: var(--space-2);
-  transform: translateX(-50%);
+  transform: none;
 }
 
 .map-actions {
   display: grid;
-  grid-template-columns: repeat(3, max-content);
+  grid-template-columns: 1fr;
   gap: var(--space-2);
 }
 
@@ -970,7 +966,7 @@ h4 {
 }
 
 .pattern-chart {
-  margin-top: var(--space-4);
+  margin: var(--space-4) 0 0;
 }
 
 .pattern-bars {
@@ -980,7 +976,7 @@ h4 {
   justify-content: space-around;
   gap: var(--space-3);
   border-bottom: 1px solid var(--color-border-strong);
-  padding: 0 var(--space-3);
+  padding: 0;
 }
 
 .pattern-bars i {
@@ -1395,25 +1391,24 @@ h4 {
   }
 
   .map-tools-dock {
-    right: 12px;
-    bottom: 32px;
-    left: 12px;
-    max-width: none;
-    align-items: stretch;
+    top: 12px;
+    left: 56px;
+    max-width: calc(100% - 68px);
+    align-items: flex-start;
     transform: none;
   }
 
   .map-actions {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: 1fr;
     gap: 6px;
   }
 
   .map-actions button {
-    min-width: 0;
+    min-width: 136px;
     min-height: 44px;
-    justify-content: center;
-    gap: 5px;
-    padding: 0 6px;
+    justify-content: flex-start;
+    gap: 9px;
+    padding: 0 var(--space-3);
     font-size: var(--font-size-control);
     line-height: var(--line-height-control);
   }
@@ -1524,15 +1519,6 @@ h4 {
 @media (min-width: 721px) and (max-width: 960px) {
   .map-shell[data-panel-open="true"] .fallback-map-copy {
     display: none;
-  }
-
-  .map-shell[data-panel-open="true"] .map-tools-dock {
-    width: 136px;
-  }
-
-  .map-shell[data-panel-open="true"] .map-actions {
-    width: 100%;
-    grid-template-columns: 1fr;
   }
 }
 

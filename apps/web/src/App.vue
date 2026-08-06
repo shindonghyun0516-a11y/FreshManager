@@ -352,6 +352,7 @@ async function setupMap() {
         displayOrder: spot.display_order,
       })),
       (spotId) => openSpot(spotId),
+      fixtureMode,
     );
     if (generation !== mapGeneration) {
       controller.destroy();
@@ -520,6 +521,7 @@ onBeforeUnmount(() => {
         <div v-if="helpOpen" id="help-panel" class="help-panel" role="status">
           <p>담당 구역을 직접 고른 뒤 지도나 판매 위치 목록을 확인하세요. 판매 위치는 현장검증 전의 선택지입니다.</p>
           <p v-if="fixtureMode">현재 화면의 인구·시간대·변화 값과 기준시각은 서비스 화면과 사용 흐름을 검토하기 위한 고정 시뮬레이션 값입니다.</p>
+          <p v-if="fixtureMode">색상 Zone은 판매 위치를 구분하기 위한 화면 검토용 표시이며, 실제 판매 범위나 행정 경계가 아닙니다.</p>
           <p v-else-if="dataMode === 'official'">구역 정보는 API가 제공한 값만 표시하며, 제공되지 않은 값은 만들지 않습니다.</p>
           <p v-else>인구 데이터가 준비되지 않아 값을 표시하지 않으며, 누락값을 임의로 만들지 않습니다.</p>
         </div>

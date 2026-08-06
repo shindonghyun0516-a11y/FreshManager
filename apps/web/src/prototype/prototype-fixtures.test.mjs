@@ -268,20 +268,43 @@ test("user-facing Spot copy consistently uses sales location language", () => {
   assert.match(app, /판매 위치 상세/);
   assert.match(app, /판매 위치로 선택/);
   assert.match(app, /판매 위치는 현장검증 전의 선택지입니다/);
+  assert.match(app, /색상 Zone은 .*화면 검토용.*실제 판매 범위나 행정 경계가 아닙니다/);
   assert.doesNotMatch(app, /후보 위치|후보 목록|후보 선택/);
 });
 
-test("map tools use one bottom dock without their own absolute positions", () => {
+test("map tools use one left vertical dock beside the NAVER controls", () => {
   const styles = readFileSync(resolve(process.cwd(), "src/styles.css"), "utf8");
   const dockRule = styles.match(/^\.map-tools-dock\s*\{([^}]*)\}/m)?.[1] ?? "";
   const actionsRule = styles.match(/^\.map-actions\s*\{([^}]*)\}/m)?.[1] ?? "";
   const legendRule = styles.match(/^\.map-legend\s*\{([^}]*)\}/m)?.[1] ?? "";
+  const mobileStyles = styles.split("@media (max-width: 720px) {")[1]
+    ?.split("@media (max-width: 380px) {")[0] ?? "";
+  const mobileDockRule = mobileStyles.match(/\.map-tools-dock\s*\{([^}]*)\}/)?.[1] ?? "";
+  const mobileActionsRule = mobileStyles.match(/\.map-actions\s*\{([^}]*)\}/)?.[1] ?? "";
 
   assert.match(dockRule, /position:\s*absolute/);
-  assert.match(dockRule, /bottom:\s*32px/);
-  assert.doesNotMatch(dockRule, /\btop:/);
+  assert.match(dockRule, /top:\s*16px/);
+  assert.match(dockRule, /left:\s*56px/);
+  assert.match(dockRule, /transform:\s*none/);
+  assert.doesNotMatch(dockRule, /\bbottom:/);
+  assert.match(actionsRule, /grid-template-columns:\s*1fr/);
   assert.doesNotMatch(actionsRule, /\b(?:position|top|right|bottom|left):/);
   assert.doesNotMatch(legendRule, /\b(?:position|top|right|bottom|left):/);
+  assert.match(mobileDockRule, /top:\s*12px/);
+  assert.match(mobileDockRule, /left:\s*56px/);
+  assert.doesNotMatch(mobileDockRule, /\bbottom:/);
+  assert.match(mobileActionsRule, /grid-template-columns:\s*1fr/);
+});
+
+test("repeated pattern graph uses the same full content width as today's change graph", () => {
+  const styles = readFileSync(resolve(process.cwd(), "src/styles.css"), "utf8");
+  const patternRule = styles.match(/^\.pattern-chart\s*\{([^}]*)\}/m)?.[1] ?? "";
+  const barsRule = styles.match(/^\.pattern-bars\s*\{([^}]*)\}/m)?.[1] ?? "";
+
+  assert.match(patternRule, /margin:\s*var\(--space-4\)\s+0\s+0/);
+  assert.doesNotMatch(patternRule, /margin-top:/);
+  assert.match(barsRule, /padding:\s*0/);
+  assert.doesNotMatch(barsRule, /padding:\s*0\s+var\(--space-3\)/);
 });
 
 test("forecast points align with the centers of four equal label columns", () => {
@@ -317,6 +340,8 @@ test("NAVER map keeps a positive container and fails closed at zero size", async
 
   let mapDestroyed = 0;
   let markerCount = 0;
+  let zoneDetachCount = 0;
+  const zoneOptions = [];
   class FakeMap {
     constructor(element) {
       element.style.position = "relative";
@@ -331,10 +356,20 @@ test("NAVER map keeps a positive container and fails closed at zero size", async
     setMap() {}
     setZIndex() {}
   }
+  class FakeCircle {
+    constructor(options) { zoneOptions.push(options); }
+    setMap(map) { if (map === null) zoneDetachCount += 1; }
+  }
   globalThis.window = { naver: { maps: {
     Map: FakeMap,
     Marker: FakeMarker,
-    LatLng: class {},
+    Circle: FakeCircle,
+    LatLng: class {
+      constructor(latitude, longitude) {
+        this.latitude = latitude;
+        this.longitude = longitude;
+      }
+    },
     LatLngBounds: class { extend() {} },
     Point: class {},
     Event: { addListener: () => ({}), removeListener() {} },
@@ -343,8 +378,8 @@ test("NAVER map keeps a positive container and fails closed at zero size", async
   const spots = [1, 2, 3].map((displayOrder) => ({
     id: `spot-${displayOrder}`,
     name: `판매 위치 ${displayOrder}`,
-    latitude: 37.5,
-    longitude: 127,
+    latitude: 37.5 + displayOrder / 100,
+    longitude: 127 + displayOrder / 100,
     displayOrder,
   }));
   const element = (width, height) => {
@@ -353,10 +388,27 @@ test("NAVER map keeps a positive container and fails closed at zero size", async
     return target;
   };
 
-  const controller = await naverMap.createNaverMap(element(800, 600), "client", spots, () => {});
+  const controller = await naverMap.createNaverMap(element(800, 600), "client", spots, () => {}, true);
   assert.equal(markerCount, 3);
+  assert.equal(zoneOptions.length, 3);
+  assert.deepEqual(zoneOptions.map(({ strokeColor }) => strokeColor), ["#0072b2", "#e69f00", "#cc79a7"]);
+  assert.equal(new Set(zoneOptions.map(({ fillColor }) => fillColor)).size, 3);
+  assert.deepEqual(
+    zoneOptions.map(({ center }) => [center.latitude, center.longitude]),
+    spots.map(({ latitude, longitude }) => [latitude, longitude]),
+  );
+  assert.equal(zoneOptions.every(({ radius }) => radius === 120), true);
+  assert.equal(zoneOptions.every(({ clickable }) => clickable === false), true);
+  assert.equal(zoneOptions.every(({ zIndex }) => zIndex === 1), true);
   controller.destroy();
   assert.equal(mapDestroyed, 1);
+  assert.equal(zoneDetachCount, 3);
+
+  const officialController = await naverMap.createNaverMap(element(800, 600), "client", spots, () => {});
+  assert.equal(zoneOptions.length, 3);
+  officialController.destroy();
+  assert.equal(mapDestroyed, 2);
+  assert.equal(zoneDetachCount, 3);
 
   await assert.rejects(
     naverMap.createNaverMap(element(800, 0), "client", spots, () => {}),
@@ -372,5 +424,5 @@ test("NAVER map keeps a positive container and fails closed at zero size", async
     naverMap.createNaverMap(collapsedBySdk, "client", spots, () => {}),
     /NAVER_MAP_CONTAINER_UNAVAILABLE/,
   );
-  assert.equal(mapDestroyed, 2);
+  assert.equal(mapDestroyed, 3);
 });
