@@ -165,9 +165,9 @@ Area 미선택 상태에서는 Area 유동정보, Spot 핀·목록과 Spot 상�
 선택하면 해당 Area로 이동하고 Spot 3개가 모두 보이도록 지도 범위를 조정한다.
 Area를 변경하면 이전 Area 수치, Spot 상세와 선택 상태를 즉시 해제한다.
 
-목표 지도 Provider는 네이버 지도 JavaScript API다. 현재 디자인의 지도는
-Layout·Interaction 검토용 Placeholder이며 실제 Provider·좌표·Zoom·Marker 위치는
-통합 단계에서 확정한다. Area 미선택 시 hy 본사를 기본 중심으로 사용한다.
+목표 지도 Provider는 네이버 지도 JavaScript API다. 현재 구현은 실제 NAVER 지도로
+확정된 기본 좌표·Zoom·중립 Marker 계약을 표시하며, Area 미선택 시 hy 본사를 기본
+중심으로 사용한다.
 
 ```text
 default_location_name=hy빌딩

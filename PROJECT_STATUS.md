@@ -257,9 +257,8 @@ PM이 장기 기준으로 확정한 5분 주기의 EG-7 1시간 파일럿 Contro
 - Spot Ranking: `DEFERRED_AFTER_INITIAL_PILOT`
 - Recommendation Contract: 문서 `Draft` 유지; Area-first 관계 `AVAILABLE_ON_MAIN`;
   생산 Schema `NOT_IMPLEMENTED`
-- UI/UX Detailed Design: Area-first 계약 `AVAILABLE_ON_MAIN`; Issue #154 화면 구현
-  `RELEASE_CANDIDATE_VALIDATED`(PR #155), `main` Merge·Production 배포 PM 승인,
-  Frontend-only Production 경로 `ACTIVE`
+- UI/UX Detailed Design: Area-first 계약 `AVAILABLE_ON_MAIN`; Issue #154 화면 구현은
+  PR #155 `MERGED`, Frontend-only Fixture Production `ACTIVE`
 
 이 절은 §2.1의 Apps Script 상시 수집 Runtime과 독립적이다. 5분 자동수집 `ACTIVE`
 상태는 이 절과 무관하게 유지된다. v3 source sheets 자체는 ML-ready Dataset이
@@ -582,8 +581,8 @@ Issue #136·PR #137의 Recommendation Service는 `main`에 있다. D-022의 Area
 웹 파일럿 계약은 Issue #140·PR #141로 승인되어 `main`에 있다. Vue·FastAPI 최소
 Scaffold는 Issue #152·PR #153에서 `ACCEPTED`이며, Service·Read-only API·데이터 공급·
 NAVER Maps Adapter·Browser-only Geolocation·Spot Population Prototype Runtime은 Issue
-#154·PR #155의 Release Candidate에 구현·검증됐다. `main` Merge와 Production 배포는
-PM 승인됐으며 Exact Head 검증 후 순차 실행한다. `responsive_equivalent_viewport=PASS`지만
+#154·PR #155로 `main`에 병합됐고 Frontend-only Fixture Production이 활성화됐다.
+`responsive_equivalent_viewport=PASS`지만
 `actual_browser_zoom_200=PENDING_MANUAL_QA`다.
 추천 실행은 0건이다. Repository Readiness Audit은 PR #145로, 문서 7건 정합화는 PR #147로
 `main`에 반영됐다. Area-first Web/API 경계와 읽기 전용 데이터 공급은 ADR-012
