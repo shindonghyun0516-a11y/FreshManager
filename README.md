@@ -5,7 +5,7 @@
 이 프로젝트는 프레시매니저 유동판매 위치·시간 추천 서비스의 선행 단계인
 서울시 공개데이터 기반 데이터 타당성 PoC다.
 
-현재 단계에서는 프레시매니저가 사용하는 모바일 앱이나 추천 화면을 개발하지 않는다.
+현재 단계에서는 상용 모바일 앱이나 정식 추천 서비스를 개발·출시하지 않는다.
 
 서울시 주요 121장소를 장기 공식 후보군으로 유지하되, 현재는 EG-6A에서 확정한
 13개 Area 패널의 수집·분석 가능성을 먼저 검증한다. EG-6B 첫 실제 단일 회차와
@@ -66,10 +66,14 @@ Issue #70·PR #71로 `main`에 반영됐으며, 실제 반복수집은 별도 PM
   `IMPLEMENTATION_AVAILABLE_ON_MAIN`; 첫 1시간 Live `NOT_STARTED`
 - Area-first 제품·UI·데이터 계약은 D-022·PR #141로 승인·`main` 반영됐고,
   Recommendation Core·Service도 PR #135·#137로 `main`에 있다. Area-first
-  Vue·FastAPI·Vercel 호환 최소 Scaffold는 Issue #152·PR #153에서 승인됐다.
-  실제 Service·Read-only API·Area·Spot 데이터, NAVER Map·Geolocation,
-  Vercel Project·Rewrite·배포는 `NOT_IMPLEMENTED`다. 세부 변동상태는
-  `PROJECT_STATUS.md`를 따른다.
+  Vue·FastAPI·Vercel 호환 최소 Scaffold는 Issue #152·PR #153에서 승인됐다. Issue
+  #154의 Area-first Service·Read-only API·Vue UI·NAVER Maps Adapter와 Browser-only
+  Geolocation은 PR #155 Release Candidate에서 구현·검증됐고 `main` Merge와 기존
+  Web Production 배포가 PM 승인됐다. Frontend-only Fixture Production 경로는 활성화돼
+  있지만 승인된 실제 Area Artifact는 `DATA_UNAVAILABLE`, Spot Population 실제값은
+  `SPOT_PROTOTYPE_DATA_UNAVAILABLE`이고 NAVER Credential Runtime은 미검증이다.
+  판매성과 Score·Rank와 자동추천은 없으며 Spot은 사용자가 직접
+  선택한다. 세부 변동상태는 `PROJECT_STATUS.md`를 따른다.
 
 ### 현재 분석 범위
 
@@ -660,8 +664,12 @@ npm run build
 npm run dev
 ```
 
-Local Vite Server는 `/api` 요청을 Local FastAPI로 Proxy한다. 현재 화면은 연결 전
-Scaffold로, 실제 Area·Spot 데이터, NAVER Map, 위치 기능과 Vercel 배포는 없다.
+Local Vite Server는 `/api` 요청을 Local FastAPI로 Proxy한다. PR #155 Head에서는
+Area-first 화면이 Service·Read-only API, NAVER Maps Adapter와 Browser-only
+Geolocation에 연결되고 지도 실패 시 목록 이용과 수동 재시도를 지원한다. 다만 실제
+Area Artifact와 Spot Population 실제값은 없고, NAVER Credential 기반 Runtime은
+검증하지 않았다. Vercel은 Frontend-only Fixture Production 경로만 사용하며 실제
+Area API Production 연결 완료를 뜻하지 않는다.
 
 일반 Project Guard와 일반 테스트는 저장된 샘플 또는 가짜 응답만 사용하며
 네트워크와 실제 서울시 API를 호출하지 않는다. `freshmanager/http_adapter.py`에

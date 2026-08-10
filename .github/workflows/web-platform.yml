@@ -11,6 +11,11 @@ on:
       - apps/__init__.py
       - apps/api/**
       - apps/web/**
+      - freshmanager/pilot_spot_options.py
+      - freshmanager/selected_area_pilot.py
+      - data/prototype/**
+      - scripts/export_web_openapi.py
+      - scripts/generate_web_api_types.py
   push:
     branches:
       - main
@@ -23,6 +28,11 @@ on:
       - apps/__init__.py
       - apps/api/**
       - apps/web/**
+      - freshmanager/pilot_spot_options.py
+      - freshmanager/selected_area_pilot.py
+      - data/prototype/**
+      - scripts/export_web_openapi.py
+      - scripts/generate_web_api_types.py
 
 permissions:
   contents: read
@@ -57,6 +67,17 @@ jobs:
           assert response.status_code == 200;
           assert response.json() == {"status": "ok", "service": "freshmanager-api"}'
 
+      - name: Verify OpenAPI and runtime error contract
+        run: python -B -m unittest apps.api.tests.test_area_pilot -v
+
+      - name: Verify OpenAPI type generator
+        run: python -B -m unittest apps.api.tests.test_web_api_type_generation -v
+
+      - name: Verify generated web API types
+        run: >-
+          python -B scripts/generate_web_api_types.py
+          --output apps/web/src/generated/api-types.ts --check
+
       - name: Run API tests
         run: python -B -m unittest discover -s apps/api/tests -p "test_*.py" -v
 
@@ -82,6 +103,159 @@ jobs:
 
       - name: Install web dependencies
         run: npm ci
+
+      - name: Verify browser-only location and interaction contract
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from "node:assert/strict";
+          import { readFileSync } from "node:fs";
+          import { createNaverMap } from "./src/naver-map.ts";
+
+          const app = readFileSync("src/App.vue", "utf8");
+          const map = readFileSync("src/naver-map.ts", "utf8");
+          const styles = readFileSync("src/styles.css", "utf8");
+          const generated = readFileSync("src/generated/api-types.ts", "utf8");
+          const between = (source, start, end) => source.split(start)[1].split(end)[0];
+
+          assert.match(app, /from "\.\/generated\/api-types";/);
+          assert.doesNotMatch(
+            app,
+            /^type (?:PopulationRange|AreaSummary|AreaView|SpotOption|PilotView)\s*=\s*\{/m,
+          );
+          assert.equal(generated.match(/^export type /gm)?.length, 9);
+          assert.doesNotMatch(generated, /\b(?:any|unknown)\b/);
+
+          assert.equal(app.match(/straightLineDistanceKm\(/g)?.length, 2);
+          assert.match(app, /straightLineDistanceKm\(point, spot\)/);
+          assert.doesNotMatch(app, /selectedSpotDistances|다른 판매 위치까지 직선거리/);
+          assert.doesNotMatch(app, /localStorage|sessionStorage|document\.cookie/);
+          assert.equal(app.match(/navigator\.geolocation\.getCurrentPosition/g)?.length, 1);
+
+          const location = between(app, "function requestLocation()", "function handleEscape()");
+          const beforeRequest = location.split("navigator.geolocation.getCurrentPosition")[0];
+          assert.match(beforeRequest, /userLocation\.value = null/);
+          assert.match(beforeRequest, /mapController\?\.setUserLocation\(null\)/);
+
+          for (const body of [
+            between(app, "async function loadAreas()", "async function selectArea()"),
+            between(app, "async function selectArea()", "function destroyMap()"),
+          ]) {
+            const call = between(body, "const response = await fetch(", "if (!response.ok)");
+            assert.doesNotMatch(call, /userLocation|latitude|longitude|body:|URLSearchParams/);
+          }
+
+          assert.match(map, /setUserLocation\(point: MapPoint \| null\)/);
+          const mapLoader = between(map, "function loadMaps(", "function markerContent(");
+          const cleanup = between(mapLoader, "const cleanupListeners", "const rejectLoad");
+          const rejectLoad = between(mapLoader, "const rejectLoad", "const finish");
+          assert.match(mapLoader, /if \(loader\) return loader;/);
+          assert.match(cleanup, /removeEventListener\("load", finish\)/);
+          assert.match(cleanup, /removeEventListener\("error", rejectLoad\)/);
+          assert.match(rejectLoad, /cleanupListeners\(\)/);
+          assert.match(rejectLoad, /script\.remove\(\)/);
+          assert.match(rejectLoad, /loader = undefined/);
+          assert.match(app, /const focusTrigger = panel\.value === "none" \? trigger : undefined/);
+          assert.match(
+            app,
+            /v-if="pilotView && viewState === 'ready' && mapState === 'unavailable'"[\s\S]{0,180}@click="setupMap"[\s\S]{0,80}지도 다시 시도/,
+          );
+          const setup = between(app, "async function setupMap()", "async function openPanel(");
+          assert.doesNotMatch(setup, /fetch\(|requestLocation|navigator\.geolocation/);
+          assert.doesNotMatch(
+            setup,
+            /openedSpotId\.value\s*=|selectedSpotId\.value\s*=|userLocation\.value\s*=|geolocationState\.value\s*=/,
+          );
+          assert.doesNotMatch(app, /toastMessage|toastTimer|setTimeout|const selectedSpot =/);
+          assert.doesNotMatch(app, /selection-toast/);
+          assert.doesNotMatch(styles, /\.selection-toast/);
+          assert.match(
+            app,
+            /v-if="selectedSpotId === openedSpot\.spot_option_id"[\s\S]{0,180}class="selection-status"[\s\S]{0,100}role="status"[\s\S]{0,100}aria-live="polite"/,
+          );
+          assert.match(
+            app,
+            /현재 선택한 판매 위치입니다\. 다른 판매 위치로 변경할 수 있습니다\./,
+          );
+          assert.match(styles, /\.sticky-action \{/);
+
+          class FakeScript {
+            dataset = {};
+            handlers = new Map();
+            removed = false;
+            addEventListener(name, handler) { this.handlers.set(name, handler); }
+            removeEventListener(name, handler) {
+              if (this.handlers.get(name) === handler) this.handlers.delete(name);
+            }
+            emit(name) { this.handlers.get(name)?.(); }
+            remove() { this.removed = true; }
+          }
+
+          const scripts = [];
+          globalThis.window = {};
+          globalThis.document = {
+            querySelector: () => scripts.find((script) => !script.removed) ?? null,
+            createElement: () => new FakeScript(),
+            head: { append: (script) => scripts.push(script) },
+          };
+          const spots = [{
+            id: "spot-1",
+            name: "판매 위치",
+            latitude: 37.5,
+            longitude: 127,
+            displayOrder: 1,
+          }];
+          const first = createNaverMap({}, "client", spots, () => {});
+          const concurrent = createNaverMap({}, "client", spots, () => {});
+          const failures = Promise.all([
+            assert.rejects(first, /NAVER_MAP_UNAVAILABLE/),
+            assert.rejects(concurrent, /NAVER_MAP_UNAVAILABLE/),
+          ]);
+          assert.equal(scripts.length, 1);
+          scripts[0].emit("error");
+          await failures;
+          assert.equal(scripts[0].removed, true);
+          assert.equal(scripts[0].handlers.size, 0);
+
+          let mapDestroyed = 0;
+          let markerCleared = 0;
+          let listenerRemoved = 0;
+          class FakeMap {
+            fitBounds() {}
+            destroy() { mapDestroyed += 1; }
+          }
+          class FakeMarker {
+            setIcon() {}
+            setMap(value) { if (value === null) markerCleared += 1; }
+          }
+          class FakeBounds { extend() {} }
+          const fakeNaver = { maps: {
+            Map: FakeMap,
+            Marker: FakeMarker,
+            LatLng: class {},
+            LatLngBounds: FakeBounds,
+            Point: class {},
+            Event: {
+              addListener: () => ({}),
+              removeListener: () => { listenerRemoved += 1; },
+            },
+          } };
+          const retry = createNaverMap({}, "client", spots, () => {});
+          assert.equal(scripts.length, 2);
+          window.naver = fakeNaver;
+          scripts[1].emit("load");
+          const controller = await retry;
+          assert.equal(scripts[1].removed, false);
+          assert.equal(scripts[1].handlers.size, 0);
+          controller.setUserLocation({ latitude: 37.5, longitude: 127 });
+          controller.destroy();
+          assert.equal(mapDestroyed, 1);
+          assert.equal(markerCleared, 2);
+          assert.equal(listenerRemoved, 1);
+
+          const reused = await createNaverMap({}, "client", spots, () => {});
+          assert.equal(scripts.length, 2);
+          reused.destroy();
+          NODE
 
       - name: Run TypeScript check
         run: npm run typecheck

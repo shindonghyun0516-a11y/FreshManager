@@ -1,9 +1,17 @@
-from fastapi import FastAPI, Request
+from typing import Annotated
+
+from fastapi import FastAPI, Path, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from apps.api.schemas import ErrorDetail, ErrorResponse, HealthResponse
+from apps.api.schemas import (
+    AreaPilotResponse,
+    AreasResponse,
+    ErrorDetail,
+    ErrorResponse,
+    HealthResponse,
+)
 
 app = FastAPI(title="FreshManager API", version="0.1.0")
 
@@ -58,3 +66,60 @@ async def handle_unexpected_error(
 @app.get("/api/v1/health", response_model=HealthResponse)
 def get_health() -> HealthResponse:
     return HealthResponse(status="ok", service="freshmanager-api")
+
+
+def _pilot_service():
+    service = getattr(app.state, "pilot_service", None)
+    if service is None:
+        from freshmanager.selected_area_pilot import SelectedAreaPilotService
+
+        service = SelectedAreaPilotService()
+        app.state.pilot_service = service
+    return service
+
+
+@app.get("/api/v1/areas", response_model=AreasResponse)
+def get_areas() -> AreasResponse:
+    return AreasResponse(areas=_pilot_service().list_areas(), selection_mode="USER_CHOICE")
+
+
+@app.get(
+    "/api/v1/areas/{area_code}/pilot-view",
+    response_model=AreaPilotResponse,
+    responses={
+        404: {"model": ErrorResponse, "description": "지원하지 않는 Area입니다."},
+        422: {"model": ErrorResponse, "description": "잘못된 Path 또는 요청 형식입니다."},
+        500: {"model": ErrorResponse, "description": "Spot 계약 또는 제한된 내부 오류입니다."},
+        503: {"model": ErrorResponse, "description": "Area Provider가 안전한 응답을 만들 수 없습니다."},
+    },
+)
+def get_area_pilot_view(
+    area_code: Annotated[str, Path(pattern=r"^POI\d{3}$")],
+) -> AreaPilotResponse | JSONResponse:
+    from freshmanager.selected_area_pilot import SelectedAreaPilotError
+
+    try:
+        return AreaPilotResponse.model_validate(
+            _pilot_service().get_pilot_view(area_code)
+        )
+    except SelectedAreaPilotError as error:
+        code = str(error)
+        if code == "AREA_NOT_SUPPORTED":
+            return _error_response(404, code, "지원하지 않는 Area입니다.")
+        if code == "SPOT_PROTOTYPE_CONTRACT_INVALID":
+            return _error_response(
+                500,
+                code,
+                "후보 위치 정보를 안전하게 제공할 수 없습니다.",
+            )
+        if code == "AREA_DATA_PROVIDER_UNAVAILABLE":
+            return _error_response(
+                503,
+                code,
+                "Area 데이터를 안전하게 제공할 수 없습니다.",
+            )
+        return _error_response(
+            500,
+            "INTERNAL_SERVER_ERROR",
+            "요청을 처리할 수 없습니다.",
+        )

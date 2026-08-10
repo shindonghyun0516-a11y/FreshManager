@@ -1,21 +1,21 @@
 # Area-first Web Pilot Contract
 
 - 문서 상태: Approved
-- 버전: v0.4.0
+- 버전: v0.5.0
 - 작성자: 신동현
 - 최종 승인자: 신동현
 - 최초 작성일: 2026-07-30
-- 최종 수정일: 2026-07-31
+- 최종 수정일: 2026-08-01
 - 적용 프로젝트: Freshmanager Data PoC
 - 관련 문서:
   - [`FreshManager_PRD_v1.0.md`](FreshManager_PRD_v1.0.md)
   - [`RECOMMENDATION_OUTPUT_CONTRACT.md`](RECOMMENDATION_OUTPUT_CONTRACT.md)
-  - [`DECISION_LOG.md`](../../ai-context/DECISION_LOG.md)의 D-020, D-021, D-022와
-    D-023(`ACCEPTED`)
+  - [`DECISION_LOG.md`](../../ai-context/DECISION_LOG.md)의 D-020, D-021, D-022,
+    D-023과 D-024(`ACCEPTED_BY_PM_FOR_ISSUE_154`)
   - [`PROJECT_STATUS.md`](../../PROJECT_STATUS.md)
   - [`REPOSITORY_READINESS_AUDIT.md`](../architecture/REPOSITORY_READINESS_AUDIT.md)
   - [`DESIGN.md`](../design/DESIGN.md)
-- 관련 작업: Issue #150, PR #151
+- 관련 작업: Issue #150, PR #151, Issue #154
 - 변경 시 PM 승인: 필요
 
 ---
@@ -123,7 +123,7 @@ Drawer와 Spot Drawer는 상호배타적이며 한 번에 하나만 연다.
 | Spot 선택 | 선택 Area의 정확히 3개 중 사용자 직접 선택 |
 | 시간 표시 | 현재·1시간 후·3시간 후를 함께 표시(내부 `horizon_minutes=60`·`180`) |
 | Area 데이터 | 서울시 공식 Area 데이터 |
-| Spot 수치 | PM 직접 입력 프로토타입 데이터 |
+| Spot 인구정보 | PM 직접 입력 프로토타입 데이터 |
 | 추천·ML | Area·Spot 자동추천 없음, ML 미사용, 공식 추천 불허 |
 
 기본 흐름은 다음과 같다.
@@ -138,8 +138,7 @@ Drawer와 Spot Drawer는 상호배타적이며 한 번에 하나만 연다.
 → Marker 또는 목록 Card 클릭
 → Desktop 단일 Drawer 또는 Mobile Bottom Sheet에 Spot 상세정보 표시
 → Spot 현재·1시간 후·3시간 후 프로토타입 정보 확인
-→ 과거 비교기준 선택
-→ 점수·순위·직선거리 확인
+→ 증감수·증감률·직선거리 확인
 → 판촉 후보 위치로 선택
 → 선택 완료
 ```
@@ -232,38 +231,65 @@ Current가 있으면 현재정보만 표시한다. 다른 시간간격 값을 �
 각 Area에는 정확히 3개 Spot을 제공한다. 후보 위치 목록과 Layout별 상세영역
 (Desktop 단일 Drawer·Mobile Bottom Sheet)에는 다음 UI 영역을 둔다.
 
-- 현재 유동인구·현재 혼잡도
-- 1시간 후 예상 유동인구·예상 혼잡도
-- 3시간 후 예상 유동인구·예상 혼잡도
-- 과거 비교 증감수·증감률
-- 판촉 기회점수·Area 내 순위
+- 데이터 기준시각
+- 현재 예상 인구 범위
+- 1시간 후 예상 인구 범위·증감수·증감률
+- 3시간 후 예상 인구 범위·증감수·증감률
+- Prototype 데이터 상태와 제한사항
 
-초기 프로토타입에서 위 값은 PM이 직접 입력한 값만 표시한다. 서울시 Area 데이터를
-Spot별로 계산·분배하거나 누락값을 추측해 생성하지 않는다.
+Spot Identity 정적 Master와 Spot 인구 Prototype은 분리한다. Spot 인구값은 PM이 직접
+입력한 값만 표시하며 서울시 Area 데이터를 Spot별로 계산·분배하거나 누락값을 추측해
+생성하지 않는다.
+
+Optional Runtime 입력의 허용 필드는 다음과 같다.
+
+```text
+pilot_area_code
+spot_option_id
+observed_at
+current_population_min
+current_population_max
+forecast_60_population_min
+forecast_60_population_max
+forecast_180_population_min
+forecast_180_population_max
+data_status
+input_method
+source_note
+updated_at
+```
 
 ```text
 data_status=PROTOTYPE
 input_method=PM_MANUAL
-score_source=PM_MANUAL
-rank_source=PM_MANUAL
+spot_population_source=PM_MANUAL_PROTOTYPE
 ```
 
 화면에는 `프로토타입 데이터`, `PM 직접 입력` 배지를 함께 표시한다. `서울시 공식
-Spot 데이터`, `AI 추천점수`, `공식 순위`, `예측모델 Spot 결과`라는 표현은 금지한다.
+Spot 데이터` 또는 `예측모델 Spot 결과`라는 표현은 금지한다. PM 입력값이 없으면 정적
+Spot 3개는 유지하고 인구·증감 필드는 `null`, 상태는
+`SPOT_PROTOTYPE_DATA_UNAVAILABLE`로 반환한다.
 
-## 8. 과거 비교 계약
+## 8. Spot 증감 계산 계약
 
-Spot 상세의 `비교기준` Dropdown은 다음 세 값만 허용한다.
+PM 수동 Prototype 인구 범위가 있는 시점만 다음 중앙값 계산을 적용한다.
 
-| 코드 | 화면 표시 |
-|---|---|
-| `PREVIOUS_DAY` | 전일 같은 시간 |
-| `PREVIOUS_WEEK` | 지난주 같은 요일·시간 |
-| `RECENT_4WEEK_AVERAGE` | 최근 4주 같은 요일·시간 평균 |
+```text
+current_mid
+= (current_population_min + current_population_max) / 2
 
-기본값은 `RECENT_4WEEK_AVERAGE`다. 화면 용어는 `유동인구 증감수`와
-`유동인구 증감률`을 사용하며 `인구 이동률`은 사용하지 않는다. 비교값 역시 PM 직접
-입력 프로토타입 값이며 이번 계약에서 계산식을 정의하지 않는다.
+future_mid
+= (forecast_population_min + forecast_population_max) / 2
+
+change_amount
+= future_mid - current_mid
+
+change_rate
+= change_amount / current_mid
+```
+
+60분과 180분은 독립 계산한다. `current_mid=0`이면 증감률은 `null`이다. 일부 범위가
+없으면 해당 시점은 unavailable이며 다른 시점이나 Area 값으로 채우지 않는다.
 
 ## 9. Spot 상세와 선택
 
@@ -273,15 +299,14 @@ Opened 상태는 동기화한다. 해당 상세영역에는 다음을 표시한�
 
 - Spot명·주소·유형
 - 프로토타입 데이터 배지와 제한사항
-- 현재·1시간 후·3시간 후 정보
-- 과거 비교 Dropdown과 증감수·증감률
-- 점수·순위
-- 현재 위치에서의 직선거리와 다른 Spot까지의 직선거리
+- 데이터 기준시각과 현재·1시간 후·3시간 후 인구정보
+- 제공된 시점의 증감수·증감률
+- 현재 위치에서의 직선거리
 
 `판촉 후보 위치로 선택` 버튼을 눌러야 선택이 완료된다. 추가 확인 팝업은 계약에
 포함하지 않는다. Marker는 Default·Opened·Selected 상태를 구분하고, 선택 후
 Marker와 목록 Card를 함께 강조한다. 다른 Spot으로 다시 선택할 수 있다.
-기본선택·자동선택·시스템 산출 추천순위는 없다.
+기본선택·자동선택은 없다.
 
 ## 10. 현재 위치와 직선거리
 
@@ -292,13 +317,12 @@ Marker와 목록 Card를 함께 강조한다. 다른 Spot으로 다시 선택할
 전송하지 않으며 새로고침 시 폐기한다. 위치권한 거부 또는 위치 확인 불가가 Area·
 Spot 조회와 선택을 막지 않는다.
 
-거리는 다음 두 관계의 직선거리만 표시한다.
-
-- 현재 위치에서 선택 Area의 각 Spot까지
-- 선택한 Spot에서 나머지 두 Spot까지
+거리는 현재 위치에서 선택 Area의 각 Spot까지의 직선거리만 표시한다. Spot 간
+거리는 계산하거나 표시하지 않는다.
 
 표현 예시는 `현재 위치에서 직선거리 약 510m`다. 도보거리·도보시간·실제 이동시간·
-최적 경로로 표현하지 않는다. 거리 계산방식과 코드는 후속 구현 범위다.
+최적 경로로 표현하지 않는다. 계산은 Browser에서만 수행하고 좌표를 Backend로
+전송하거나 영구 저장하지 않는다.
 
 ## 11. UI 상태 계약
 
@@ -311,12 +335,12 @@ Spot 조회와 선택을 막지 않는다.
 | `AREA_UNSELECTED` | Area Dropdown, 선택 안내, 가능하면 기본지도 | Area 수치, Spot 핀·목록·상세 | 담당 Area를 선택하세요 | 해당 없음 | Area 선택 |
 | `AREA_LOADING` | 선택 Area명, Loading 안내 | 이전 Area 수치·Spot·선택 | Area 정보를 불러오는 중입니다 | 완료·실패 후 가능 | 대기 또는 Area 변경 |
 | `AREA_AVAILABLE` | 데이터 기준시각, 구역 정보 Trigger, Spot Marker 3개 | Drawer를 열기 전 Area 공식 수치·Spot 상세 | 구역 정보나 후보 위치를 확인하세요 | 수동 새로고침 가능 | Trigger·Marker 또는 목록 선택 |
-| `AREA_DATA_UNAVAILABLE` | Area명, 정적 Spot 이름·주소, 안전한 제한 안내 | 공식 Area 수치·증감 | Area 정보를 사용할 수 없어 값을 표시하지 않습니다 | 수동 가능 | 재시도·다른 Area·정적 Spot 확인 |
+| `DATA_UNAVAILABLE` | Area명, 정적 Spot 이름·주소, 안전한 제한 안내 | 공식 Area 수치·증감 | Area 정보를 사용할 수 없어 값을 표시하지 않습니다 | 수동 가능 | 재시도·다른 Area·정적 Spot 확인 |
 | `SPOT_UNSELECTED` | Spot Marker 3개와 후보 위치 목록 Trigger | Spot 상세·선택 강조 | 후보 위치를 눌러 정보를 확인하세요 | 해당 없음 | Marker 또는 목록 열기 |
 | `SPOT_LIST_OPEN` | 후보 위치 3곳 목록과 Marker 연동상태 | Area Drawer·Spot 상세 | 후보 위치 3곳을 확인하세요 | 해당 없음 | 목록 Card 또는 Marker 선택 |
-| `SPOT_DETAIL_OPEN` | Spot 정체성, 프로토타입 배지, 가능한 수동정보·거리·제한 | 시스템 추천 표현 | 정보를 확인한 뒤 후보 위치를 선택하세요 | 해당 없음 | 비교기준 변경 또는 명시 선택 |
+| `SPOT_DETAIL_OPEN` | Spot 정체성, 프로토타입 배지, 가능한 수동 인구정보·거리·제한 | 시스템 추천 표현 | 정보를 확인한 뒤 후보 위치를 선택하세요 | 해당 없음 | 명시 선택 |
 | `SPOT_SELECTED` | 선택 핀·카드 강조, 선택 완료, 상세 | 자동·공식 추천 주장 | 판촉 후보 위치로 선택했습니다. 다른 후보 위치로 변경할 수 있습니다 | 해당 없음 | 유지 또는 재선택 |
-| `SPOT_PROTOTYPE_DATA_UNAVAILABLE` | Spot명·주소·유형, 데이터 없음과 제한 안내 | 누락된 수동값·점수·순위 | 프로토타입 값을 만들거나 대체하지 않았습니다 | 수동 가능 | 정적 정보로 선택·다른 Spot 확인·데이터 갱신 |
+| `SPOT_PROTOTYPE_DATA_UNAVAILABLE` | Spot명·주소·유형, 인구정보 표의 `—`, 데이터 없음과 제한 안내 | 누락된 수동값 | Spot별 프로토타입 인구 데이터가 아직 입력되지 않았습니다. | 수동 가능 | 정적 정보로 선택·다른 Spot 확인·데이터 갱신 |
 | `MAP_PLACEHOLDER` | Layout·Interaction 검토용 지도 | 실제 좌표·Zoom 정확성 주장 | 지도와 위치는 후속 통합 단계에서 연결합니다 | 해당 없음 | UI 흐름 검토 |
 | `MAP_LOADING` | 지도 Loading, Area·Spot 텍스트 정보 | 지도·Marker | 지도를 불러오는 중입니다 | 완료·실패 후 가능 | 대기 또는 목록 사용 |
 | `MAP_AVAILABLE` | 지도·Marker·Control과 텍스트 정보 | 없음 | 후보 위치를 지도나 목록에서 확인하세요 | 수동 가능 | Marker·목록 사용 |
@@ -330,7 +354,7 @@ Spot 조회와 선택을 막지 않는다.
 | `DEGRADED` | 해당 미래정보와 경고 | 없음 | 참고가 필요한 데이터 상태입니다 | 수동 가능 | 경고와 함께 확인 |
 | `STALE_BLOCKED` | 해당 미래값 이용불가 안내 | 오래된 미래값 | 오래된 미래값은 표시하지 않습니다 | 수동 가능 | Current 또는 다른 시점 확인 |
 | `NO_COMPLETE_SNAPSHOT` | 표시 가능한 Current와 미래값 없음 안내 | 불완전한 미래값 | 완전한 미래정보를 사용할 수 없습니다 | 수동 가능 | Current 확인 |
-| `INPUT_INVALID` | 안전한 입력오류, Area Dropdown | 잘못된 입력 기반 파생값·Spot 상세 | 승인된 Area 또는 비교기준을 다시 선택하세요 | 입력 수정 후 가능 | 입력 교정 |
+| `INPUT_INVALID` | 안전한 입력오류, Area Dropdown | 잘못된 입력 기반 파생값·Spot 상세 | 승인된 Area를 다시 선택하세요 | 입력 수정 후 가능 | 입력 교정 |
 
 잘못된 입력과 Area 변경 시 이전 Area·Spot 데이터를 그대로 남기지 않는다. 지도·위치
 실패는 텍스트 기반 Area·Spot 조회와 사용자 선택을 차단하지 않는다. Spot 수동
@@ -374,27 +398,22 @@ Drawer, 좁은 화면은 단일 Bottom Sheet Container를 사용하며 태블릿
 
 Brand Color, 정확한 크기·간격과 Component Library는 후속 UI 설계에서 결정한다.
 
-## 15. 후속 구현 경계
+## 15. 구현 및 승인 경계
 
-Area-first 화면은 사용자 선택 Area를 조회하는 별도 Application Service가 필요하다.
-그 Service의 인터페이스·오류·Runtime과 UI 구현은 별도 Issue에서 다룬다. 이번
-계약은 다음을 구현하거나 승인하지 않는다.
+Area-first 화면의 사용자 선택 Area 조회 Service·Read-only API·Vue UI·NAVER Map
+Adapter와 Spot Population Prototype Runtime은 Issue #154에서 로컬 구현·검증했다.
+현재 구현은 다음을 승인하거나 수행하지 않는다.
 
-- Python Service, HTTP Endpoint, Web Framework
-- Spot 프로토타입 CSV·JSON과 PM 수치 입력
-- 네이버 지도 Application, Client ID와 지도·위치·거리 코드
-- HTML·CSS·JavaScript, Database, 배포
+- 실제 Area 데이터 연결
+- 실제 NAVER Map Credential 사용
+- Spot 인구 Prototype 실데이터 입력
+- Database와 배포
 - 실제 API·Recommendation·ML·S-DoT 실행
 - 로그인과 사용자 파일럿
 
-후속 구현 목표 기술 스택은 Repository Readiness Audit의 목표구조로만 사용한다.
-이번 계약은 `Responsive Web`과 `Desktop Web + Mobile Web` 제품계약만 정의하며,
-Audit 완료 후 별도 ADR로 공식화하기 전에는 Framework·Dependency·Scaffold를
-구현하거나 확정하지 않는다.
-
-현재 Area-first Service·API, Vue UI, FastAPI, NAVER Map, Spot Prototype Data와
-배포는 모두 `NOT_IMPLEMENTED`다. Vue·FastAPI는 Audit의 목표구조일 뿐 별도 ADR
-전의 공식 기술 Stack이 아니다.
+Issue #154의 구현은 Draft PR 검토 전이며 공식 반영·배포 완료를 뜻하지 않는다.
+`Responsive Web`과 `Desktop Web + Mobile Web` 제품계약, ADR-012의 Vue·FastAPI
+경계와 Issue #152 Scaffold를 유지한다.
 
 ## 16. PM 확인 대기 항목
 
@@ -417,19 +436,21 @@ Area별 접근권한과 제한배포 방식도 후속 결정이다. 미결정값
 - 정확한 5개 Area와 Area당 Spot 3개 계약이 명시됨
 - Area 공식 데이터와 Spot PM 수동 프로토타입 데이터가 분리됨
 - 반응형 Desktop Web·Mobile Web, 태블릿 전용 UI 제외, 현재·1시간 후·3시간 후,
-  과거 비교와 명시 선택이 정의됨
+  증감 계산과 명시 선택이 정의됨
 - Area·Spot·Map·Geolocation·Future Data 독립 상태군과 지도·위치 실패 Fallback이
   정의됨
 - 개인정보 비저장과 모바일 기준이 정의됨
 - D-020·D-021 구현 이력과 기존 Core·Service가 보존됨
-- Area-first Service·API, Spot Prototype Data, Vue UI·FastAPI·NAVER Map·배포가
-  구현되지 않음
+- Area-first Service·Read-only API·Vue UI·NAVER Map Adapter·Spot Prototype Runtime은
+  Issue #154에서 로컬 구현·검증됨
+- 실제 Area 데이터·NAVER Map Credential·Spot Population 실데이터·배포는 미실행
 - PM 문서 검토 완료
 
 ## 18. 변경 이력
 
 | 버전 | 날짜 | 변경내용 | 승인상태 |
 |---|---|---|---|
+| v0.5.0 | 2026-08-01 | PM 수동 Spot 인구 Prototype·증감 계산·unavailable 계약으로 상세정보 범위를 정렬 | Issue #154 PM 변경 승인 |
 | v0.4.0 | 2026-07-31 | Desktop 고정 3열을 지도 중심 기본화면과 상호배타 단일 Drawer로 교체하고 Mobile Bottom Sheet, Marker·목록 동기화와 디자인 정본 연결을 반영 | PM 변경 승인 |
 | v0.3.0 | 2026-07-31 | 실제 인터뷰 PM 확인과 Git Evidence 미추적, 합성 Matrix 비증거, Gate C 별도 평가를 구분하고 Audit 목표구조와 현재 미구현 Runtime 경계를 명시 | PM 변경 승인 |
 | v0.2.0 | 2026-07-30 | 최신 PM 결정에 따라 반응형 Desktop·Mobile Layout, 사용자 시간표현, 중앙값 기반 Area 증감, EG-8D 최신성 재사용, 실제 인터뷰 근거와 Audit 이후 ADR 경계를 반영 | PR #141 main 반영 |

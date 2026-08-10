@@ -2,7 +2,7 @@
 
 - Status: `APPROVED · ACCEPTED`
 - Decision record: `ADR-012`
-- Related Issue: `#148`
+- Related Issue: `#148`, `#154`
 - Baseline: `main` at `3740daead8a02964316ed0ba36284ed7f157a6e8`
 
 ## 1. 목적과 책임 경계
@@ -72,14 +72,15 @@ data/prototype
 | `freshmanager` | 수집·분석 Domain과 Application Service | 기존 생산코드, 새 선택 Area Service·Provider 계약 | FastAPI·Vue Import | `apps/*`에 의존하지 않음 | 기존 유지; 새 코드는 구현 Issue에서만 |
 | `data/reference` | 공식·승인 기준자료 | Area·Spot·S-DoT 정본 | 화면 전용 임시값 | 기존 Python 계약이 읽음 | 기존 유지 |
 | `data/samples` | 오프라인 공식 Sample | 저장된 비운영 Sample | Live 결과·사용자 위치 | Offline 검증만 | 기존 유지 |
-| `data/prototype` | 화면용 비운영 Prototype | PM 승인 Pilot Spot 선택지 | Raw·Forecast·공식 Manifest | Prototype Adapter만 읽음 | 별도 데이터 이동 Issue 승인 후 |
+| `data/prototype` | 화면용 비운영 Prototype | PM 승인 Pilot Spot 정적 Master와 Optional 인구자료 | Raw·Forecast·공식 Manifest | Prototype Adapter만 읽음 | Issue #154 승인 구현 |
 | `docs/architecture` | Architecture·Audit | 이 ADR와 구조 감사문서 | 실행로그·운영 데이터 | 정본 문서에 링크 | 이 ADR부터 사용 |
 | `scripts` | 수동 검증·운영 보조 | 승인된 단일목적 Script | Web 요청 처리코드 | 소유 모듈 계약만 호출 | 필요성이 승인된 구현 Issue에서 |
 | `tests` | Python·통합 안전계약 | Backend·Domain·Guard test | 운영 데이터·Secret | 생산경로를 검증 | 구현과 함께 |
 | `ai-context` | 압축된 결정·복원정보 | ADR 요약과 장기 결정 | 상세 구현 복제 | 상세 정본에 링크 | 기존 유지 |
 
-현재 `data/reference/pilot_spot_options.csv`는 별도 이동 승인이 있을 때까지 원위치를
-유지한다. 목표 `data/prototype` 경로를 먼저 만들거나 파일을 이 ADR에서 이동하지 않는다.
+Issue #154는 정적 Master를 `data/prototype/pilot_spot_options.csv`로 Git Rename한다.
+Optional 인구자료는 `data/prototype/pilot_spot_population.csv`에서만 읽고, PM 입력값이
+없으면 파일이나 행을 만들지 않는다.
 
 ## 5. Backend 계층
 
@@ -166,21 +167,19 @@ Current-only Snapshot만 사용하고 두 미래값은 모두 `NO_COMPLETE_SNAPS
 ### 6.2 `PilotSpotOptionRepository`
 
 - Spot identity는 기존 `pilot_spot_options.load_pilot_spot_options()`의 검증을 좁게
-  재사용하고, PM 수기 값은 별도 승인 뒤 명시적으로 설정된 `data/prototype` 자산에서만
-  읽는다. 두 입력 중 없는 값을 서로 만들어 채우지 않는다.
+  재사용한다. Spot 인구 Prototype은 별도 Optional 입력으로 읽으며 두 입력 중 없는
+  값을 서로 만들어 채우지 않는다.
 - 선택 Area에 연결된 Spot을 정확히 3개 반환한다.
-- Spot identity·주소·좌표와, 존재하는 경우 PM 수기 Current·60분·180분 값,
-  혼잡도, 비교값, 점수·Area 내 순위를 함께 반환한다.
-- 비교기준은 `PREVIOUS_DAY`, `PREVIOUS_WEEK`, `RECENT_4WEEK_AVERAGE`만 허용하고
-  기본값은 `RECENT_4WEEK_AVERAGE`다.
+- Spot identity·주소·좌표·표시순서·현장검증·운영 적합성·제한사항을 반환한다.
+- 존재하는 경우에만 PM 수기 Current·60분·180분 인구 범위와 `observed_at`을 반환하고,
+  제공된 범위로 각 미래시점의 증감수·증감률을 계산한다.
 - 수기 값에는 `data_status=PROTOTYPE`, `input_method=PM_MANUAL`,
-  `score_source=PM_MANUAL`, `rank_source=PM_MANUAL`을 보존한다.
+  `spot_population_source=PM_MANUAL_PROTOTYPE`을 보존한다.
 - Area 값을 Spot 값으로 복사·분배·추정하지 않는다.
-- Spot 점수·순위를 계산하지 않고 PM 입력값만 전달한다. 기본선택·자동추천을 만들거나
-  입력을 쓰지 않는다.
+- 기본선택·자동추천을 만들거나 입력을 쓰지 않는다.
 - 선택지 3개의 identity 계약 위반만 500 오류다. 선택지 계약은 유효하지만 일부
-  PM 수기 값 또는 출처 metadata가 없거나 유효하지 않으면 정적 Spot은 반환하고
-  `SPOT_PROTOTYPE_DATA_UNAVAILABLE`로 표시하며 해당 값을 숨기고 새로 만들지 않는다.
+  PM 수기 인구값이 없으면 정적 Spot은 반환하고 `SPOT_PROTOTYPE_DATA_UNAVAILABLE`로
+  표시하며 인구·증감 필드를 `null`로 두고 새로 만들지 않는다.
 
 초기 Runtime은 Spreadsheet 직접 접근, Google OAuth와 Browser의 서울시 API Key
 보유를 지원하지 않는다.
@@ -200,15 +199,19 @@ Recommendation, Recommended, Best, Optimal, Ranking, Ranked 또는 이에 해당
 중립 개념명은 `AreaPilotView`, `SelectedAreaView`, `SpotOption`이다.
 
 `pilot-view`는 Area identity, Current, 60분·180분 값과 각 Freshness, Spot Option
-3개, 사용 가능한 PM 수기 Prototype 값·Source metadata, warning과 limitation을 한
-Response로 반환한다.
-Pydantic Schema가 API 계약의 정본이고 TypeScript Type은 FastAPI OpenAPI에서
-파생한다. Type Generator Package는 Scaffold Issue에서 승인·선정하며 Frontend와
-Backend Schema를 손으로 이중 관리하지 않는다.
+3개, 사용 가능한 PM 수기 Spot 인구 Prototype의 기준시각·현재·60분·180분·증감,
+상태·warning·limitation을 한 Response로 반환한다.
+Pydantic Schema가 API 계약의 정본이고 성공 Response와 `ErrorResponse` 오류 계약을
+FastAPI OpenAPI에 선언한다. TypeScript Type은
+`IN_REPOSITORY_FAIL_CLOSED_OPENAPI_GENERATOR`로 이 OpenAPI에서 결정적으로 생성하며,
+지원하지 않는 Schema 구조는 임의 Type으로 바꾸지 않고 실패한다. 외부 Generator
+Package를 사용하지 않고 Frontend와 Backend Schema를 손으로 이중 관리하지 않는다.
 
 ### 7.1 오류 계약
 
 오류 Body는 다음 한 형태만 사용하고 내부 경로·원본 데이터·예외문을 포함하지 않는다.
+`pilot-view`의 404·422·500·503 Response는 OpenAPI에서도 모두 `ErrorResponse`로
+문서화하며 Runtime 오류 Body와 HTTP 상태를 변경하지 않는다.
 
 ```json
 {
@@ -228,7 +231,7 @@ Backend Schema를 손으로 이중 관리하지 않는다.
 
 특정 Horizon의 정상적인 데이터 부족은 HTTP 오류가 아니다. 성공 Response 안에서
 해당 Horizon을 명시적 unavailable로 반환한다. 선택 Area의 동적 값이 없더라도
-정적 Spot 3개를 검증할 수 있으면 `AREA_DATA_UNAVAILABLE` 성공 Response로 반환한다.
+정적 Spot 3개를 검증할 수 있으면 `DATA_UNAVAILABLE` 성공 Response로 반환한다.
 
 ## 8. Freshness와 부분 Response
 
@@ -251,7 +254,7 @@ Frontend는 Composition API의 `ref`·`reactive`·`computed`, Composable, Native
 `fetch`, Scoped CSS 또는 CSS Modules와 CSS Custom Properties를 사용한다.
 
 초기 상태는 `selectedAreaCode`, `areaPilotView`, `openedSpotId`, `selectedSpotId`,
-`mapStatus`, `geolocationStatus`, `userLocation`, `comparisonType`으로 제한한다.
+`mapStatus`, `geolocationStatus`, `userLocation`으로 제한한다.
 Desktop과 Mobile은 같은 상태·Component를 쓰고 Layout만 바꾼다. Area가 바뀌면 이전
 Spot 열림·선택 상태를 초기화한다.
 
@@ -269,6 +272,9 @@ Spot 열림·선택 상태를 초기화한다.
   Application log에는 Route template과 HTTP 상태만 남기고 Area 코드를 기록하지 않는다.
 - Spot 선택은 현재 Browser 상태에만 두고 API, 로그, Telemetry, Analytics, Database,
   파일 또는 Browser 영구저장소로 전송·기록하지 않는다.
+- 지도 Script Load 실패는 Loader와 이번 호출에서 만든 Script를 정리하고 다음 수동
+  재시도를 허용한다. 재시도는 Area·Spot 선택·사용자 위치를 유지하며 API나
+  Geolocation을 다시 호출하지 않는다.
 
 NAVER Maps Client ID는 Frontend 환경변수로 주입하고 허용 Domain을 제한한다. 서울시
 API Key와 분리하며 실제 값은 코드·문서·Git에 기록하지 않는다. Client ID는 Browser에
@@ -278,21 +284,23 @@ API Key와 분리하며 실제 값은 코드·문서·Git에 기록하지 않는
 
 - 개발: Vite Dev Server + FastAPI Development Server + `/api` Proxy.
 - 파일럿: 사용자 URL 하나와 Same-origin 우선.
-- 배포 플랫폼: `VERCEL`, 상태는 `PLANNED_NOT_DEPLOYED`.
+- 배포 플랫폼: `VERCEL`. 초기 Release는 Frontend-only Static Fixture Production이며
+  Browser의 `/api` Runtime 요청은 0회다.
+- 공식 Release 순서: PR Exact Head CI → `main` Squash Merge → 기존 Web Production 배포.
 - ADR-013: `ACCEPTED`.
 - Working Topology: Web Root는 `apps/web`, API Root는 Repository Root이며
   `TWO_PROJECTS_ACCEPTED_FOR_INITIAL_PILOT` 상태다.
 - FastAPI는 `apps.api.main:app` 표준 ASGI App이며 Local Uvicorn과 Vercel Python
   Runtime에서 같은 Entry Point를 사용한다. Vercel은 배포 Adapter일 뿐 Business
   Logic에 포함되지 않는다.
-- ADR-012의 Same-origin 원칙은 유지한다. 실제 API Project 주소가 만들어진 뒤
-  별도 배포 작업에서 Production Rewrite와 Domain을 결정한다.
+- ADR-012의 Same-origin 원칙은 실제 Area Artifact 연결 단계에 유지한다. 초기
+  Frontend-only Fixture Production에는 API Rewrite를 만들지 않는다.
 - Python Runtime은 API용 Dependency만 설치하고 `requirements-ml.txt`를 설치하지
   않는다.
 - Runtime 파일쓰기는 금지한다. 후속 Snapshot 공급은 저장소 밖 승인 불변자료를
   읽기 전용으로 사용하는 Provider가 담당한다.
-- 실제 Vercel Project·Domain·Rewrite·Secret·배포와 운영 로그 정책은 후속 배포
-  작업이 소유한다.
+- 실제 Vercel 환경설정 값은 저장소에 기록하지 않는다. API Rewrite·공식 데이터
+  연결과 운영 로그 정책은 후속 승인 작업이 소유한다.
 
 Microservice, API Gateway, BFF, Kubernetes, Redis, Celery, PostgreSQL, 사용자 인증,
 관리자 페이지, Model Serving과 실시간 Collector 연결은 초기 범위가 아니다.
@@ -335,8 +343,8 @@ Module은 표에 적은 호출 Import와 전용 Test를 근거로 삼는다. Mod
 
 현재 `WEB_REQUEST_PATH_REUSE`로 판정한 기존 Module은 0개다. Audit의 7개 Interface
 seam 검토 후보는 모두 `KEEP · DEFERRED`이며, 이번 ADR에서 선행 정리 대상으로 확정한
-`TARGETED_CLEANUP_CANDIDATE`는 0개다. 새 Service와 Provider가 후속 구현에서 최초
-Web request path를 만든다.
+`TARGETED_CLEANUP_CANDIDATE`는 0개다. Issue #154의 새 Service와 Provider가 최초
+Web request path를 로컬 구현했다.
 
 ## 14. Code Cleanup Decision
 
@@ -347,9 +355,9 @@ NO_CODE_CLEANUP_REQUIRED_BEFORE_SCAFFOLD
 ```
 
 Repository Readiness Audit은 즉시 삭제·정리 가능한 코드가 0개임을 확인했다. 이번
-분석도 기존 Module의 Import·Test·Guard 책임이 유효함을 확인했다. 기존 Python Module과
-새 Application 계층 사이에 추가할 경계는 `SelectedAreaPilotService`와 Provider 두
-개다. Route·Schema·오류 변환은 HTTP Layer 책임이다. 기존 Recommendation Service
+분석도 기존 Module의 Import·Test·Guard 책임이 유효함을 확인했다. Issue #154는 기존
+Python Module과 새 Application 계층 사이에 `SelectedAreaPilotService`와 Provider
+경계를 구현했다. Route·Schema·오류 변환은 HTTP Layer 책임이다. 기존 Recommendation Service
 일반화나 private Helper 추출은 선택 Area 경로의 선행조건이 아니며 현재 범위를 넓힌다.
 
 - 정리 대상 파일·함수: 없음
@@ -362,25 +370,25 @@ API 구현 중 실제 중복이나 막힌 Interface가 증거로 확인될 때�
 
 ## 15. 결정 결과와 제외범위
 
-Issue #152·PR #153의 이 경계를 따르는 `apps/web`·`apps/api` 최소 Scaffold와
-Dependency는 승인됐다. 이는 실제 Area 기능, Snapshot 연결 또는 Vercel 배포 완료를
-뜻하지 않는다. 다음은 여전히 `NOT_IMPLEMENTED`이며 별도 PM 승인이 필요하다.
+Issue #152·PR #153의 `apps/web`·`apps/api` 최소 Scaffold 위에 Issue #154가 다음을
+구현·검증했다. PR #155 Release Candidate의 `main` Merge와 기존 Web Production
+배포는 PM 승인됐으며 Final Release Head CI 후 순차 실행한다.
 
-다음 항목은 별도 Issue로 분리하지 않고 후속 End-to-end MVP의 내부 Gate와 Commit에서
-확인한다.
+- `data/prototype`과 정적 Spot Master 이동
+- Health 외 Area-first Read-only API와 Vue 연결
+- `ErrorResponse` OpenAPI와 저장소 내부 Fail-closed Type Generator
+- 실패 복구·수동 재시도를 지원하는 NAVER Map Adapter와 Browser-only Geolocation
+- Fixed Global Toast 없는 Inline Selection Status
+- AreaDataProvider, PilotSpotOptionRepository, SelectedAreaPilotService
+- 잘못된 `area_code`와 안전한 HTTP 오류 계약
 
-- Vercel Preview Build
+다음은 Frontend-only Fixture Release 이후에도 완료되지 않았으며 별도 PM 승인이 필요하다.
+
 - FastAPI Function Bundle 크기와 필요 시 `excludeFiles`
 - Production `/api` Rewrite
-- 잘못된 `area_code` 추적 오류 시험
-- 최종 UI Theme·Brand Color
-- UI 참고 이미지 해석
-
-- `data/prototype` 생성
-- Health 외 Area-first API와 실제 Area 데이터가 연결된 Vue 기능
-- NAVER Map 구현
-- AreaDataProvider, PilotSpotOptionRepository, SelectedAreaPilotService 구현
-- Pilot CSV 이동, 코드 이동·삭제·Refactor
-- Cloud 배포, Database, 인증, 사용자 위치·선택 저장
+- 승인 Area Artifact 실제 연결
+- NAVER Map Credential 기반 Runtime 검증
+- Spot Population Prototype 실데이터 입력
+- API Production 배포, Database, 인증, 사용자 위치·선택 저장
 - 실제 API·Recommendation·ML 실행
 - Dataset·Manifest 변경 또는 사용자 파일럿 실행

@@ -1,5 +1,6 @@
 import json
 import os
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -16,10 +17,22 @@ class HealthApiTests(unittest.TestCase):
         cls.client = TestClient(app, raise_server_exceptions=False)
 
     def test_app_imports_without_business_modules(self) -> None:
-        self.assertIsNotNone(app)
-        self.assertFalse(
-            any(name == "freshmanager" or name.startswith("freshmanager.") for name in sys.modules)
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-c",
+                (
+                    "import sys; from apps.api.main import app; "
+                    "assert not any(name == 'freshmanager' or "
+                    "name.startswith('freshmanager.') for name in sys.modules)"
+                ),
+            ],
+            cwd=Path(__file__).resolve().parents[3],
+            check=False,
+            capture_output=True,
+            text=True,
         )
+        self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_health_returns_stable_schema(self) -> None:
         response = self.client.get("/api/v1/health")

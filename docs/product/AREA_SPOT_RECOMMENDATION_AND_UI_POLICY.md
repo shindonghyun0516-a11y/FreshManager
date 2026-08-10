@@ -1,12 +1,12 @@
 # Area·Spot 판매 추천과 지도 UI 정책
 
 - 상태: `PM_APPROVED`
-- 기준일: 2026-07-31
-- 관련 Issue: #124, #126, #128, #129, #132, #140, #146, #150
+- 기준일: 2026-08-01
+- 관련 Issue: #124, #126, #128, #129, #132, #140, #146, #150, #154
 - 관련 PR: #151
 - 상위 Issue: #99
 - 선행 결정: D-018, D-020, D-021, D-022
-- 후속 결정: D-023 `ACCEPTED`
+- 후속 결정: D-023 `ACCEPTED`, D-024 `ACCEPTED_BY_PM_FOR_ISSUE_154`
 
 이 문서는 D-022 초기 Area-first 사용자 선택 흐름, D-021 다중 Area 비교의 내부
 분석 이력과 D-020 장기 원격 SPOT 추천 정책을 함께 정의한다. 정책 문서일 뿐 UI,
@@ -19,8 +19,8 @@
 
 초기 파일럿은 사용자가 승인된 5개 중 담당 Area를 직접 선택하고, 선택 Area의
 서울시 공식 현재·1시간 후·3시간 후 정보와 대표 Spot 3개를 확인해 이동할 지점을
-직접 고르게 돕는다. Area·Spot 자동추천은 없으며, Spot별 값은 명확히 배지된
-`PM_MANUAL` 프로토타입으로만 Area 공식 데이터와 분리해 표시한다. D-021
+직접 고르게 돕는다. Area·Spot 자동추천은 없으며, Spot별 인구값은 명확히 배지된
+`PM_MANUAL_PROTOTYPE`으로만 Area 공식 데이터와 분리해 표시한다. D-021
 Core·Service는 다중 Area 비교 내부 분석 기능으로 보존하며 Area-first 기본 UX나
 Primary API가 아니다.
 
@@ -46,16 +46,16 @@ Spot은 Area 안의 유동인구·밀집도와 반복패턴을 비교해 프래�
 최종 SPOT 추천 대상이 될 수 있다.
 
 초기 파일럿에서는 역할이 다르다. 대표 Spot 3개는
-`spot_role=USER_SELECTABLE_OPTION`이며, 시스템 추천·순위 대상이 아니다. 장기
+`spot_role=USER_SELECTABLE_OPTION`이며, 우열 없이 사용자가 직접 고른다. 장기
 D-020의 Spot은 Eligibility를 통과한 `SYSTEM_RECOMMENDATION_TARGET`이다.
 
 현재 Spot Master의 13개 행은 모두 역 중심 대리좌표인 Candidate Anchor다. 공식 출구나
 검증된 판매 위치가 아니며 `field_verified=false`다.
 
 초기 파일럿의 사용자 선택지는 별도 정본
-`data/reference/pilot_spot_options.csv`의 5개 Area·15개 행이다. 이 행은 PM이 공개
+`data/prototype/pilot_spot_options.csv`의 5개 Area·15개 행이다. 이 행은 PM이 공개
 지도에서 확인한 대표 위치지만 현장검증·운영 적합성·Spot별 동적근거가 없으며,
-시스템 추천이나 추천순위가 아닌 같은 수준의 사용자 선택지다.
+같은 수준의 사용자 선택지다. `display_order`는 표시순서일 뿐 우열 근거가 아니다.
 
 13개 Area에는 각각 Candidate Anchor 1개만 연결돼 있다. 이는 실제 출구·흡연부스·
 오피스 입구·광장·버스정류장 같은 판매 후보가 아니라 실제 후보 구성을 위한
@@ -136,10 +136,11 @@ Spot 근거(`DIRECT_SENSOR`)까지 충족한 미래 상태를 설명하는 조�
   동적 밀집근거로 사용할 수 있다.
 - Area 인구를 Spot 인구로 복사하거나 중간값·가장 가까운 값을 대신 사용하지
   않는다.
-- 초기 파일럿의 후보 3개에 Area 예측값을 복사하거나 Spot별 순위·기본선택을
-  부여하지 않는다.
-- Spot 직접값이나 선택적 동적 근거가 부족하면 Spot 숫자와 SPOT 추천을 만들지
-  않고 AREA 안내 또는 판매 후보로 하향하며 근거 부족을 명시한다.
+- 초기 파일럿의 후보 3개에 Area 예측값을 복사하거나 기본선택을 부여하지 않는다.
+- 초기 파일럿의 Spot 인구값은 `PM_MANUAL_PROTOTYPE`만 허용한다. 값이 없으면
+  `SPOT_PROTOTYPE_DATA_UNAVAILABLE`로 표시하고 수치를 만들지 않는다. D-020 장기
+  경로에서 Spot 직접값이나 선택적 동적 근거가 부족하면 SPOT 추천을 만들지 않고
+  AREA 안내 또는 판매 후보로 하향하며 근거 부족을 명시한다.
 
 현재 완료된 범위는 Candidate Anchor 13개, Anchor 기준 S-DoT 공간 연결 13개,
 직접 지원 후보 3개·인근 지원 후보 4개·가까운 센서 없음 6개, 2026-07-06부터
@@ -184,8 +185,8 @@ Spot 근거(`DIRECT_SENSOR`)까지 충족한 미래 상태를 설명하는 조�
 - 좌표 상태: `PM_CONFIRMED`
 - 좌표 출처 유형: `PM_PROVIDED_PUBLIC_MAP_LOOKUP`
 - 역할·선택 방식: `USER_SELECTABLE_OPTION`·`USER_CHOICE`
-- 표시순서: 추천순위나 기본선택이 아님
-- 시간대별 Spot 동적 유동인구·혼잡도: 없음
+- 표시순서: 우열 근거나 기본선택이 아님
+- Spot 인구정보: 승인된 `PM_MANUAL_PROTOTYPE`이 있을 때만 표시, 없으면 unavailable
 - 현장검증·운영 적합성: `UNAVAILABLE`·`NOT_VERIFIED`
 - 현재 결과범위: 사용자가 직접 고르는 판매 후보; 공식 추천 아님
 
@@ -232,7 +233,7 @@ S-DoT 존재나 후보 수만으로 추천하지 않는다. 운영 적합성·�
 
 1. 사용자가 승인된 5개 중 담당 Area를 직접 선택한다.
 2. 선택 Area의 서울시 공식 현재·1시간 후·3시간 후 정보와 대표 Spot 3개를
-   순위 없이 표시한다.
+   같은 수준의 선택지로 표시한다.
 3. 사용자가 이동할 Spot을 직접 선택한다.
 
 D-021 Recommendation Core·Service의 서울시 Forecast 기반 다중 Area 비교는
@@ -269,10 +270,15 @@ machine_learning_used_for_recommendation=false
 official_recommendation_allowed=false
 data_status=PROTOTYPE
 input_method=PM_MANUAL
+sales_history_available=false
+sales_performance_metrics_allowed=false
+spot_population_prototype_allowed=true
+spot_population_source=PM_MANUAL_PROTOTYPE
 ```
 
-서울시 공식 값은 Area 정보로만 표시하고 `PM_MANUAL` Spot 프로토타입 값과
-분리한다. 이 사용자 선택 흐름은 Recommendation Output이 아니다.
+서울시 공식 값은 Area 정보로만 표시하고 `PM_MANUAL_PROTOTYPE` Spot 인구값과
+분리한다. 값이 없으면 `SPOT_PROTOTYPE_DATA_UNAVAILABLE`로 표시한다. 이 사용자 선택
+흐름은 Recommendation Output이 아니다.
 
 다음은 장기 D-020 원격 SPOT 평가값이다.
 
@@ -313,9 +319,11 @@ Output Contract를 따른다.
 - 지도 실패 시 Area 정보와 Spot 이름·주소 목록·상세·선택을 제공하는
   `MapFallback`으로 핵심기능을 유지한다.
 - 초기 파일럿은 사용자가 선택한 Area의 공식 정보와 대표 Spot 3개를 같은 수준의
-  선택지로 표시한다. 추천·1위·기본선택 표시는 하지 않는다.
+  선택지로 표시한다. 자동선택·기본선택 표시는 하지 않는다.
 - 후보 위치는 사용자가 비교·선택하는 미검증 위치다. 검증된 판매위치, 판매 허용
   지점이나 공식 추천으로 표현하지 않는다.
+- Spot 상세는 PM 수동 현재·1시간 후·3시간 후 인구 범위와 제공된 시점의 증감만
+  표시한다. 값이 없으면 표를 유지하고 `—`와 데이터 없음 안내를 표시한다.
 - Area 공식정보에는 `데이터 기준시각`, `저장된 최신 승인 데이터 기준`,
   `서울시 공식 Area 데이터`를 사용한다. `실시간`, `Live`, `Monitoring`,
   `현재 접속시점 수집`, `자동 새로고침`, `Telemetry`는 사용하지 않는다.
@@ -385,15 +393,14 @@ D-021 내부 다중 Area 비교의 `AREA` 결과도 SPOT 추천 실패에 따른
 가능하다. 향후 실제 운영기관이 별도 현장검증을 수행할 때만 운영 적합성 확인단계를
 추가할 수 있다. 역 중심 대리좌표를 출구 또는 판매 위치로 자동 승격하지 않는다.
 
-## 16. 향후 판매량·상품·매출 확장
+## 16. 현재 데이터 경계
 
-장기 목표는 검증된 Spot·시간에 적합한 상품을 안내하는 것이다. 실제 판매량,
-상품별 수요, 매출과 구매전환 자료가 별도 계약으로 확보되고 PM이 승인한 뒤에만
-상품·판매성과 추천을 검토한다. 현재 Area·Spot 자료로 이를 추정하지 않는다.
+초기 파일럿은 판매량·상품별 수요·매출·구매전환 자료를 사용하지 않는다. 현재
+Area·Spot 자료로 해당 값을 추정하거나 Spot 인구정보를 대체하지 않는다.
 
 ## 17. 현재 제외범위
 
-- UI 코드·지도 API·Backend·Database 구현
+- Database·인증·사용자 위치·선택 이력 저장
 - Spot 추천 실행·사용자 게시·공식 Recommendation 활성화
 - 초기 파일럿의 Spot 동적근거·S-DoT 신규 수집·Spot별 혼잡 예측·자동추천
 - Spot 반복성·Backtesting·순위 안정성과 추천 신뢰도 임계값
@@ -405,10 +412,11 @@ D-021 내부 다중 Area 비교의 `AREA` 결과도 SPOT 추천 실패에 따른
 
 ## 18. 다음 PM 승인사항
 
-정적 Master와 D-021 Core·Service, D-022 계약은 `main`에 있다. 이 문서 정합화는
-Area-first Service·API, Vue UI, FastAPI, NAVER Map, Spot Prototype Runtime,
-추천 실행 또는 배포를 승인하지 않는다. 해당 구현에는 Architecture ADR과 별도
-PM 승인이 필요하다.
+정적 Master와 D-021 Core·Service, D-022 계약은 `main`에 있다. Issue #154는
+Area-first Service·Read-only API, Vue UI, NAVER Map Adapter와 Spot Prototype
+Runtime을 로컬 구현·검증했으며 Draft PR 검토 전 상태다. 실제 Area Artifact 연결,
+NAVER Map Credential 사용, Spot Population 실데이터 입력, 추천 실행과 배포는
+승인하지 않는다.
 
 ## 관련 정본
 
@@ -416,7 +424,7 @@ PM 승인이 필요하다.
 - `docs/product/RECOMMENDATION_OUTPUT_CONTRACT.md`
 - `data/reference/eg6_area_panel.csv`
 - `data/reference/eg6_spot_master.csv`
-- `data/reference/pilot_spot_options.csv`
+- `data/prototype/pilot_spot_options.csv`
 - `data/reference/eg6_sdot_links.csv`
 - `docs/product/FreshManager_PRD_v1.0.md`
 - `docs/engineering/FreshManager_TRD_v1.0.md`
