@@ -1,21 +1,21 @@
 # Area-first Web Pilot Contract
 
 - 문서 상태: Approved
-- 버전: v0.5.0
+- 버전: v0.6.0
 - 작성자: 신동현
 - 최종 승인자: 신동현
 - 최초 작성일: 2026-07-30
-- 최종 수정일: 2026-08-01
+- 최종 수정일: 2026-08-10
 - 적용 프로젝트: Freshmanager Data PoC
 - 관련 문서:
   - [`FreshManager_PRD_v1.0.md`](FreshManager_PRD_v1.0.md)
   - [`RECOMMENDATION_OUTPUT_CONTRACT.md`](RECOMMENDATION_OUTPUT_CONTRACT.md)
   - [`DECISION_LOG.md`](../../ai-context/DECISION_LOG.md)의 D-020, D-021, D-022,
-    D-023과 D-024(`ACCEPTED_BY_PM_FOR_ISSUE_154`)
+    D-023, D-024(`ACCEPTED_BY_PM_FOR_ISSUE_154`)와 D-025
   - [`PROJECT_STATUS.md`](../../PROJECT_STATUS.md)
   - [`REPOSITORY_READINESS_AUDIT.md`](../architecture/REPOSITORY_READINESS_AUDIT.md)
   - [`DESIGN.md`](../design/DESIGN.md)
-- 관련 작업: Issue #150, PR #151, Issue #154
+- 관련 작업: Issue #150, PR #151, Issue #154, Issue #156
 - 변경 시 PM 승인: 필요
 
 ---
@@ -165,23 +165,28 @@ Area 미선택 상태에서는 Area 유동정보, Spot 핀·목록과 Spot 상�
 선택하면 해당 Area로 이동하고 Spot 3개가 모두 보이도록 지도 범위를 조정한다.
 Area를 변경하면 이전 Area 수치, Spot 상세와 선택 상태를 즉시 해제한다.
 
-목표 지도 Provider는 네이버 지도 JavaScript API다. 현재 디자인의 지도는
-Layout·Interaction 검토용 Placeholder이며 실제 Provider·좌표·Zoom·Marker 위치는
-통합 단계에서 확정한다. Area 미선택 시 hy 본사를 기본 중심으로 사용하는 계약은
-유지하지만 다음 값은 PM 확인 전까지 확정하지 않는다.
+목표 지도 Provider는 네이버 지도 JavaScript API다. NAVER Map Adapter는 확정된 기본
+좌표·Zoom·중립 Marker 계약을 지원한다. NAVER Credential Runtime은 아직
+`NOT_VERIFIED`이며, Area 미선택 시 hy 본사를 기본 중심으로 사용한다.
 
 ```text
-default_location_name
-default_address
-default_latitude
-default_longitude
-default_zoom
-coordinate_status=PM_CONFIRMATION_REQUIRED
+default_location_name=hy빌딩
+default_address=서울특별시 서초구 강남대로 577 (잠원동, hy빌딩)
+default_latitude=37.51325
+default_longitude=127.01982
+default_zoom=16
+default_marker_label=hy 기준 위치
+coordinate_status=PM_CONFIRMED
 ```
 
-주소·검색결과만으로 좌표와 zoom을 추측하지 않는다. Client ID 실제값은 문서와
-Git에 기록하지 않는다. 후속 환경변수 이름 후보는 `NAVER_MAP_CLIENT_ID`이며 이번
-문서가 실제 환경변수 생성이나 키 발급을 승인하지 않는다.
+`hy 기준 위치` Marker는 모든 방문자에게 동일한 지도 시작점을 알리는 중립 표기다.
+담당 Area, 사용자 현재 위치, 판매 위치 또는 추천 결과로 사용하지 않는다. Area 미선택
+상태에서는 Area 수치, Spot Marker·Zone·목록·상세를 숨기고, Area를 선택하면 기존
+Spot 3개 `fitBounds` 지도로 전환한다.
+
+Client ID 실제값은 문서와 Git에 기록하지 않는다. Frontend 환경변수 이름은
+`VITE_NAVER_MAP_CLIENT_ID`다. 이번 문서는 실제 값 생성이나 키 발급을 승인하지 않으며
+Credential Runtime은 계속 `NOT_VERIFIED`다.
 
 ## 6. Area 공식 데이터 표시 계약
 
@@ -400,35 +405,39 @@ Brand Color, 정확한 크기·간격과 Component Library는 후속 UI 설계�
 
 ## 15. 구현 및 승인 경계
 
-Area-first 화면의 사용자 선택 Area 조회 Service·Read-only API·Vue UI·NAVER Map
-Adapter와 Spot Population Prototype Runtime은 Issue #154에서 로컬 구현·검증했다.
+Issue #154·PR #155의 Area-first Web은 `main`에 병합됐고 Frontend-only Fixture
+Production이 활성화됐다. 실제 Area API·운영 데이터 Production 연결은 완료되지 않았다.
+Issue #156은 첫 진입 기본 지도 계약만 정렬하며 실제 데이터 연결 범위를 확대하지 않는다.
+
 현재 구현은 다음을 승인하거나 수행하지 않는다.
 
-- 실제 Area 데이터 연결
-- 실제 NAVER Map Credential 사용
+- 실제 Area API·운영 데이터 연결
 - Spot 인구 Prototype 실데이터 입력
-- Database와 배포
+- Database
 - 실제 API·Recommendation·ML·S-DoT 실행
 - 로그인과 사용자 파일럿
 
-Issue #154의 구현은 Draft PR 검토 전이며 공식 반영·배포 완료를 뜻하지 않는다.
 `Responsive Web`과 `Desktop Web + Mobile Web` 제품계약, ADR-012의 Vue·FastAPI
 경계와 Issue #152 Scaffold를 유지한다.
 
-## 16. PM 확인 대기 항목
-
-다음 지도 기본값은 `PM_CONFIRMATION_REQUIRED`다.
+## 16. PM 확인 완료 및 후속 항목
 
 ```text
-default_location_name=NOT_PROVIDED
-default_address=NOT_PROVIDED
-default_latitude=NOT_PROVIDED
-default_longitude=NOT_PROVIDED
-default_zoom=NOT_PROVIDED
+default_location_name=hy빌딩
+default_address=서울특별시 서초구 강남대로 577 (잠원동, hy빌딩)
+default_latitude=37.51325
+default_longitude=127.01982
+default_zoom=16
+default_marker_label=hy 기준 위치
+coordinate_status=PM_CONFIRMED
 ```
 
-Area별 접근권한과 제한배포 방식도 후속 결정이다. 미결정값은 구현 기본값으로
-추측하지 않는다.
+`hy 기준 위치` Marker는 모든 방문자에게 동일한 지도 시작점을 알리는 중립 표기다.
+담당 Area, 사용자 현재 위치, 판매 위치 또는 추천 결과로 사용하지 않는다. Area 미선택
+상태에서는 Area 수치, Spot Marker·Zone·목록·상세를 숨기고, Area를 선택하면 기존
+Spot 3개 `fitBounds` 지도로 전환한다.
+
+Area별 접근권한과 제한배포 방식은 후속 결정이다.
 
 ## 17. 완료 정의
 
@@ -441,15 +450,16 @@ Area별 접근권한과 제한배포 방식도 후속 결정이다. 미결정값
   정의됨
 - 개인정보 비저장과 모바일 기준이 정의됨
 - D-020·D-021 구현 이력과 기존 Core·Service가 보존됨
-- Area-first Service·Read-only API·Vue UI·NAVER Map Adapter·Spot Prototype Runtime은
-  Issue #154에서 로컬 구현·검증됨
-- 실제 Area 데이터·NAVER Map Credential·Spot Population 실데이터·배포는 미실행
+- Issue #154·PR #155의 Area-first Web은 `main`에 병합됐고 Frontend-only Fixture
+  Production이 활성화됨
+- 실제 Area API·운영 데이터 Production 연결과 Spot Population 실데이터는 미완료
 - PM 문서 검토 완료
 
 ## 18. 변경 이력
 
 | 버전 | 날짜 | 변경내용 | 승인상태 |
 |---|---|---|---|
+| v0.6.0 | 2026-08-10 | 첫 진입 hy빌딩 중심 좌표·Zoom 16·중립 Marker와 Area 미선택 계약 확정 | Issue #156 PM 변경 승인 |
 | v0.5.0 | 2026-08-01 | PM 수동 Spot 인구 Prototype·증감 계산·unavailable 계약으로 상세정보 범위를 정렬 | Issue #154 PM 변경 승인 |
 | v0.4.0 | 2026-07-31 | Desktop 고정 3열을 지도 중심 기본화면과 상호배타 단일 Drawer로 교체하고 Mobile Bottom Sheet, Marker·목록 동기화와 디자인 정본 연결을 반영 | PM 변경 승인 |
 | v0.3.0 | 2026-07-31 | 실제 인터뷰 PM 확인과 Git Evidence 미추적, 합성 Matrix 비증거, Gate C 별도 평가를 구분하고 Audit 목표구조와 현재 미구현 Runtime 경계를 명시 | PM 변경 승인 |

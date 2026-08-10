@@ -6,7 +6,7 @@
 단일 운영 기준이다. 제품 목적은 PRD, 기술 계약은 TRD, 검사 ID와 판정은
 `docs/testing/PROJECT_GUARD_SPEC.md`를 따른다.
 
-마지막 동기화 시각: `2026-08-01` (Asia/Seoul)
+마지막 동기화 시각: `2026-08-10` (Asia/Seoul)
 
 ## 2. 현재 요약
 
@@ -46,21 +46,29 @@
 - Repository Documentation Structure Alignment: `ACCEPTED` · Issue #150 · PR #151
 - History Archive and Documentation Index: `ACCEPTED` · Issue #150 · PR #151
 - Web Platform Scaffold: `ACCEPTED` · Issue #152 · PR #153
-- Area-first End-to-end MVP: `RELEASE_CANDIDATE_VALIDATED · PM_MERGE_APPROVED · PRODUCTION_DEPLOY_APPROVED` ·
-  Issue #154 · PR #155 — 공식 Release 순서는 Exact Head CI 확인 → `main` Squash Merge →
-  기존 `freshmanager-web` Production 배포다. PM 수동 Spot 인구 Prototype만 허용하고 값 부재 시
-  `SPOT_PROTOTYPE_DATA_UNAVAILABLE`을 사용한다.
-- PR #155 Final Release Head CI: `PASS_REQUIRED_BEFORE_MERGE`
+- Area-first End-to-end MVP: `AVAILABLE_ON_MAIN · FRONTEND_ONLY_FIXTURE_PRODUCTION_ACTIVE` ·
+  Issue #154 · PR #155 — 실제 Area API·운영 데이터 Production 연결은 완료되지 않았다.
+- PR #155: `MERGED`
 - Area Data: `DATA_UNAVAILABLE`
 - Spot Population: `SPOT_PROTOTYPE_DATA_UNAVAILABLE`
 - NAVER Credential Runtime: `NOT_VERIFIED`
 - Deployment: `deployment_platform=VERCEL`,
-  `deployment_status=FRONTEND_ONLY_PRODUCTION_ACTIVE`,
-  `final_release_status=PM_APPROVED`
+  `deployment_status=FRONTEND_ONLY_FIXTURE_PRODUCTION_ACTIVE`,
+  `final_release_status=ACTIVE`
 - Vercel Topology: `TWO_PROJECTS_ACCEPTED_FOR_INITIAL_PILOT`
 - Area-first Read-only Service·API·데이터 공급·NAVER Maps Adapter·Browser-only
-  Geolocation: `RELEASE_CANDIDATE_AVAILABLE_ON_PR_HEAD`(Issue #154, PR #155),
-  `main` Integration `PM_APPROVED`
+  Geolocation: `AVAILABLE_ON_MAIN`(Issue #154, PR #155)
+- Issue #156: `READY_FOR_PM_MERGE_DECISION`
+- PR #157: `OPEN · DRAFT`
+- Base: `main`
+- Branch: `feat/issue-156-default-hy-map`
+- Exact-head CI: `PASS · 3/3 SUCCESS`
+- HEAD 재확인: 세션 시작 시 현재 PR `headRefOid`와 Branch `HEAD`를 조회·비교하며
+  문서에 고정 SHA를 기록하지 않음
+- Default map: `hy빌딩 / 37.51325 / 127.01982 / zoom 16 / hy 기준 위치`
+- API·Collector·Backup·ML execution: `0`
+- main Merge: `0 · NOT_APPROVED`
+- Preview/Production deploy: `0 · NOT_APPROVED`
 - Web API Type 계약: `ErrorResponse` OpenAPI 연결,
   `IN_REPOSITORY_FAIL_CLOSED_OPENAPI_GENERATOR`, 외부 Generator Dependency `0`
 - Map·선택 피드백: 실패 Loader 복구·수동 재시도, Fixed Global Toast `0`,
@@ -253,9 +261,8 @@ PM이 장기 기준으로 확정한 5분 주기의 EG-7 1시간 파일럿 Contro
 - Spot Ranking: `DEFERRED_AFTER_INITIAL_PILOT`
 - Recommendation Contract: 문서 `Draft` 유지; Area-first 관계 `AVAILABLE_ON_MAIN`;
   생산 Schema `NOT_IMPLEMENTED`
-- UI/UX Detailed Design: Area-first 계약 `AVAILABLE_ON_MAIN`; Issue #154 화면 구현
-  `RELEASE_CANDIDATE_VALIDATED`(PR #155), `main` Merge·Production 배포 PM 승인,
-  Frontend-only Production 경로 `ACTIVE`
+- UI/UX Detailed Design: Area-first 계약 `AVAILABLE_ON_MAIN`; Issue #154 화면 구현은
+  PR #155 `MERGED`, Frontend-only Fixture Production `ACTIVE`
 
 이 절은 §2.1의 Apps Script 상시 수집 Runtime과 독립적이다. 5분 자동수집 `ACTIVE`
 상태는 이 절과 무관하게 유지된다. v3 source sheets 자체는 ML-ready Dataset이
@@ -514,26 +521,12 @@ H-707은 구현과 함께 `PASS`로 활성화됐지만 이는 합성 계약 검�
 
 ## 10. 다음 행동
 
-Repository Readiness Audit은 Issue #144·PR #145로, 승인된 7개 문서 정합화는
-Issue #146·PR #147로 `main`에 반영됐다. Area-first Web/API 경계와 읽기 전용 데이터
-공급은 ADR-012 `ACCEPTED`로 확정했다. 지도 중심 UI 계약과 문서구조 정렬은
-Issue #150·PR #151의 승인 정본을 따른다. 다음 행동은 다음 순서다.
+Issue #156의 Targeted Tests, Full Tests·Project Guard, Draft PR #157 생성과
+Exact-head CI 3/3 SUCCESS까지 완료됐다. 첫 진입 기본 지도 계약만 정렬했으며 실제
+API·Collector·Backup·ML 실행, `main` Merge와 Preview·Production 배포는 모두 0이다.
 
-1. PR #155 Final Release Head CI 확인
-2. Exact Head Ready 전환·Squash Merge와 `main` SHA 확인
-3. 동일 `main`을 기존 `freshmanager-web` Production에 배포·검증
-
-PM은 PR #155의 `main` Merge와 기존 Web Production 배포를 각각 승인했다.
-
-파일 이동·삭제·리팩터링과 후속 Dependency 변경은 각각 별도 승인 범위에서만
-수행한다. Issue #152·PR #153의 Health API와 연결 전 Vue 화면을 포함한 최소 Scaffold는
-승인됐다. Issue #154의 Area-first Service·Read-only API·데이터 공급, NAVER Maps
-Adapter, Browser-only Geolocation과 Spot Population Prototype Runtime은 PR #155
-Release Candidate에 구현·검증됐다. Frontend-only Vercel Production 경로는 이전 PR Head에서
-검증됐으며 Final Release는 위의 Exact Head CI → `main` → Production 순서를 따른다.
-`responsive_equivalent_viewport=PASS`지만
-`actual_browser_zoom_200=PENDING_MANUAL_QA`다. 아래 EG-7 Live 결정은 독립 backlog로
-유지한다.
+다음 행동은 PM이 Draft PR #157을 검토하고 Ready 전환·`main` Squash Merge 여부를
+결정하는 것이다. 아래 EG-7 Live 결정은 독립 backlog로 유지한다.
 
 현재 OPEN 또는 미생성 결정:
 
@@ -587,8 +580,8 @@ Issue #136·PR #137의 Recommendation Service는 `main`에 있다. D-022의 Area
 웹 파일럿 계약은 Issue #140·PR #141로 승인되어 `main`에 있다. Vue·FastAPI 최소
 Scaffold는 Issue #152·PR #153에서 `ACCEPTED`이며, Service·Read-only API·데이터 공급·
 NAVER Maps Adapter·Browser-only Geolocation·Spot Population Prototype Runtime은 Issue
-#154·PR #155의 Release Candidate에 구현·검증됐다. `main` Merge와 Production 배포는
-PM 승인됐으며 Exact Head 검증 후 순차 실행한다. `responsive_equivalent_viewport=PASS`지만
+#154·PR #155로 `main`에 병합됐고 Frontend-only Fixture Production이 활성화됐다.
+`responsive_equivalent_viewport=PASS`지만
 `actual_browser_zoom_200=PENDING_MANUAL_QA`다.
 추천 실행은 0건이다. Repository Readiness Audit은 PR #145로, 문서 7건 정합화는 PR #147로
 `main`에 반영됐다. Area-first Web/API 경계와 읽기 전용 데이터 공급은 ADR-012

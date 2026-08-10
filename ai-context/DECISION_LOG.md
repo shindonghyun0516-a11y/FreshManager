@@ -424,7 +424,7 @@ official_recommendation_allowed=false
   Sheet로 표시한다.
 - UI boundary: 네이버 지도와 현재 위치는 보조기능이다. 지도·위치 실패가 텍스트
   기반 Area·Spot 조회와 사용자 선택을 차단하지 않으며 위치와 선택이력을 저장하지
-  않는다. hy 본사 기본 좌표·zoom은 `PM_CONFIRMATION_REQUIRED`다.
+  않는다. hy 본사 기본 좌표·zoom은 `RESOLVED_BY_D-025`다.
 - Service boundary: 기존 Recommendation Service는 Area-first 화면의 Primary API가
   아니다. 사용자 선택 Area 조회 Application Service는 별도 Issue에서 정의한다.
 - Scope boundary: 이 결정은 제품·UI·데이터 표시 계약이다. 코드·HTTP Endpoint·
@@ -499,6 +499,18 @@ spot_population_source=PM_MANUAL_PROTOTYPE
   않는다.
 - Evidence: Issue #154 PM 결정,
   `docs/product/AREA_FIRST_WEB_PILOT_CONTRACT.md`, `docs/design/DESIGN.md`.
+
+### D-025 — hy 본사 기본 지도 좌표·Zoom·중립 Marker 확정
+
+- Date: `2026-08-10`
+- Status: `ACCEPTED`
+- Relationship: D-022의 `서비스 접속 → hy 본사 중심 지도 → 담당 Area 직접 선택` 계약과 D-023의 지도 중심 기본화면을 구현값으로 확정한다.
+- Default map: `hy빌딩`, `서울특별시 서초구 강남대로 577 (잠원동, hy빌딩)`, latitude `37.51325`, longitude `127.01982`, zoom `16`.
+- Marker: `hy 기준 위치` 중립 Marker 하나만 표시하며 담당 Area·내 위치·판매 위치·추천으로 사용하지 않는다.
+- Interaction: Area Dropdown은 미선택 상태를 유지하고 Area 선택 전 Area 수치·Spot Marker·Zone·목록·상세를 숨긴다. Area 선택 시 기존 Spot 3개 `fitBounds`로 전환하고 선택 해제 시 기본 지도로 복귀한다.
+- Privacy: 로그인·위치권한 자동요청·Browser 저장·새 Backend 요청을 추가하지 않는다.
+- Scope boundary: Backend·API·Dataset·Fixture 값·ML·Dependency·실제 서울시 API·Collector·Backup은 변경하거나 실행하지 않는다. `main` Merge와 Production 배포는 별도 PM 승인사항이다.
+- Evidence: Issue #156, `docs/superpowers/specs/2026-08-10-hy-default-map-design.md`.
 
 ## 4. 갱신 규칙
 

@@ -272,6 +272,23 @@ test("user-facing Spot copy consistently uses sales location language", () => {
   assert.doesNotMatch(app, /후보 위치|후보 목록|후보 선택/);
 });
 
+test("initial screen opens the approved hy default map without selecting an Area", () => {
+  const app = readFileSync(resolve(process.cwd(), "src/App.vue"), "utf8");
+  const emptyAreaBranch = app.match(
+    /if \(!selectedAreaCode\.value\) \{([\s\S]*?)\n\s*\}/,
+  )?.[1] ?? "";
+
+  assert.match(app, /latitude:\s*37\.51325/);
+  assert.match(app, /longitude:\s*127\.01982/);
+  assert.match(app, /zoom:\s*16/);
+  assert.match(app, /title:\s*"hy 기준 위치"/);
+  assert.match(app, /onMounted\(\(\) => \{[\s\S]*void setupMap\(\)/);
+  assert.match(emptyAreaBranch, /viewState\.value = "idle"/);
+  assert.match(emptyAreaBranch, /await setupMap\(\)/);
+  assert.match(app, /viewState === 'idle' && mapState !== 'available'/);
+  assert.match(app, /hy 기준 위치 지도와 담당 구역 선택/);
+});
+
 test("map tools use one left vertical dock beside the NAVER controls", () => {
   const styles = readFileSync(resolve(process.cwd(), "src/styles.css"), "utf8");
   const dockRule = styles.match(/^\.map-tools-dock\s*\{([^}]*)\}/m)?.[1] ?? "";
@@ -354,20 +371,29 @@ test("NAVER map keeps a positive container and fails closed at zero size", async
 
   let mapDestroyed = 0;
   let markerCount = 0;
+  let fitBoundsCount = 0;
+  let markerDetachCount = 0;
+  let listenerCount = 0;
   let zoneDetachCount = 0;
+  const mapOptions = [];
+  const markerOptions = [];
   const zoneOptions = [];
   class FakeMap {
-    constructor(element) {
+    constructor(element, options) {
+      mapOptions.push(options);
       element.style.position = "relative";
       if (element.collapseOnCreate) element.height = 0;
     }
-    fitBounds() {}
+    fitBounds() { fitBoundsCount += 1; }
     destroy() { mapDestroyed += 1; }
   }
   class FakeMarker {
-    constructor() { markerCount += 1; }
+    constructor(options) {
+      markerCount += 1;
+      markerOptions.push(options);
+    }
     setIcon() {}
-    setMap() {}
+    setMap(map) { if (map === null) markerDetachCount += 1; }
     setZIndex() {}
   }
   class FakeCircle {
@@ -386,7 +412,13 @@ test("NAVER map keeps a positive container and fails closed at zero size", async
     },
     LatLngBounds: class { extend() {} },
     Point: class {},
-    Event: { addListener: () => ({}), removeListener() {} },
+    Event: {
+      addListener: () => {
+        listenerCount += 1;
+        return {};
+      },
+      removeListener() {},
+    },
   } } };
 
   const spots = [1, 2, 3].map((displayOrder) => ({
@@ -416,13 +448,53 @@ test("NAVER map keeps a positive container and fails closed at zero size", async
   assert.equal(zoneOptions.every(({ zIndex }) => zIndex === 1), true);
   controller.destroy();
   assert.equal(mapDestroyed, 1);
+  assert.equal(markerDetachCount, 3);
   assert.equal(zoneDetachCount, 3);
 
   const officialController = await naverMap.createNaverMap(element(800, 600), "client", spots, () => {});
   assert.equal(zoneOptions.length, 3);
   officialController.destroy();
   assert.equal(mapDestroyed, 2);
+  assert.equal(markerDetachCount, 6);
   assert.equal(zoneDetachCount, 3);
+
+  const fitBoundsBeforeDefault = fitBoundsCount;
+  const markerCountBeforeDefault = markerCount;
+  const detachCountBeforeDefault = markerDetachCount;
+  const zoneCountBeforeDefault = zoneOptions.length;
+  const listenerCountBeforeDefault = listenerCount;
+  const defaultController = await naverMap.createNaverMap(
+    element(800, 600),
+    "client",
+    [],
+    () => {},
+    false,
+    {
+      latitude: 37.51325,
+      longitude: 127.01982,
+      zoom: 16,
+      title: "hy 기준 위치",
+    },
+  );
+  assert.equal(mapOptions.at(-1).center.latitude, 37.51325);
+  assert.equal(mapOptions.at(-1).center.longitude, 127.01982);
+  assert.equal(mapOptions.at(-1).zoom, 16);
+  assert.equal(markerCount, markerCountBeforeDefault + 1);
+  assert.equal(markerOptions.at(-1).title, "hy 기준 위치");
+  assert.equal(markerOptions.at(-1).position.latitude, 37.51325);
+  assert.equal(markerOptions.at(-1).position.longitude, 127.01982);
+  assert.match(markerOptions.at(-1).icon.content, /hy 기준 위치/);
+  assert.equal(markerOptions.at(-1).clickable, false);
+  assert.equal(fitBoundsCount, fitBoundsBeforeDefault);
+  assert.equal(zoneOptions.length, zoneCountBeforeDefault);
+  assert.equal(listenerCount, listenerCountBeforeDefault);
+  defaultController.destroy();
+  assert.equal(markerDetachCount, detachCountBeforeDefault + 1);
+
+  await assert.rejects(
+    naverMap.createNaverMap(element(800, 600), "client", [], () => {}),
+    /NAVER_MAP_UNAVAILABLE/,
+  );
 
   await assert.rejects(
     naverMap.createNaverMap(element(800, 0), "client", spots, () => {}),
@@ -438,5 +510,5 @@ test("NAVER map keeps a positive container and fails closed at zero size", async
     naverMap.createNaverMap(collapsedBySdk, "client", spots, () => {}),
     /NAVER_MAP_CONTAINER_UNAVAILABLE/,
   );
-  assert.equal(mapDestroyed, 3);
+  assert.equal(mapDestroyed, 4);
 });

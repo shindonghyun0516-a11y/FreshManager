@@ -47,6 +47,13 @@ const dataMode = resolvePrototypeDataMode(
 );
 const fixtureMode = dataMode === "fixture";
 
+const HY_DEFAULT_MAP_LOCATION = {
+  latitude: 37.51325,
+  longitude: 127.01982,
+  zoom: 16,
+  title: "hy 기준 위치",
+} as const;
+
 const numberFormatter = new Intl.NumberFormat("ko-KR", {
   maximumFractionDigits: 1,
 });
@@ -271,7 +278,7 @@ async function selectArea() {
 
   if (!selectedAreaCode.value) {
     viewState.value = "idle";
-    mapState.value = "idle";
+    await setupMap();
     return;
   }
 
@@ -336,7 +343,7 @@ async function setupMap() {
   destroyMap();
   const view = pilotView.value;
   const element = mapCanvas.value;
-  if (!view || !element) return;
+  if (!element) return;
 
   const generation = mapGeneration;
   mapState.value = "loading";
@@ -344,15 +351,16 @@ async function setupMap() {
     const controller = await createNaverMap(
       element,
       import.meta.env.VITE_NAVER_MAP_CLIENT_ID ?? "",
-      view.spot_options.map((spot) => ({
+      view?.spot_options.map((spot) => ({
         id: spot.spot_option_id,
         name: spot.spot_name,
         latitude: spot.latitude,
         longitude: spot.longitude,
         displayOrder: spot.display_order,
-      })),
+      })) ?? [],
       (spotId) => openSpot(spotId),
-      fixtureMode,
+      fixtureMode && Boolean(view),
+      view ? undefined : HY_DEFAULT_MAP_LOCATION,
     );
     if (generation !== mapGeneration) {
       controller.destroy();
@@ -442,6 +450,7 @@ watch([openedSpotId, selectedSpotId], ([openedId, selectedId]) => {
 
 onMounted(() => {
   void loadAreas();
+  void setupMap();
   document.addEventListener("keydown", handleDocumentKeydown);
 });
 
@@ -538,11 +547,14 @@ onBeforeUnmount(() => {
         class="map-shell"
         :data-map-state="mapState"
         :data-panel-open="panel !== 'none'"
-        aria-label="판매 위치 지도와 정보"
+        :aria-label="selectedAreaCode ? '판매 위치 지도와 정보' : 'hy 기준 위치 지도와 담당 구역 선택'"
       >
         <div ref="mapCanvas" class="map-canvas" :aria-hidden="mapState !== 'available'"></div>
 
-        <div v-if="viewState === 'idle'" class="map-fallback map-empty">
+        <div
+          v-if="viewState === 'idle' && mapState !== 'available'"
+          class="map-fallback map-empty"
+        >
           <span class="map-fallback-icon" aria-hidden="true">
             <svg class="ui-icon" viewBox="0 0 24 24" fill="none">
               <path d="m3.5 6.5 5-2.5 7 2.5 5-2.5v13.5l-5 2.5-7-2.5-5 2.5Z" />
