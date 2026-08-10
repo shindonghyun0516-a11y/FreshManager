@@ -68,10 +68,11 @@ Issue #70·PR #71로 `main`에 반영됐으며, 실제 반복수집은 별도 PM
   Recommendation Core·Service도 PR #135·#137로 `main`에 있다. Area-first
   Vue·FastAPI·Vercel 호환 최소 Scaffold는 Issue #152·PR #153에서 승인됐다. Issue
   #154의 Area-first Service·Read-only API·Vue UI·NAVER Maps Adapter와 Browser-only
-  Geolocation 구현은 PR #155의 `OPEN · DRAFT` Head에 있으며 아직 `main`에 반영되지
-  않았다. 승인된 실제 Area Artifact는 `DATA_UNAVAILABLE`, Spot Population 실제값은
-  `SPOT_PROTOTYPE_DATA_UNAVAILABLE`이고, NAVER Credential Runtime은 미검증이며 Vercel은
-  미배포 상태다. 판매성과 Score·Rank와 자동추천은 없으며 Spot은 사용자가 직접
+  Geolocation은 PR #155 Release Candidate에서 구현·검증됐고 `main` Merge와 기존
+  Web Production 배포가 PM 승인됐다. Frontend-only Fixture Production 경로는 활성화돼
+  있지만 승인된 실제 Area Artifact는 `DATA_UNAVAILABLE`, Spot Population 실제값은
+  `SPOT_PROTOTYPE_DATA_UNAVAILABLE`이고 NAVER Credential Runtime은 미검증이다.
+  판매성과 Score·Rank와 자동추천은 없으며 Spot은 사용자가 직접
   선택한다. 세부 변동상태는 `PROJECT_STATUS.md`를 따른다.
 
 ### 현재 분석 범위
@@ -667,7 +668,8 @@ Local Vite Server는 `/api` 요청을 Local FastAPI로 Proxy한다. PR #155 Head
 Area-first 화면이 Service·Read-only API, NAVER Maps Adapter와 Browser-only
 Geolocation에 연결되고 지도 실패 시 목록 이용과 수동 재시도를 지원한다. 다만 실제
 Area Artifact와 Spot Population 실제값은 없고, NAVER Credential 기반 Runtime은
-검증하지 않았으며 Vercel은 배포하지 않았다.
+검증하지 않았다. Vercel은 Frontend-only Fixture Production 경로만 사용하며 실제
+Area API Production 연결 완료를 뜻하지 않는다.
 
 일반 Project Guard와 일반 테스트는 저장된 샘플 또는 가짜 응답만 사용하며
 네트워크와 실제 서울시 API를 호출하지 않는다. `freshmanager/http_adapter.py`에

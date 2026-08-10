@@ -284,21 +284,23 @@ API Key와 분리하며 실제 값은 코드·문서·Git에 기록하지 않는
 
 - 개발: Vite Dev Server + FastAPI Development Server + `/api` Proxy.
 - 파일럿: 사용자 URL 하나와 Same-origin 우선.
-- 배포 플랫폼: `VERCEL`, 상태는 `PLANNED_NOT_DEPLOYED`.
+- 배포 플랫폼: `VERCEL`. 초기 Release는 Frontend-only Static Fixture Production이며
+  Browser의 `/api` Runtime 요청은 0회다.
+- 공식 Release 순서: PR Exact Head CI → `main` Squash Merge → 기존 Web Production 배포.
 - ADR-013: `ACCEPTED`.
 - Working Topology: Web Root는 `apps/web`, API Root는 Repository Root이며
   `TWO_PROJECTS_ACCEPTED_FOR_INITIAL_PILOT` 상태다.
 - FastAPI는 `apps.api.main:app` 표준 ASGI App이며 Local Uvicorn과 Vercel Python
   Runtime에서 같은 Entry Point를 사용한다. Vercel은 배포 Adapter일 뿐 Business
   Logic에 포함되지 않는다.
-- ADR-012의 Same-origin 원칙은 유지한다. 실제 API Project 주소가 만들어진 뒤
-  별도 배포 작업에서 Production Rewrite와 Domain을 결정한다.
+- ADR-012의 Same-origin 원칙은 실제 Area Artifact 연결 단계에 유지한다. 초기
+  Frontend-only Fixture Production에는 API Rewrite를 만들지 않는다.
 - Python Runtime은 API용 Dependency만 설치하고 `requirements-ml.txt`를 설치하지
   않는다.
 - Runtime 파일쓰기는 금지한다. 후속 Snapshot 공급은 저장소 밖 승인 불변자료를
   읽기 전용으로 사용하는 Provider가 담당한다.
-- 실제 Vercel Project·Domain·Rewrite·Secret·배포와 운영 로그 정책은 후속 배포
-  작업이 소유한다.
+- 실제 Vercel 환경설정 값은 저장소에 기록하지 않는다. API Rewrite·공식 데이터
+  연결과 운영 로그 정책은 후속 승인 작업이 소유한다.
 
 Microservice, API Gateway, BFF, Kubernetes, Redis, Celery, PostgreSQL, 사용자 인증,
 관리자 페이지, Model Serving과 실시간 Collector 연결은 초기 범위가 아니다.
@@ -369,8 +371,8 @@ API 구현 중 실제 중복이나 막힌 Interface가 증거로 확인될 때�
 ## 15. 결정 결과와 제외범위
 
 Issue #152·PR #153의 `apps/web`·`apps/api` 최소 Scaffold 위에 Issue #154가 다음을
-구현·검증했다. 구현은 PR #155 `OPEN · DRAFT` Head에서 이용할 수 있지만 아직
-`main`에 반영되지 않았고 배포 완료를 뜻하지 않는다.
+구현·검증했다. PR #155 Release Candidate의 `main` Merge와 기존 Web Production
+배포는 PM 승인됐으며 Final Release Head CI 후 순차 실행한다.
 
 - `data/prototype`과 정적 Spot Master 이동
 - Health 외 Area-first Read-only API와 Vue 연결
@@ -380,14 +382,13 @@ Issue #152·PR #153의 `apps/web`·`apps/api` 최소 Scaffold 위에 Issue #154�
 - AreaDataProvider, PilotSpotOptionRepository, SelectedAreaPilotService
 - 잘못된 `area_code`와 안전한 HTTP 오류 계약
 
-다음은 PR #155 Head에서도 완료되지 않았으며 별도 PM 승인이 필요하다.
+다음은 Frontend-only Fixture Release 이후에도 완료되지 않았으며 별도 PM 승인이 필요하다.
 
-- Vercel Preview Build
 - FastAPI Function Bundle 크기와 필요 시 `excludeFiles`
 - Production `/api` Rewrite
 - 승인 Area Artifact 실제 연결
 - NAVER Map Credential 기반 Runtime 검증
 - Spot Population Prototype 실데이터 입력
-- Cloud 배포, Database, 인증, 사용자 위치·선택 저장
+- API Production 배포, Database, 인증, 사용자 위치·선택 저장
 - 실제 API·Recommendation·ML 실행
 - Dataset·Manifest 변경 또는 사용자 파일럿 실행
