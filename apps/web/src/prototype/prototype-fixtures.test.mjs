@@ -272,6 +272,23 @@ test("user-facing Spot copy consistently uses sales location language", () => {
   assert.doesNotMatch(app, /후보 위치|후보 목록|후보 선택/);
 });
 
+test("initial screen opens the approved hy default map without selecting an Area", () => {
+  const app = readFileSync(resolve(process.cwd(), "src/App.vue"), "utf8");
+  const emptyAreaBranch = app.match(
+    /if \(!selectedAreaCode\.value\) \{([\s\S]*?)\n\s*\}/,
+  )?.[1] ?? "";
+
+  assert.match(app, /latitude:\s*37\.51325/);
+  assert.match(app, /longitude:\s*127\.01982/);
+  assert.match(app, /zoom:\s*16/);
+  assert.match(app, /title:\s*"hy 기준 위치"/);
+  assert.match(app, /onMounted\(\(\) => \{[\s\S]*void setupMap\(\)/);
+  assert.match(emptyAreaBranch, /viewState\.value = "idle"/);
+  assert.match(emptyAreaBranch, /await setupMap\(\)/);
+  assert.match(app, /viewState === 'idle' && mapState !== 'available'/);
+  assert.match(app, /hy 기준 위치 지도와 담당 구역 선택/);
+});
+
 test("map tools use one left vertical dock beside the NAVER controls", () => {
   const styles = readFileSync(resolve(process.cwd(), "src/styles.css"), "utf8");
   const dockRule = styles.match(/^\.map-tools-dock\s*\{([^}]*)\}/m)?.[1] ?? "";
