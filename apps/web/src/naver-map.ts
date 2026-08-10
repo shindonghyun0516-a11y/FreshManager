@@ -8,6 +8,11 @@ export type MapSpot = {
 
 export type MapPoint = { latitude: number; longitude: number };
 
+export type MapInitialLocation = MapPoint & {
+  zoom: number;
+  title: string;
+};
+
 type NaverMarker = {
   setIcon(icon: { content: string; anchor: NaverPoint }): void;
   setMap(map: null): void;
@@ -114,22 +119,32 @@ function markerContent(order: number, state: "default" | "opened" | "selected") 
   };
 }
 
+function initialLocationMarkerContent() {
+  return {
+    content:
+      '<span aria-hidden="true" style="display:flex;align-items:center;gap:6px;padding:8px 10px;border:1px solid #008577;border-radius:999px;background:#fff;color:#006b5e;font:700 13px/1 system-ui,sans-serif;box-shadow:0 4px 14px rgba(21,47,41,.10)"><span style="display:block;width:8px;height:8px;border-radius:50%;background:#008577"></span>hy 기준 위치</span>',
+  };
+}
+
 export async function createNaverMap(
   element: HTMLElement,
   clientId: string,
   spots: MapSpot[],
   onSpotClick: (spotId: string) => void,
   showPrototypeZones = false,
+  initialLocation?: MapInitialLocation,
 ) {
-  if (!clientId || spots.length === 0) throw new Error("NAVER_MAP_UNAVAILABLE");
+  const defaultLocation = spots.length === 0 ? initialLocation : undefined;
+  const centerPoint = spots[0] ?? defaultLocation;
+  if (!clientId || !centerPoint) throw new Error("NAVER_MAP_UNAVAILABLE");
 
   assertMapContainerAvailable(element);
   const maps = await loadMaps(clientId);
   assertMapContainerAvailable(element);
-  const center = new maps.LatLng(spots[0].latitude, spots[0].longitude);
+  const center = new maps.LatLng(centerPoint.latitude, centerPoint.longitude);
   const map = new maps.Map(element, {
     center,
-    zoom: 14,
+    zoom: defaultLocation?.zoom ?? 14,
     minZoom: 10,
     zoomControl: true,
   });
@@ -143,6 +158,19 @@ export async function createNaverMap(
   const listeners: object[] = [];
   const markers = new Map<string, { marker: NaverMarker; order: number }>();
   const zones: NaverCircle[] = [];
+  const initialLocationMarker = defaultLocation
+    ? new maps.Marker({
+        map,
+        position: center,
+        title: defaultLocation.title,
+        clickable: false,
+        zIndex: 5,
+        icon: {
+          ...initialLocationMarkerContent(),
+          anchor: new maps.Point(54, 18),
+        },
+      })
+    : undefined;
 
   for (const spot of spots) {
     const position = new maps.LatLng(spot.latitude, spot.longitude);
@@ -178,7 +206,9 @@ export async function createNaverMap(
     markers.set(spot.id, { marker, order: spot.displayOrder });
   }
 
-  map.fitBounds(bounds, { top: 80, right: 80, bottom: 100, left: 80 });
+  if (spots.length > 0) {
+    map.fitBounds(bounds, { top: 80, right: 80, bottom: 100, left: 80 });
+  }
 
   let userMarker: NaverMarker | undefined;
 
@@ -210,6 +240,7 @@ export async function createNaverMap(
     },
     destroy() {
       listeners.forEach((listener) => maps.Event.removeListener(listener));
+      initialLocationMarker?.setMap(null);
       userMarker?.setMap(null);
       markers.forEach(({ marker }) => marker.setMap(null));
       zones.forEach((zone) => zone.setMap(null));
