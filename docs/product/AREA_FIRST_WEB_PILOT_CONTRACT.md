@@ -184,8 +184,9 @@ coordinate_status=PM_CONFIRMED
 상태에서는 Area 수치, Spot Marker·Zone·목록·상세를 숨기고, Area를 선택하면 기존
 Spot 3개 `fitBounds` 지도로 전환한다.
 
-Client ID 실제값은 문서와 Git에 기록하지 않는다. 후속 환경변수 이름 후보는
-`NAVER_MAP_CLIENT_ID`이며 이번 문서가 실제 환경변수 생성이나 키 발급을 승인하지 않는다.
+Client ID 실제값은 문서와 Git에 기록하지 않는다. Frontend 환경변수 이름은
+`VITE_NAVER_MAP_CLIENT_ID`다. 이번 문서는 실제 값 생성이나 키 발급을 승인하지 않으며
+Credential Runtime은 계속 `NOT_VERIFIED`다.
 
 ## 6. Area 공식 데이터 표시 계약
 

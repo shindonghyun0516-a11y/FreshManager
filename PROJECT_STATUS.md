@@ -58,13 +58,17 @@
 - Vercel Topology: `TWO_PROJECTS_ACCEPTED_FOR_INITIAL_PILOT`
 - Area-first Read-only Service·API·데이터 공급·NAVER Maps Adapter·Browser-only
   Geolocation: `AVAILABLE_ON_MAIN`(Issue #154, PR #155)
-- Issue #156: `IMPLEMENTED_PENDING_PR_VALIDATION`
+- Issue #156: `READY_FOR_PM_MERGE_DECISION`
+- PR #157: `OPEN · DRAFT`
+- Base: `main`
 - Branch: `feat/issue-156-default-hy-map`
-- Base: `main @ f71d397deb580003c05cd0ddb14a5995b42fc095`
+- Exact-head CI: `PASS · 3/3 SUCCESS`
+- HEAD 재확인: 세션 시작 시 현재 PR `headRefOid`와 Branch `HEAD`를 조회·비교하며
+  문서에 고정 SHA를 기록하지 않음
 - Default map: `hy빌딩 / 37.51325 / 127.01982 / zoom 16 / hy 기준 위치`
 - API·Collector·Backup·ML execution: `0`
-- main Merge: `NOT_APPROVED`
-- Production deploy: `NOT_APPROVED`
+- main Merge: `0 · NOT_APPROVED`
+- Preview/Production deploy: `0 · NOT_APPROVED`
 - Web API Type 계약: `ErrorResponse` OpenAPI 연결,
   `IN_REPOSITORY_FAIL_CLOSED_OPENAPI_GENERATOR`, 외부 Generator Dependency `0`
 - Map·선택 피드백: 실패 Loader 복구·수동 재시도, Fixed Global Toast `0`,
@@ -517,17 +521,12 @@ H-707은 구현과 함께 `PASS`로 활성화됐지만 이는 합성 계약 검�
 
 ## 10. 다음 행동
 
-Issue #156의 다음 행동은 다음 순서다.
+Issue #156의 Targeted Tests, Full Tests·Project Guard, Draft PR #157 생성과
+Exact-head CI 3/3 SUCCESS까지 완료됐다. 첫 진입 기본 지도 계약만 정렬했으며 실제
+API·Collector·Backup·ML 실행, `main` Merge와 Preview·Production 배포는 모두 0이다.
 
-1. Targeted Tests
-2. Full Tests·Project Guard
-3. Draft PR
-4. Exact-head CI
-5. PM Merge 결정
-
-Issue #156은 첫 진입 기본 지도 계약만 정렬한다. 실제 API·Collector·Backup·ML 실행,
-`main` Merge와 Production 배포는 수행하지 않았다. 아래 EG-7 Live 결정은 독립 backlog로
-유지한다.
+다음 행동은 PM이 Draft PR #157을 검토하고 Ready 전환·`main` Squash Merge 여부를
+결정하는 것이다. 아래 EG-7 Live 결정은 독립 backlog로 유지한다.
 
 현재 OPEN 또는 미생성 결정:
 
