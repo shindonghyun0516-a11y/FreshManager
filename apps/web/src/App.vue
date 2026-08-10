@@ -726,7 +726,7 @@ onBeforeUnmount(() => {
                   <h4 id="area-basis-title">데이터 기준</h4>
                 </div>
                 <dl class="source-list">
-                  <div><dt>데이터 출처</dt><dd>{{ fixtureMode ? "화면 검토용 시뮬레이션" : (dataMode === "official" ? (pilotView.area.source ?? "—") : "—") }}</dd></div>
+                  <div><dt>데이터 출처</dt><dd>{{ fixtureMode ? "서울열린데이터광장" : (dataMode === "official" ? (pilotView.area.source ?? "—") : "—") }}</dd></div>
                   <div><dt>분석기간</dt><dd>{{ fixtureMode ? ANALYSIS_FIXTURE.analysis_period_label : "—" }}</dd></div>
                   <div><dt>관측 시점</dt><dd>{{ fixtureMode ? `${ANALYSIS_FIXTURE.total_observation_points}개` : "—" }}</dd></div>
                   <div><dt>기준시각</dt><dd>{{ fixtureMode ? (areaFixture?.reference_time_label ?? "—") : compactObservedTimeLabel }}</dd></div>
