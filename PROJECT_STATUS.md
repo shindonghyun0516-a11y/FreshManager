@@ -51,24 +51,25 @@
 - PR #155: `MERGED`
 - Area Data: `DATA_UNAVAILABLE`
 - Spot Population: `SPOT_PROTOTYPE_DATA_UNAVAILABLE`
-- NAVER Credential Runtime: `NOT_VERIFIED`
+- NAVER Credential Runtime: `PRODUCTION_BROWSER_VERIFIED`(기본 지도 Smoke, 값 미열람)
 - Deployment: `deployment_platform=VERCEL`,
   `deployment_status=FRONTEND_ONLY_FIXTURE_PRODUCTION_ACTIVE`,
   `final_release_status=ACTIVE`
 - Vercel Topology: `TWO_PROJECTS_ACCEPTED_FOR_INITIAL_PILOT`
 - Area-first Read-only Service·API·데이터 공급·NAVER Maps Adapter·Browser-only
   Geolocation: `AVAILABLE_ON_MAIN`(Issue #154, PR #155)
-- Issue #156: `READY_FOR_PM_MERGE_DECISION`
-- PR #157: `OPEN · DRAFT`
+- Issue #156: `CLOSED · COMPLETED`
+- PR #157: `MERGED`
 - Base: `main`
-- Branch: `feat/issue-156-default-hy-map`
+- Source Branch: `feat/issue-156-default-hy-map`
+- Squash Merge SHA: `b8e09d8a1a62c59849011cd100c70014e45b3831`
 - Exact-head CI: `PASS · 3/3 SUCCESS`
-- HEAD 재확인: 세션 시작 시 현재 PR `headRefOid`와 Branch `HEAD`를 조회·비교하며
-  문서에 고정 SHA를 기록하지 않음
+- post-merge main CI: `PASS · 2/2 SUCCESS`
 - Default map: `hy빌딩 / 37.51325 / 127.01982 / zoom 16 / hy 기준 위치`
+- Production: `READY · PROMOTED · HTTP 200 · DEFAULT_MAP_BROWSER_SMOKE_PASS`
 - API·Collector·Backup·ML execution: `0`
-- main Merge: `0 · NOT_APPROVED`
-- Preview/Production deploy: `0 · NOT_APPROVED`
+- main Merge: `1 · COMPLETED`
+- Production deploy: `1 · READY · PROMOTED`
 - Web API Type 계약: `ErrorResponse` OpenAPI 연결,
   `IN_REPOSITORY_FAIL_CLOSED_OPENAPI_GENERATOR`, 외부 Generator Dependency `0`
 - Map·선택 피드백: 실패 Loader 복구·수동 재시도, Fixed Global Toast `0`,
@@ -205,9 +206,11 @@ PM이 장기 기준으로 확정한 5분 주기의 EG-7 1시간 파일럿 Contro
   기존 Core·Service는 다중 Area 비교·내부 분석 기능으로 보존하고 Area-first
   Primary API로 사용하지 않는다. Area 증감은 EG-8D 중앙값 의미·기존 최신성 상태를
   재사용하며, 실제 프래시매니저 인터뷰의 문제 맥락을 사용한다. 계약 문서는 `main`에
-  있고 기술 Stack은 ADR-012로 확정됐다. Issue #154에서 Area-first Service·Read-only
-  API·Vue UI·NAVER Map Adapter·Spot Prototype Runtime을 로컬 구현·검증했으며 아직
-  공식 반영·실제 Area 데이터 연결·NAVER Credential 사용·배포 완료 상태는 아니다.
+  있고 기술 Stack은 ADR-012로 확정됐다. Issue #154·PR #155의 Area-first Service·
+  Read-only API·Vue UI·NAVER Map Adapter·Spot Prototype Runtime은 `main`에 반영됐고
+  Frontend-only Fixture Production이 `ACTIVE`다. Issue #156·PR #157의 첫 진입 hy
+  본사 중심 기본 지도도 Production에 `READY · PROMOTED` 상태로 반영됐다. 실제 Area
+  데이터·API Production 연결은 아직 완료되지 않았다.
 - Area Ranking: `IMPLEMENTATION_AVAILABLE_ON_MAIN`(PR #110, Issue #109) — 서울시
   Forecast 기반 60분·180분 예상 유동인구 변화·미래 인구 규모 순위를 각각 계산.
   `LATEST_COMPLETE_LOCKED_SNAPSHOT` 정책으로 잠긴 Dataset의 전체 1,027회 중 승인된
@@ -499,6 +502,8 @@ H-707은 구현과 함께 `PASS`로 활성화됐지만 이는 합성 계약 검�
 - PR #141: `MERGED`
 - PR #145: `MERGED`
 - PR #147: `MERGED`
+- PR #157: `MERGED` · Squash Merge
+  `b8e09d8a1a62c59849011cd100c70014e45b3831`
 - Issue #70: `CLOSED`
 - Issue #113: `CLOSED · COMPLETED`
 - Issue #144: `CLOSED · COMPLETED`
@@ -511,22 +516,27 @@ H-707은 구현과 함께 `PASS`로 활성화됐지만 이는 합성 계약 검�
 - Issue #134: `CLOSED`
 - Issue #136: `CLOSED · COMPLETED`
 - Issue #140: `CLOSED · COMPLETED`
+- Issue #156: `CLOSED · COMPLETED`
 - Issue #140 Source Branch: local·remote `DELETED`
 - Issue #140 Review State: `COMPLETED`
 - Issue #136 Source Branch: local·remote `DELETED`
 - Issue #136 Review State: `COMPLETED`
-- 병합된 feature Branch: local·remote `DELETED`
+- Issue #156 Source Branch: local·remote `PRESENT`
+- Issue #156 post-merge Branch 정리: `NOT_RUN`
 - post-merge 검증 시 작업 트리: `CLEAN`
 - post-merge 검증 시 미추적 파일: `0`
 
 ## 10. 다음 행동
 
-Issue #156의 Targeted Tests, Full Tests·Project Guard, Draft PR #157 생성과
-Exact-head CI 3/3 SUCCESS까지 완료됐다. 첫 진입 기본 지도 계약만 정렬했으며 실제
-API·Collector·Backup·ML 실행, `main` Merge와 Preview·Production 배포는 모두 0이다.
+Issue #156의 Targeted Tests, Full Tests·Project Guard, PR #157 Exact-head CI
+3/3 SUCCESS, `main` Squash Merge와 post-merge main CI 2/2 SUCCESS까지 완료됐다.
+첫 진입 hy 본사 중심 기본 지도는 Vercel Production에 `READY · PROMOTED` 상태로
+반영됐고 공개 화면 HTTP 200·기본 지도 Browser Smoke를 통과했다. 200% 확대 실제
+브라우저 QA는 계속 `PENDING_MANUAL_QA`다. 실제 API·Collector·Backup·ML 실행은
+0이며 실제 Area 데이터·API Production 연결은 완료되지 않았다.
 
-다음 행동은 PM이 Draft PR #157을 검토하고 Ready 전환·`main` Squash Merge 여부를
-결정하는 것이다. 아래 EG-7 Live 결정은 독립 backlog로 유지한다.
+Issue #156·PR #157 Release의 필수 후속 행동은 없다. 이 상태 동기화로 재귀적인
+후속 문서 PR을 만들지 않으며, 아래 EG-7 Live 결정은 독립 backlog로 유지한다.
 
 현재 OPEN 또는 미생성 결정:
 
@@ -581,6 +591,11 @@ Issue #136·PR #137의 Recommendation Service는 `main`에 있다. D-022의 Area
 Scaffold는 Issue #152·PR #153에서 `ACCEPTED`이며, Service·Read-only API·데이터 공급·
 NAVER Maps Adapter·Browser-only Geolocation·Spot Population Prototype Runtime은 Issue
 #154·PR #155로 `main`에 병합됐고 Frontend-only Fixture Production이 활성화됐다.
+Issue #156·PR #157의 첫 진입 hy 본사 중심 기본 지도는 Squash Merge
+`b8e09d8a1a62c59849011cd100c70014e45b3831`로 `main`에 반영됐고 Vercel
+Production은 `READY · PROMOTED`다. 공개 화면 HTTP 200과 기본 지도 Browser Smoke에서
+담당 Area 미선택·hy 기준 위치 Marker·zoom 16을 확인했으며 NAVER Credential 값은
+읽지 않았다.
 `responsive_equivalent_viewport=PASS`지만
 `actual_browser_zoom_200=PENDING_MANUAL_QA`다.
 추천 실행은 0건이다. Repository Readiness Audit은 PR #145로, 문서 7건 정합화는 PR #147로
@@ -588,8 +603,9 @@ NAVER Maps Adapter·Browser-only Geolocation·Spot Population Prototype Runtime�
 `ACCEPTED`(Issue #148, PR #149)이며 Scaffold는 Issue #152·PR #153에서 승인됐고,
 나머지 실제 Area Artifact 연결·Spot Population 실제값·NAVER Credential 기반
 Runtime은 각각 `DATA_UNAVAILABLE`·`SPOT_PROTOTYPE_DATA_UNAVAILABLE`·
-`NOT_VERIFIED`다. Web 배포는 Frontend-only Fixture Production 경로이며 실제 Area
-Artifact 또는 API Production 연결 완료를 뜻하지 않는다. Issue #150·PR #151의
+`PRODUCTION_BROWSER_VERIFIED`(기본 지도 Smoke, 값 미열람)다. Web 배포는
+Frontend-only Fixture Production 경로이며 실제 Area Artifact 또는 API Production
+연결 완료를 뜻하지 않는다. Issue #150·PR #151의
 지도 중심 UI 계약·문서구조·History Index는
 `ACCEPTED`이며 구현 완료를 뜻하지 않는다. EG-7 Live
 preflight는 독립 backlog이며 EG-7 구현
