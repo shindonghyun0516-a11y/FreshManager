@@ -122,7 +122,7 @@ function markerContent(order: number, state: "default" | "opened" | "selected") 
 function initialLocationMarkerContent() {
   return {
     content:
-      '<span aria-hidden="true" style="display:flex;align-items:center;gap:6px;padding:8px 10px;border:1px solid #008577;border-radius:999px;background:#fff;color:#006b5e;font:700 13px/1 system-ui,sans-serif;box-shadow:0 4px 14px rgba(21,47,41,.10)"><span style="display:block;width:8px;height:8px;border-radius:50%;background:#008577"></span>hy 기준 위치</span>',
+      '<span aria-hidden="true" style="display:flex;align-items:center;gap:6px;padding:8px 10px;border:1px solid #008577;border-radius:999px;background:#fff;color:#006b5e;font:700 13px/1 system-ui,sans-serif;box-shadow:0 4px 14px rgba(21,47,41,.10)"><span style="display:block;width:8px;height:8px;border-radius:50%;background:#008577"></span>FreshManager 시작하기</span>',
   };
 }
 

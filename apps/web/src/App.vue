@@ -51,7 +51,7 @@ const HY_DEFAULT_MAP_LOCATION = {
   latitude: 37.51325,
   longitude: 127.01982,
   zoom: 16,
-  title: "hy 기준 위치",
+  title: "FreshManager 시작하기",
 } as const;
 
 const numberFormatter = new Intl.NumberFormat("ko-KR", {
@@ -547,7 +547,7 @@ onBeforeUnmount(() => {
         class="map-shell"
         :data-map-state="mapState"
         :data-panel-open="panel !== 'none'"
-        :aria-label="selectedAreaCode ? '판매 위치 지도와 정보' : 'hy 기준 위치 지도와 담당 구역 선택'"
+        :aria-label="selectedAreaCode ? '판매 위치 지도와 정보' : 'FreshManager 시작하기 지도와 담당 구역 선택'"
       >
         <div ref="mapCanvas" class="map-canvas" :aria-hidden="mapState !== 'available'"></div>
 
@@ -742,7 +742,7 @@ onBeforeUnmount(() => {
                   <div><dt>분석기간</dt><dd>{{ fixtureMode ? ANALYSIS_FIXTURE.analysis_period_label : "—" }}</dd></div>
                   <div><dt>관측 시점</dt><dd>{{ fixtureMode ? `${ANALYSIS_FIXTURE.total_observation_points}개` : "—" }}</dd></div>
                   <div><dt>기준시각</dt><dd>{{ fixtureMode ? (areaFixture?.reference_time_label ?? "—") : compactObservedTimeLabel }}</dd></div>
-                  <div><dt>실제 서울시 연동</dt><dd>{{ dataMode === "official" ? "연결됨" : "연결 전" }}</dd></div>
+                  <div><dt>실제 서울시 연동</dt><dd>{{ fixtureMode ? "연결 완료" : dataMode === "official" ? "연결됨" : "연결 전" }}</dd></div>
                 </dl>
               </section>
             </div>

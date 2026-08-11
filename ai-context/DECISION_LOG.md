@@ -503,7 +503,7 @@ spot_population_source=PM_MANUAL_PROTOTYPE
 ### D-025 — hy 본사 기본 지도 좌표·Zoom·중립 Marker 확정
 
 - Date: `2026-08-10`
-- Status: `ACCEPTED`
+- Status: `ACCEPTED · SUPERSEDED_IN_PART_BY_D-026`
 - Relationship: D-022의 `서비스 접속 → hy 본사 중심 지도 → 담당 Area 직접 선택` 계약과 D-023의 지도 중심 기본화면을 구현값으로 확정한다.
 - Default map: `hy빌딩`, `서울특별시 서초구 강남대로 577 (잠원동, hy빌딩)`, latitude `37.51325`, longitude `127.01982`, zoom `16`.
 - Marker: `hy 기준 위치` 중립 Marker 하나만 표시하며 담당 Area·내 위치·판매 위치·추천으로 사용하지 않는다.
@@ -511,6 +511,26 @@ spot_population_source=PM_MANUAL_PROTOTYPE
 - Privacy: 로그인·위치권한 자동요청·Browser 저장·새 Backend 요청을 추가하지 않는다.
 - Scope boundary: Backend·API·Dataset·Fixture 값·ML·Dependency·실제 서울시 API·Collector·Backup은 변경하거나 실행하지 않는다. `main` Merge와 Production 배포는 별도 PM 승인사항이다.
 - Evidence: Issue #156, `docs/superpowers/specs/2026-08-10-hy-default-map-design.md`.
+
+### D-026 — Fixture 테스트 연결 상태와 기본 Marker 문구 확정
+
+- Date: `2026-08-11`
+- Status: `ACCEPTED`
+- Relationship: D-025의 기본 좌표·zoom 16·중립 Marker·Area 미선택 계약은 유지하고
+  Marker 표시 문구만 `FreshManager 시작하기`로 대체한다.
+- Fixture copy: 데이터 기준의 `실제 서울시 연동` 상태는 PM이 테스트 화면임을
+  확인한 범위에서 `연결 완료`로 표시한다.
+- Factual boundary: `연결 완료`는 Fixture 시각 검토용 문구이며 실제 Area API·운영
+  데이터 Production 연결 완료를 뜻하지 않는다. `official`의 `연결됨`과
+  `unavailable`의 `연결 전` 동작은 유지한다.
+- Marker: 화면 문구·SDK title·Area 미선택 지도 접근성 이름을
+  `FreshManager 시작하기`로 정렬한다. Marker는 계속 클릭 불가이며 CTA 동작을
+  추가하지 않는다.
+- Unchanged: latitude `37.51325`, longitude `127.01982`, zoom `16`, Area 선택 흐름,
+  Provider·API·환경변수·Dataset·Dependency·배포 설정을 변경하지 않는다.
+- Scope boundary: 실제 API·Collector·Backup·ML 실행, `main` Merge와 Production
+  배포는 별도 승인사항이다.
+- Evidence: Issue #160과 2026-08-11 PM 문구 변경 승인.
 
 ## 4. 갱신 규칙
 
