@@ -272,7 +272,16 @@ test("user-facing Spot copy consistently uses sales location language", () => {
   assert.doesNotMatch(app, /후보 위치|후보 목록|후보 선택/);
 });
 
-test("initial screen opens the approved hy default map without selecting an Area", () => {
+test("fixture data basis uses the approved test-only connection copy", () => {
+  const app = readFileSync(resolve(process.cwd(), "src/App.vue"), "utf8");
+
+  assert.match(
+    app,
+    /fixtureMode\s*\?\s*"연결 완료"\s*:\s*dataMode === "official"\s*\?\s*"연결됨"\s*:\s*"연결 전"/,
+  );
+});
+
+test("initial screen opens the approved FreshManager default map without selecting an Area", () => {
   const app = readFileSync(resolve(process.cwd(), "src/App.vue"), "utf8");
   const emptyAreaBranch = app.match(
     /if \(!selectedAreaCode\.value\) \{([\s\S]*?)\n\s*\}/,
@@ -281,12 +290,13 @@ test("initial screen opens the approved hy default map without selecting an Area
   assert.match(app, /latitude:\s*37\.51325/);
   assert.match(app, /longitude:\s*127\.01982/);
   assert.match(app, /zoom:\s*16/);
-  assert.match(app, /title:\s*"hy 기준 위치"/);
+  assert.match(app, /title:\s*"FreshManager 시작하기"/);
   assert.match(app, /onMounted\(\(\) => \{[\s\S]*void setupMap\(\)/);
   assert.match(emptyAreaBranch, /viewState\.value = "idle"/);
   assert.match(emptyAreaBranch, /await setupMap\(\)/);
   assert.match(app, /viewState === 'idle' && mapState !== 'available'/);
-  assert.match(app, /hy 기준 위치 지도와 담당 구역 선택/);
+  assert.match(app, /FreshManager 시작하기 지도와 담당 구역 선택/);
+  assert.doesNotMatch(app, /hy 기준 위치/);
 });
 
 test("map tools use one left vertical dock beside the NAVER controls", () => {
@@ -473,17 +483,18 @@ test("NAVER map keeps a positive container and fails closed at zero size", async
       latitude: 37.51325,
       longitude: 127.01982,
       zoom: 16,
-      title: "hy 기준 위치",
+      title: "FreshManager 시작하기",
     },
   );
   assert.equal(mapOptions.at(-1).center.latitude, 37.51325);
   assert.equal(mapOptions.at(-1).center.longitude, 127.01982);
   assert.equal(mapOptions.at(-1).zoom, 16);
   assert.equal(markerCount, markerCountBeforeDefault + 1);
-  assert.equal(markerOptions.at(-1).title, "hy 기준 위치");
+  assert.equal(markerOptions.at(-1).title, "FreshManager 시작하기");
   assert.equal(markerOptions.at(-1).position.latitude, 37.51325);
   assert.equal(markerOptions.at(-1).position.longitude, 127.01982);
-  assert.match(markerOptions.at(-1).icon.content, /hy 기준 위치/);
+  assert.match(markerOptions.at(-1).icon.content, /FreshManager 시작하기/);
+  assert.doesNotMatch(markerOptions.at(-1).icon.content, /hy 기준 위치/);
   assert.equal(markerOptions.at(-1).clickable, false);
   assert.equal(fitBoundsCount, fitBoundsBeforeDefault);
   assert.equal(zoneOptions.length, zoneCountBeforeDefault);

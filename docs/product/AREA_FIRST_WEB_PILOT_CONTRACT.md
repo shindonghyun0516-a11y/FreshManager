@@ -175,11 +175,11 @@ default_address=서울특별시 서초구 강남대로 577 (잠원동, hy빌딩)
 default_latitude=37.51325
 default_longitude=127.01982
 default_zoom=16
-default_marker_label=hy 기준 위치
+default_marker_label=FreshManager 시작하기
 coordinate_status=PM_CONFIRMED
 ```
 
-`hy 기준 위치` Marker는 모든 방문자에게 동일한 지도 시작점을 알리는 중립 표기다.
+`FreshManager 시작하기` Marker는 모든 방문자에게 동일한 지도 시작점을 알리는 중립 표기다.
 담당 Area, 사용자 현재 위치, 판매 위치 또는 추천 결과로 사용하지 않는다. Area 미선택
 상태에서는 Area 수치, Spot Marker·Zone·목록·상세를 숨기고, Area를 선택하면 기존
 Spot 3개 `fitBounds` 지도로 전환한다.
@@ -408,6 +408,9 @@ Brand Color, 정확한 크기·간격과 Component Library는 후속 UI 설계�
 Issue #154·PR #155의 Area-first Web은 `main`에 병합됐고 Frontend-only Fixture
 Production이 활성화됐다. 실제 Area API·운영 데이터 Production 연결은 완료되지 않았다.
 Issue #156은 첫 진입 기본 지도 계약만 정렬하며 실제 데이터 연결 범위를 확대하지 않는다.
+Fixture 모드의 `실제 서울시 연동 | 연결 완료`는 PM이 승인한 테스트 화면 문구이며,
+실제 Area API·운영 데이터 연결 완료를 뜻하지 않는다. `official` 모드는 기존 `연결됨`,
+`unavailable` 모드는 기존 `연결 전` 상태를 유지한다.
 
 현재 구현은 다음을 승인하거나 수행하지 않는다.
 
@@ -428,11 +431,11 @@ default_address=서울특별시 서초구 강남대로 577 (잠원동, hy빌딩)
 default_latitude=37.51325
 default_longitude=127.01982
 default_zoom=16
-default_marker_label=hy 기준 위치
+default_marker_label=FreshManager 시작하기
 coordinate_status=PM_CONFIRMED
 ```
 
-`hy 기준 위치` Marker는 모든 방문자에게 동일한 지도 시작점을 알리는 중립 표기다.
+`FreshManager 시작하기` Marker는 모든 방문자에게 동일한 지도 시작점을 알리는 중립 표기다.
 담당 Area, 사용자 현재 위치, 판매 위치 또는 추천 결과로 사용하지 않는다. Area 미선택
 상태에서는 Area 수치, Spot Marker·Zone·목록·상세를 숨기고, Area를 선택하면 기존
 Spot 3개 `fitBounds` 지도로 전환한다.
@@ -452,6 +455,7 @@ Area별 접근권한과 제한배포 방식은 후속 결정이다.
 - D-020·D-021 구현 이력과 기존 Core·Service가 보존됨
 - Issue #154·PR #155의 Area-first Web은 `main`에 병합됐고 Frontend-only Fixture
   Production이 활성화됨
+- Fixture의 `연결 완료`는 테스트 표시이며 실제 Area API 연결 상태와 분리됨
 - 실제 Area API·운영 데이터 Production 연결과 Spot Population 실데이터는 미완료
 - PM 문서 검토 완료
 
@@ -459,6 +463,7 @@ Area별 접근권한과 제한배포 방식은 후속 결정이다.
 
 | 버전 | 날짜 | 변경내용 | 승인상태 |
 |---|---|---|---|
+| v0.7.0 | 2026-08-11 | Fixture 테스트용 `연결 완료` 표시와 `FreshManager 시작하기` 중립 Marker 문구를 확정하고 실제 API 미연결 경계를 유지 | Issue #160 PM 변경 승인 |
 | v0.6.0 | 2026-08-10 | 첫 진입 hy빌딩 중심 좌표·Zoom 16·중립 Marker와 Area 미선택 계약 확정 | Issue #156 PM 변경 승인 |
 | v0.5.0 | 2026-08-01 | PM 수동 Spot 인구 Prototype·증감 계산·unavailable 계약으로 상세정보 범위를 정렬 | Issue #154 PM 변경 승인 |
 | v0.4.0 | 2026-07-31 | Desktop 고정 3열을 지도 중심 기본화면과 상호배타 단일 Drawer로 교체하고 Mobile Bottom Sheet, Marker·목록 동기화와 디자인 정본 연결을 반영 | PM 변경 승인 |
